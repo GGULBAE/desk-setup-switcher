@@ -10,13 +10,15 @@ The app does not create an account, contact an application server, collect analy
 
 ## Local data
 
-Profiles, settings, backups, and redacted diagnostics are stored under the app's directory in the current user's Application Support folder. Imports are read from, and exports are written to, locations the user explicitly selects. Removing the app does not automatically delete these files.
+Profiles, settings, backups, corruption quarantine files, and redacted diagnostics are stored under `~/Library/Application Support/Desk Setup Switcher/`. App-managed profile/quarantine/diagnostic directories use owner-only 0700 permissions and their managed files use 0600. Imports are read from, and exports are written to, locations the user explicitly selects. Removing the app does not automatically delete these files. The Diagnostics Settings pane can browse, refresh, and clear the app-managed sanitized diagnostic files.
 
-Profiles may contain device identifiers needed for stable matching, selected SSID condition values, and network ranges. They do not contain Wi-Fi passwords or other credentials. A user should review an exported profile before sharing it because desk and network names can still be identifying.
+Profiles may contain device identifiers needed for stable matching, selected SSID condition values, network ranges, and location-condition centers stored as exact latitude/longitude coordinates plus a radius. Import/export preserves those profile values; diagnostic redaction does not rewrite an exported profile. They do not contain Wi-Fi passwords or other credentials.
+
+Treat exported profiles as potentially sensitive. Before sharing one, review or remove desk/device labels, SSIDs, network ranges, and location conditions. An exact location-condition center can identify a home, office, or other private place even though the app does not upload it.
 
 ## Credentials
 
-When a feature requires a credential reference, the credential is stored in macOS Keychain. Passwords are never written to profile JSON, backups, exports, or logs. The app prefers credentials already managed by macOS for saved Wi-Fi networks.
+Passwords are never model fields and are never written to profile JSON, backups, exports, operations, or logs. Saved Wi-Fi association uses credentials already managed by macOS rather than asking the app to store a password. A separate Security-framework Keychain boundary exists for future secret references and is mock tested with synthetic bytes; its live write test has deliberately not been run.
 
 ## Permissions
 
@@ -24,7 +26,7 @@ The app requests the minimum permission needed for a selected feature and explai
 
 ## Diagnostics
 
-Diagnostics are local and rotate by size/count. Before writing, the app removes credentials, precise location, unnecessary SSIDs, host portions of IP addresses, home-directory paths, and Keychain data. Users choose whether to export diagnostics. No diagnostic is uploaded automatically.
+Diagnostics are local and rotate by size/count. Before writing, the app removes credentials, precise location, SSIDs, host portions of IP addresses, home-directory paths, and Keychain data. This protection applies to diagnostic entries, not to the user's profile JSON. The current UI supports local browsing, refresh, and clearing; diagnostic export is not currently implemented. No diagnostic is uploaded automatically.
 
 ## Network configuration
 
@@ -36,4 +38,4 @@ The implementation and its permission declarations are public under the MIT Lice
 
 ## Current status
 
-The repository is pre-alpha. This policy is the required implementation contract, not a claim that an installable release already exists. The evidence ledger tracks conformance.
+The pre-release implementation follows the local-only architecture: no app-owned `URLSession`, telemetry, analytics, account, or cloud path exists; profile/diagnostic storage and redaction tests pass. The locally packaged app launches, but no public release exists. Permission-denied behavior, downloaded/quarantined install behavior, and clean-user removal/clearing still require manual verification, and live hardware tests must keep their evidence redacted. The [evidence ledger](COMPLETION-CRITERIA.md) tracks conformance without treating source, mocks, or read-only discovery as mutation proof.

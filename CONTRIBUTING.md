@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping build Desk Setup Switcher. The project is pre-alpha and prioritizes safety, privacy, testability, and honest capability reporting.
+Thanks for helping build Desk Setup Switcher. The project is a pre-release 0.1.0 implementation candidate and prioritizes safety, privacy, testability, and honest capability reporting.
 
 ## Before starting
 
@@ -8,20 +8,47 @@ Thanks for helping build Desk Setup Switcher. The project is pre-alpha and prior
 2. Check [docs/ROADMAP.md](docs/ROADMAP.md) and existing issues.
 3. Discuss changes that expand scope, add a permission, use a non-public contract, or alter distribution/privacy behavior.
 
+Use full Xcode with a Swift 6.1-or-later toolchain. The project targets macOS 14 or later and checks a universal `arm64 x86_64` Xcode app.
+
+## Canonical commands
+
+```sh
+make build
+make test
+make lint
+make analyze
+make package
+make verify-package
+make verify
+make clean
+```
+
+`make verify` is the required local gate. It runs source-policy and formatting checks, the default unit/mock suite, Swift and universal Xcode Debug/Release builds with warnings as errors, Xcode Analyze, no-Developer-ID DMG packaging, SHA-256 validation, and mounted-image inspection.
+
+The read-only live discovery tests require an explicit opt-in and still do not change settings:
+
+```sh
+DESK_SETUP_LIVE_READ_TESTS=1 make test
+```
+
+The Keychain round trip has a separate write gate and is not part of normal verification. Live display, audio, network, mouse, or keyboard mutation must never be added to an ordinary test or CI job.
+
 ## Development expectations
 
-- Use Swift/SwiftUI and the checked-in Apple-framework adapter boundaries.
+- Keep SwiftUI/AppKit in the app layer, pure domain logic in `DeskSetupCore`, and macOS framework effects behind `DeskSetupSystem` adapters.
 - Do not introduce a runtime dependency on Homebrew or another CLI.
-- Do not add application-owned outbound network traffic, telemetry, accounts, or cloud storage.
-- Keep CI and ordinary local tests free of live system-setting mutations.
-- Add tests for success, capability limitation, permission denial, partial failure, fatal failure, and rollback where relevant.
-- Use synthetic device/network data in tests and screenshots.
-- Update documentation and the evidence ledger with behavior changes.
-
-Canonical build and verification commands will be added with Milestone 1. Until then, do not infer implementation status from this documentation-only baseline.
+- Do not add application-owned outbound traffic, telemetry, accounts, cloud storage, automatic switching, arbitrary shell execution, UI automation, or private APIs.
+- Re-read current system state immediately before an apply and never execute a preview whose operations or rollback payloads became stale.
+- Keep high-risk display changes app-only until explicit confirmation and preserve rollback behavior for failure, timeout, confirmation failure, and termination.
+- Treat a powered-on Wi-Fi interface with no readable SSID as ambiguous; never assume it is safely disassociated. Require saved target and rollback preflight before planning association.
+- Add deterministic tests for success, capability limitation, permission denial, no-op behavior, partial/fatal failure, stale state, and rollback where relevant.
+- Use synthetic device/network/location data in tests and screenshots.
+- Keep user-facing copy localizable in English and Korean and update README, roadmap, support matrix, and completion evidence with behavior changes.
 
 ## Pull requests
 
-Keep changes focused. Explain the user-visible behavior, safety/rollback impact, permissions, public or experimental API status, tests run, hardware actually used, and documentation changed. A mock-tested capability must not be described as hardware verified.
+Keep changes focused. Explain user-visible behavior, safety/rollback impact, permissions, supported or experimental API status, tests run, hardware actually used, documentation changed, and any unverified manual path. A mock-tested or live-read capability must not be described as hardware-mutation verified.
+
+Before requesting review, run `make verify` and `git diff --check`. If a required manual or hardware test was not run, state that directly. Do not treat the ad-hoc integrity signature in the local DMG as Developer ID signing or notarization.
 
 All contributions are licensed under the repository's [MIT License](LICENSE). By participating, you agree to [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

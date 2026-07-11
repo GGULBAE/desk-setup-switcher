@@ -1,0 +1,2 @@
+"NSLocationUsageDescription" = "Desk Setup Switcher uses location only when macOS requires it to read a Wi-Fi name or when you add a location readiness condition.";
+"NSLocationWhenInUseUsageDescription" = "Desk Setup Switcher uses location only when macOS requires it to read a Wi-Fi name or when you add a location readiness condition.";

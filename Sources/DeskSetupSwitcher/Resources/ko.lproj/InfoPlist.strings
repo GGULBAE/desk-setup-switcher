@@ -1,0 +1,2 @@
+"NSLocationUsageDescription" = "책상 설정 전환기는 macOS가 Wi-Fi 이름을 읽는 데 위치 정보가 필요하거나 사용자가 위치 준비 조건을 추가한 경우에만 위치를 사용합니다.";
+"NSLocationWhenInUseUsageDescription" = "책상 설정 전환기는 macOS가 Wi-Fi 이름을 읽는 데 위치 정보가 필요하거나 사용자가 위치 준비 조건을 추가한 경우에만 위치를 사용합니다.";

@@ -1,0 +1,1349 @@
+import AppKit
+import Combine
+import Foundation
+import ServiceManagement
+import UniformTypeIdentifiers
+
+#if canImport(DeskSetupCore)
+  import DeskSetupCore
+#endif
+#if canImport(DeskSetupSystem)
+  import DeskSetupSystem
+#endif
+
+func appLocalized(_ value: String.LocalizationValue) -> String {
+  #if SWIFT_PACKAGE
+    String(localized: value, bundle: .module)
+  #else
+    String(localized: value)
+  #endif
+}
+
+func appReadinessTitle(_ readiness: ProfileReadiness) -> String {
+  switch readiness {
+  case .ready: appLocalized("Ready")
+  case .partial: appLocalized("Partial")
+  case .unavailable: appLocalized("Unavailable")
+  case .applying: appLocalized("Applying")
+  case .applied: appLocalized("Applied")
+  case .failed: appLocalized("Failed")
+  }
+}
+
+func appSettingGroupTitle(_ group: SettingGroup) -> String {
+  switch group {
+  case .display: appLocalized("Displays")
+  case .audio: appLocalized("Audio")
+  case .network: appLocalized("Network")
+  case .input: appLocalized("Mouse & Keyboard")
+  }
+}
+
+func appApplicationItemStatusTitle(_ status: ApplicationItemStatus) -> String {
+  switch status {
+  case .succeeded: appLocalized("Succeeded")
+  case .failed: appLocalized("Failed")
+  case .skipped: appLocalized("Skipped")
+  case .unsupported: appLocalized("Unsupported")
+  case .rolledBack: appLocalized("Rolled back")
+  case .rollbackFailed: appLocalized("Rollback failed")
+  }
+}
+
+func appApplicationItemTitle(_ key: String) -> String {
+  switch key {
+  case "display-safety-confirmation": return appLocalized("Display safety confirmation")
+  case "display.atomic-configuration": return appLocalized("Complete display configuration")
+  case "defaultInput": return appLocalized("Default input device")
+  case "defaultOutput": return appLocalized("Default output device")
+  case "systemOutput": return appLocalized("System output device")
+  case "outputVolume": return appLocalized("Output volume")
+  case "outputMute": return appLocalized("Output mute")
+  case "wifi.power": return appLocalized("Wi-Fi power")
+  case "wifi.ssid": return appLocalized("Wi-Fi network")
+  case "network.ipv4": return appLocalized("IPv4 configuration")
+  case "network.dns": return appLocalized("DNS servers")
+  case "network.webProxy": return appLocalized("Web proxy")
+  case "network.secureWebProxy": return appLocalized("Secure web proxy")
+  case "com.apple.mouse.scaling": return appLocalized("Pointer speed")
+  case "com.apple.swipescrolldirection": return appLocalized("Natural scrolling")
+  case "KeyRepeat": return appLocalized("Key repeat")
+  case "InitialKeyRepeat": return appLocalized("Initial key repeat delay")
+  case "com.apple.keyboard.fnState": return appLocalized("Function-key behavior")
+  default:
+    if key.hasPrefix("display.") {
+      return appLocalized("Display setting")
+    }
+    return key
+  }
+}
+
+func appApplicationStatusTitle(
+  _ status: ProfileReadiness,
+  isAwaitingDisplayConfirmation: Bool
+) -> String {
+  isAwaitingDisplayConfirmation
+    ? appLocalized("Awaiting display confirmation") : appReadinessTitle(status)
+}
+
+struct PendingApplyRequest: Identifiable, Sendable {
+  let id = UUID()
+  let profile: DeskProfile
+  let preparation: ApplyPreparation
+  let conditions: ConditionEvaluation
+  let isReviewOnly: Bool
+}
+
+struct PendingImportRequest: Identifiable, Sendable {
+  let id = UUID()
+  let imported: ImportedProfileDocument
+  let existingProfileCount: Int
+}
+
+struct SafetyConfirmationState: Identifiable, Sendable {
+  let id: UUID
+  let profileID: UUID
+  var secondsRemaining: Int
+}
+
+private func makeDefaultDiagnosticLog() -> (any DiagnosticLogStoring)? {
+  let directory = ProfileStore.defaultDirectoryURL.appendingPathComponent(
+    "Diagnostics", isDirectory: true)
+  return try? RotatingDiagnosticLogStore(directoryURL: directory)
+}
+
+@MainActor
+final class ApplicationModel: ObservableObject {
+  @Published private(set) var profiles: [DeskProfile] = []
+  @Published private(set) var selectedProfileID: UUID?
+  @Published private(set) var lastMessage = appLocalized("No profile has been applied.")
+  @Published private(set) var storageStatus = appLocalized("Loading local profiles…")
+  @Published private(set) var snapshotStatus = appLocalized(
+    "No system snapshot has been captured.")
+  @Published private(set) var lastSnapshot: SystemSnapshotResult?
+  @Published private(set) var lastConditionContext = ConditionContext()
+  @Published private(set) var conditionContextStatus = appLocalized(
+    "Readiness facts have not been refreshed yet.")
+  @Published private(set) var readinessLastRefreshedAt: Date?
+  @Published private(set) var launchAtLoginDesired = false
+  @Published private(set) var loginItemEnabled = false
+  @Published private(set) var loginItemStatus = appLocalized("Checking…")
+  @Published private(set) var canRetryLoginItemRegistration = false
+  @Published private(set) var readinessByProfile: [UUID: ProfileReadiness] = [:]
+  @Published private(set) var operationCountByProfile: [UUID: Int] = [:]
+  @Published private(set) var normalApplyAvailableByProfile: [UUID: Bool] = [:]
+  @Published private(set) var forceApplyAvailableByProfile: [UUID: Bool] = [:]
+  @Published private(set) var operationalStatusByProfile: [UUID: ProfileReadiness] = [:]
+  @Published private(set) var pendingApply: PendingApplyRequest?
+  @Published private(set) var pendingImport: PendingImportRequest?
+  @Published private(set) var lastApplyResult: ApplyExecutionResult?
+  @Published private(set) var safetyConfirmation: SafetyConfirmationState?
+  @Published private(set) var isApplyTransactionInProgress = false
+  @Published private(set) var isProfileStoreMutationInProgress = false
+  @Published private(set) var diagnosticEntries: [DiagnosticEntry] = []
+  @Published private(set) var diagnosticStatus = appLocalized("No local diagnostic events.")
+
+  private let defaults = UserDefaults.standard
+  private let profileStore: ProfileStore
+  private let profileImportExport: ProfileImportExport
+  private let snapshotCoordinator: SystemSnapshotCoordinator
+  private let conditionContextProvider: ConditionContextProvider
+  private let conditionEvaluator: ConditionEvaluator
+  private let applyEngine: ApplyEngine
+  private let diagnosticLog: (any DiagnosticLogStoring)?
+  private let launchAtLoginPreferenceKey = "launchAtLoginEnabled"
+  private let launchAtLoginPreferenceCreatedKey = "launchAtLoginPreferenceCreated"
+  private let displaySafetyConfirmationKey = "display-safety-confirmation"
+  private var hasStarted = false
+  private var safetyCountdownTask: Task<Void, Never>?
+  private var loginItemOperationFailure: LoginItemOperationFailure?
+  private var terminationRequestIsDeferred = false
+
+  var isProfileMutationLocked: Bool {
+    isApplyTransactionInProgress
+      || isProfileStoreMutationInProgress
+      || safetyConfirmation != nil
+  }
+
+  var shouldDeferTermination: Bool {
+    isApplyTransactionInProgress || isProfileStoreMutationInProgress
+  }
+
+  private enum LoginItemOperationFailure: Equatable {
+    case invalidSignature
+    case deniedByUser
+    case registration
+    case unregistration
+
+    var diagnosticCode: String {
+      switch self {
+      case .invalidSignature: "invalid-signature"
+      case .deniedByUser: "denied-by-user"
+      case .registration: "registration-failed"
+      case .unregistration: "unregistration-failed"
+      }
+    }
+  }
+
+  init(
+    profileStore: ProfileStore = ProfileStore(),
+    profileImportExport: ProfileImportExport = ProfileImportExport(),
+    snapshotCoordinator: SystemSnapshotCoordinator? = nil,
+    conditionContextProvider: ConditionContextProvider = ConditionContextProvider(),
+    conditionEvaluator: ConditionEvaluator = ConditionEvaluator(),
+    applyEngine: ApplyEngine? = nil,
+    diagnosticLog: (any DiagnosticLogStoring)? = makeDefaultDiagnosticLog()
+  ) {
+    let adapters = LiveAdapterFactory.makeAdapters()
+    self.profileStore = profileStore
+    self.profileImportExport = profileImportExport
+    self.snapshotCoordinator = snapshotCoordinator ?? SystemSnapshotCoordinator(adapters: adapters)
+    self.conditionContextProvider = conditionContextProvider
+    self.conditionEvaluator = conditionEvaluator
+    self.applyEngine =
+      applyEngine
+      ?? ApplyEngine(registry: (try? AdapterRegistry(adapters)) ?? AdapterRegistry())
+    self.diagnosticLog = diagnosticLog
+  }
+
+  func start() {
+    guard !hasStarted else { return }
+    hasStarted = true
+
+    configureDefaultLaunchPreferenceIfNeeded()
+    launchAtLoginDesired = defaults.bool(forKey: launchAtLoginPreferenceKey)
+    reconcileLoginItemRegistrationAtStartup()
+
+    refreshDiagnostics()
+
+    guard beginProfileStoreMutation() else { return }
+    Task {
+      defer { finishProfileStoreMutation() }
+      await loadProfiles()
+    }
+  }
+
+  func setLaunchAtLogin(_ enabled: Bool) {
+    launchAtLoginDesired = enabled
+    defaults.set(enabled, forKey: launchAtLoginPreferenceKey)
+    loginItemOperationFailure = nil
+
+    updateLoginItemRegistration(enabled: enabled)
+    recordDiagnostic(
+      severity: .info,
+      component: "login-item",
+      code: enabled ? "requested" : "opted-out",
+      message: appLocalized("The user login item preference changed.")
+    )
+  }
+
+  func retryLaunchAtLoginRegistration() {
+    guard launchAtLoginDesired else { return }
+    loginItemOperationFailure = nil
+    updateLoginItemRegistration(enabled: true)
+  }
+
+  func refreshLoginItemStatusFromSystem() {
+    refreshLoginItemStatus()
+  }
+
+  private func updateLoginItemRegistration(enabled: Bool) {
+    let status = SMAppService.mainApp.status
+
+    do {
+      if enabled {
+        if status != .enabled, status != .requiresApproval {
+          try SMAppService.mainApp.register()
+        }
+      } else if status == .enabled || status == .requiresApproval {
+        try SMAppService.mainApp.unregister()
+      }
+      loginItemOperationFailure = nil
+      refreshLoginItemStatus()
+      recordDiagnostic(
+        severity: .info,
+        component: "login-item",
+        code: enabled ? "registration-attempted" : "unregistration-attempted",
+        message: appLocalized("The login item request was sent to macOS.")
+      )
+    } catch {
+      loginItemOperationFailure = loginItemFailure(for: error, enabling: enabled)
+      refreshLoginItemStatus()
+      recordDiagnostic(
+        severity: .warning,
+        component: "login-item",
+        code: loginItemOperationFailure?.diagnosticCode ?? "update-failed",
+        message: appLocalized("The login item preference could not be updated.")
+      )
+    }
+  }
+
+  func refreshReadinessFacts() {
+    guard !isProfileMutationLocked else { return }
+    Task {
+      await refreshReadiness()
+    }
+  }
+
+  func createProfile() {
+    guard beginProfileStoreMutation() else { return }
+    Task {
+      defer { finishProfileStoreMutation() }
+      do {
+        let profile = DeskProfile(name: appLocalized("New Profile \(profiles.count + 1)"))
+        let created = try await profileStore.createProfile(profile)
+        try await profileStore.selectProfile(id: created.id)
+        await refreshProfiles(message: appLocalized("Created \(created.name)."))
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func updateProfile(_ profile: DeskProfile) {
+    guard beginProfileStoreMutation() else { return }
+    Task {
+      defer { finishProfileStoreMutation() }
+      do {
+        let updated = try await profileStore.updateProfile(profile)
+        await refreshProfiles(message: appLocalized("Saved \(updated.name)."))
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func duplicateProfile(id: UUID) {
+    guard beginProfileStoreMutation() else { return }
+    Task {
+      defer { finishProfileStoreMutation() }
+      do {
+        let duplicate = try await profileStore.duplicateProfile(id: id)
+        try await profileStore.selectProfile(id: duplicate.id)
+        await refreshProfiles(message: appLocalized("Duplicated \(duplicate.name)."))
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func deleteProfile(id: UUID) {
+    guard beginProfileStoreMutation() else { return }
+    Task {
+      defer { finishProfileStoreMutation() }
+      do {
+        try await profileStore.deleteProfile(id: id)
+        await refreshProfiles(message: appLocalized("Deleted the profile."))
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func moveProfile(id: UUID, by offset: Int) {
+    guard let currentIndex = profiles.firstIndex(where: { $0.id == id }) else { return }
+    let destination = currentIndex + offset
+    guard profiles.indices.contains(destination) else { return }
+    guard beginProfileStoreMutation() else { return }
+
+    Task {
+      defer { finishProfileStoreMutation() }
+      do {
+        try await profileStore.moveProfile(id: id, toIndex: destination)
+        await refreshProfiles(message: appLocalized("Reordered profiles."))
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func selectProfile(id: UUID?) {
+    guard beginProfileStoreMutation() else { return }
+    selectedProfileID = id
+    Task {
+      defer { finishProfileStoreMutation() }
+      do {
+        try await profileStore.selectProfile(id: id)
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func importProfiles() {
+    guard !isProfileMutationLocked else { return }
+    let panel = NSOpenPanel()
+    panel.title = appLocalized("Import Desk Setup Profiles")
+    panel.prompt = appLocalized("Import")
+    panel.allowedContentTypes = [.json]
+    panel.allowsMultipleSelection = false
+    panel.canChooseDirectories = false
+    guard panel.runModal() == .OK, let sourceURL = panel.url else { return }
+    guard beginProfileStoreMutation() else { return }
+
+    Task {
+      defer { finishProfileStoreMutation() }
+      do {
+        let importer = profileImportExport
+        let imported = try await Task.detached {
+          try importer.importDocument(from: sourceURL)
+        }.value
+        pendingImport = PendingImportRequest(
+          imported: imported,
+          existingProfileCount: profiles.count
+        )
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func confirmImportReplacement() {
+    guard let request = pendingImport, beginProfileStoreMutation() else { return }
+    pendingImport = nil
+    Task {
+      defer { finishProfileStoreMutation() }
+      do {
+        try await profileStore.replaceAll(with: request.imported.document)
+        await refreshProfiles(
+          message: appLocalized(
+            "Imported \(request.imported.document.profiles.count) profiles."))
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func cancelImportReplacement() {
+    pendingImport = nil
+  }
+
+  func exportProfiles() {
+    let panel = NSSavePanel()
+    panel.title = appLocalized("Export Desk Setup Profiles")
+    panel.prompt = appLocalized("Export")
+    panel.nameFieldStringValue = "Desk-Setup-Profiles.json"
+    panel.allowedContentTypes = [.json]
+    guard panel.runModal() == .OK, let destinationURL = panel.url else { return }
+
+    Task {
+      do {
+        let document = await profileStore.currentDocument()
+        let exporter = profileImportExport
+        try await Task.detached {
+          try exporter.export(document, to: destinationURL)
+        }.value
+        storageStatus = appLocalized("Exported profiles to a user-selected file.")
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func createProfileFromCurrentSettings() {
+    guard beginProfileStoreMutation() else { return }
+    snapshotStatus = appLocalized("Reading current settings without changing them…")
+    Task {
+      defer { finishProfileStoreMutation() }
+      let snapshot = await snapshotCoordinator.capture()
+      lastSnapshot = snapshot
+      snapshotStatus = snapshotSummary(snapshot)
+      recordSnapshotDiagnostic(snapshot)
+
+      do {
+        let profile = DeskProfile(
+          name: appLocalized("Current Setup \(profiles.count + 1)"),
+          profileDescription: appLocalized("Created from a read-only system snapshot."),
+          settings: snapshot.profileSettings
+        )
+        let created = try await profileStore.createProfile(profile)
+        try await profileStore.selectProfile(id: created.id)
+        await refreshProfiles(
+          message: appLocalized("Created \(created.name) from the current settings."))
+        lastMessage = appLocalized("Captured current settings without changing the Mac.")
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func updateProfileFromCurrentSettings(id: UUID) {
+    guard var profile = profiles.first(where: { $0.id == id }) else { return }
+    guard beginProfileStoreMutation() else { return }
+    snapshotStatus = appLocalized("Reading current settings without changing them…")
+
+    Task {
+      defer { finishProfileStoreMutation() }
+      let snapshot = await snapshotCoordinator.capture()
+      lastSnapshot = snapshot
+      snapshotStatus = snapshotSummary(snapshot)
+      recordSnapshotDiagnostic(snapshot)
+      profile.settings = snapshot.profileSettings
+
+      do {
+        let updated = try await profileStore.updateProfile(profile)
+        await refreshProfiles(
+          message: appLocalized("Updated \(updated.name) from the current settings."))
+        lastMessage = appLocalized("Captured current settings without changing the Mac.")
+      } catch {
+        reportStorageError(error)
+      }
+    }
+  }
+
+  func readiness(for profile: DeskProfile) -> ProfileReadiness {
+    operationalStatusByProfile[profile.id]
+      ?? readinessByProfile[profile.id]
+      ?? .unavailable
+  }
+
+  func canApplyNormally(_ profile: DeskProfile) -> Bool {
+    readinessByProfile[profile.id] == .ready
+      && normalApplyAvailableByProfile[profile.id] == true
+      && operationalStatusByProfile[profile.id] != .applying
+      && !isProfileMutationLocked
+  }
+
+  func canForceApply(_ profile: DeskProfile) -> Bool {
+    readinessByProfile[profile.id] == .partial
+      && forceApplyAvailableByProfile[profile.id] == true
+      && operationalStatusByProfile[profile.id] != .applying
+      && !isProfileMutationLocked
+  }
+
+  func prepareApply(profile: DeskProfile, mode: ApplyMode) {
+    prepareApply(profile: profile, mode: mode, isReviewOnly: false)
+  }
+
+  func reviewAvailability(profile: DeskProfile) {
+    prepareApply(profile: profile, mode: .normal, isReviewOnly: true)
+  }
+
+  private func prepareApply(
+    profile: DeskProfile,
+    mode: ApplyMode,
+    isReviewOnly: Bool
+  ) {
+    guard !isProfileMutationLocked else { return }
+    operationalStatusByProfile[profile.id] = nil
+    lastMessage = appLocalized("Calculating a read-only change plan for \(profile.name)…")
+    Task {
+      let context = await captureReadinessContext()
+      let conditions = conditionEvaluator.evaluate(profile.conditions, in: context)
+      let preparation = await applyEngine.prepare(
+        profile: profile,
+        mode: mode,
+        conditionsSatisfied: conditions.isMatched
+      )
+      pendingApply = PendingApplyRequest(
+        profile: profile,
+        preparation: preparation,
+        conditions: conditions,
+        isReviewOnly: isReviewOnly
+      )
+      readinessByProfile[profile.id] = preparation.readiness.status
+      operationCountByProfile[profile.id] = preparation.operations.count
+      let isAvailable = preparation.canExecute && !preparation.operations.isEmpty
+      if mode == .normal {
+        normalApplyAvailableByProfile[profile.id] = isAvailable
+      } else {
+        forceApplyAvailableByProfile[profile.id] = isAvailable
+      }
+      if isReviewOnly {
+        lastMessage = appLocalized(
+          "Reviewing availability for \(profile.name) does not change any setting.")
+      } else {
+        lastMessage =
+          preparation.canExecute
+          ? appLocalized("Review the planned changes before applying \(profile.name).")
+          : appLocalized("The change plan explains why \(profile.name) cannot be applied.")
+      }
+    }
+  }
+
+  func cancelPendingApply() {
+    pendingApply = nil
+  }
+
+  func executePendingApply() {
+    guard let request = pendingApply, !request.isReviewOnly, !isProfileMutationLocked else {
+      return
+    }
+    pendingApply = nil
+    isApplyTransactionInProgress = true
+    operationalStatusByProfile[request.profile.id] = .applying
+    lastMessage = appLocalized(
+      "Checking current system state before applying \(request.profile.name)…")
+
+    Task {
+      defer { finishApplyTransaction() }
+      guard let currentProfile = profiles.first(where: { $0.id == request.profile.id }) else {
+        operationalStatusByProfile[request.profile.id] = .failed
+        lastMessage = appLocalized("The profile was removed before it could be applied.")
+        return
+      }
+
+      let currentContext = await captureReadinessContext()
+      let currentConditions = conditionEvaluator.evaluate(
+        currentProfile.conditions,
+        in: currentContext
+      )
+      let currentPreparation = await applyEngine.prepare(
+        profile: currentProfile,
+        mode: request.preparation.mode,
+        conditionsSatisfied: currentConditions.isMatched
+      )
+
+      guard currentProfile == request.profile,
+        currentConditions == request.conditions,
+        currentPreparation.isExecutionEquivalent(to: request.preparation)
+      else {
+        operationalStatusByProfile[request.profile.id] = nil
+        pendingApply = PendingApplyRequest(
+          profile: currentProfile,
+          preparation: currentPreparation,
+          conditions: currentConditions,
+          isReviewOnly: request.isReviewOnly
+        )
+        readinessByProfile[currentProfile.id] = currentPreparation.readiness.status
+        operationCountByProfile[currentProfile.id] = currentPreparation.operations.count
+        let isAvailable =
+          currentPreparation.canExecute && !currentPreparation.operations.isEmpty
+        if currentPreparation.mode == .normal {
+          normalApplyAvailableByProfile[currentProfile.id] = isAvailable
+        } else {
+          forceApplyAvailableByProfile[currentProfile.id] = isAvailable
+        }
+        lastMessage = appLocalized(
+          "The system or profile changed. Review the refreshed plan before applying.")
+        return
+      }
+
+      lastMessage = appLocalized("Applying \(currentProfile.name)…")
+      let result = await applyEngine.execute(currentPreparation)
+      let safetyConfirmationID = result.safetyConfirmationID
+      var presentedResult = result
+      if safetyConfirmationID != nil {
+        presentedResult.status = .applying
+        presentedResult.itemResults.append(
+          makeSafetyOutcomeItem(
+            status: .succeeded,
+            message: appLocalized(
+              "Display changes are temporary and are waiting for confirmation.")
+          )
+        )
+      }
+      lastApplyResult = presentedResult
+      operationalStatusByProfile[currentProfile.id] = presentedResult.status
+      if let safetyConfirmationID {
+        armSafetyCountdown(
+          confirmationID: safetyConfirmationID,
+          profileID: currentProfile.id
+        )
+      }
+
+      if result.didExecute {
+        if safetyConfirmationID != nil {
+          lastMessage = appLocalized(
+            "Display changes for \(currentProfile.name) are temporary. Confirm or revert them within 15 seconds."
+          )
+        } else {
+          lastMessage =
+            result.status == .applied
+            ? appLocalized("Applied \(currentProfile.name).")
+            : appLocalized("\(currentProfile.name) finished with failures.")
+        }
+        await persistApplicationSummary(
+          presentedResult.applicationSummary,
+          profileID: currentProfile.id
+        )
+      } else {
+        lastMessage = appLocalized("\(currentProfile.name) was not applied.")
+      }
+
+      if safetyConfirmationID == nil {
+        await refreshReadiness()
+      }
+      recordDiagnostic(
+        severity: result.status == .failed ? .error : .info,
+        component: "apply-engine",
+        code: result.status.rawValue,
+        message:
+          appLocalized(
+            "Apply completed with \(result.itemResults.count) item results and \(result.rollbackResults.count) immediate rollback results."
+          )
+      )
+    }
+  }
+
+  func deferTerminationUntilApplyCompletes() {
+    guard shouldDeferTermination else { return }
+    terminationRequestIsDeferred = true
+    lastMessage = appLocalized(
+      "Quit is waiting for the current protected operation to be safely recorded.")
+  }
+
+  func confirmHighRiskChanges() {
+    guard let state = safetyConfirmation, !isApplyTransactionInProgress else { return }
+    safetyCountdownTask?.cancel()
+    safetyCountdownTask = nil
+    isApplyTransactionInProgress = true
+
+    Task {
+      defer { finishApplyTransaction() }
+      let resolution = await applyEngine.confirmSafetyRollback(state.id)
+      let outcome: SafetyOutcome
+      switch resolution.status {
+      case .confirmed:
+        safetyConfirmation = nil
+        operationalStatusByProfile[state.profileID] = .applied
+        lastMessage = appLocalized("Kept the display changes.")
+        outcome = SafetyOutcome(
+          profileStatus: .applied,
+          itemStatus: .succeeded,
+          message: appLocalized("The user confirmed and kept the display changes.")
+        )
+      case .confirmationFailed:
+        safetyConfirmation = nil
+        operationalStatusByProfile[state.profileID] = .partial
+        lastMessage = appLocalized(
+          "The display settings could not be committed, so the previous configuration was restored."
+        )
+        outcome = SafetyOutcome(
+          profileStatus: .partial,
+          itemStatus: .rolledBack,
+          message: appLocalized(
+            "Confirmation failed and the previous display configuration was restored.")
+        )
+      case .rollbackFailed:
+        safetyConfirmation = nil
+        operationalStatusByProfile[state.profileID] = .failed
+        lastMessage = appLocalized(
+          "The display settings could not be committed or fully restored. Review diagnostics immediately."
+        )
+        outcome = SafetyOutcome(
+          profileStatus: .failed,
+          itemStatus: .rollbackFailed,
+          message: appLocalized(
+            "Confirmation failed and the previous display configuration could not be fully restored."
+          )
+        )
+      case .unknownOrExpired:
+        safetyConfirmation = nil
+        operationalStatusByProfile[state.profileID] = .partial
+        lastMessage = appLocalized("The display confirmation had already expired.")
+        outcome = SafetyOutcome(
+          profileStatus: .partial,
+          itemStatus: .skipped,
+          message: appLocalized(
+            "The confirmation outcome was unavailable. Verify the current display configuration."
+          )
+        )
+      case .transactionInProgress:
+        armSafetyCountdown(confirmationID: state.id, profileID: state.profileID)
+        lastMessage = appLocalized("Display confirmation is busy; the safety timer was restarted.")
+        return
+      case .reverted:
+        safetyConfirmation = nil
+        operationalStatusByProfile[state.profileID] = .partial
+        lastMessage = appLocalized("Restored the previous display configuration.")
+        outcome = SafetyOutcome(
+          profileStatus: .partial,
+          itemStatus: .rolledBack,
+          message: appLocalized("The previous display configuration was restored.")
+        )
+      }
+
+      let summary = resolveSafetyOutcome(
+        outcome,
+        rollbackResults: resolution.rollbackResults,
+        profileID: state.profileID
+      )
+      operationalStatusByProfile[state.profileID] = summary.status
+      if resolution.status == .confirmed, summary.status == .failed {
+        lastMessage = appLocalized(
+          "The display changes were kept, but one or more other profile items failed."
+        )
+      }
+      await persistApplicationSummary(summary, profileID: state.profileID)
+      recordDiagnostic(
+        severity: resolution.status == .confirmed ? .info : .warning,
+        component: "display-safety",
+        code: resolution.status.rawValue,
+        message: appLocalized("The guarded display-change confirmation was resolved.")
+      )
+      await refreshReadiness()
+    }
+  }
+
+  func revertHighRiskChanges() {
+    guard let state = safetyConfirmation else { return }
+    safetyCountdownTask?.cancel()
+    safetyCountdownTask = nil
+    Task {
+      await revertHighRiskChanges(state)
+    }
+  }
+
+  private func loadProfiles() async {
+    do {
+      let result = try await profileStore.load()
+      profiles = result.document.profiles
+      selectedProfileID = result.document.selectedProfileID
+      storageStatus = storageMessage(for: result.status)
+      recordDiagnostic(
+        severity: .info,
+        component: "profile-storage",
+        code: "loaded",
+        message: storageDiagnosticMessage(for: result.status)
+      )
+      let recoveredInterruptedConfirmation = await reconcileInterruptedSafetyConfirmation()
+      if profiles.isEmpty {
+        let snapshot = await snapshotCoordinator.capture()
+        lastSnapshot = snapshot
+        snapshotStatus = snapshotSummary(snapshot)
+        lastMessage = appLocalized(
+          "No profiles yet. Capture the current settings to create the first profile.")
+        recordSnapshotDiagnostic(snapshot)
+      } else if recoveredInterruptedConfirmation {
+        lastMessage = appLocalized(
+          "A display confirmation was interrupted. Temporary app-scoped changes should have reverted; verify the current display configuration."
+        )
+      }
+      await refreshReadiness()
+    } catch {
+      reportStorageError(error)
+    }
+  }
+
+  private func refreshProfiles(message: String? = nil) async {
+    let document = await profileStore.currentDocument()
+    profiles = document.profiles
+    selectedProfileID = document.selectedProfileID
+    if let message {
+      storageStatus = message
+    }
+    await refreshReadiness()
+  }
+
+  private func refreshReadiness() async {
+    let context = await captureReadinessContext()
+    guard !profiles.isEmpty else {
+      readinessByProfile = [:]
+      operationCountByProfile = [:]
+      normalApplyAvailableByProfile = [:]
+      forceApplyAvailableByProfile = [:]
+      return
+    }
+
+    var statuses: [UUID: ProfileReadiness] = [:]
+    var operationCounts: [UUID: Int] = [:]
+    var normalAvailability: [UUID: Bool] = [:]
+    var forceAvailability: [UUID: Bool] = [:]
+    for profile in profiles {
+      guard profile.isEnabled else {
+        statuses[profile.id] = .unavailable
+        operationCounts[profile.id] = 0
+        normalAvailability[profile.id] = false
+        forceAvailability[profile.id] = false
+        continue
+      }
+      let conditions = conditionEvaluator.evaluate(profile.conditions, in: context)
+      let preparation = await applyEngine.prepare(
+        profile: profile,
+        mode: .normal,
+        conditionsSatisfied: conditions.isMatched
+      )
+      statuses[profile.id] = preparation.readiness.status
+      operationCounts[profile.id] = preparation.operations.count
+      normalAvailability[profile.id] =
+        preparation.canExecute && !preparation.operations.isEmpty
+      if preparation.readiness.status == .partial {
+        let forcePreparation = await applyEngine.prepare(
+          profile: profile,
+          mode: .force,
+          conditionsSatisfied: conditions.isMatched
+        )
+        forceAvailability[profile.id] =
+          forcePreparation.canExecute && !forcePreparation.operations.isEmpty
+      } else {
+        forceAvailability[profile.id] = false
+      }
+    }
+    readinessByProfile = statuses
+    operationCountByProfile = operationCounts
+    normalApplyAvailableByProfile = normalAvailability
+    forceApplyAvailableByProfile = forceAvailability
+  }
+
+  private func captureReadinessContext() async -> ConditionContext {
+    let result = await conditionContextProvider.discover()
+    lastConditionContext = result.context
+    conditionContextStatus =
+      result.unavailableSources.isEmpty
+      ? appLocalized("Readiness facts are current.")
+      : appLocalized(
+        "Readiness facts were refreshed with \(result.unavailableSources.count) unavailable sources."
+      )
+    readinessLastRefreshedAt = Date()
+    return result.context
+  }
+
+  private func persistApplicationSummary(
+    _ summary: ApplicationSummary,
+    profileID: UUID
+  ) async {
+    guard var profile = profiles.first(where: { $0.id == profileID }) else { return }
+    profile.lastApplication = summary
+    do {
+      _ = try await profileStore.updateProfile(profile)
+      profiles = await profileStore.currentDocument().profiles
+    } catch {
+      reportStorageError(error)
+    }
+  }
+
+  private func armSafetyCountdown(confirmationID: UUID, profileID: UUID) {
+    safetyCountdownTask?.cancel()
+    safetyConfirmation = SafetyConfirmationState(
+      id: confirmationID,
+      profileID: profileID,
+      secondsRemaining: 15
+    )
+
+    safetyCountdownTask = Task { [weak self] in
+      for remaining in stride(from: 14, through: 0, by: -1) {
+        do {
+          try await Task.sleep(for: .seconds(1))
+        } catch {
+          return
+        }
+        guard let self, self.safetyConfirmation?.id == confirmationID else { return }
+        self.safetyConfirmation?.secondsRemaining = remaining
+      }
+      guard let self, let state = self.safetyConfirmation, state.id == confirmationID else {
+        return
+      }
+      await self.revertHighRiskChanges(state)
+    }
+  }
+
+  private func revertHighRiskChanges(_ state: SafetyConfirmationState) async {
+    guard !isApplyTransactionInProgress else {
+      armSafetyCountdown(confirmationID: state.id, profileID: state.profileID)
+      return
+    }
+    isApplyTransactionInProgress = true
+    defer { finishApplyTransaction() }
+
+    let resolution = await applyEngine.revertSafetyRollback(state.id)
+
+    if resolution.status == .transactionInProgress {
+      armSafetyCountdown(confirmationID: state.id, profileID: state.profileID)
+      lastMessage = appLocalized("Display confirmation is busy; the safety timer was restarted.")
+      return
+    }
+
+    safetyConfirmation = nil
+    safetyCountdownTask = nil
+
+    if resolution.status == .unknownOrExpired {
+      operationalStatusByProfile[state.profileID] = .partial
+      lastMessage = appLocalized("The display confirmation had already expired.")
+      let summary = resolveSafetyOutcome(
+        SafetyOutcome(
+          profileStatus: .partial,
+          itemStatus: .skipped,
+          message: appLocalized(
+            "The rollback outcome was unavailable. Verify the current display configuration.")
+        ),
+        rollbackResults: [],
+        profileID: state.profileID
+      )
+      operationalStatusByProfile[state.profileID] = summary.status
+      await persistApplicationSummary(summary, profileID: state.profileID)
+      await refreshReadiness()
+      return
+    }
+
+    let failed = resolution.status == .rollbackFailed
+    operationalStatusByProfile[state.profileID] = failed ? .failed : .partial
+    lastMessage =
+      failed
+      ? appLocalized("Automatic display rollback failed; review the itemized result immediately.")
+      : appLocalized("Restored the previous display configuration.")
+
+    let summary = resolveSafetyOutcome(
+      SafetyOutcome(
+        profileStatus: failed ? .failed : .partial,
+        itemStatus: failed ? .rollbackFailed : .rolledBack,
+        message:
+          failed
+          ? appLocalized("The previous display configuration could not be fully restored.")
+          : appLocalized("The previous display configuration was restored.")
+      ),
+      rollbackResults: resolution.rollbackResults,
+      profileID: state.profileID
+    )
+    operationalStatusByProfile[state.profileID] = summary.status
+    await persistApplicationSummary(summary, profileID: state.profileID)
+    recordDiagnostic(
+      severity: failed ? .error : .warning,
+      component: "display-safety",
+      code: resolution.status.rawValue,
+      message:
+        appLocalized(
+          "The guarded display rollback completed with \(resolution.rollbackResults.count) item results."
+        )
+    )
+    await refreshReadiness()
+  }
+
+  func refreshDiagnostics() {
+    guard let diagnosticLog else {
+      diagnosticEntries = []
+      diagnosticStatus = appLocalized("Local diagnostic storage is unavailable.")
+      return
+    }
+
+    Task {
+      do {
+        let entries = try await diagnosticLog.entries()
+        diagnosticEntries = Array(entries.suffix(200).reversed())
+        diagnosticStatus =
+          entries.isEmpty
+          ? appLocalized("No local diagnostic events.")
+          : appLocalized(
+            "Showing the most recent \(min(entries.count, 200)) redacted local events.")
+      } catch {
+        diagnosticEntries = []
+        diagnosticStatus = appLocalized("Local diagnostic events could not be read.")
+      }
+    }
+  }
+
+  func clearDiagnostics() {
+    guard let diagnosticLog else { return }
+    Task {
+      do {
+        try await diagnosticLog.removeAll()
+        diagnosticEntries = []
+        diagnosticStatus = appLocalized("Local diagnostic events were removed.")
+      } catch {
+        diagnosticStatus = appLocalized("Local diagnostic events could not be removed.")
+      }
+    }
+  }
+
+  private func storageMessage(for status: ProfileLoadStatus) -> String {
+    switch status {
+    case .loaded:
+      appLocalized("Loaded local profiles.")
+    case .createdEmpty:
+      appLocalized("Created secure local profile storage.")
+    case .migrated(let version):
+      appLocalized(
+        "Migrated profile schema \(version) to \(ProfileDocument.currentSchemaVersion).")
+    case .recoveredFromBackup:
+      appLocalized(
+        "Recovered profiles from the last known-good backup; the corrupt file was quarantined.")
+    case .resetAfterCorruption:
+      appLocalized(
+        "Both profile files were corrupt and quarantined; storage was safely reset.")
+    }
+  }
+
+  private func snapshotSummary(_ snapshot: SystemSnapshotResult) -> String {
+    let items = snapshot.groups.flatMap(\.items)
+    let stored = items.filter { $0.state == .storable }.count
+    let detected = items.filter { $0.state == .detected }.count
+    let unreadable = items.filter { $0.state == .unreadable }.count
+    let permission = items.filter { $0.state == .permissionRequired }.count
+    let unsupported = items.filter { $0.state == .unsupported }.count
+    return appLocalized(
+      "Snapshot: \(detected) detected, \(stored) storable, \(unreadable) unreadable, \(permission) permission required, \(unsupported) unsupported."
+    )
+  }
+
+  private func recordSnapshotDiagnostic(_ snapshot: SystemSnapshotResult) {
+    let items = snapshot.groups.flatMap(\.items)
+    recordDiagnostic(
+      severity: items.contains(where: { $0.state == .unreadable }) ? .warning : .info,
+      component: "snapshot",
+      code: "read-only-complete",
+      message: appLocalized(
+        "Read-only snapshot completed with \(items.count) classified items across \(snapshot.groups.count) groups."
+      )
+    )
+  }
+
+  private func recordDiagnostic(
+    severity: DiagnosticSeverity,
+    component: String,
+    code: String,
+    message: String
+  ) {
+    guard let diagnosticLog else { return }
+    let entry = DiagnosticEntry(
+      severity: severity,
+      component: component,
+      code: code,
+      message: message
+    )
+    Task {
+      do {
+        try await diagnosticLog.append(entry)
+        refreshDiagnostics()
+      } catch {
+        diagnosticStatus = appLocalized("A local diagnostic event could not be saved.")
+      }
+    }
+  }
+
+  private func storageDiagnosticMessage(for status: ProfileLoadStatus) -> String {
+    switch status {
+    case .loaded:
+      appLocalized("Local profile storage loaded.")
+    case .createdEmpty:
+      appLocalized("Empty local profile storage was created.")
+    case .migrated(let version):
+      appLocalized("Local profile storage migrated from schema \(version).")
+    case .recoveredFromBackup:
+      appLocalized("Local profile storage recovered from a backup.")
+    case .resetAfterCorruption:
+      appLocalized("Corrupt local profile storage was quarantined and reset.")
+    }
+  }
+
+  private func reportStorageError(_ error: Error) {
+    storageStatus = appLocalized("Profile operation failed: \(error.localizedDescription)")
+    recordDiagnostic(
+      severity: .error,
+      component: "profile-storage",
+      code: "operation-failed",
+      message: appLocalized("A local profile storage operation failed.")
+    )
+  }
+
+  private func configureDefaultLaunchPreferenceIfNeeded() {
+    guard !defaults.bool(forKey: launchAtLoginPreferenceCreatedKey) else { return }
+    defaults.set(true, forKey: launchAtLoginPreferenceKey)
+    defaults.set(true, forKey: launchAtLoginPreferenceCreatedKey)
+  }
+
+  private func finishApplyTransaction() {
+    isApplyTransactionInProgress = false
+    completeDeferredTerminationIfPossible()
+  }
+
+  private func beginProfileStoreMutation() -> Bool {
+    guard !isProfileMutationLocked else { return false }
+    isProfileStoreMutationInProgress = true
+    return true
+  }
+
+  private func finishProfileStoreMutation() {
+    isProfileStoreMutationInProgress = false
+    completeDeferredTerminationIfPossible()
+  }
+
+  private func completeDeferredTerminationIfPossible() {
+    guard terminationRequestIsDeferred, !shouldDeferTermination else { return }
+    terminationRequestIsDeferred = false
+    NSApplication.shared.reply(toApplicationShouldTerminate: true)
+  }
+
+  private func reconcileLoginItemRegistrationAtStartup() {
+    let status = SMAppService.mainApp.status
+    if launchAtLoginDesired {
+      if status == .notRegistered || status == .notFound {
+        updateLoginItemRegistration(enabled: true)
+      } else {
+        refreshLoginItemStatus()
+      }
+    } else if status == .enabled || status == .requiresApproval {
+      updateLoginItemRegistration(enabled: false)
+    } else {
+      refreshLoginItemStatus()
+    }
+  }
+
+  private func refreshLoginItemStatus() {
+    let status = SMAppService.mainApp.status
+    switch status {
+    case .enabled:
+      loginItemEnabled = true
+      loginItemOperationFailure = nil
+    case .requiresApproval:
+      loginItemEnabled = false
+    case .notFound:
+      loginItemEnabled = false
+    case .notRegistered:
+      loginItemEnabled = false
+    @unknown default:
+      loginItemEnabled = false
+    }
+
+    canRetryLoginItemRegistration =
+      launchAtLoginDesired && status != .enabled && status != .requiresApproval
+
+    if launchAtLoginDesired {
+      switch status {
+      case .enabled:
+        loginItemStatus = appLocalized("Requested and enabled by macOS.")
+      case .requiresApproval:
+        loginItemStatus = appLocalized(
+          "Requested; approval is required in System Settings > General > Login Items.")
+      case .notFound:
+        loginItemStatus = registrationFailureStatus(
+          fallback: appLocalized(
+            "Requested, but macOS cannot find an eligible installed app bundle. Retry after installing a properly signed build."
+          )
+        )
+      case .notRegistered:
+        loginItemStatus = registrationFailureStatus(
+          fallback: appLocalized("Requested, but not registered with macOS yet.")
+        )
+      @unknown default:
+        loginItemStatus = appLocalized("Requested; the effective macOS status is unknown.")
+      }
+    } else {
+      switch status {
+      case .notRegistered, .notFound:
+        loginItemStatus = appLocalized("Off; not registered with macOS.")
+      case .enabled:
+        loginItemStatus =
+          loginItemOperationFailure == .unregistration
+          ? appLocalized("Turned off in the app, but macOS rejected the removal request.")
+          : appLocalized("Turned off in the app, but still enabled by macOS.")
+      case .requiresApproval:
+        loginItemStatus = appLocalized(
+          "Turned off in the app, but macOS still reports a registration awaiting approval.")
+      @unknown default:
+        loginItemStatus = appLocalized("Turned off; the effective macOS status is unknown.")
+      }
+    }
+  }
+
+  private struct SafetyOutcome {
+    var profileStatus: ProfileReadiness
+    var itemStatus: ApplicationItemStatus
+    var message: String
+  }
+
+  private func loginItemFailure(for error: Error, enabling: Bool) -> LoginItemOperationFailure {
+    guard enabling else { return .unregistration }
+    let code = (error as NSError).code
+    if code == kSMErrorInvalidSignature {
+      return .invalidSignature
+    }
+    if code == kSMErrorLaunchDeniedByUser {
+      return .deniedByUser
+    }
+    return .registration
+  }
+
+  private func registrationFailureStatus(fallback: String) -> String {
+    switch loginItemOperationFailure {
+    case .invalidSignature:
+      appLocalized(
+        "Requested, but macOS rejected this build’s code signature. Install a properly signed build or turn this preference off."
+      )
+    case .deniedByUser:
+      appLocalized(
+        "Requested, but macOS denied registration. Review Login Items in System Settings or turn this preference off."
+      )
+    case .registration:
+      appLocalized(
+        "Requested, but macOS rejected registration. This build or install location may not be eligible."
+      )
+    case .unregistration, .none:
+      fallback
+    }
+  }
+
+  private func makeSafetyOutcomeItem(
+    status: ApplicationItemStatus,
+    message: String
+  ) -> ApplicationItemSummary {
+    ApplicationItemSummary(
+      group: .display,
+      key: displaySafetyConfirmationKey,
+      status: status,
+      message: message
+    )
+  }
+
+  private func resolveSafetyOutcome(
+    _ outcome: SafetyOutcome,
+    rollbackResults: [ApplicationItemSummary],
+    profileID: UUID
+  ) -> ApplicationSummary {
+    let completedAt = Date()
+    var items: [ApplicationItemSummary]
+    var updatedResult: ApplyExecutionResult?
+
+    if var result = lastApplyResult, result.preparation.profileID == profileID {
+      result.completedAt = completedAt
+      result.safetyConfirmationID = nil
+      result.itemResults.removeAll { $0.key == displaySafetyConfirmationKey }
+      result.itemResults.append(
+        makeSafetyOutcomeItem(status: outcome.itemStatus, message: outcome.message)
+      )
+      result.rollbackResults.append(contentsOf: rollbackResults)
+      items = result.itemResults + result.rollbackResults
+      updatedResult = result
+    } else {
+      items = rollbackResults
+      items.append(makeSafetyOutcomeItem(status: outcome.itemStatus, message: outcome.message))
+    }
+
+    let finalStatus: ProfileReadiness =
+      items.contains(where: isFailedApplicationItem) ? .failed : outcome.profileStatus
+    if var updatedResult {
+      updatedResult.status = finalStatus
+      lastApplyResult = updatedResult
+    }
+
+    return ApplicationSummary(
+      appliedAt: completedAt,
+      status: finalStatus,
+      items: items
+    )
+  }
+
+  private func isFailedApplicationItem(_ item: ApplicationItemSummary) -> Bool {
+    item.status == .failed || item.status == .rollbackFailed
+  }
+
+  private func reconcileInterruptedSafetyConfirmation() async -> Bool {
+    var didReconcile = false
+    for profile in profiles where profile.lastApplication?.status == .applying {
+      guard var summary = profile.lastApplication else { continue }
+      var updated = profile
+      summary.status =
+        summary.items.contains(where: isFailedApplicationItem) ? .failed : .partial
+      summary.appliedAt = Date()
+      summary.items.removeAll { $0.key == displaySafetyConfirmationKey }
+      summary.items.append(
+        makeSafetyOutcomeItem(
+          status: .skipped,
+          message: appLocalized(
+            "The app exited before the confirmation outcome was recorded. Verify the current display configuration."
+          )
+        )
+      )
+      updated.lastApplication = summary
+      do {
+        _ = try await profileStore.updateProfile(updated)
+        didReconcile = true
+      } catch {
+        reportStorageError(error)
+      }
+    }
+    if didReconcile {
+      profiles = await profileStore.currentDocument().profiles
+    }
+    return didReconcile
+  }
+}

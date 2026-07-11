@@ -2,7 +2,7 @@
 
 ## Status
 
-Desk Setup Switcher is in pre-alpha development. This document defines the product that the repository is intended to ship; it does not describe already verified behavior. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) for the evidence ledger.
+Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. Final local `make verify` passes with 158 tests (83 XCTest + 75 Swift Testing), as do the five opt-in read-only hardware gates, universal no-Developer-ID DMG/checksum verification, and a fresh `/Applications` smoke test. That is not a public release or mutation proof: no live setting mutation, physical Intel run, live Keychain write, GitHub CI run, or quarantined Gatekeeper test exists. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
 ## Product promise
 
@@ -30,9 +30,11 @@ The app covers displays, audio, network state, and the macOS-wide mouse and keyb
 3. If there are no profiles, it offers to create one from that snapshot.
 4. Permission-dependent values are explained before a prompt and appear as unavailable when permission is declined.
 
+The fresh final-DMG install launched background-only/menu-bar-only. Default-on `SMAppService` registration succeeded; UI opt-out disabled it and re-enable restored enabled status, followed by a final opted-out cleanup. Approval-required and failure/retry states plus actual login-at-boot after a reboot remain unverified.
+
 ### Create and manage a profile
 
-A user can create, inspect, edit, duplicate, delete, reorder, enable, import, and export profiles. A snapshot pre-fills only values that were actually read. Each group and individual option can be included or excluded. A profile includes a name, description, SF Symbol, conditions, schema version, and last-application summary.
+A user can create, inspect, edit, duplicate, delete, reorder, enable, import, and export profiles. A snapshot pre-fills only values that were actually read. Each group and individual option can be included or excluded. A profile includes a name, description, SF Symbol, conditions, and last-application summary; the containing document carries the schema version. The fresh-install smoke test created one schema-v1 Ready profile from a read-only snapshot with all four groups.
 
 ### Apply a profile
 
@@ -40,10 +42,13 @@ The app evaluates conditions and adapter capabilities, calculates a change plan,
 
 - Normal apply is available only when every enabled setting can be applied.
 - Force apply requires explicit confirmation, lists omissions first, and applies only supported/available values.
-- Force apply is disabled if no change is possible.
-- Results are recorded per setting as succeeded, failed, skipped, unsupported, or rolled back.
+- Force confirmation is disabled if no change is possible.
+- Before execution, the app recaptures profile/condition/system state and refreshes the plan. If execution-relevant operations or rollback payloads changed, it requires another preview instead of using stale state.
+- Results are recorded per setting as succeeded, failed, skipped, unsupported, rolled back, or rollback failed.
 - A fatal failure rolls completed steps back in reverse order when rollback is supported.
-- Risky display changes use a timed confirmation flow and restore the prior arrangement when not confirmed.
+- Risky display changes are initially app-only, become session-scoped only after confirmation, and restore the prior arrangement on timeout/revert or confirmation failure.
+
+The fresh snapshot profile produced a zero-operation plan, so both Apply and Force Apply were disabled and no live setting changed.
 
 ## Readiness states
 
@@ -60,7 +65,7 @@ State is communicated by text and symbol as well as color.
 
 ### Displays
 
-Discover connected displays and stable identity attributes; snapshot primary display, topology, mirroring, mode, refresh rate, rotation, and active state where public Core Graphics APIs expose them. Validate saved modes before applying. Never persist a `CGDirectDisplayID` as the sole identity. High-risk changes require preflight backup, rollback, and timed confirmation.
+Discover connected displays and stable identity attributes; snapshot primary display, topology, mirroring, mode, refresh rate, rotation, and active state where public Core Graphics APIs expose them. Validate saved modes before applying. Never persist a `CGDirectDisplayID` as the sole identity. High-risk changes require preflight backup and an app-only temporary commit; **Keep Changes** promotes the same configuration to session scope, while timeout/revert/failed confirmation restores the backup. This path is mock verified, not live-mutation verified.
 
 ### Audio
 
@@ -68,7 +73,7 @@ Discover Core Audio input/output devices by UID; snapshot and apply default inpu
 
 ### Network
 
-Use CoreWLAN, Network, and SystemConfiguration for Wi-Fi power and current network facts, Ethernet/link facts, interface/IP/subnet/gateway/DNS snapshots, and readiness conditions. Saved-network association may use credentials already held by macOS; secrets are never placed in profiles or logs. Administrative network mutations remain out of the core path until a public, rollback-safe implementation is evidenced.
+Use CoreWLAN, Network, and SystemConfiguration for Wi-Fi power and current network facts, Ethernet/link facts, interface/IP/subnet/gateway/DNS snapshots, and readiness conditions. Saved-network association may use credentials already held by macOS; secrets are never placed in profiles or logs. The app plans a switch only after preflighting the target saved access and a safe rollback target. A powered-on interface whose SSID is unreadable is ambiguous, not assumed disassociated. Administrative network mutations remain out of scope until a public, rollback-safe implementation is evidenced.
 
 ### Mouse and keyboard
 
@@ -84,9 +89,13 @@ Conditions include display, audio input/output, USB/hardware presence, SSID, Eth
 
 The menu and settings window support VoiceOver labels, keyboard navigation, sufficient contrast, non-color status cues, macOS text/accessibility preferences, actionable error copy, and confirmation for destructive or risky actions. English is the development language and Korean is shipped through localizable resources.
 
+The fresh-install popover and Settings rendered in Korean, and an accessibility label passed inspection. A complete English/Korean walkthrough and full VoiceOver/keyboard/focus/contrast/text-size audit remain release work; this section is the acceptance target, not a completed claim.
+
 ## Distribution
 
-The minimum deployment target is macOS 14 Sonoma. Release builds target both Apple Silicon and Intel. The project produces an unsigned DMG with the app, an Applications alias, a versioned filename, and a SHA-256 checksum. Developer ID signing and notarization are optional. See [DISTRIBUTION.md](DISTRIBUTION.md).
+The minimum deployment target is macOS 14 Sonoma. Release builds target both Apple Silicon and Intel. The project produces a no-Developer-ID DMG with an ad-hoc-signed app, Applications link, versioned filename, and SHA-256 checksum. Developer ID signing and notarization are optional. See [DISTRIBUTION.md](DISTRIBUTION.md).
+
+The final local DMG/checksum and fresh app launch pass; its SHA-256 is `3f99ebcea13ea1495e9c2471a45f66dacb851e3ba6670ce16aa84f48b26b99b7`. Download quarantine/Gatekeeper, tagged release, pushed CI, and physical Intel have not been verified. The ad-hoc signature supplies integrity, not publisher identity or notarization.
 
 ## Non-goals
 

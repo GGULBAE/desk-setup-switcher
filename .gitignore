@@ -28,6 +28,6 @@ artifacts/
 .idea/
 .vscode/
 
-# Sensitive/local diagnostics
-Diagnostics/
+# Sensitive/local diagnostics (repository-root scratch output only)
+/Diagnostics/
 *.log
