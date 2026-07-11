@@ -1,0 +1,33 @@
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Local configuration and artifacts
+.env
+.env.*
+!.env.example
+artifacts/
+*.dmg
+*.sha256
+*.xcarchive
+*.app.dSYM/
+
+# macOS / editors
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Sensitive/local diagnostics
+Diagnostics/
+*.log
