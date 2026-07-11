@@ -2,7 +2,7 @@
 
 ## Status
 
-Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. Post-fix full local `make verify` passes with 158 tests (83 XCTest + 75 Swift Testing), as do the five opt-in read-only hardware gates, universal no-Developer-ID DMG/checksum verification, and a fresh `/Applications` smoke test. Implementation milestone `0d8f510` is pushed, but Actions run `29154880831` failed under Xcode 16.4/Swift 6.1.2 on the `NetworkSystemAPI` `??` actor-isolation diagnostic; the locally passing Sendable-value repair and green retry are not yet pushed. This is not a public release or mutation proof: no live setting mutation, physical Intel run, live Keychain write, or quarantined Gatekeeper test exists. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. Post-fix full local `make verify` passes with 158 tests (83 XCTest + 75 Swift Testing), as do the five opt-in read-only hardware gates, universal no-Developer-ID DMG/checksum verification, and a fresh `/Applications` smoke test. Repair commit `4e45328` is pushed, and [Actions run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) passed full `make verify` and unsigned-package upload under macOS 15/Xcode 16.4/Swift 6.1.2. This is not a public release or mutation proof: no live setting mutation, physical Intel run, live Keychain write, or quarantined Gatekeeper test exists. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
 ## Product promise
 
@@ -95,7 +95,7 @@ The fresh-install popover and Settings rendered in Korean, and an accessibility 
 
 The minimum deployment target is macOS 14 Sonoma. Release builds target both Apple Silicon and Intel. The project produces a no-Developer-ID DMG with an ad-hoc-signed app, Applications link, versioned filename, and SHA-256 checksum. Developer ID signing and notarization are optional. See [DISTRIBUTION.md](DISTRIBUTION.md).
 
-The post-fix local DMG/checksum and fresh app launch pass; its SHA-256 is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`. Download quarantine/Gatekeeper, tagged release, green CI for the repaired tree, and physical Intel have not been verified. The ad-hoc signature supplies integrity, not publisher identity or notarization.
+The post-fix local DMG SHA-256 is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`; downloaded CI artifact ID `8249295840` verified CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. The DMGs are not byte-for-byte reproducible. Download quarantine/Gatekeeper, a tagged release, publication, and physical Intel remain unverified. The ad-hoc signature supplies integrity, not publisher identity or notarization.
 
 ## Non-goals
 

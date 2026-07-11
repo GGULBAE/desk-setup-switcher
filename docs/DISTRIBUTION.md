@@ -4,7 +4,7 @@
 
 The version 0.1.0 no-Developer-ID packaging path passes locally. On 2026-07-11, post-fix full `make verify` completed lint/policy checks, 158 tests (83 XCTest + 75 Swift Testing), Swift and universal Xcode Debug/Release builds, Xcode Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. Six opt-in cases skipped by default. The resulting app contains `arm64` and `x86_64`; the post-fix DMG checksum is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
 
-Implementation commit `0d8f510` was pushed, but no artifact has been published and the downloaded/quarantined Gatekeeper path has not been tested. Actions run `29154880831` failed in `make verify` under Xcode 16.4/Swift 6.1.2 because the `NetworkSystemAPI` `??` autoclosure crossed actor isolation with `[String: Any]`. The local repair extracts Sendable values first and post-fix full `make verify` passes; the repaired commit and green retry remain pending. The fresh `/Applications` smoke evidence below remains valid.
+Initial Actions run `29154880831` for implementation commit `0d8f510` exposed the Swift 6.1 actor-isolation issue. Repair commit `4e45328` is pushed, and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) succeeded on 2026-07-11 under macOS 15/Xcode 16.4/Swift 6.1.2; full `make verify` and unsigned-package upload passed. No release has been published, and the downloaded/quarantined Gatekeeper path remains untested.
 
 Developer ID signing and notarization remain optional and unimplemented because the repository has no Apple signing identity or notarization credentials.
 
@@ -32,6 +32,8 @@ The command creates:
 - `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg.sha256`
 
 The post-fix locally verified DMG has SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
+
+Downloaded CI artifact ID `8249295840` verified its checksum file and CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. The local and CI-generated DMGs are not byte-for-byte reproducible, so both checksums remain part of the evidence.
 
 The DMG contains `Desk Setup Switcher.app` and an `/Applications` symbolic link. `make verify-package`:
 
@@ -83,7 +85,7 @@ This exact quarantined install flow has not yet been recorded, so these steps re
 
 The CI workflow runs `make verify` for pushes to `master`, pull requests, and manual dispatch, then uploads the no-Developer-ID DMG/checksum. The release workflow triggers on `v*` tags, rejects a tag that does not equal `v` plus `CFBundleShortVersionString`, reruns `make verify`, and uses GitHub's token to create an explicitly unsigned release.
 
-Run `29154880831` exercised the CI workflow for milestone `0d8f510` and failed at the compiler-compatibility issue described above; the release workflow has not run. The pending local workflow repair also advances the SHA-pinned `actions/checkout` and `actions/upload-artifact` dependencies to v7.0.0 and v7.0.1, respectively, their current Node-24 majors. Those pins and the source repair have not yet run in Actions. A tag must not be pushed until the repaired commit is green on CI, the remaining release/manual matrix has been accepted, and the completion ledger is current.
+Run `29154880831` preserves the initial compiler-compatibility failure history. Repair [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) passed full `make verify` and unsigned artifact upload for `4e45328`, including the SHA-pinned `actions/checkout` v7.0.0 and `actions/upload-artifact` v7.0.1 Node-24 majors. The release workflow has not run. A tag must not be pushed until the remaining release/manual matrix has been accepted and the completion ledger is current.
 
 ## Optional Developer ID signing
 

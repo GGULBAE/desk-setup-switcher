@@ -1,6 +1,6 @@
 # Completion criteria and evidence ledger
 
-This ledger prevents implementation from being reported as release completion. A checked row requires source/tests in the milestone commit and the named local evidence. Hardware-dependent rows may have mock evidence while remaining explicitly “not hardware-verified.” Final release gates stay unchecked until the integrated commit, clean verification, push, CI, and manual procedures are complete.
+This ledger separates mandatory implementation/test/package/push/CI gates from optional or unapproved manual hardware evidence and release publication. A checked row is tied to the named commit and evidence; this later docs-only evidence update does not claim that its own eventual commit has already run CI. Hardware-dependent rows may have mock evidence while remaining explicitly “not hardware-verified.”
 
 ## Evidence snapshot — 2026-07-11
 
@@ -8,19 +8,21 @@ This ledger prevents implementation from being reported as release completion. A
 | --- | --- |
 | Repository/product documentation milestone | Committed and pushed as `aaea058` |
 | Implementation milestone | Commit `0d8f510` pushed to `origin/master` |
+| CI repair milestone | Commit `4e45328` pushed to `origin/master` |
 | Toolchain | Xcode 26.6, Swift 6.3.3, macOS 26.5.2, Apple M5; process-local `DEVELOPER_DIR` fallback |
 | Full local verification | Post-fix full `make verify` passed: lint/policy, 158 tests (83 XCTest + 75 Swift Testing), Swift/Xcode Debug and Release, Analyze, package, checksum, and mounted-DMG inspection |
-| GitHub Actions | Run `29154880831` for `0d8f510` failed in `make verify` under Xcode 16.4/Swift 6.1.2: `NetworkSystemAPI` used a `??` autoclosure over actor-isolated `[String: Any]`. The local repair extracts Sendable values first; repaired commit/push and a green retry are pending |
+| GitHub Actions | Run `29154880831` for `0d8f510` recorded the Swift 6.1 actor-isolation failure. [Run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) for repair `4e45328` succeeded on 2026-07-11 under macOS 15, Xcode 16.4, and Swift 6.1.2; full `make verify` and unsigned-package upload passed |
 | Default test behavior | Six cases skip without explicit opt-in: five read-only hardware cases and one Keychain-write round trip |
 | Opt-in live reads | Display, audio, network, input, and combined readiness-context tests passed with `DESK_SETUP_LIVE_READ_TESTS=1` |
 | Xcode/package architectures | Current Debug/Release builds and packaged executable verified as `arm64 x86_64`; x86_64 was not run on Intel hardware |
 | Final package | Post-fix universal `arm64 x86_64` no-Developer-ID DMG with ad-hoc-signed app; SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f` |
-| Fresh-install smoke | Copied from the final DMG to `/Applications` and launched background-only/menu-bar-only; Korean popover/Settings and an accessibility label passed |
+| CI package | Downloaded artifact ID `8249295840` verified its checksum file; CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. Local and CI DMGs are not byte-for-byte reproducible |
+| Fresh-install smoke | A recorded local-DMG copy to `/Applications` launched background-only/menu-bar-only; Korean popover/Settings and an accessibility label passed |
 | Snapshot profile | Created one schema-v1 Ready profile from a read-only snapshot with all four groups; the zero-operation plan kept Apply and Force Apply disabled |
 | Login item | Default-on registration succeeded; BTM reported `[enabled, allowed, notified]`; UI opt-out disabled it and re-enable restored enabled status. Final cleanup opted out and left only disabled BTM history |
 | Live mutations | Not run for display, audio, network, mouse, or keyboard |
 | Live Keychain write | Not run |
-| Still pending | Repaired commit/push and green Actions retry, full VoiceOver/keyboard/import/export/permission matrix, quarantined Gatekeeper install, physical Intel, login-item approval/retry and actual login-at-boot after a reboot, live Keychain write, and live mutation/rollback |
+| Optional/unapproved evidence gaps | Full VoiceOver/keyboard/import/export/permission matrix, quarantined Gatekeeper install, physical Intel, login-item approval/retry and actual login-at-boot after a reboot, live Keychain write, live mutation/rollback, release tag, and publication |
 
 No test evidence contains a real SSID, exact location, IP host address, credential, serial number, or personal device identifier.
 
@@ -88,13 +90,14 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] Current default unit and mock integration suites pass locally; live setting changes are not part of them.
 - [x] `make lint` and `make analyze` pass on the integrated tree.
 - [x] Post-fix local `make verify` passes with the generated Xcode project, 158 tests (83 XCTest + 75 Swift Testing), universal builds, Analyze, and package verification.
-- [ ] GitHub Actions passes on the repaired pushed tree. Run `29154880831` for milestone `0d8f510` failed under Xcode 16.4/Swift 6.1.2; the compatible local repair passes but is not yet pushed or green in Actions.
+- [x] GitHub Actions passes on the repaired pushed implementation tree. [Run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) for `4e45328` passed full `make verify` and unsigned-package upload under macOS 15/Xcode 16.4/Swift 6.1.2.
 - [x] Versioned no-Developer-ID DMG contains the ad-hoc-signed universal app and `/Applications` link.
 - [x] SHA-256 validation and mounted-DMG metadata/resource/architecture/signature checks pass locally; the post-fix checksum is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
+- [x] Downloaded CI artifact ID `8249295840` verifies against its checksum file; its DMG SHA-256 is `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. It is distinct from the local DMG because packaging is not byte-for-byte reproducible.
 - [ ] Manual release review is complete. Fresh `/Applications` launch, background/menu-bar-only behavior, Korean rendering, popover, Settings, one accessibility label, snapshot-profile creation, and basic login-item state transitions passed; Gatekeeper, login approval/retry/reboot, import/export, permissions, full accessibility, and mutation paths remain.
 - [x] Signing status is accurately classified: ad-hoc integrity signature only, no Developer ID identity, no notarization, and no claim of Gatekeeper trust.
-- [ ] Working tree is clean after the final release-candidate commit and all completed milestones are pushed.
-- [ ] No mandatory release item remains; hardware-unverified capabilities remain explicitly labelled and have approved manual procedures.
+- [x] Mandatory implementation, test, package, push, and CI gates are complete for repair commit `4e45328`; this does not claim the later docs-only evidence update has already run CI.
+- [ ] Optional release publication and manual/hardware evidence are complete. They remain unapproved or unrun and do not negate the completed implementation gates.
 
 ## Manual hardware evidence format
 
