@@ -1,6 +1,6 @@
 # Desk Setup Switcher
 
-> **Pre-release 0.1.0 implementation candidate:** the native app, safe profile core, concrete macOS adapters, editor/apply UI, and no-Developer-ID packaging pipeline are implemented. Final local `make verify`, the 158-test inventory, all five opt-in read-only discovery gates, universal DMG/checksum verification, and a fresh `/Applications` smoke test pass. There is no published release or GitHub CI result yet; live setting mutations, physical Intel, a live Keychain write, the downloaded/quarantined Gatekeeper path, and several manual workflows remain unverified.
+> **Pre-release 0.1.0 implementation candidate:** the native app, safe profile core, concrete macOS adapters, editor/apply UI, and no-Developer-ID packaging pipeline are implemented. Final local `make verify`, the 158-test inventory, all five opt-in read-only discovery gates, universal DMG/checksum verification, and a fresh `/Applications` smoke test pass. Implementation commit `0d8f510` is pushed, but there is no green GitHub CI result or published release yet; live setting mutations, physical Intel, a live Keychain write, the downloaded/quarantined Gatekeeper path, and several manual workflows remain unverified.
 
 Desk Setup Switcher is a free and open-source macOS menu-bar app for manually saving and applying display, audio, network, mouse, and keyboard profiles. It is local-first: no account, server, cloud sync, telemetry, analytics, or automatic profile switching.
 
@@ -25,14 +25,14 @@ Evidence is intentionally split by confidence level:
 | Full local gate | Final `make verify` passed on 2026-07-11: lint/policy, 158 tests (83 XCTest + 75 Swift Testing), Swift/Xcode Debug and Release, Xcode Analyze, packaging, checksum, and mounted-DMG checks |
 | Default test behavior | Six opt-in cases skip by default: five read-only hardware cases and one Keychain-write round trip |
 | Live read-only discovery | Display, audio, network, input, and readiness-context smoke tests passed on an Apple M5 Mac running macOS 26.5.2 |
-| Universal package | The final no-Developer-ID DMG verified `arm64 x86_64`, bundle metadata, icon, English/Korean resources, `/Applications` link, ad-hoc app signature, and SHA-256 `3f99ebcea13ea1495e9c2471a45f66dacb851e3ba6670ce16aa84f48b26b99b7` |
+| Universal package | The final no-Developer-ID DMG verified `arm64 x86_64`, bundle metadata, icon, English/Korean resources, `/Applications` link, ad-hoc app signature, and SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f` |
 | Manual packaged app | A fresh copy from the final DMG to `/Applications` launched background-only/menu-bar-only; the Korean popover, Settings, and an accessibility label passed inspection |
 | Snapshot profile | The fresh install created one schema-v1 **Ready** profile from a read-only snapshot with all four setting groups; because it was a zero-operation plan, both Apply and Force Apply were disabled |
 | Login item | Default-on `SMAppService` registration succeeded and Background Task Management reported `[enabled, allowed, notified]`; UI opt-out disabled it and re-enable restored enabled status. Final cleanup opted out, leaving only disabled BTM history |
 | Live mutations | **Not run** for display, audio, network, mouse, or keyboard |
 | Live Keychain write | **Not run**; the Keychain path is mock verified |
 | Remaining manual checks | Approval-required and failure/retry login-item states, actual login-at-boot after a reboot, full VoiceOver/keyboard/contrast, import/export, permission denial, Gatekeeper/quarantine, physical Intel, and mutation/rollback procedures are pending |
-| CI and release | Workflow files exist, but no implementation commit has been pushed through Actions and no release has been published |
+| CI and release | Implementation commit `0d8f510` was pushed. Actions run `29154880831` failed in `make verify` under Xcode 16.4/Swift 6.1.2 on the `NetworkSystemAPI` `??` autoclosure over actor-isolated `[String: Any]`. The local repair extracts Sendable values first and full `make verify` passes; the repaired commit and green retry remain pending. No release is published |
 
 See the [support matrix](docs/SUPPORT-MATRIX.md) and [completion ledger](docs/COMPLETION-CRITERIA.md) for capability-level evidence and explicit manual procedures.
 

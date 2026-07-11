@@ -2,9 +2,9 @@
 
 ## Current status
 
-The version 0.1.0 no-Developer-ID packaging path passes locally. On 2026-07-11, final `make verify` completed lint/policy checks, 158 tests (83 XCTest + 75 Swift Testing), Swift and universal Xcode Debug/Release builds, Xcode Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. Six opt-in cases skipped by default. The resulting app contains `arm64` and `x86_64`; the final DMG checksum is `3f99ebcea13ea1495e9c2471a45f66dacb851e3ba6670ce16aa84f48b26b99b7`.
+The version 0.1.0 no-Developer-ID packaging path passes locally. On 2026-07-11, post-fix full `make verify` completed lint/policy checks, 158 tests (83 XCTest + 75 Swift Testing), Swift and universal Xcode Debug/Release builds, Xcode Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. Six opt-in cases skipped by default. The resulting app contains `arm64` and `x86_64`; the post-fix DMG checksum is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
 
-No artifact has been published, no GitHub Actions run exists for the implementation milestone, and the downloaded/quarantined Gatekeeper path has not been tested. A fresh `/Applications` install passed the local launch and login-item state-transition smoke checks described below; ad-hoc signature validation alone still must not be presented as login-at-boot, publisher-identity, or Gatekeeper evidence.
+Implementation commit `0d8f510` was pushed, but no artifact has been published and the downloaded/quarantined Gatekeeper path has not been tested. Actions run `29154880831` failed in `make verify` under Xcode 16.4/Swift 6.1.2 because the `NetworkSystemAPI` `??` autoclosure crossed actor isolation with `[String: Any]`. The local repair extracts Sendable values first and post-fix full `make verify` passes; the repaired commit and green retry remain pending. The fresh `/Applications` smoke evidence below remains valid.
 
 Developer ID signing and notarization remain optional and unimplemented because the repository has no Apple signing identity or notarization credentials.
 
@@ -31,7 +31,7 @@ The command creates:
 - `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`
 - `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg.sha256`
 
-The final locally verified DMG has SHA-256 `3f99ebcea13ea1495e9c2471a45f66dacb851e3ba6670ce16aa84f48b26b99b7`.
+The post-fix locally verified DMG has SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
 
 The DMG contains `Desk Setup Switcher.app` and an `/Applications` symbolic link. `make verify-package`:
 
@@ -83,7 +83,7 @@ This exact quarantined install flow has not yet been recorded, so these steps re
 
 The CI workflow runs `make verify` for pushes to `master`, pull requests, and manual dispatch, then uploads the no-Developer-ID DMG/checksum. The release workflow triggers on `v*` tags, rejects a tag that does not equal `v` plus `CFBundleShortVersionString`, reruns `make verify`, and uses GitHub's token to create an explicitly unsigned release.
 
-Neither workflow has run against the implementation milestone. A tag must not be pushed until the implementation commit is green on CI, the remaining release/manual matrix has been accepted, and the completion ledger is current.
+Run `29154880831` exercised the CI workflow for milestone `0d8f510` and failed at the compiler-compatibility issue described above; the release workflow has not run. The pending local workflow repair also advances the SHA-pinned `actions/checkout` and `actions/upload-artifact` dependencies to v7.0.0 and v7.0.1, respectively, their current Node-24 majors. Those pins and the source repair have not yet run in Actions. A tag must not be pushed until the repaired commit is green on CI, the remaining release/manual matrix has been accepted, and the completion ledger is current.
 
 ## Optional Developer ID signing
 

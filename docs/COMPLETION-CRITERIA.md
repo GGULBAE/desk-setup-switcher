@@ -7,18 +7,20 @@ This ledger prevents implementation from being reported as release completion. A
 | Evidence | Result |
 | --- | --- |
 | Repository/product documentation milestone | Committed and pushed as `aaea058` |
+| Implementation milestone | Commit `0d8f510` pushed to `origin/master` |
 | Toolchain | Xcode 26.6, Swift 6.3.3, macOS 26.5.2, Apple M5; process-local `DEVELOPER_DIR` fallback |
-| Full local verification | Final `make verify` passed: lint/policy, 158 tests (83 XCTest + 75 Swift Testing), Swift/Xcode Debug and Release, Analyze, package, checksum, and mounted-DMG inspection |
+| Full local verification | Post-fix full `make verify` passed: lint/policy, 158 tests (83 XCTest + 75 Swift Testing), Swift/Xcode Debug and Release, Analyze, package, checksum, and mounted-DMG inspection |
+| GitHub Actions | Run `29154880831` for `0d8f510` failed in `make verify` under Xcode 16.4/Swift 6.1.2: `NetworkSystemAPI` used a `??` autoclosure over actor-isolated `[String: Any]`. The local repair extracts Sendable values first; repaired commit/push and a green retry are pending |
 | Default test behavior | Six cases skip without explicit opt-in: five read-only hardware cases and one Keychain-write round trip |
 | Opt-in live reads | Display, audio, network, input, and combined readiness-context tests passed with `DESK_SETUP_LIVE_READ_TESTS=1` |
 | Xcode/package architectures | Current Debug/Release builds and packaged executable verified as `arm64 x86_64`; x86_64 was not run on Intel hardware |
-| Final package | Universal `arm64 x86_64` no-Developer-ID DMG with ad-hoc-signed app; SHA-256 `3f99ebcea13ea1495e9c2471a45f66dacb851e3ba6670ce16aa84f48b26b99b7` |
+| Final package | Post-fix universal `arm64 x86_64` no-Developer-ID DMG with ad-hoc-signed app; SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f` |
 | Fresh-install smoke | Copied from the final DMG to `/Applications` and launched background-only/menu-bar-only; Korean popover/Settings and an accessibility label passed |
 | Snapshot profile | Created one schema-v1 Ready profile from a read-only snapshot with all four groups; the zero-operation plan kept Apply and Force Apply disabled |
 | Login item | Default-on registration succeeded; BTM reported `[enabled, allowed, notified]`; UI opt-out disabled it and re-enable restored enabled status. Final cleanup opted out and left only disabled BTM history |
 | Live mutations | Not run for display, audio, network, mouse, or keyboard |
 | Live Keychain write | Not run |
-| Still pending | GitHub Actions/push, full VoiceOver/keyboard/import/export/permission matrix, quarantined Gatekeeper install, physical Intel, login-item approval/retry and actual login-at-boot after a reboot, live Keychain write, and live mutation/rollback |
+| Still pending | Repaired commit/push and green Actions retry, full VoiceOver/keyboard/import/export/permission matrix, quarantined Gatekeeper install, physical Intel, login-item approval/retry and actual login-at-boot after a reboot, live Keychain write, and live mutation/rollback |
 
 No test evidence contains a real SSID, exact location, IP host address, credential, serial number, or personal device identifier.
 
@@ -85,10 +87,10 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] Required repository, community, privacy, architecture, support, asset-provenance, and distribution documentation exists.
 - [x] Current default unit and mock integration suites pass locally; live setting changes are not part of them.
 - [x] `make lint` and `make analyze` pass on the integrated tree.
-- [x] Final local `make verify` passes with the generated Xcode project, 158 tests (83 XCTest + 75 Swift Testing), universal builds, Analyze, and package verification.
-- [ ] GitHub Actions passes on the pushed implementation milestone.
+- [x] Post-fix local `make verify` passes with the generated Xcode project, 158 tests (83 XCTest + 75 Swift Testing), universal builds, Analyze, and package verification.
+- [ ] GitHub Actions passes on the repaired pushed tree. Run `29154880831` for milestone `0d8f510` failed under Xcode 16.4/Swift 6.1.2; the compatible local repair passes but is not yet pushed or green in Actions.
 - [x] Versioned no-Developer-ID DMG contains the ad-hoc-signed universal app and `/Applications` link.
-- [x] SHA-256 validation and mounted-DMG metadata/resource/architecture/signature checks pass locally; the final checksum is `3f99ebcea13ea1495e9c2471a45f66dacb851e3ba6670ce16aa84f48b26b99b7`.
+- [x] SHA-256 validation and mounted-DMG metadata/resource/architecture/signature checks pass locally; the post-fix checksum is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
 - [ ] Manual release review is complete. Fresh `/Applications` launch, background/menu-bar-only behavior, Korean rendering, popover, Settings, one accessibility label, snapshot-profile creation, and basic login-item state transitions passed; Gatekeeper, login approval/retry/reboot, import/export, permissions, full accessibility, and mutation paths remain.
 - [x] Signing status is accurately classified: ad-hoc integrity signature only, no Developer ID identity, no notarization, and no claim of Gatekeeper trust.
 - [ ] Working tree is clean after the final release-candidate commit and all completed milestones are pushed.

@@ -19,7 +19,8 @@
 | macOS | 14 Sonoma or later | Deployment target is 14.0; final 158-test local gate passes on macOS 26.5.2 with Xcode 26.6 |
 | Apple Silicon | arm64 | Default tests and opt-in live-read smoke tests passed on an Apple M5 Mac |
 | Intel Mac | x86_64 | Current Debug/Release and packaged executable contain x86_64; no physical Intel Mac run |
-| Distribution | Direct no-Developer-ID DMG | Final universal artifact, SHA-256 `3f99ebcea13ea1495e9c2471a45f66dacb851e3ba6670ce16aa84f48b26b99b7`, mount, metadata/resources, architectures, and ad-hoc app signature verified; not published and Gatekeeper path pending |
+| Distribution | Direct no-Developer-ID DMG | Post-fix universal artifact, SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`, mount, metadata/resources, architectures, and ad-hoc app signature verified; not published and Gatekeeper path pending |
+| CI | GitHub Actions | Milestone `0d8f510` was pushed; run `29154880831` failed in `make verify` under Xcode 16.4/Swift 6.1.2 on the `NetworkSystemAPI` `??` actor-isolation diagnostic. The Sendable-value repair passes full local verification; repaired push and green retry pending |
 | App Store | Not required | No sandbox/App Store claim |
 | Signing/notarization | Optional | App is ad-hoc signed for integrity only; no Developer ID identity or notarization exists |
 
@@ -87,7 +88,7 @@ The final local `make verify` gate passed with 158 tests: 83 XCTest and 75 Swift
 ## Local package evidence recorded on 2026-07-11
 
 - Universal Debug/Release builds and the packaged executable contain `arm64 x86_64`.
-- The final no-Developer-ID DMG checksum is `3f99ebcea13ea1495e9c2471a45f66dacb851e3ba6670ce16aa84f48b26b99b7`; mounted layout, bundle metadata, icon, English/Korean resources, and ad-hoc app signature passed the checked-in verifier.
+- The post-fix no-Developer-ID DMG checksum is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`; mounted layout, bundle metadata, icon, English/Korean resources, and ad-hoc app signature passed the checked-in verifier.
 - A fresh copy from that DMG to `/Applications` launched background-only/menu-bar-only; the popover and Settings rendered in Korean, and an accessibility label passed inspection.
 - The fresh install created one schema-v1 Ready profile from a read-only snapshot with all four groups. Its zero-operation plan kept Apply and Force Apply disabled.
 - Default-on `SMAppService` registration succeeded and BTM reported `[enabled, allowed, notified]`; UI opt-out disabled it, re-enable restored enabled status, and final cleanup opted out with only disabled BTM history.

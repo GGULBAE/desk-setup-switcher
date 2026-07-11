@@ -284,12 +284,18 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
     let ipv6 = dynamicDictionary("State:/Network/Global/IPv6", store: dynamicStore)
     let dns = dynamicDictionary("State:/Network/Global/DNS", store: dynamicStore)
 
-    let primaryInterface =
-      stringValue(ipv4, key: "PrimaryInterface")
-      ?? stringValue(ipv6, key: "PrimaryInterface")
-    let primaryService =
-      stringValue(ipv4, key: "PrimaryService")
-      ?? stringValue(ipv6, key: "PrimaryService")
+    // Read the non-Sendable SystemConfiguration dictionaries into Sendable
+    // values before using nil coalescing. This avoids older Swift 6
+    // compilers treating `??`'s autoclosure as a cross-actor send.
+    let ipv4PrimaryInterface = ipv4["PrimaryInterface"] as? String
+    let ipv6PrimaryInterface = ipv6["PrimaryInterface"] as? String
+    let ipv4PrimaryService = ipv4["PrimaryService"] as? String
+    let ipv6PrimaryService = ipv6["PrimaryService"] as? String
+    let ipv4Gateway = ipv4["Router"] as? String
+    let ipv6Gateway = ipv6["Router"] as? String
+    let dnsServers = dns[kSCPropNetDNSServerAddresses as String] as? [String] ?? []
+    let primaryInterface = ipv4PrimaryInterface ?? ipv6PrimaryInterface
+    let primaryService = ipv4PrimaryService ?? ipv6PrimaryService
 
     var serviceOrder: [String] = []
     var services: [NetworkServiceConfigurationSnapshot] = []
@@ -308,9 +314,9 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
     return SystemConfigurationSnapshot(
       primaryInterfaceName: primaryInterface,
       primaryServiceID: primaryService,
-      ipv4Gateway: stringValue(ipv4, key: "Router"),
-      ipv6Gateway: stringValue(ipv6, key: "Router"),
-      dnsServers: stringArray(dns, key: kSCPropNetDNSServerAddresses as String),
+      ipv4Gateway: ipv4Gateway,
+      ipv6Gateway: ipv6Gateway,
+      dnsServers: dnsServers,
       serviceOrder: serviceOrder,
       services: services
     )
