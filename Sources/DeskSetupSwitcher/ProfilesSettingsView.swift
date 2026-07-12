@@ -6,6 +6,9 @@ import SwiftUI
 #if canImport(DeskSetupPresentation)
   import DeskSetupPresentation
 #endif
+#if canImport(DeskSetupSystem)
+  import DeskSetupSystem
+#endif
 
 struct ProfilesSettingsView: View {
   @EnvironmentObject private var model: ApplicationModel
@@ -249,7 +252,8 @@ struct ProfilesSettingsView: View {
       if profileEditor.draft != nil {
         ProfileEditorForm(
           profile: draftBinding,
-          conditionContext: model.lastConditionContext
+          conditionContext: model.lastConditionContext,
+          systemSnapshot: model.lastSnapshot
         )
         Divider()
         editorActionBar
@@ -573,6 +577,7 @@ private enum DeferredProfileAction: Identifiable {
 private struct ProfileEditorForm: View {
   @Binding var profile: DeskProfile
   let conditionContext: ConditionContext
+  let systemSnapshot: SystemSnapshotResult?
 
   var body: some View {
     Form {
@@ -608,57 +613,46 @@ private struct ProfileEditorForm: View {
         Toggle("Enabled", isOn: $profile.isEnabled)
       }
 
-      Section("Included settings") {
-        groupToggle(
-          appLocalized("Displays"),
-          systemImage: "display.2",
-          isOn: $profile.settings.display.isIncluded,
-          detail: summaryPreview(for: .display)
-        )
-        groupToggle(
-          appLocalized("Audio"),
-          systemImage: "speaker.wave.2",
-          isOn: $profile.settings.audio.isIncluded,
-          detail: summaryPreview(for: .audio)
-        )
-        groupToggle(
-          appLocalized("Network"),
-          systemImage: "network",
-          isOn: $profile.settings.network.isIncluded,
-          detail: summaryPreview(for: .network)
-        )
-        groupToggle(
-          appLocalized("Mouse & Keyboard"),
-          systemImage: "keyboard",
-          isOn: $profile.settings.input.isIncluded,
-          detail: summaryPreview(for: .input)
-        )
-
-        if profile.settings.display.isIncluded {
-          displayOptions
-        }
-        if profile.settings.audio.isIncluded {
-          audioOptions
-        }
-        if profile.settings.network.isIncluded {
-          networkOptions
-        }
-        if profile.settings.input.isIncluded {
-          inputOptions
-        }
+      Section("Settings") {
+        Text("Turn on a category to edit the values this profile will apply.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
 
-      Section("Readiness conditions") {
-        ConditionEditorView(
-          conditionSet: $profile.conditions,
-          availableDisplays: detectedConditionDisplays,
-          availableAudioInputUIDs: conditionContext.audioInputUIDs.sorted(),
-          availableAudioOutputUIDs: conditionContext.audioOutputUIDs.sorted(),
-          availableHardwareIdentifiers: conditionContext.hardwareIdentifiers.sorted(),
-          currentWiFiSSID: conditionContext.wifiSSID,
-          currentIPAddresses: conditionContext.ipAddresses.sorted(),
-          currentLocation: conditionContext.location
-        )
+      settingGroupEditor(
+        "Displays",
+        systemImage: "display.2",
+        isOn: $profile.settings.display.isIncluded,
+        summary: summaryPreview(for: .display)
+      ) {
+        displayOptions
+      }
+
+      settingGroupEditor(
+        "Audio",
+        systemImage: "speaker.wave.2",
+        isOn: $profile.settings.audio.isIncluded,
+        summary: summaryPreview(for: .audio)
+      ) {
+        audioOptions
+      }
+
+      settingGroupEditor(
+        "Network",
+        systemImage: "network",
+        isOn: $profile.settings.network.isIncluded,
+        summary: summaryPreview(for: .network)
+      ) {
+        networkOptions
+      }
+
+      settingGroupEditor(
+        "Mouse & Keyboard",
+        systemImage: "keyboard",
+        isOn: $profile.settings.input.isIncluded,
+        summary: summaryPreview(for: .input)
+      ) {
+        inputOptions
       }
 
       if let lastApplication = profile.lastApplication {
@@ -703,119 +697,422 @@ private struct ProfileEditorForm: View {
     .formStyle(.grouped)
   }
 
+  @ViewBuilder
   private var displayOptions: some View {
-    DisclosureGroup("Display options") {
-      summaryRows(for: .display)
-      ForEach($profile.settings.display.value.displays) { $display in
-        VStack(alignment: .leading, spacing: 6) {
-          Text(display.identity.productName ?? appLocalized("Detected display"))
-            .font(.subheadline.bold())
-          Toggle("Primary display", isOn: $display.isPrimary.isIncluded)
-          Toggle("Position", isOn: $display.origin.isIncluded)
-          Toggle("Mirroring", isOn: $display.mirroring.isIncluded)
-          Toggle("Resolution and refresh rate", isOn: $display.mode.isIncluded)
-          Toggle("Rotation", isOn: $display.rotationDegrees.isIncluded)
-          Toggle("Active state", isOn: $display.isActive.isIncluded)
-        }
-        .padding(.leading, 8)
-      }
-    }
-  }
-
-  private var audioOptions: some View {
-    DisclosureGroup("Audio options") {
-      summaryRows(for: .audio)
-      Toggle("Default input device", isOn: $profile.settings.audio.value.defaultInputUID.isIncluded)
-      Toggle(
-        "Default output device", isOn: $profile.settings.audio.value.defaultOutputUID.isIncluded)
-      Toggle("System output device", isOn: $profile.settings.audio.value.systemOutputUID.isIncluded)
-      Toggle("Output volume", isOn: $profile.settings.audio.value.outputVolume.isIncluded)
-      Toggle("Output mute", isOn: $profile.settings.audio.value.outputMuted.isIncluded)
-    }
-  }
-
-  private var networkOptions: some View {
-    DisclosureGroup("Network options") {
-      summaryRows(for: .network)
-      Toggle("Wi-Fi power", isOn: $profile.settings.network.value.wifiPower.isIncluded)
-      Toggle("Wi-Fi network", isOn: $profile.settings.network.value.wifiSSID.isIncluded)
-      Toggle("IPv4 configuration", isOn: $profile.settings.network.value.ipv4.isIncluded)
-      Toggle("DNS servers", isOn: $profile.settings.network.value.dnsServers.isIncluded)
-      Toggle("Web proxy", isOn: $profile.settings.network.value.webProxy.isIncluded)
-      Toggle("Secure web proxy", isOn: $profile.settings.network.value.secureWebProxy.isIncluded)
-    }
-  }
-
-  private var inputOptions: some View {
-    DisclosureGroup("Mouse and keyboard options") {
-      summaryRows(for: .input)
+    if profile.settings.display.value.displays.isEmpty {
       Label(
-        "Experimental: macOS does not document the stability of these global preference keys.",
-        systemImage: "testtube.2"
+        "Capture current settings to add detected displays before editing this category.",
+        systemImage: "display.badge.exclamationmark"
       )
       .font(.caption)
       .foregroundStyle(.secondary)
-      Toggle("Pointer speed", isOn: $profile.settings.input.value.pointerSpeed.isIncluded)
-      Toggle("Natural scrolling", isOn: $profile.settings.input.value.naturalScrolling.isIncluded)
-      Toggle("Key repeat", isOn: $profile.settings.input.value.keyRepeatInterval.isIncluded)
-      Toggle(
-        "Initial key repeat delay",
-        isOn: $profile.settings.input.value.initialKeyRepeatDelay.isIncluded
-      )
-      Toggle(
-        "Use F1–F12 as standard function keys",
-        isOn: $profile.settings.input.value.useStandardFunctionKeys.isIncluded
-      )
-    }
-  }
+    } else {
+      ForEach($profile.settings.display.value.displays) { $display in
+        GroupBox {
+          VStack(alignment: .leading, spacing: 10) {
+            optionEditor("Primary display", isOn: $display.isPrimary.isIncluded) {
+              Picker("Primary display value", selection: $display.isPrimary.value) {
+                Text("Primary").tag(true)
+                Text("Not primary").tag(false)
+              }
+              .pickerStyle(.segmented)
+            }
 
-  @ViewBuilder
-  private func groupToggle(
-    _ title: String,
-    systemImage: String,
-    isOn: Binding<Bool>,
-    detail: String
-  ) -> some View {
-    HStack {
-      Label(title, systemImage: systemImage)
-      Spacer()
-      Text(detail)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      Toggle(title, isOn: isOn)
-        .labelsHidden()
-        .accessibilityLabel(appLocalized("Include \(title)"))
-    }
-  }
-
-  @ViewBuilder
-  private func summaryRows(for group: SettingGroup) -> some View {
-    if let summary = presentationBuilder.summary(for: group, in: profile.settings) {
-      VStack(alignment: .leading, spacing: 6) {
-        ForEach(Array(summary.items.enumerated()), id: \.offset) { _, item in
-          LabeledContent {
-            Text(appProfileSummaryValue(item))
-              .multilineTextAlignment(.trailing)
-          } label: {
-            Text(appLocalizedPresentationText(item.label))
-          }
-          .accessibilityElement(children: .combine)
-        }
-
-        if !summary.technicalDetails.isEmpty {
-          DisclosureGroup("Technical Information") {
-            ForEach(Array(summary.technicalDetails.enumerated()), id: \.offset) { _, detail in
-              LabeledContent(appLocalizedRuntime(detail.label)) {
-                Text(detail.value)
-                  .font(.caption.monospaced())
-                  .textSelection(.enabled)
+            optionEditor("Position", isOn: $display.origin.isIncluded) {
+              HStack {
+                TextField("X position", value: $display.origin.value.x, format: .number)
+                TextField("Y position", value: $display.origin.value.y, format: .number)
               }
             }
+
+            optionEditor("Mirroring", isOn: $display.mirroring.isIncluded) {
+              Picker(
+                "Display arrangement",
+                selection: mirroredDisplayBinding($display.mirroring.value)
+              ) {
+                Text("Extended desktop").tag(Optional<DisplayIdentity>.none)
+                ForEach(mirrorTargets(excluding: display.id)) { target in
+                  Text(displayName(target))
+                    .tag(Optional(target.identity))
+                }
+                if let savedMirror = mirroredIdentity(display.mirroring.value),
+                  !mirrorTargets(excluding: display.id).contains(where: {
+                    $0.identity == savedMirror
+                  })
+                {
+                  Text("Saved display — currently disconnected")
+                    .tag(Optional(savedMirror))
+                }
+              }
+            }
+
+            optionEditor("Resolution and refresh rate", isOn: $display.mode.isIncluded) {
+              Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                  Text("Logical width")
+                  TextField("Logical width", value: $display.mode.value.width, format: .number)
+                }
+                GridRow {
+                  Text("Logical height")
+                  TextField("Logical height", value: $display.mode.value.height, format: .number)
+                }
+                GridRow {
+                  Text("Pixel width")
+                  TextField("Pixel width", value: $display.mode.value.pixelWidth, format: .number)
+                }
+                GridRow {
+                  Text("Pixel height")
+                  TextField("Pixel height", value: $display.mode.value.pixelHeight, format: .number)
+                }
+                GridRow {
+                  Text("Refresh rate")
+                  HStack {
+                    TextField(
+                      "Refresh rate",
+                      value: $display.mode.value.refreshRate,
+                      format: .number.precision(.fractionLength(0...2))
+                    )
+                    Text("Hz")
+                      .foregroundStyle(.secondary)
+                  }
+                }
+              }
+            }
+
+            optionEditor("Rotation", isOn: $display.rotationDegrees.isIncluded) {
+              Picker("Rotation", selection: $display.rotationDegrees.value) {
+                Text("0°").tag(0)
+                Text("90°").tag(90)
+                Text("180°").tag(180)
+                Text("270°").tag(270)
+              }
+              .pickerStyle(.segmented)
+              unsupportedDisplayOptionNotice
+            }
+
+            optionEditor("Active state", isOn: $display.isActive.isIncluded) {
+              Picker("Active state value", selection: $display.isActive.value) {
+                Text("Active").tag(true)
+                Text("Inactive").tag(false)
+              }
+              .pickerStyle(.segmented)
+              unsupportedDisplayOptionNotice
+            }
           }
+        } label: {
+          Label(displayName(display), systemImage: "display")
+            .font(.headline)
         }
       }
-      .padding(.vertical, 4)
     }
+  }
+
+  @ViewBuilder
+  private var audioOptions: some View {
+    audioDeviceOption(
+      "Default input device",
+      option: $profile.settings.audio.value.defaultInputUID,
+      scope: .input
+    )
+    audioDeviceOption(
+      "Default output device",
+      option: $profile.settings.audio.value.defaultOutputUID,
+      scope: .output
+    )
+    audioDeviceOption(
+      "System output device",
+      option: $profile.settings.audio.value.systemOutputUID,
+      scope: .output
+    )
+
+    optionEditor("Output volume", isOn: $profile.settings.audio.value.outputVolume.isIncluded) {
+      HStack {
+        TextField(
+          "Volume percent",
+          value: percentageBinding($profile.settings.audio.value.outputVolume.value),
+          format: .number.precision(.fractionLength(0...1))
+        )
+        Text("%")
+          .foregroundStyle(.secondary)
+      }
+      Text("Enter a value from 0 to 100 percent.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+
+    optionEditor("Output mute", isOn: $profile.settings.audio.value.outputMuted.isIncluded) {
+      optionalBooleanPicker(
+        "Output mute value",
+        selection: $profile.settings.audio.value.outputMuted.value
+      )
+    }
+  }
+
+  @ViewBuilder
+  private var networkOptions: some View {
+    optionEditor("Wi-Fi power", isOn: $profile.settings.network.value.wifiPower.isIncluded) {
+      optionalBooleanPicker(
+        "Wi-Fi power value",
+        selection: $profile.settings.network.value.wifiPower.value
+      )
+    }
+
+    optionEditor("Wi-Fi network", isOn: $profile.settings.network.value.wifiSSID.isIncluded) {
+      TextField(
+        "Network name",
+        text: optionalStringBinding($profile.settings.network.value.wifiSSID.value)
+      )
+      if let currentSSID = conditionContext.wifiSSID,
+        currentSSID != profile.settings.network.value.wifiSSID.value
+      {
+        Button("Use Current Wi-Fi Network") {
+          profile.settings.network.value.wifiSSID.value = currentSSID
+        }
+      }
+    }
+
+    optionEditor("IPv4 configuration", isOn: $profile.settings.network.value.ipv4.isIncluded) {
+      Picker(
+        "IPv4 method",
+        selection: ipv4ModeBinding($profile.settings.network.value.ipv4.value)
+      ) {
+        Text("Choose").tag(Optional<IPv4EditorMode>.none)
+        Text("DHCP").tag(Optional(IPv4EditorMode.dhcp))
+        Text("Manual").tag(Optional(IPv4EditorMode.manual))
+      }
+      .pickerStyle(.segmented)
+
+      if ipv4ModeBinding($profile.settings.network.value.ipv4.value).wrappedValue == .manual {
+        TextField(
+          "IP address",
+          text: manualIPv4AddressBinding($profile.settings.network.value.ipv4.value)
+        )
+        TextField(
+          "Subnet mask",
+          text: manualIPv4SubnetBinding($profile.settings.network.value.ipv4.value)
+        )
+        TextField(
+          "Router (optional)",
+          text: manualIPv4RouterBinding($profile.settings.network.value.ipv4.value)
+        )
+      }
+      unsupportedNetworkOptionNotice
+    }
+
+    optionEditor("DNS servers", isOn: $profile.settings.network.value.dnsServers.isIncluded) {
+      TextField(
+        "DNS servers, separated by commas or new lines",
+        text: stringListBinding($profile.settings.network.value.dnsServers.value),
+        axis: .vertical
+      )
+      .lineLimit(2...5)
+      unsupportedNetworkOptionNotice
+    }
+
+    proxyOptionEditor(
+      "Web proxy",
+      option: $profile.settings.network.value.webProxy
+    )
+    proxyOptionEditor(
+      "Secure web proxy",
+      option: $profile.settings.network.value.secureWebProxy
+    )
+  }
+
+  @ViewBuilder
+  private var inputOptions: some View {
+    Label(
+      "Experimental: macOS does not document the stability of these global preference keys.",
+      systemImage: "testtube.2"
+    )
+    .font(.caption)
+    .foregroundStyle(.secondary)
+
+    optionEditor("Pointer speed", isOn: $profile.settings.input.value.pointerSpeed.isIncluded) {
+      optionalNumberField(
+        "Pointer speed value",
+        value: $profile.settings.input.value.pointerSpeed.value,
+        rangeDescription: "Allowed range: −1 to 10."
+      )
+    }
+
+    optionEditor(
+      "Natural scrolling",
+      isOn: $profile.settings.input.value.naturalScrolling.isIncluded
+    ) {
+      optionalBooleanPicker(
+        "Natural scrolling value",
+        selection: $profile.settings.input.value.naturalScrolling.value
+      )
+    }
+
+    optionEditor("Key repeat", isOn: $profile.settings.input.value.keyRepeatInterval.isIncluded) {
+      optionalNumberField(
+        "Key repeat value",
+        value: $profile.settings.input.value.keyRepeatInterval.value,
+        rangeDescription: "Allowed range: 1 to 120. Lower values repeat faster."
+      )
+    }
+
+    optionEditor(
+      "Initial key repeat delay",
+      isOn: $profile.settings.input.value.initialKeyRepeatDelay.isIncluded
+    ) {
+      optionalNumberField(
+        "Initial key repeat delay value",
+        value: $profile.settings.input.value.initialKeyRepeatDelay.value,
+        rangeDescription: "Allowed range: 1 to 300."
+      )
+    }
+
+    optionEditor(
+      "Use F1–F12 as standard function keys",
+      isOn: $profile.settings.input.value.useStandardFunctionKeys.isIncluded
+    ) {
+      optionalBooleanPicker(
+        "Function key value",
+        selection: $profile.settings.input.value.useStandardFunctionKeys.value
+      )
+    }
+  }
+
+  @ViewBuilder
+  private func settingGroupEditor<Content: View>(
+    _ title: LocalizedStringKey,
+    systemImage: String,
+    isOn: Binding<Bool>,
+    summary: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    Section {
+      Toggle(isOn: isOn) {
+        Label(title, systemImage: systemImage)
+          .font(.headline)
+      }
+
+      if isOn.wrappedValue {
+        content()
+          .padding(.leading, 4)
+      } else {
+        Text(summary)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(3)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func optionEditor<Content: View>(
+    _ title: LocalizedStringKey,
+    isOn: Binding<Bool>,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Toggle(title, isOn: isOn)
+      if isOn.wrappedValue {
+        VStack(alignment: .leading, spacing: 8) {
+          content()
+        }
+        .padding(.leading, 20)
+      }
+    }
+    .padding(.vertical, 3)
+  }
+
+  @ViewBuilder
+  private func audioDeviceOption(
+    _ title: LocalizedStringKey,
+    option: Binding<SettingOption<String?>>,
+    scope: AudioDeviceScope
+  ) -> some View {
+    optionEditor(title, isOn: option.isIncluded) {
+      let choices = audioDeviceChoices.filter { $0.scopes.contains(scope) }
+      Picker("Device", selection: option.value) {
+        Text("Choose a device").tag(Optional<String>.none)
+        ForEach(choices) { choice in
+          Text(choice.name).tag(Optional(choice.uid))
+        }
+        if let savedUID = option.wrappedValue.value,
+          !choices.contains(where: { $0.uid == savedUID })
+        {
+          Text("Saved device — currently disconnected")
+            .tag(Optional(savedUID))
+        }
+      }
+
+      DisclosureGroup("Advanced") {
+        TextField("Device UID", text: optionalStringBinding(option.value))
+          .font(.caption.monospaced())
+      }
+    }
+  }
+
+  private func optionalBooleanPicker(
+    _ title: LocalizedStringKey,
+    selection: Binding<Bool?>
+  ) -> some View {
+    Picker(title, selection: selection) {
+      Text("Choose").tag(Optional<Bool>.none)
+      Text("On").tag(Optional(true))
+      Text("Off").tag(Optional(false))
+    }
+    .pickerStyle(.segmented)
+  }
+
+  @ViewBuilder
+  private func optionalNumberField(
+    _ title: LocalizedStringKey,
+    value: Binding<Double?>,
+    rangeDescription: LocalizedStringKey
+  ) -> some View {
+    TextField(
+      title,
+      value: value,
+      format: .number.precision(.fractionLength(0...2))
+    )
+    Text(rangeDescription)
+      .font(.caption)
+      .foregroundStyle(.secondary)
+  }
+
+  @ViewBuilder
+  private func proxyOptionEditor(
+    _ title: LocalizedStringKey,
+    option: Binding<SettingOption<ProxyConfiguration?>>
+  ) -> some View {
+    optionEditor(title, isOn: option.isIncluded) {
+      Picker("Proxy mode", selection: proxyModeBinding(option.value)) {
+        Text("Choose").tag(Optional<ProxyEditorMode>.none)
+        Text("Disabled").tag(Optional(ProxyEditorMode.disabled))
+        Text("Enabled").tag(Optional(ProxyEditorMode.enabled))
+      }
+      .pickerStyle(.segmented)
+
+      if proxyModeBinding(option.value).wrappedValue == .enabled {
+        TextField("Proxy host", text: proxyHostBinding(option.value))
+        TextField("Proxy port", value: proxyPortBinding(option.value), format: .number)
+      }
+      unsupportedNetworkOptionNotice
+    }
+  }
+
+  private var unsupportedDisplayOptionNotice: some View {
+    Label(
+      "This display value is preserved for snapshots, but the current adapter does not apply it.",
+      systemImage: "exclamationmark.circle"
+    )
+    .font(.caption)
+    .foregroundStyle(.secondary)
+  }
+
+  private var unsupportedNetworkOptionNotice: some View {
+    Label(
+      "This network value is preserved for snapshots, but the current adapter does not apply administrative network settings.",
+      systemImage: "exclamationmark.circle"
+    )
+    .font(.caption)
+    .foregroundStyle(.secondary)
   }
 
   private func summaryPreview(for group: SettingGroup) -> String {
@@ -837,26 +1134,264 @@ private struct ProfileEditorForm: View {
     ProfilePresentationBuilder()
   }
 
-  private var detectedConditionDisplays: [DisplayIdentity] {
-    conditionContext.displays.sorted {
-      displayChoiceSortKey($0) < displayChoiceSortKey($1)
+  private func displayName(_ display: DisplayTargetSettings) -> String {
+    let name = display.identity.productName?.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let name, !name.isEmpty {
+      return name
     }
+    return display.identity.isBuiltIn
+      ? appLocalized("Built-in display") : appLocalized("External display")
   }
 
-  private func displayChoiceSortKey(_ identity: DisplayIdentity) -> String {
-    let name = identity.productName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    let builtInOrder = identity.isBuiltIn ? "0" : "1"
-    let technicalTieBreaker =
-      identity.uuid?.uuidString
-      ?? [identity.vendorID, identity.modelID, identity.serialNumber]
-      .map { $0.map(String.init) ?? "" }
-      .joined(separator: ":")
-    return "\(builtInOrder)|\(name)|\(technicalTieBreaker)"
+  private func mirrorTargets(excluding id: UUID) -> [DisplayTargetSettings] {
+    profile.settings.display.value.displays.filter { $0.id != id }
+  }
+
+  private func mirroredIdentity(_ mirroring: DisplayMirroring) -> DisplayIdentity? {
+    guard case .mirrors(let identity) = mirroring else { return nil }
+    return identity
+  }
+
+  private func mirroredDisplayBinding(
+    _ mirroring: Binding<DisplayMirroring>
+  ) -> Binding<DisplayIdentity?> {
+    Binding(
+      get: { mirroredIdentity(mirroring.wrappedValue) },
+      set: { identity in
+        mirroring.wrappedValue = identity.map(DisplayMirroring.mirrors) ?? .extended
+      }
+    )
+  }
+
+  private var audioDeviceChoices: [AudioDeviceChoice] {
+    var choicesByUID: [String: AudioDeviceChoice] = [:]
+    for item in systemSnapshot?.result(for: .audio)?.items ?? [] {
+      let prefix = "device:"
+      guard item.state == .detected, item.key.hasPrefix(prefix) else { continue }
+      let uid = String(item.key.dropFirst(prefix.count))
+      guard !uid.isEmpty else { continue }
+      var scopes = Set<AudioDeviceScope>()
+      if item.detail.contains("Input") { scopes.insert(.input) }
+      if item.detail.contains("Output") { scopes.insert(.output) }
+      choicesByUID[uid] = AudioDeviceChoice(uid: uid, name: item.label, scopes: scopes)
+    }
+
+    let detectedUIDs = conditionContext.audioInputUIDs.union(conditionContext.audioOutputUIDs)
+      .sorted()
+    for (index, uid) in detectedUIDs.enumerated() {
+      var scopes = choicesByUID[uid]?.scopes ?? []
+      if conditionContext.audioInputUIDs.contains(uid) { scopes.insert(.input) }
+      if conditionContext.audioOutputUIDs.contains(uid) { scopes.insert(.output) }
+      let fallbackRole: String
+      switch (scopes.contains(.input), scopes.contains(.output)) {
+      case (true, true): fallbackRole = appLocalized("Detected audio device")
+      case (true, false): fallbackRole = appLocalized("Detected input device")
+      case (false, true): fallbackRole = appLocalized("Detected output device")
+      case (false, false): continue
+      }
+      choicesByUID[uid] = AudioDeviceChoice(
+        uid: uid,
+        name: choicesByUID[uid]?.name ?? "\(fallbackRole) \(index + 1)",
+        scopes: scopes
+      )
+    }
+
+    return choicesByUID.values
+      .sorted {
+        let nameOrder = $0.name.localizedCaseInsensitiveCompare($1.name)
+        return nameOrder == .orderedSame ? $0.uid < $1.uid : nameOrder == .orderedAscending
+      }
+  }
+
+  private func optionalStringBinding(_ value: Binding<String?>) -> Binding<String> {
+    Binding(
+      get: { value.wrappedValue ?? "" },
+      set: { updated in
+        value.wrappedValue = updated.isEmpty ? nil : updated
+      }
+    )
+  }
+
+  private func percentageBinding(_ value: Binding<Double?>) -> Binding<Double?> {
+    Binding(
+      get: { value.wrappedValue.map { $0 * 100 } },
+      set: { value.wrappedValue = $0.map { $0 / 100 } }
+    )
+  }
+
+  private func stringListBinding(_ values: Binding<[String]>) -> Binding<String> {
+    Binding(
+      get: { values.wrappedValue.joined(separator: ", ") },
+      set: { text in
+        values.wrappedValue =
+          text
+          .split(whereSeparator: { $0 == "," || $0 == "\n" })
+          .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+          .filter { !$0.isEmpty }
+      }
+    )
+  }
+
+  private func ipv4ModeBinding(
+    _ configuration: Binding<IPv4Configuration?>
+  ) -> Binding<IPv4EditorMode?> {
+    Binding(
+      get: {
+        switch configuration.wrappedValue {
+        case .dhcp?: .dhcp
+        case .manual?: .manual
+        case nil: nil
+        }
+      },
+      set: { mode in
+        switch mode {
+        case .dhcp?:
+          configuration.wrappedValue = .dhcp
+        case .manual?:
+          if case .manual? = configuration.wrappedValue { return }
+          configuration.wrappedValue = .manual(address: "", subnetMask: "", router: nil)
+        case nil:
+          configuration.wrappedValue = nil
+        }
+      }
+    )
+  }
+
+  private func manualIPv4AddressBinding(
+    _ configuration: Binding<IPv4Configuration?>
+  ) -> Binding<String> {
+    Binding(
+      get: {
+        guard case .manual(let address, _, _)? = configuration.wrappedValue else { return "" }
+        return address
+      },
+      set: { address in
+        guard case .manual(_, let subnet, let router)? = configuration.wrappedValue else { return }
+        configuration.wrappedValue = .manual(
+          address: address,
+          subnetMask: subnet,
+          router: router
+        )
+      }
+    )
+  }
+
+  private func manualIPv4SubnetBinding(
+    _ configuration: Binding<IPv4Configuration?>
+  ) -> Binding<String> {
+    Binding(
+      get: {
+        guard case .manual(_, let subnet, _)? = configuration.wrappedValue else { return "" }
+        return subnet
+      },
+      set: { subnet in
+        guard case .manual(let address, _, let router)? = configuration.wrappedValue else { return }
+        configuration.wrappedValue = .manual(
+          address: address,
+          subnetMask: subnet,
+          router: router
+        )
+      }
+    )
+  }
+
+  private func manualIPv4RouterBinding(
+    _ configuration: Binding<IPv4Configuration?>
+  ) -> Binding<String> {
+    Binding(
+      get: {
+        guard case .manual(_, _, let router)? = configuration.wrappedValue else { return "" }
+        return router ?? ""
+      },
+      set: { router in
+        guard case .manual(let address, let subnet, _)? = configuration.wrappedValue else { return }
+        configuration.wrappedValue = .manual(
+          address: address,
+          subnetMask: subnet,
+          router: router.isEmpty ? nil : router
+        )
+      }
+    )
+  }
+
+  private func proxyModeBinding(
+    _ configuration: Binding<ProxyConfiguration?>
+  ) -> Binding<ProxyEditorMode?> {
+    Binding(
+      get: {
+        guard let proxy = configuration.wrappedValue else { return nil }
+        return proxy.enabled ? .enabled : .disabled
+      },
+      set: { mode in
+        guard let mode else {
+          configuration.wrappedValue = nil
+          return
+        }
+        var proxy =
+          configuration.wrappedValue
+          ?? ProxyConfiguration(enabled: false, host: "", port: 8080)
+        proxy.enabled = mode == .enabled
+        configuration.wrappedValue = proxy
+      }
+    )
+  }
+
+  private func proxyHostBinding(
+    _ configuration: Binding<ProxyConfiguration?>
+  ) -> Binding<String> {
+    Binding(
+      get: { configuration.wrappedValue?.host ?? "" },
+      set: { host in
+        var proxy =
+          configuration.wrappedValue
+          ?? ProxyConfiguration(enabled: true, host: "", port: 8080)
+        proxy.host = host
+        configuration.wrappedValue = proxy
+      }
+    )
+  }
+
+  private func proxyPortBinding(
+    _ configuration: Binding<ProxyConfiguration?>
+  ) -> Binding<Int> {
+    Binding(
+      get: { configuration.wrappedValue?.port ?? 8080 },
+      set: { port in
+        var proxy =
+          configuration.wrappedValue
+          ?? ProxyConfiguration(enabled: true, host: "", port: 8080)
+        proxy.port = port
+        configuration.wrappedValue = proxy
+      }
+    )
   }
 
   private var iconChoices: [ProfileIconChoice] {
     profileIconChoices
   }
+}
+
+private enum AudioDeviceScope: Hashable {
+  case input
+  case output
+}
+
+private struct AudioDeviceChoice: Identifiable {
+  let uid: String
+  let name: String
+  let scopes: Set<AudioDeviceScope>
+
+  var id: String { uid }
+}
+
+private enum IPv4EditorMode: Hashable {
+  case dhcp
+  case manual
+}
+
+private enum ProxyEditorMode: Hashable {
+  case disabled
+  case enabled
 }
 
 private struct ProfileIconChoice {

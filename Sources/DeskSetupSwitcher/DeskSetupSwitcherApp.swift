@@ -150,6 +150,9 @@ private struct MenuContentView: View {
   @Binding var selectedSettingsTab: SettingsTab
   @State private var isCaptureDraftPromptPresented = false
   @State private var captureDraftSaveError: String?
+  @State private var captureOperationError: String?
+  @State private var transientCaptureMessage: String?
+  @State private var transientCaptureTask: Task<Void, Never>?
 
   var body: some View {
     Group {
@@ -178,7 +181,7 @@ private struct MenuContentView: View {
       }
       Button("Discard Changes and Capture", role: .destructive) {
         profileEditor.revertDraft()
-        model.createProfileFromCurrentSettings()
+        Task { await performCapture() }
       }
       Button("Cancel", role: .cancel) {}
     } message: {
@@ -195,18 +198,74 @@ private struct MenuContentView: View {
     } message: {
       Text(captureDraftSaveError ?? "")
     }
+    .alert(
+      "Could Not Capture Current Settings",
+      isPresented: Binding(
+        get: { captureOperationError != nil },
+        set: { if !$0 { captureOperationError = nil } }
+      )
+    ) {
+      Button("OK") { captureOperationError = nil }
+    } message: {
+      Text(captureOperationError ?? "")
+    }
     .onAppear {
       // Opening the menu is an explicit, read-only refresh point so hot-plugged
       // devices and network changes do not leave readiness permanently stale.
       model.refreshReadinessFacts()
     }
+    .onDisappear {
+      transientCaptureTask?.cancel()
+      transientCaptureTask = nil
+      transientCaptureMessage = nil
+    }
   }
 
   private var menuBody: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Label("Desk Setup Switcher", systemImage: "switch.2")
-        .font(.headline)
-        .accessibilityAddTraits(.isHeader)
+      HStack(spacing: 8) {
+        Label("Desk Setup Switcher", systemImage: "switch.2")
+          .font(.headline)
+          .accessibilityAddTraits(.isHeader)
+
+        Spacer()
+
+        Button {
+          requestCaptureCurrentSettings()
+        } label: {
+          Label("Capture", systemImage: "camera.metering.center.weighted")
+        }
+        .disabled(
+          model.isProfileMutationLocked || profileEditor.session.pendingSelection != nil
+        )
+        .accessibilityLabel("Capture Current Settings")
+        .help("Reads current settings without changing the Mac and creates a profile.")
+
+        Button {
+          presentSettings()
+        } label: {
+          Label("Settings", systemImage: "gearshape")
+            .labelStyle(.iconOnly)
+        }
+        .keyboardShortcut(",")
+        .accessibilityLabel("Settings")
+        .help("Settings")
+
+        Button {
+          NSApplication.shared.terminate(nil)
+        } label: {
+          Label("Quit Desk Setup Switcher", systemImage: "power")
+            .labelStyle(.iconOnly)
+        }
+        .keyboardShortcut("q")
+        .disabled(model.isProfileMutationLocked)
+        .accessibilityLabel("Quit Desk Setup Switcher")
+        .help(
+          model.isProfileMutationLocked
+            ? "Quit becomes available after the current apply transaction is safely recorded."
+            : "Quit Desk Setup Switcher"
+        )
+      }
 
       Divider()
 
@@ -243,48 +302,12 @@ private struct MenuContentView: View {
         .frame(width: 340, height: profileListHeight)
       }
 
-      Label(model.lastMessage, systemImage: "info.circle")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .accessibilityLabel(appLocalized("Last result: \(model.lastMessage)"))
-
-      HStack {
-        Button {
-          requestCaptureCurrentSettings()
-        } label: {
-          Label("Capture Current Settings", systemImage: "camera.metering.center.weighted")
-        }
-        .disabled(
-          model.isProfileMutationLocked || profileEditor.session.pendingSelection != nil
-        )
-        .accessibilityLabel("Capture Current Settings")
-        .help("Reads current settings without changing the Mac and creates a profile.")
-
-        Spacer()
-
-        Button {
-          presentSettings()
-        } label: {
-          Label("Settings", systemImage: "gearshape")
-        }
-        .keyboardShortcut(",")
-        .accessibilityLabel("Settings")
-        .help("Settings")
+      if let transientCaptureMessage {
+        Label(transientCaptureMessage, systemImage: "checkmark.circle")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .transition(.opacity)
       }
-
-      Divider()
-
-      Button("Quit Desk Setup Switcher") {
-        NSApplication.shared.terminate(nil)
-      }
-      .keyboardShortcut("q")
-      .disabled(model.isProfileMutationLocked)
-      .accessibilityLabel("Quit Desk Setup Switcher")
-      .help(
-        model.isProfileMutationLocked
-          ? "Quit becomes available after the current apply transaction is safely recorded."
-          : "Quit Desk Setup Switcher"
-      )
     }
     .padding(14)
   }
@@ -296,7 +319,7 @@ private struct MenuContentView: View {
   private func requestCaptureCurrentSettings() {
     guard profileEditor.session.pendingSelection == nil else { return }
     guard profileEditor.isDirty else {
-      model.createProfileFromCurrentSettings()
+      Task { await performCapture() }
       return
     }
     isCaptureDraftPromptPresented = true
@@ -332,10 +355,31 @@ private struct MenuContentView: View {
         )
         return
       }
-      model.createProfileFromCurrentSettings()
+      await performCapture()
     case .rejected(let message):
       profileEditor.finishWithError(message)
       captureDraftSaveError = message
+    }
+  }
+
+  private func performCapture() async {
+    transientCaptureTask?.cancel()
+    transientCaptureTask = nil
+    transientCaptureMessage = nil
+
+    switch await model.createProfileFromCurrentSettings() {
+    case .created:
+      let message = appLocalized("Captured current settings without changing the Mac.")
+      transientCaptureMessage = message
+      AccessibilityNotification.Announcement(message).post()
+      transientCaptureTask = Task { @MainActor in
+        try? await Task.sleep(for: .seconds(3))
+        guard !Task.isCancelled else { return }
+        transientCaptureMessage = nil
+        transientCaptureTask = nil
+      }
+    case .rejected(let message):
+      captureOperationError = message
     }
   }
 
@@ -388,22 +432,6 @@ private struct MenuContentView: View {
         .accessibilityLabel(appLocalized("Edit \(profile.name)"))
         .help("Edit Profile")
 
-        Menu {
-          Button("Apply Available Settings…") {
-            model.prepareApply(profile: profile, mode: .force)
-          }
-          .disabled(!actions.forceApply.isEnabled)
-
-          if let reason = actions.forceApply.disabledReason {
-            Text(appLocalizedRuntime(reason.defaultMessage))
-          }
-        } label: {
-          Label("More Profile Actions", systemImage: "ellipsis.circle")
-            .labelStyle(.iconOnly)
-        }
-        .menuStyle(.borderlessButton)
-        .accessibilityLabel("More Profile Actions")
-        .help("Previews omissions, then applies only the currently available settings.")
       }
     }
     .padding(10)

@@ -162,6 +162,45 @@ final class ProfileDraftSessionTests: XCTestCase {
     XCTAssertFalse(session.isDirty)
   }
 
+  func testSettingInclusionTogglesPreserveValuesAndLegacyConditions() throws {
+    var original = makeProfile(id: profileAID, name: "Home")
+    original.settings.audio = .init(
+      isIncluded: true,
+      value: .init(outputVolume: .init(isIncluded: true, value: 0.42))
+    )
+    original.conditions = ProfileConditionSet(
+      mode: .any,
+      conditions: [ProfileCondition(kind: .ethernetConnected)]
+    )
+    var session = ProfileDraftSession(selectedProfile: original)
+
+    XCTAssertTrue(
+      session.updateDraft {
+        $0.settings.audio.value.outputVolume.isIncluded = false
+        $0.settings.audio.isIncluded = false
+      }
+    )
+
+    var draft = try XCTUnwrap(session.draft)
+    XCTAssertFalse(draft.settings.audio.isIncluded)
+    XCTAssertFalse(draft.settings.audio.value.outputVolume.isIncluded)
+    XCTAssertEqual(draft.settings.audio.value.outputVolume.value, 0.42)
+    XCTAssertEqual(draft.conditions, original.conditions)
+
+    XCTAssertTrue(
+      session.updateDraft {
+        $0.settings.audio.isIncluded = true
+        $0.settings.audio.value.outputVolume.isIncluded = true
+      }
+    )
+
+    draft = try XCTUnwrap(session.draft)
+    XCTAssertTrue(draft.settings.audio.isIncluded)
+    XCTAssertTrue(draft.settings.audio.value.outputVolume.isIncluded)
+    XCTAssertEqual(draft.settings.audio.value.outputVolume.value, 0.42)
+    XCTAssertEqual(draft.conditions, original.conditions)
+  }
+
   func testSaveCandidatePreservesLatestNonUserMetadata() throws {
     let saved = makeProfile(id: profileAID, name: "Home", metadataSeed: 10)
     var edited = saved

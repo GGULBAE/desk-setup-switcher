@@ -14,7 +14,12 @@ final class ProfileStoreTests: XCTestCase {
     XCTAssertEqual(initial.status, .createdEmpty)
 
     let first = try await store.createProfile(DeskProfile(id: UUID(), name: "Home"))
-    let second = try await store.createProfile(DeskProfile(id: UUID(), name: "Office"))
+    let second = try await store.createProfile(
+      DeskProfile(id: UUID(), name: "Office"),
+      selecting: true
+    )
+    let selectedAfterAtomicCreation = await store.currentDocument().selectedProfileID
+    XCTAssertEqual(selectedAfterAtomicCreation, second.id)
     let copyID = UUID()
     let copy = try await store.duplicateProfile(id: first.id, newID: copyID, name: "Home Alt")
     try await store.moveProfile(id: copy.id, toIndex: 0)

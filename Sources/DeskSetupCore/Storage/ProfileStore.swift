@@ -98,7 +98,10 @@ public actor ProfileStore {
   }
 
   @discardableResult
-  public func createProfile(_ profile: DeskProfile) throws -> DeskProfile {
+  public func createProfile(
+    _ profile: DeskProfile,
+    selecting: Bool = false
+  ) throws -> DeskProfile {
     try ensureLoaded()
     guard !document.profiles.contains(where: { $0.id == profile.id }) else {
       throw ProfileStorageError.profileAlreadyExists(profile.id)
@@ -110,7 +113,9 @@ public actor ProfileStore {
 
     var candidate = document
     candidate.profiles.append(created)
-    candidate.selectedProfileID = candidate.selectedProfileID ?? created.id
+    if selecting || candidate.selectedProfileID == nil {
+      candidate.selectedProfileID = created.id
+    }
     candidate.updatedAt = timestamp
     try replaceCurrent(with: candidate)
     return created

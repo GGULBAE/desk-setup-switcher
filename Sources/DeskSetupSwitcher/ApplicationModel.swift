@@ -116,6 +116,11 @@ enum ProfileSettingsCaptureResult: Equatable, Sendable {
   case rejected(message: String)
 }
 
+enum ProfileCreationCaptureResult: Equatable, Sendable {
+  case created(DeskProfile)
+  case rejected(message: String)
+}
+
 private func makeDefaultDiagnosticLog() -> (any DiagnosticLogStoring)? {
   let directory = ProfileStore.defaultDirectoryURL.appendingPathComponent(
     "Diagnostics", isDirectory: true)
@@ -308,8 +313,7 @@ final class ApplicationModel: ObservableObject {
       defer { finishProfileStoreMutation() }
       do {
         let profile = DeskProfile(name: appLocalized("New Profile \(profiles.count + 1)"))
-        let created = try await profileStore.createProfile(profile)
-        try await profileStore.selectProfile(id: created.id)
+        let created = try await profileStore.createProfile(profile, selecting: true)
         await refreshProfiles(message: appLocalized("Created \(created.name)."))
       } catch {
         reportStorageError(error)
@@ -475,30 +479,41 @@ final class ApplicationModel: ObservableObject {
     }
   }
 
-  func createProfileFromCurrentSettings() {
-    guard beginProfileStoreMutation() else { return }
+  func createProfileFromCurrentSettings() async -> ProfileCreationCaptureResult {
+    guard beginProfileStoreMutation() else {
+      return .rejected(message: profileEditingLockedMessage)
+    }
+    defer { finishProfileStoreMutation() }
     snapshotStatus = appLocalized("Reading current settings without changing them…")
-    Task {
-      defer { finishProfileStoreMutation() }
-      let snapshot = await snapshotCoordinator.capture()
-      lastSnapshot = snapshot
-      snapshotStatus = snapshotSummary(snapshot)
-      recordSnapshotDiagnostic(snapshot)
 
-      do {
-        let profile = DeskProfile(
-          name: appLocalized("Current Setup \(profiles.count + 1)"),
-          profileDescription: appLocalized("Created from a read-only system snapshot."),
-          settings: snapshot.profileSettings
-        )
-        let created = try await profileStore.createProfile(profile)
-        try await profileStore.selectProfile(id: created.id)
-        await refreshProfiles(
-          message: appLocalized("Created \(created.name) from the current settings."))
-        lastMessage = appLocalized("Captured current settings without changing the Mac.")
-      } catch {
-        reportStorageError(error)
-      }
+    let snapshot = await snapshotCoordinator.capture()
+    lastSnapshot = snapshot
+    snapshotStatus = snapshotSummary(snapshot)
+    recordSnapshotDiagnostic(snapshot)
+
+    guard
+      SettingGroup.safeApplicationSequence.contains(where: {
+        snapshot.profileSettings.payload(for: $0) != nil
+      })
+    else {
+      return .rejected(
+        message: appLocalized("No settings could be added safely from this snapshot."))
+    }
+
+    do {
+      let profile = DeskProfile(
+        name: appLocalized("Current Setup \(profiles.count + 1)"),
+        profileDescription: appLocalized("Created from a read-only system snapshot."),
+        settings: snapshot.profileSettings
+      )
+      let created = try await profileStore.createProfile(profile, selecting: true)
+      await refreshProfiles(
+        message: appLocalized("Created \(created.name) from the current settings."))
+      return .created(created)
+    } catch {
+      let message = profileStorageUserMessage(for: error)
+      reportStorageError(error)
+      return .rejected(message: message)
     }
   }
 
@@ -513,7 +528,6 @@ final class ApplicationModel: ObservableObject {
     lastSnapshot = snapshot
     snapshotStatus = snapshotSummary(snapshot)
     recordSnapshotDiagnostic(snapshot)
-    lastMessage = appLocalized("Captured current settings without changing the Mac.")
     return .captured(snapshot)
   }
 
