@@ -33,6 +33,8 @@ for strings_file in Sources/DeskSetupSwitcher/Resources/{en,ko}.lproj/{InfoPlist
     plutil -lint "$strings_file"
 done
 
+ruby scripts/validate-localizations.rb
+
 xcodebuild \
     -project DeskSetupSwitcher.xcodeproj \
     -list \

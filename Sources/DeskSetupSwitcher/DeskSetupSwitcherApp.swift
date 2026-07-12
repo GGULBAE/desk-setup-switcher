@@ -1,18 +1,97 @@
 import AppKit
+import Combine
 import SwiftUI
 
 #if canImport(DeskSetupCore)
   import DeskSetupCore
 #endif
+#if canImport(DeskSetupPresentation)
+  import DeskSetupPresentation
+#endif
 
 @MainActor
 private final class DeskSetupSwitcherAppDelegate: NSObject, NSApplicationDelegate {
   weak var model: ApplicationModel?
+  weak var profileEditor: ProfileEditorModel?
+  private var terminationObservation: AnyCancellable?
+  private var isSavingBeforeTermination = false
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    if isSavingBeforeTermination || terminationObservation != nil {
+      return .terminateLater
+    }
+
+    if let profileEditor, profileEditor.activity.isBusy {
+      terminationObservation = profileEditor.$activity
+        .filter { !$0.isBusy }
+        .prefix(1)
+        .sink { [weak self, weak sender] _ in
+          Task { @MainActor in
+            self?.terminationObservation = nil
+            sender?.reply(toApplicationShouldTerminate: false)
+            sender?.terminate(nil)
+          }
+        }
+      return .terminateLater
+    }
+
+    if let profileEditor, profileEditor.isDirty {
+      let alert = NSAlert()
+      alert.alertStyle = .warning
+      alert.messageText = appLocalized("Save profile changes before quitting?")
+      alert.informativeText = appLocalized(
+        "This profile has unsaved changes that will be lost if you quit without saving.")
+      alert.addButton(withTitle: appLocalized("Save and Quit"))
+      alert.addButton(withTitle: appLocalized("Quit Without Saving"))
+      alert.addButton(withTitle: appLocalized("Cancel"))
+
+      switch alert.runModal() {
+      case .alertFirstButtonReturn:
+        guard let model, let candidate = profileEditor.session.saveCandidate() else {
+          return .terminateCancel
+        }
+        isSavingBeforeTermination = true
+        profileEditor.beginSaving()
+        Task {
+          switch await model.updateProfile(candidate) {
+          case .saved(let persisted):
+            switch profileEditor.completeSave(with: persisted) {
+            case .saved, .savedAndSelected:
+              isSavingBeforeTermination = false
+              sender.reply(toApplicationShouldTerminate: true)
+            case .rejected:
+              isSavingBeforeTermination = false
+              presentTerminationSaveError(
+                appLocalized("The saved profile did not match the active draft."),
+                sender: sender
+              )
+            }
+          case .rejected(let message):
+            profileEditor.finishWithError(message)
+            isSavingBeforeTermination = false
+            presentTerminationSaveError(message, sender: sender)
+          }
+        }
+        return .terminateLater
+      case .alertSecondButtonReturn:
+        profileEditor.revertDraft()
+      default:
+        return .terminateCancel
+      }
+    }
+
     guard model?.shouldDeferTermination == true else { return .terminateNow }
     model?.deferTerminationUntilApplyCompletes()
     return .terminateLater
+  }
+
+  private func presentTerminationSaveError(_ message: String, sender: NSApplication) {
+    let errorAlert = NSAlert()
+    errorAlert.alertStyle = .critical
+    errorAlert.messageText = appLocalized("Could Not Save Profile")
+    errorAlert.informativeText = message
+    errorAlert.runModal()
+    sender.reply(toApplicationShouldTerminate: false)
   }
 }
 
@@ -22,13 +101,17 @@ struct DeskSetupSwitcherApp: App {
   @NSApplicationDelegateAdaptor(DeskSetupSwitcherAppDelegate.self) private var appDelegate
   @StateObject private var model: ApplicationModel
   @StateObject private var locationPermission: LocationPermissionController
+  @StateObject private var profileEditor: ProfileEditorModel
 
   init() {
     let model = ApplicationModel()
     let locationPermission = LocationPermissionController()
+    let profileEditor = ProfileEditorModel()
     _model = StateObject(wrappedValue: model)
     _locationPermission = StateObject(wrappedValue: locationPermission)
+    _profileEditor = StateObject(wrappedValue: profileEditor)
     appDelegate.model = model
+    appDelegate.profileEditor = profileEditor
     locationPermission.onReadinessFactsChanged = { [weak model] in
       model?.refreshReadinessFacts()
     }
@@ -41,6 +124,7 @@ struct DeskSetupSwitcherApp: App {
       MenuContentView()
         .environmentObject(model)
         .environmentObject(locationPermission)
+        .environmentObject(profileEditor)
     } label: {
       Label("Desk Setup Switcher", systemImage: "switch.2")
         .labelStyle(.iconOnly)
@@ -52,6 +136,7 @@ struct DeskSetupSwitcherApp: App {
       SettingsView()
         .environmentObject(model)
         .environmentObject(locationPermission)
+        .environmentObject(profileEditor)
         .frame(minWidth: 680, minHeight: 480)
     }
   }
@@ -59,6 +144,9 @@ struct DeskSetupSwitcherApp: App {
 
 private struct MenuContentView: View {
   @EnvironmentObject private var model: ApplicationModel
+  @EnvironmentObject private var profileEditor: ProfileEditorModel
+  @State private var isCaptureDraftPromptPresented = false
+  @State private var captureDraftSaveError: String?
 
   var body: some View {
     Group {
@@ -77,6 +165,32 @@ private struct MenuContentView: View {
     ) { request in
       ApplyPreviewView(request: request)
         .environmentObject(model)
+    }
+    .confirmationDialog(
+      "Save changes before capturing a new profile?",
+      isPresented: $isCaptureDraftPromptPresented
+    ) {
+      Button("Save and Capture") {
+        Task { await saveDraftThenCaptureCurrentSettings() }
+      }
+      Button("Discard Changes and Capture", role: .destructive) {
+        profileEditor.revertDraft()
+        model.createProfileFromCurrentSettings()
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("The open profile has changes that have not been saved.")
+    }
+    .alert(
+      "Could Not Save Profile",
+      isPresented: Binding(
+        get: { captureDraftSaveError != nil },
+        set: { if !$0 { captureDraftSaveError = nil } }
+      )
+    ) {
+      Button("OK") { captureDraftSaveError = nil }
+    } message: {
+      Text(captureDraftSaveError ?? "")
     }
     .onAppear {
       // Opening the menu is an explicit, read-only refresh point so hot-plugged
@@ -99,45 +213,29 @@ private struct MenuContentView: View {
           systemImage: "rectangle.stack.badge.plus",
           description: Text("Capture the current Mac to create your first editable profile.")
         )
-        .frame(width: 320, height: 150)
-      } else {
-        VStack(alignment: .leading, spacing: 6) {
-          ForEach(model.profiles.filter(\.isEnabled)) { profile in
-            let readiness = model.readiness(for: profile)
-            HStack {
-              Label(profile.name, systemImage: profile.symbolName)
-              Spacer()
-              Label(readinessTitle(readiness), systemImage: readinessSymbol(readiness))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(
-                  appLocalized("Profile status: \(readinessTitle(readiness))"))
-            }
-
-            HStack {
-              Button("Review Availability…") {
-                model.reviewAvailability(profile: profile)
-              }
-              .disabled(model.isProfileMutationLocked)
-              .help("Shows a current read-only plan and every availability explanation.")
-
-              Spacer()
-
-              Button("Apply") {
-                model.prepareApply(profile: profile, mode: .normal)
-              }
-              .disabled(!model.canApplyNormally(profile))
-              .help("Normal apply requires every included setting and condition to be ready.")
-
-              Button("Force Apply…") {
-                model.prepareApply(profile: profile, mode: .force)
-              }
-              .disabled(!model.canForceApply(profile))
-              .help("Previews omissions, then applies only the currently available settings.")
-            }
+        .frame(width: 340, height: 150)
+      } else if enabledProfiles.isEmpty {
+        VStack(spacing: 10) {
+          ContentUnavailableView(
+            "No Enabled Profiles",
+            systemImage: "pause.rectangle",
+            description: Text("Enable a profile in Settings before applying it.")
+          )
+          SettingsLink {
+            Label("Manage Profiles", systemImage: "slider.horizontal.3")
           }
         }
-        .frame(width: 320)
+        .frame(width: 340, height: 170)
+      } else {
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 8) {
+            ForEach(enabledProfiles) { profile in
+              profileRow(profile)
+            }
+          }
+          .padding(.trailing, 2)
+        }
+        .frame(width: 340, height: profileListHeight)
       }
 
       Label(model.lastMessage, systemImage: "info.circle")
@@ -149,9 +247,13 @@ private struct MenuContentView: View {
         Button {
           model.refreshReadinessFacts()
         } label: {
-          Label("Refresh Readiness", systemImage: "arrow.clockwise")
+          Label(
+            model.isReadinessRefreshInProgress
+              ? appLocalized("Checking Readiness…") : appLocalized("Refresh Readiness"),
+            systemImage: model.isReadinessRefreshInProgress ? "hourglass" : "arrow.clockwise"
+          )
         }
-        .disabled(model.isProfileMutationLocked)
+        .disabled(model.isProfileMutationLocked || model.isReadinessRefreshInProgress)
         .accessibilityLabel("Refresh Readiness")
         .help("Reads current system facts without changing any setting.")
 
@@ -166,11 +268,13 @@ private struct MenuContentView: View {
 
       HStack {
         Button {
-          model.createProfileFromCurrentSettings()
+          requestCaptureCurrentSettings()
         } label: {
           Label("Capture Current Settings", systemImage: "camera.metering.center.weighted")
         }
-        .disabled(model.isProfileMutationLocked)
+        .disabled(
+          model.isProfileMutationLocked || profileEditor.session.pendingSelection != nil
+        )
         .accessibilityLabel("Capture Current Settings")
         .help("Reads current settings without changing the Mac and creates a profile.")
 
@@ -199,6 +303,126 @@ private struct MenuContentView: View {
       )
     }
     .padding(14)
+  }
+
+  private var enabledProfiles: [DeskProfile] {
+    model.profiles.filter(\.isEnabled)
+  }
+
+  private func requestCaptureCurrentSettings() {
+    guard profileEditor.session.pendingSelection == nil else { return }
+    guard profileEditor.isDirty else {
+      model.createProfileFromCurrentSettings()
+      return
+    }
+    isCaptureDraftPromptPresented = true
+  }
+
+  private func saveDraftThenCaptureCurrentSettings() async {
+    guard profileEditor.session.pendingSelection == nil,
+      let candidate = profileEditor.session.saveCandidate()
+    else { return }
+
+    profileEditor.beginSaving()
+    switch await model.updateProfile(candidate) {
+    case .saved(let persisted):
+      guard case .saved = profileEditor.completeSave(with: persisted) else {
+        captureDraftSaveError = appLocalized(
+          "The saved profile did not match the active draft."
+        )
+        return
+      }
+      model.createProfileFromCurrentSettings()
+    case .rejected(let message):
+      profileEditor.finishWithError(message)
+      captureDraftSaveError = message
+    }
+  }
+
+  private var profileListHeight: CGFloat {
+    min(max(CGFloat(enabledProfiles.count) * 132, 124), 360)
+  }
+
+  private func profileRow(_ profile: DeskProfile) -> some View {
+    let readiness = model.readiness(for: profile)
+    let actions = profileActionState(profile, readiness: readiness)
+
+    return VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Label(profile.name, systemImage: appResolvedProfileSymbolName(profile.symbolName))
+          .lineLimit(2)
+          .fixedSize(horizontal: false, vertical: true)
+        Spacer()
+        Label(readinessTitle(readiness), systemImage: readinessSymbol(readiness))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .accessibilityLabel(
+            appLocalized("Profile status: \(readinessTitle(readiness))"))
+      }
+
+      if let reason = actions.apply.disabledReason {
+        Label(appLocalizedRuntime(reason.defaultMessage), systemImage: reason.symbolName)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      HStack {
+        Button("Apply") {
+          model.prepareApply(profile: profile, mode: .normal)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(!actions.apply.isEnabled)
+        .help(
+          actions.apply.disabledReason.map { appLocalizedRuntime($0.defaultMessage) }
+            ?? appLocalized("Preview and apply this complete profile."))
+
+        Spacer()
+
+        Menu {
+          Button("Review Availability…") {
+            model.reviewAvailability(profile: profile)
+          }
+          .disabled(!actions.review.isEnabled)
+
+          Divider()
+
+          Button("Apply Available Settings…") {
+            model.prepareApply(profile: profile, mode: .force)
+          }
+          .disabled(!actions.forceApply.isEnabled)
+
+          if let reason = actions.forceApply.disabledReason {
+            Text(appLocalizedRuntime(reason.defaultMessage))
+          }
+        } label: {
+          Label("More Profile Actions", systemImage: "ellipsis.circle")
+            .labelStyle(.iconOnly)
+        }
+        .menuStyle(.borderlessButton)
+        .accessibilityLabel("More Profile Actions")
+        .help("Review availability or apply only currently available settings.")
+      }
+    }
+    .padding(10)
+    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 9))
+    .accessibilityElement(children: .contain)
+  }
+
+  private func profileActionState(
+    _ profile: DeskProfile,
+    readiness: ProfileReadiness
+  ) -> MenuProfileActionState {
+    MenuProfileActionState(
+      profile: profile,
+      readiness: readiness,
+      normalApplyAvailable: model.canApplyNormally(profile),
+      forceApplyAvailable: model.canForceApply(profile),
+      isRefreshing: model.isReadinessRefreshInProgress,
+      isTransactionLocked: model.isProfileMutationLocked,
+      rejectionReasons: model.normalApplyRejectionReasonsByProfile[profile.id] ?? [],
+      forceRejectionReasons: model.forceApplyRejectionReasonsByProfile[profile.id]
+    )
   }
 
   private func readinessTitle(_ readiness: ProfileReadiness) -> String {
@@ -307,35 +531,9 @@ private struct ApplyPreviewView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                   }
-                  if let preview = operation.preview {
-                    Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 3) {
-                      GridRow {
-                        Text("Current")
-                          .font(.caption.bold())
-                        Text(
-                          appOperationPreviewValue(
-                            preview.previousValue,
-                            operation: operation,
-                            isPreviousValue: true
-                          )
-                        )
-                      }
-                      GridRow {
-                        Text("After apply")
-                          .font(.caption.bold())
-                        Text(
-                          appOperationPreviewValue(
-                            preview.desiredValue,
-                            operation: operation,
-                            isPreviousValue: false
-                          )
-                        )
-                      }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .padding(.leading, 80)
+                  if let preview = presentationBuilder.operationPreview(for: operation) {
+                    operationPreview(preview, operation: operation)
+                      .padding(.leading, 80)
                   }
                 }
                 .padding(.vertical, 3)
@@ -394,12 +592,83 @@ private struct ApplyPreviewView: View {
             model.executePendingApply()
           }
           .keyboardShortcut(.defaultAction)
+          .buttonStyle(.borderedProminent)
           .disabled(!request.preparation.canExecute || model.isProfileMutationLocked)
         }
       }
     }
     .padding(20)
-    .frame(minWidth: 560, idealWidth: 620, minHeight: 500, idealHeight: 580)
+    .frame(
+      minWidth: 560,
+      idealWidth: 620,
+      minHeight: 320,
+      idealHeight: 420,
+      maxHeight: 620
+    )
+  }
+
+  @ViewBuilder
+  private func operationPreview(
+    _ preview: FriendlyOperationPreview,
+    operation: PlannedOperation
+  ) -> some View {
+    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
+      GridRow {
+        Text("Current")
+          .font(.caption.bold())
+        Text(
+          appOperationPreviewValue(
+            preview.previousValue.compactText,
+            operation: operation,
+            isPreviousValue: true
+          )
+        )
+      }
+      GridRow {
+        Text("After apply")
+          .font(.caption.bold())
+        Text(
+          appOperationPreviewValue(
+            preview.desiredValue.compactText,
+            operation: operation,
+            isPreviousValue: false
+          )
+        )
+      }
+    }
+    .font(.caption)
+    .foregroundStyle(.secondary)
+    .textSelection(.enabled)
+
+    let previousDetails = preview.previousValue.technicalDetails
+    let desiredDetails = preview.desiredValue.technicalDetails
+    if !previousDetails.isEmpty || !desiredDetails.isEmpty {
+      DisclosureGroup("Technical Information") {
+        ForEach(Array(previousDetails.enumerated()), id: \.offset) { _, detail in
+          LabeledContent(
+            appLocalized("Current \(appLocalizedPresentationText(detail.label))")
+          ) {
+            Text(detail.value)
+              .font(.caption.monospaced())
+              .textSelection(.enabled)
+          }
+        }
+        ForEach(Array(desiredDetails.enumerated()), id: \.offset) { _, detail in
+          LabeledContent(
+            appLocalized("After apply \(appLocalizedPresentationText(detail.label))")
+          ) {
+            Text(detail.value)
+              .font(.caption.monospaced())
+              .textSelection(.enabled)
+          }
+        }
+      }
+      .font(.caption)
+    }
+  }
+
+  private var presentationBuilder: ProfilePresentationBuilder {
+    ProfilePresentationBuilder()
   }
 
   private func previewSection<Content: View>(
@@ -456,9 +725,11 @@ private struct SafetyConfirmationView: View {
 
       ProgressView(value: Double(state.secondsRemaining), total: 15)
         .accessibilityLabel("Display confirmation time remaining")
+        .accessibilityValue(appLocalized("\(state.secondsRemaining) seconds remaining"))
 
       HStack {
         Button("Revert Now") { model.revertHighRiskChanges() }
+          .keyboardShortcut(.cancelAction)
           .disabled(model.isApplyTransactionInProgress)
         Button("Keep Changes") { model.confirmHighRiskChanges() }
           .keyboardShortcut(.defaultAction)
@@ -509,17 +780,26 @@ private struct PermissionsSettingsView: View {
         )
 
         LabeledContent(
-          "Requested",
+          "App setting",
           value: model.launchAtLoginDesired ? appLocalized("On") : appLocalized("Off")
         )
         LabeledContent(
-          "Effective macOS state",
+          "macOS registration",
           value: model.loginItemEnabled ? appLocalized("Enabled") : appLocalized("Not enabled")
         )
-        Text(model.loginItemStatus)
+
+        if loginItemStatesDiffer || model.canRetryLoginItemRegistration {
+          Label(model.loginItemStatus, systemImage: "exclamationmark.triangle")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel(appLocalized("Login item status: \(model.loginItemStatus)"))
+        } else {
+          Label(
+            "The app setting matches the macOS registration state.", systemImage: "checkmark.circle"
+          )
           .font(.caption)
           .foregroundStyle(.secondary)
-          .accessibilityLabel(appLocalized("Login item status: \(model.loginItemStatus)"))
+        }
 
         HStack {
           if model.canRetryLoginItemRegistration {
@@ -532,11 +812,13 @@ private struct PermissionsSettingsView: View {
           }
         }
 
-        Text(
-          "macOS accepts login-item registration only for an eligible installed and code-signed app. The requested preference does not guarantee registration."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
+        DisclosureGroup("Why can these states differ?") {
+          Text(
+            "macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        }
       }
 
       Section("System permissions") {
@@ -554,6 +836,10 @@ private struct PermissionsSettingsView: View {
       }
     }
     .formStyle(.grouped)
+  }
+
+  private var loginItemStatesDiffer: Bool {
+    model.launchAtLoginDesired != model.loginItemEnabled
   }
 }
 
@@ -690,7 +976,8 @@ private struct DiagnosticsSettingsView: View {
           ForEach(model.diagnosticEntries) { entry in
             VStack(alignment: .leading, spacing: 3) {
               Label(
-                appLocalized("\(entry.component): \(entry.code)"),
+                appLocalized(
+                  "\(diagnosticSeverityTitle(entry.severity)): \(entry.component): \(entry.code)"),
                 systemImage: diagnosticSymbol(entry.severity)
               )
               .font(.caption.bold())
@@ -720,6 +1007,15 @@ private struct DiagnosticsSettingsView: View {
     case .info: "info.circle"
     case .warning: "exclamationmark.triangle"
     case .error: "xmark.octagon"
+    }
+  }
+
+  private func diagnosticSeverityTitle(_ severity: DiagnosticSeverity) -> String {
+    switch severity {
+    case .debug: appLocalized("Debug")
+    case .info: appLocalized("Information")
+    case .warning: appLocalized("Warning")
+    case .error: appLocalized("Error")
     }
   }
 
@@ -781,7 +1077,7 @@ private struct DiagnosticsSettingsView: View {
 
 private struct AboutSettingsView: View {
   var body: some View {
-    VStack(spacing: 12) {
+    VStack(spacing: 14) {
       Image(systemName: "switch.2")
         .font(.system(size: 56))
         .accessibilityHidden(true)
@@ -791,6 +1087,31 @@ private struct AboutSettingsView: View {
         .foregroundStyle(.secondary)
       Text("Free and open source under the MIT License")
         .font(.caption)
+
+      Divider()
+        .frame(maxWidth: 360)
+
+      HStack(spacing: 16) {
+        Link(destination: repositoryURL) {
+          Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
+        }
+        Link(destination: issuesURL) {
+          Label("Report an Issue", systemImage: "exclamationmark.bubble")
+        }
+      }
+
+      HStack(spacing: 16) {
+        Link(destination: licenseURL) {
+          Label("MIT License", systemImage: "doc.text")
+        }
+        Link(destination: privacyURL) {
+          Label("Privacy Principles", systemImage: "hand.raised")
+        }
+      }
+
+      Text("Links open only when you choose them and use your default browser.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
@@ -798,4 +1119,11 @@ private struct AboutSettingsView: View {
   private var appVersion: String {
     Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
   }
+
+  private let repositoryURL = URL(string: "https://github.com/GGULBAE/desk-setup-switcher")!
+  private let issuesURL = URL(string: "https://github.com/GGULBAE/desk-setup-switcher/issues")!
+  private let licenseURL = URL(
+    string: "https://github.com/GGULBAE/desk-setup-switcher/blob/master/LICENSE")!
+  private let privacyURL = URL(
+    string: "https://github.com/GGULBAE/desk-setup-switcher/blob/master/docs/PRIVACY.md")!
 }

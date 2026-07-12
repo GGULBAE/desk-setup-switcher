@@ -106,6 +106,16 @@ struct SafetyConfirmationState: Identifiable, Sendable {
   var secondsRemaining: Int
 }
 
+enum ProfileSaveResult: Equatable, Sendable {
+  case saved(DeskProfile)
+  case rejected(message: String)
+}
+
+enum ProfileSettingsCaptureResult: Equatable, Sendable {
+  case captured(SystemSnapshotResult)
+  case rejected(message: String)
+}
+
 private func makeDefaultDiagnosticLog() -> (any DiagnosticLogStoring)? {
   let directory = ProfileStore.defaultDirectoryURL.appendingPathComponent(
     "Diagnostics", isDirectory: true)
@@ -125,6 +135,7 @@ final class ApplicationModel: ObservableObject {
   @Published private(set) var conditionContextStatus = appLocalized(
     "Readiness facts have not been refreshed yet.")
   @Published private(set) var readinessLastRefreshedAt: Date?
+  @Published private(set) var isReadinessRefreshInProgress = false
   @Published private(set) var launchAtLoginDesired = false
   @Published private(set) var loginItemEnabled = false
   @Published private(set) var loginItemStatus = appLocalized("Checking…")
@@ -133,6 +144,10 @@ final class ApplicationModel: ObservableObject {
   @Published private(set) var operationCountByProfile: [UUID: Int] = [:]
   @Published private(set) var normalApplyAvailableByProfile: [UUID: Bool] = [:]
   @Published private(set) var forceApplyAvailableByProfile: [UUID: Bool] = [:]
+  @Published private(set) var normalApplyRejectionReasonsByProfile: [UUID: [ApplyRejectionReason]] =
+    [:]
+  @Published private(set) var forceApplyRejectionReasonsByProfile: [UUID: [ApplyRejectionReason]] =
+    [:]
   @Published private(set) var operationalStatusByProfile: [UUID: ProfileReadiness] = [:]
   @Published private(set) var pendingApply: PendingApplyRequest?
   @Published private(set) var pendingImport: PendingImportRequest?
@@ -279,9 +294,11 @@ final class ApplicationModel: ObservableObject {
   }
 
   func refreshReadinessFacts() {
-    guard !isProfileMutationLocked else { return }
+    guard !isProfileMutationLocked, !isReadinessRefreshInProgress else { return }
+    isReadinessRefreshInProgress = true
     Task {
       await refreshReadiness()
+      isReadinessRefreshInProgress = false
     }
   }
 
@@ -300,16 +317,33 @@ final class ApplicationModel: ObservableObject {
     }
   }
 
-  func updateProfile(_ profile: DeskProfile) {
-    guard beginProfileStoreMutation() else { return }
-    Task {
-      defer { finishProfileStoreMutation() }
-      do {
-        let updated = try await profileStore.updateProfile(profile)
-        await refreshProfiles(message: appLocalized("Saved \(updated.name)."))
-      } catch {
-        reportStorageError(error)
-      }
+  func updateProfile(_ saveCandidate: DeskProfile) async -> ProfileSaveResult {
+    guard beginProfileStoreMutation() else {
+      return .rejected(message: profileEditingLockedMessage)
+    }
+    defer { finishProfileStoreMutation() }
+
+    let document = await profileStore.currentDocument()
+    guard let authoritativeProfile = document.profiles.first(where: { $0.id == saveCandidate.id })
+    else {
+      let message = appLocalized("The selected profile no longer exists.")
+      reportProfileEditorFailure(code: "save-profile-missing", message: message)
+      return .rejected(message: message)
+    }
+
+    let mergedCandidate = mergeUserEditableProfileValues(
+      from: saveCandidate,
+      metadataFrom: authoritativeProfile
+    )
+
+    do {
+      let updated = try await profileStore.updateProfile(mergedCandidate)
+      await refreshProfiles(message: appLocalized("Saved \(updated.name)."))
+      return .saved(updated)
+    } catch {
+      let message = profileStorageUserMessage(for: error)
+      reportProfileEditorFailure(code: "save-failed", message: message)
+      return .rejected(message: message)
     }
   }
 
@@ -365,6 +399,7 @@ final class ApplicationModel: ObservableObject {
       do {
         try await profileStore.selectProfile(id: id)
       } catch {
+        await refreshProfiles()
         reportStorageError(error)
       }
     }
@@ -467,28 +502,19 @@ final class ApplicationModel: ObservableObject {
     }
   }
 
-  func updateProfileFromCurrentSettings(id: UUID) {
-    guard var profile = profiles.first(where: { $0.id == id }) else { return }
-    guard beginProfileStoreMutation() else { return }
+  func captureCurrentProfileSettings() async -> ProfileSettingsCaptureResult {
+    guard beginProfileStoreMutation() else {
+      return .rejected(message: profileEditingLockedMessage)
+    }
+    defer { finishProfileStoreMutation() }
     snapshotStatus = appLocalized("Reading current settings without changing them…")
 
-    Task {
-      defer { finishProfileStoreMutation() }
-      let snapshot = await snapshotCoordinator.capture()
-      lastSnapshot = snapshot
-      snapshotStatus = snapshotSummary(snapshot)
-      recordSnapshotDiagnostic(snapshot)
-      profile.settings = snapshot.profileSettings
-
-      do {
-        let updated = try await profileStore.updateProfile(profile)
-        await refreshProfiles(
-          message: appLocalized("Updated \(updated.name) from the current settings."))
-        lastMessage = appLocalized("Captured current settings without changing the Mac.")
-      } catch {
-        reportStorageError(error)
-      }
-    }
+    let snapshot = await snapshotCoordinator.capture()
+    lastSnapshot = snapshot
+    snapshotStatus = snapshotSummary(snapshot)
+    recordSnapshotDiagnostic(snapshot)
+    lastMessage = appLocalized("Captured current settings without changing the Mac.")
+    return .captured(snapshot)
   }
 
   func readiness(for profile: DeskProfile) -> ProfileReadiness {
@@ -546,8 +572,10 @@ final class ApplicationModel: ObservableObject {
       let isAvailable = preparation.canExecute && !preparation.operations.isEmpty
       if mode == .normal {
         normalApplyAvailableByProfile[profile.id] = isAvailable
+        normalApplyRejectionReasonsByProfile[profile.id] = preparation.rejectionReasons
       } else {
         forceApplyAvailableByProfile[profile.id] = isAvailable
+        forceApplyRejectionReasonsByProfile[profile.id] = preparation.rejectionReasons
       }
       if isReviewOnly {
         lastMessage = appLocalized(
@@ -611,8 +639,12 @@ final class ApplicationModel: ObservableObject {
           currentPreparation.canExecute && !currentPreparation.operations.isEmpty
         if currentPreparation.mode == .normal {
           normalApplyAvailableByProfile[currentProfile.id] = isAvailable
+          normalApplyRejectionReasonsByProfile[currentProfile.id] =
+            currentPreparation.rejectionReasons
         } else {
           forceApplyAvailableByProfile[currentProfile.id] = isAvailable
+          forceApplyRejectionReasonsByProfile[currentProfile.id] =
+            currentPreparation.rejectionReasons
         }
         lastMessage = appLocalized(
           "The system or profile changed. Review the refreshed plan before applying.")
@@ -833,6 +865,8 @@ final class ApplicationModel: ObservableObject {
       operationCountByProfile = [:]
       normalApplyAvailableByProfile = [:]
       forceApplyAvailableByProfile = [:]
+      normalApplyRejectionReasonsByProfile = [:]
+      forceApplyRejectionReasonsByProfile = [:]
       return
     }
 
@@ -840,12 +874,16 @@ final class ApplicationModel: ObservableObject {
     var operationCounts: [UUID: Int] = [:]
     var normalAvailability: [UUID: Bool] = [:]
     var forceAvailability: [UUID: Bool] = [:]
+    var normalRejectionReasons: [UUID: [ApplyRejectionReason]] = [:]
+    var forceRejectionReasons: [UUID: [ApplyRejectionReason]] = [:]
     for profile in profiles {
       guard profile.isEnabled else {
         statuses[profile.id] = .unavailable
         operationCounts[profile.id] = 0
         normalAvailability[profile.id] = false
         forceAvailability[profile.id] = false
+        normalRejectionReasons[profile.id] = [.profileDisabled]
+        forceRejectionReasons[profile.id] = [.profileDisabled]
         continue
       }
       let conditions = conditionEvaluator.evaluate(profile.conditions, in: context)
@@ -858,6 +896,7 @@ final class ApplicationModel: ObservableObject {
       operationCounts[profile.id] = preparation.operations.count
       normalAvailability[profile.id] =
         preparation.canExecute && !preparation.operations.isEmpty
+      normalRejectionReasons[profile.id] = preparation.rejectionReasons
       if preparation.readiness.status == .partial {
         let forcePreparation = await applyEngine.prepare(
           profile: profile,
@@ -866,14 +905,18 @@ final class ApplicationModel: ObservableObject {
         )
         forceAvailability[profile.id] =
           forcePreparation.canExecute && !forcePreparation.operations.isEmpty
+        forceRejectionReasons[profile.id] = forcePreparation.rejectionReasons
       } else {
         forceAvailability[profile.id] = false
+        forceRejectionReasons[profile.id] = preparation.rejectionReasons
       }
     }
     readinessByProfile = statuses
     operationCountByProfile = operationCounts
     normalApplyAvailableByProfile = normalAvailability
     forceApplyAvailableByProfile = forceAvailability
+    normalApplyRejectionReasonsByProfile = normalRejectionReasons
+    forceApplyRejectionReasonsByProfile = forceRejectionReasons
   }
 
   private func captureReadinessContext() async -> ConditionContext {
@@ -1115,8 +1158,71 @@ final class ApplicationModel: ObservableObject {
     }
   }
 
+  private var profileEditingLockedMessage: String {
+    appLocalized("Profile editing is locked until the current operation is safely recorded.")
+  }
+
+  private var sanitizedProfileStorageFailureMessage: String {
+    appLocalized("A local profile storage operation failed.")
+  }
+
+  private func profileStorageUserMessage(for error: Error) -> String {
+    if error is ProfileValidationError {
+      return appLocalized("The profile contains an invalid value. Review the edited fields.")
+    }
+    guard let storageError = error as? ProfileStorageError else {
+      return sanitizedProfileStorageFailureMessage
+    }
+    switch storageError {
+    case .fileTooLarge:
+      return appLocalized("The profile file is too large to open safely.")
+    case .invalidJSON:
+      return appLocalized("The selected profile file is not valid JSON.")
+    case .unsupportedSchema:
+      return appLocalized("The profile file was created by an unsupported app version.")
+    case .missingMigration, .invalidMigration:
+      return appLocalized("The profile file could not be migrated safely.")
+    case .profileNotFound:
+      return appLocalized("The selected profile no longer exists.")
+    case .profileAlreadyExists:
+      return appLocalized("A profile with the same identifier already exists.")
+    case .invalidReorderIndex:
+      return appLocalized("The profile order changed before this move could be saved.")
+    case .destinationExists:
+      return appLocalized("The export destination already exists. Choose a new file name.")
+    case .importSourceOverwrite:
+      return appLocalized("Choose a different export destination from the imported file.")
+    case .io:
+      return sanitizedProfileStorageFailureMessage
+    }
+  }
+
+  private func mergeUserEditableProfileValues(
+    from saveCandidate: DeskProfile,
+    metadataFrom authoritativeProfile: DeskProfile
+  ) -> DeskProfile {
+    var merged = authoritativeProfile
+    merged.name = saveCandidate.name
+    merged.profileDescription = saveCandidate.profileDescription
+    merged.symbolName = saveCandidate.symbolName
+    merged.isEnabled = saveCandidate.isEnabled
+    merged.settings = saveCandidate.settings
+    merged.conditions = saveCandidate.conditions
+    return merged
+  }
+
+  private func reportProfileEditorFailure(code: String, message: String) {
+    storageStatus = message
+    recordDiagnostic(
+      severity: .error,
+      component: "profile-storage",
+      code: code,
+      message: appLocalized("A local profile storage operation failed.")
+    )
+  }
+
   private func reportStorageError(_ error: Error) {
-    storageStatus = appLocalized("Profile operation failed: \(error.localizedDescription)")
+    storageStatus = profileStorageUserMessage(for: error)
     recordDiagnostic(
       severity: .error,
       component: "profile-storage",

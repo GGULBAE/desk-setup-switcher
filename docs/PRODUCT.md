@@ -2,7 +2,7 @@
 
 ## Status
 
-Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. Post-fix full local `make verify` passes with 158 tests (83 XCTest + 75 Swift Testing), as do the five opt-in read-only hardware gates, universal no-Developer-ID DMG/checksum verification, and a fresh `/Applications` smoke test. Repair commit `4e45328` is pushed, and [Actions run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) passed full `make verify` and unsigned-package upload under macOS 15/Xcode 16.4/Swift 6.1.2. This is not a public release or mutation proof: no live setting mutation, physical Intel run, live Keychain write, or quarantined Gatekeeper test exists. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. The current UI-hardening tree passes full local `make verify` with 214 default non-live tests (111 XCTest + 103 Swift Testing), including 55 presentation-specific cases, plus universal Analyze/package/checksum verification; final commit and CI evidence remain pending. The current local DMG SHA-256 is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`. The earlier repair commit `4e45328` retains its green 2026-07-11 five opt-in read-only hardware and fresh `/Applications` smoke evidence. This is not a public release or mutation proof: no live setting mutation, physical Intel run, live Keychain write, or quarantined Gatekeeper test exists. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
 ## Product promise
 
@@ -34,11 +34,13 @@ The fresh final-DMG install launched background-only/menu-bar-only. Default-on `
 
 ### Create and manage a profile
 
-A user can create, inspect, edit, duplicate, delete, reorder, enable, import, and export profiles. A snapshot pre-fills only values that were actually read. Each group and individual option can be included or excluded. A profile includes a name, description, SF Symbol, conditions, and last-application summary; the containing document carries the schema version. The fresh-install smoke test created one schema-v1 Ready profile from a read-only snapshot with all four groups.
+A user can create, inspect, edit, duplicate, delete, reorder, enable, import, and export profiles. Settings keeps a distinct app-lifetime draft and saved profile: selection, replacement, and ordinary quit paths require save, discard, or cancel when the draft is dirty, and a failed save leaves the draft intact. Successful saves merge user-editable fields into the latest stored metadata. A current-settings snapshot pre-fills only values that were actually read and changes the reviewable draft, not the persistent profile, until the user saves. Each group and individual option can be included or excluded. A profile includes a name, description, SF Symbol, conditions, and last-application summary; the containing document carries the schema version. The 2026-07-11 fresh-install smoke test created one schema-v1 Ready profile from a read-only snapshot with all four groups; the current UI flow has not received a new manual walkthrough.
 
 ### Apply a profile
 
 The app evaluates conditions and adapter capabilities, calculates a change plan, and skips no-op values.
+
+The menu exposes one primary Apply action per profile. Availability review and applying only available items are secondary actions. Disabled actions include a text-and-symbol reason. Profile summaries and previews lead with friendly included values; opaque identifiers remain available only under explicit technical disclosures.
 
 - Normal apply is available only when every enabled setting can be applied.
 - Force apply requires explicit confirmation, lists omissions first, and applies only supported/available values.
@@ -83,13 +85,13 @@ Vendor application profiles, firmware, proprietary DPI/button mappings, Karabine
 
 ## Conditions
 
-Conditions include display, audio input/output, USB/hardware presence, SSID, Ethernet, IP/CIDR, and location when authorized. A condition set supports all/any matching and inversion. Conditions never initiate an apply operation.
+Conditions include display, audio input/output, USB/hardware presence, SSID, Ethernet, IP/CIDR, and location when authorized. The editor prefers currently detected friendly choices, preserves a saved disconnected identifier, and keeps raw identifier entry under Advanced. IP/CIDR and location values are validated before insertion; blank identifiers, a synthetic network, and `(0, 0)` are not silently created as valid defaults. A condition set supports all/any matching and inversion. Conditions never initiate an apply operation.
 
 ## Accessibility and localization
 
-The menu and settings window support VoiceOver labels, keyboard navigation, sufficient contrast, non-color status cues, macOS text/accessibility preferences, actionable error copy, and confirmation for destructive or risky actions. English is the development language and Korean is shipped through localizable resources.
+The menu and settings window provide VoiceOver labels, keyboard shortcuts, non-color status cues, actionable error copy, and confirmation for destructive or risky actions. Current source/build includes save/apply announcements, text-and-symbol diagnostic severity, an Escape revert and default keep action for display safety, and a remaining-seconds accessibility value. English is the development language and Korean is shipped through localizable resources; lint checks catalog parity, duplicate keys, placeholders, and statically discoverable UI keys.
 
-The fresh-install popover and Settings rendered in Korean, and an accessibility label passed inspection. A complete English/Korean walkthrough and full VoiceOver/keyboard/focus/contrast/text-size audit remain release work; this section is the acceptance target, not a completed claim.
+The 2026-07-11 baseline fresh-install popover and Settings rendered in Korean, and one accessibility label passed inspection. No current-tree screenshot walkthrough or full VoiceOver/keyboard/focus/contrast/text-size audit has run. Structural localization checks do not prove rendered layout, translation quality, or assistive-technology behavior; this section remains the acceptance target, not a completed claim.
 
 ## Distribution
 

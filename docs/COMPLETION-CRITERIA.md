@@ -1,8 +1,8 @@
 # Completion criteria and evidence ledger
 
-This ledger separates mandatory implementation/test/package/push/CI gates from optional or unapproved manual hardware evidence and release publication. A checked row is tied to the named commit and evidence; this later docs-only evidence update does not claim that its own eventual commit has already run CI. Hardware-dependent rows may have mock evidence while remaining explicitly “not hardware-verified.”
+This ledger separates mandatory implementation/test/package/push/CI gates from optional or unapproved manual hardware evidence and release publication. The 2026-07-11 repair baseline retains its committed full-gate evidence. Current UI-hardening rows record worktree-level source, test, lint, build, Analyze, and package evidence without claiming a final commit or CI run. Hardware-dependent rows may have mock evidence while remaining explicitly “not hardware-verified.”
 
-## Evidence snapshot — 2026-07-11
+## Evidence snapshot — 2026-07-11 baseline and 2026-07-12 UI tree
 
 | Evidence | Result |
 | --- | --- |
@@ -10,33 +10,36 @@ This ledger separates mandatory implementation/test/package/push/CI gates from o
 | Implementation milestone | Commit `0d8f510` pushed to `origin/master` |
 | CI repair milestone | Commit `4e45328` pushed to `origin/master` |
 | Toolchain | Xcode 26.6, Swift 6.3.3, macOS 26.5.2, Apple M5; process-local `DEVELOPER_DIR` fallback |
-| Full local verification | Post-fix full `make verify` passed: lint/policy, 158 tests (83 XCTest + 75 Swift Testing), Swift/Xcode Debug and Release, Analyze, package, checksum, and mounted-DMG inspection |
+| Historical full local verification | Post-fix `make verify` passed on 2026-07-11: lint/policy, 158 tests (83 XCTest + 75 Swift Testing), Swift/Xcode Debug and Release, Analyze, package, checksum, and mounted-DMG inspection |
 | GitHub Actions | Run `29154880831` for `0d8f510` recorded the Swift 6.1 actor-isolation failure. [Run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) for repair `4e45328` succeeded on 2026-07-11 under macOS 15, Xcode 16.4, and Swift 6.1.2; full `make verify` and unsigned-package upload passed |
+| Current UI implementation checks | `make lint`, `make build`, and 214 default non-live tests pass: 111 XCTest with five skips plus 103 Swift Testing cases with one skip. The 55 presentation-specific tests comprise 28 draft XCTest and 27 presentation/condition Swift Testing cases |
+| Current UI full local gate | `make verify` passed with localization/policy lint, 214 tests, Swift and universal Xcode Debug/Release, Analyze, DMG/checksum, mounted resources/architectures, and ad-hoc signature classification. Local DMG SHA-256: `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68` |
+| Current UI push/CI | Pending: final commit, push, GitHub Actions, and unsigned-package upload on that exact SHA have not run |
 | Default test behavior | Six cases skip without explicit opt-in: five read-only hardware cases and one Keychain-write round trip |
 | Opt-in live reads | Display, audio, network, input, and combined readiness-context tests passed with `DESK_SETUP_LIVE_READ_TESTS=1` |
 | Xcode/package architectures | Current Debug/Release builds and packaged executable verified as `arm64 x86_64`; x86_64 was not run on Intel hardware |
 | Final package | Post-fix universal `arm64 x86_64` no-Developer-ID DMG with ad-hoc-signed app; SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f` |
 | CI package | Downloaded artifact ID `8249295840` verified its checksum file; CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. Local and CI DMGs are not byte-for-byte reproducible |
-| Fresh-install smoke | A recorded local-DMG copy to `/Applications` launched background-only/menu-bar-only; Korean popover/Settings and an accessibility label passed |
+| Historical fresh-install smoke | A recorded 2026-07-11 local-DMG copy to `/Applications` launched background-only/menu-bar-only; Korean popover/Settings and an accessibility label passed. This is not a current-tree walkthrough |
 | Snapshot profile | Created one schema-v1 Ready profile from a read-only snapshot with all four groups; the zero-operation plan kept Apply and Force Apply disabled |
 | Login item | Default-on registration succeeded; BTM reported `[enabled, allowed, notified]`; UI opt-out disabled it and re-enable restored enabled status. Final cleanup opted out and left only disabled BTM history |
 | Live mutations | Not run for display, audio, network, mouse, or keyboard |
 | Live Keychain write | Not run |
-| Optional/unapproved evidence gaps | Full VoiceOver/keyboard/import/export/permission matrix, quarantined Gatekeeper install, physical Intel, login-item approval/retry and actual login-at-boot after a reboot, live Keychain write, live mutation/rollback, release tag, and publication |
+| Optional/unapproved evidence gaps | Current-tree screenshot/layout walkthrough, full VoiceOver/keyboard/import/export/TCC permission matrix, quarantined Gatekeeper install, physical Intel, login-item approval/retry and actual login-at-boot after a reboot, live Keychain write, live mutation/rollback, release tag, and publication |
 
 No test evidence contains a real SSID, exact location, IP host address, credential, serial number, or personal device identifier.
 
 ## Product and app lifecycle
 
-- [x] Checked-in Xcode project, shared scheme, Swift Package targets, and deterministic project generator pass the local verification gate.
-- [x] Current-tree Swift and Xcode Debug builds pass with warnings as errors through `make verify`.
-- [x] Current-tree Release app and DMG executable verify as universal `arm64 x86_64`; physical Intel execution is pending.
+- [x] Checked-in Xcode project, shared scheme, Swift Package targets, and deterministic project generator pass `make build` on the current UI tree.
+- [x] Current-tree Swift and universal Xcode Debug/Release builds pass through `make build`.
+- [x] Current UI tree passes the full `make verify` Release/package gate as universal `arm64 x86_64`; physical Intel execution remains pending.
 - [x] A fresh copy from the final locally built DMG launches from `/Applications`.
 - [x] The fresh install launched background-only/menu-bar-only and exposed its popover without a normal app lifecycle.
 - [x] Default-on `SMAppService` registration, status inspection, UI opt-out, and re-enable passed; final cleanup opted out and left only disabled BTM history.
 - [ ] Approval-required and failure/retry login-item paths, plus actual login-at-boot after a reboot, are manually verified.
-- [ ] English and Korean UI coverage is complete. The fresh-install popover/settings rendered in Korean, but a complete bilingual walkthrough remains pending.
-- [ ] VoiceOver, keyboard-only navigation, focus order, contrast, and macOS text-size behavior are audited. One accessibility label passed inspection, but the full manual audit is pending.
+- [ ] English and Korean UI coverage is complete. Current catalogs pass structural parity/duplicate/placeholder/static-key checks, and the baseline fresh-install popover/settings rendered in Korean, but a complete current-tree bilingual walkthrough remains pending.
+- [ ] VoiceOver, keyboard-only navigation, focus order, contrast, and macOS text-size behavior are audited. Current source/build includes labels, announcements, display default/Escape shortcuts, and remaining-time accessibility values; one baseline label passed inspection, but the full current-tree manual audit is pending.
 
 ## Profiles and storage
 
@@ -47,6 +50,19 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] Atomic writes, last-known-good backup, primary/backup corruption quarantine, recovery, failed-update state preservation, 0700 directories, and 0600 managed files pass temporary-file tests.
 - [x] Import/export enforces the 5 MiB limit, schema/semantic limits, unique IDs, valid selection, regular-file input, source protection, and exclusive no-overwrite output.
 - [x] Last application summary is persisted back into the profile and contains typed item statuses/messages without credential fields. Manual relaunch/readback remains part of the app audit.
+
+## UI hardening
+
+- [x] A pure app-lifetime draft session distinguishes saved and editable profile values, detects user-field changes, and unit-tests save/discard/cancel selection resolution, failed or mismatched save completion, external refreshes, and authoritative metadata preservation.
+- [x] Selection, creation, duplication, deletion, import, snapshot replacement, and ordinary termination use the shared dirty-draft decision path in source; fixed save/revert state and `⌘S` compile in the current app build.
+- [x] Current-settings capture remains read-only, returns a typed result, and replaces only draft settings until an explicit successful save.
+- [x] Deterministic presentation logic summarizes included display/audio/network/input values, keeps opaque identifiers in technical details, preserves imported symbols, and models Ready/Partial/Unavailable/Applying, locked, disabled, and zero-operation actions.
+- [x] Menu/apply source uses one primary Apply action, secondary review/available-items actions, text-and-symbol disabled reasons, bounded profile scrolling, an all-disabled state, adaptive previews, and progressive technical disclosure without changing transaction semantics.
+- [x] Condition presentation tests cover stable detected choices, disconnected saved values, blank filtering, typed IP/CIDR validation, and finite bounded location validation; the built UI uses Picker-first entry and Advanced raw identifiers.
+- [x] Permission/About/diagnostic source distinguishes desired and actual login state, limits mismatch guidance, exposes source/issues/license/privacy links, and pairs diagnostic severity symbols with text.
+- [x] English/Korean localization lint passes for key parity, duplicate keys, format placeholders, and statically discoverable UI keys. This is not a rendered bilingual or linguistic-quality audit.
+- [x] Accessibility source/build includes labeled icon actions, non-color state text, save/apply announcements, display-confirmation default/Escape shortcuts, and a remaining-time value. Full assistive-technology behavior remains manually unverified.
+- [ ] Current-tree visual layout, long-content behavior, keyboard-only flow, VoiceOver speech/focus, contrast, transparency, and text-size behavior are manually verified with synthetic data.
 
 ## Snapshot and adapters
 
@@ -82,21 +98,22 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] Rotating diagnostic JSONL storage enforces local directory/file permissions, size/count bounds, serialized complete entries, pruning, and scoped clearing; Settings browsing/refresh/clear is implemented.
 - [ ] Permission explanations and denial isolation are manually verified for location/SSID. Source paths are nonfatal, but the user-facing matrix is pending.
 - [x] Import validation prevents path-driven traversal/network access, rejects non-regular files and oversize input before decode, and never overwrites the source or an existing export.
-- [x] `make lint` source audit passes and rejects shell, outbound-networking, and UI-scripting primitives after all implementation changes.
+- [x] Current-tree `make lint` passes source policy and English/Korean structural localization checks, rejecting shell, outbound-networking, and UI-scripting primitives.
 
 ## Quality, packaging, and delivery
 
 - [x] Required repository, community, privacy, architecture, support, asset-provenance, and distribution documentation exists.
-- [x] Current default unit and mock integration suites pass locally; live setting changes are not part of them.
-- [x] `make lint` and `make analyze` pass on the integrated tree.
-- [x] Post-fix local `make verify` passes with the generated Xcode project, 158 tests (83 XCTest + 75 Swift Testing), universal builds, Analyze, and package verification.
-- [x] GitHub Actions passes on the repaired pushed implementation tree. [Run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) for `4e45328` passed full `make verify` and unsigned-package upload under macOS 15/Xcode 16.4/Swift 6.1.2.
+- [x] Current default unit and mock integration suites pass locally with 214 tests: 111 XCTest and 103 Swift Testing cases; six explicit opt-in cases skip and no live setting change is part of the run.
+- [x] Current-tree `make lint` and `make build` pass.
+- [x] Current-tree `make analyze`, full `make verify`, replacement package/checksum, and mounted-image verification pass. The verified local DMG SHA-256 is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`.
+- [ ] GitHub Actions passes on the final pushed UI-hardening SHA. [Run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) remains the green 2026-07-11 repair baseline.
 - [x] Versioned no-Developer-ID DMG contains the ad-hoc-signed universal app and `/Applications` link.
-- [x] SHA-256 validation and mounted-DMG metadata/resource/architecture/signature checks pass locally; the post-fix checksum is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
+- [x] SHA-256 validation and mounted-DMG metadata/resource/architecture/signature checks pass locally; the current UI-tree checksum is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68` and the historical post-fix checksum is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
 - [x] Downloaded CI artifact ID `8249295840` verifies against its checksum file; its DMG SHA-256 is `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. It is distinct from the local DMG because packaging is not byte-for-byte reproducible.
 - [ ] Manual release review is complete. Fresh `/Applications` launch, background/menu-bar-only behavior, Korean rendering, popover, Settings, one accessibility label, snapshot-profile creation, and basic login-item state transitions passed; Gatekeeper, login approval/retry/reboot, import/export, permissions, full accessibility, and mutation paths remain.
 - [x] Signing status is accurately classified: ad-hoc integrity signature only, no Developer ID identity, no notarization, and no claim of Gatekeeper trust.
-- [x] Mandatory implementation, test, package, push, and CI gates are complete for repair commit `4e45328`; this does not claim the later docs-only evidence update has already run CI.
+- [x] Mandatory implementation, test, package, push, and CI gates are complete for the historical repair commit `4e45328`.
+- [ ] Mandatory full verification, package, push, and CI gates are complete for the current UI-hardening milestone.
 - [ ] Optional release publication and manual/hardware evidence are complete. They remain unapproved or unrun and do not negate the completed implementation gates.
 
 ## Manual hardware evidence format

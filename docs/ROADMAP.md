@@ -37,47 +37,59 @@ Evidence: mocks pass. All five opt-in read-only display, audio, network, input, 
 
 Evidence: injected/mock success and fault tests pass. The fresh snapshot profile had a zero-operation plan and both Apply and Force Apply were disabled. **No live display, audio, network, mouse, or keyboard mutation and no live Keychain write has been run.**
 
-## M4 — UX and release hardening (in progress)
+## M4 — UX and release hardening (implemented; full local gate verified)
 
 The active implementation contract is [UI-REFINEMENT-GOAL.md](UI-REFINEMENT-GOAL.md). It prioritizes unsaved-draft protection, human-readable setting summaries, clearer menu/apply hierarchy, safer condition entry, accessibility feedback, and English/Korean parity without changing adapter or mutation semantics.
 
-Implemented or partially verified:
+Implemented and verified without live flags:
 
-- CRUD/reorder/snapshot/import/export/apply UI, permission explanations, diagnostics browsing/clear, icon, localization catalogs, accessibility labels, and keyboard shortcuts
+- App-lifetime saved/draft state with dirty detection, save/discard/cancel replacement protection, external-refresh preservation, authoritative metadata merge, fixed save/revert status, `⌘S`, ordinary-quit protection, and read-only capture into the draft
+- Friendly included-value summaries and operation previews with technical details disclosed separately, preserved imported symbols, and deterministic localization at the UI boundary
+- One primary Apply action, secondary review/available-items actions, disabled-reason text and symbols, bounded profile scrolling, all-disabled empty state, and readiness refresh progress
+- Detected-device condition pickers, preserved disconnected values, advanced raw entry, typed IP/CIDR and location validation, and non-synthetic defaults
+- Separate app-desired and macOS login-item state, mismatch-only guidance, About links, text diagnostic severity, accessibility announcements, and display safety keyboard/value metadata
+- English/Korean catalog parity, duplicate-key, placeholder, and static-key validation
+
+Evidence: the current UI-hardening tree passes full local `make verify` with 214 default non-live tests: 111 XCTest with five skips plus 103 Swift Testing cases with one skip. The 55 presentation-specific cases are 28 draft XCTest cases and 27 presentation/condition Swift Testing cases. Universal builds, Analyze, DMG/checksum, mount, resources, architectures, and ad-hoc signature classification pass; the local DMG SHA-256 is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`. No live flag, current-run screenshot capture, TCC action, Keychain write, or setting mutation was used.
+
+Historical evidence retained from the 2026-07-11 baseline:
+
 - Fresh `/Applications` launch as a background-only/menu-bar-only app; Korean popover and Settings rendering
-- Accessibility-label inspection
+- One accessibility-label inspection
 - Default-on login-item registration, enabled status, UI opt-out, re-enable, and final disabled cleanup
 
-Remaining:
+Remaining before this milestone is done:
 
+- Commit and push the complete milestone, then require green GitHub Actions and unsigned-artifact upload on that exact SHA
+- Perform a current-tree non-mutating English/Korean layout and keyboard walkthrough with synthetic data if a safe evidence path is available
 - Manually verify approval-required and failure/retry login-item states plus actual login-at-boot after a reboot
 - Complete the full English/Korean walkthrough
 - Run full VoiceOver, keyboard-only, focus, contrast, text-size, destructive-action, and permission-denial audits
 - Manually verify import/export replacement/no-overwrite and diagnostics clearing
 - Decide whether diagnostic export belongs in 0.1.0
 
-## M5 — Packaging and CI (pushed and green; publication pending)
+## M5 — Packaging and CI (current local package green; current CI pending)
 
-- Post-fix full `make verify` locally passes lint, 158 tests (83 XCTest + 75 Swift Testing), universal builds, Analyze, packaging, checksum, and mounted-image inspection
+- The 2026-07-11 post-fix full `make verify` locally passed lint, 158 tests (83 XCTest + 75 Swift Testing), universal builds, Analyze, packaging, checksum, and mounted-image inspection
 - Versioned DMG contains universal app, `/Applications` link, resources, and a verified ad-hoc integrity signature
 - Local post-fix DMG SHA-256 is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`
 - CI artifact ID `8249295840` verified CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`; the DMGs are not byte-for-byte reproducible
 - The artifact is correctly classified as no Developer ID and not notarized
 - CI and tag-triggered release workflows are implemented; CI passed for repair commit `4e45328`
+- Current UI-tree `make verify` produced and verified a universal local DMG with SHA-256 `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`
 
 Remaining:
 
+- Record the current UI commit's CI run and unsigned-package upload
 - Perform a quarantined Gatekeeper/Open Anyway install on a clean user account or Mac
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
-## Current next task — UI refinement implementation
+## Current next task — UI refinement closure
 
-Execute [UI-REFINEMENT-GOAL.md](UI-REFINEMENT-GOAL.md) in verified milestones:
+Close [UI-REFINEMENT-GOAL.md](UI-REFINEMENT-GOAL.md) without broadening its safety scope:
 
-- Protect dirty profile drafts before selection, snapshot, import, deletion, or other replacement flows.
-- Add testable human-readable summaries and menu/apply presentation states without exposing technical identifiers by default.
-- Refine the profile editor, menu, preview, conditions, permissions, About, accessibility feedback, and English/Korean copy.
-- Run non-mutating tests and UI checks, update the evidence ledger, push the final commit, and require green CI on the same SHA.
+- Commit and push the intended milestone, then require green CI and unsigned-package upload on the same final SHA.
+- Keep full assistive-technology, TCC, login approval/reboot, Gatekeeper, physical Intel, Keychain, and live mutation evidence explicitly pending unless separately authorized and actually performed.
 
 Release publication, Gatekeeper, physical Intel, full assistive-technology testing, and any live mutation-and-rollback procedure remain separate optional evidence work and require the authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

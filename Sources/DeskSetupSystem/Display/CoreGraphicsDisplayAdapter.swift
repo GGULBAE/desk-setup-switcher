@@ -206,6 +206,9 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
     {
       return name
     }
+    if identity.isBuiltIn {
+      return "Built-in display"
+    }
     if let uuid = identity.uuid {
       return "🖥 \(uuid.uuidString.prefix(8))"
     }

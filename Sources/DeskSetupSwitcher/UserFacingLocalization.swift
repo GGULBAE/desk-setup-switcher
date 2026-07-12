@@ -1,7 +1,11 @@
+import AppKit
 import Foundation
 
 #if canImport(DeskSetupCore)
   import DeskSetupCore
+#endif
+#if canImport(DeskSetupPresentation)
+  import DeskSetupPresentation
 #endif
 
 private var appRuntimeLocalizationBundle: Bundle {
@@ -10,6 +14,16 @@ private var appRuntimeLocalizationBundle: Bundle {
   #else
     Bundle.main
   #endif
+}
+
+func appResolvedProfileSymbolName(_ symbolName: String) -> String {
+  let candidate = symbolName.trimmingCharacters(in: .whitespacesAndNewlines)
+  guard !candidate.isEmpty,
+    NSImage(systemSymbolName: candidate, accessibilityDescription: nil) != nil
+  else {
+    return "questionmark.square.dashed"
+  }
+  return candidate
 }
 
 /// Localizes messages produced by the framework targets at the UI boundary.
@@ -183,14 +197,226 @@ func appOperationPreviewValue(
   case "wifi.ssid":
     return isPreviousValue && value == "Not associated"
       ? appLocalizedRuntime(value) : value
-  case "display.atomic-configuration", "defaultInput", "defaultOutput",
-    "systemOutput":
-    // These values contain user/device-provided names or identifiers and must
-    // remain verbatim, even if they happen to equal a localization key.
-    return value
+  case "display.atomic-configuration":
+    return appLocalizedDisplayOperationValue(value)
+  case "defaultInput", "defaultOutput", "systemOutput":
+    return appLocalizedFriendlyAudioValue(value)
   default:
     return appLocalizedRuntime(value)
   }
+}
+
+/// Localizes typed presentation phrases without ever looking up a user/device
+/// value as a localization key. In particular, names such as "Home" or
+/// "Office" remain verbatim even though those words are app localization keys.
+func appProfileSummaryValue(_ item: ProfileSummaryItem) -> String {
+  let primary: String
+  let secondary: String?
+
+  switch item.kind {
+  case .display:
+    primary = appLocalizedKnownDisplayName(item.value.primaryText)
+    secondary = item.value.secondaryText
+  case .displayMirroring:
+    primary = appLocalizedMirroringValue(item.value.primaryText)
+    secondary = item.value.secondaryText
+  case .defaultInput, .defaultOutput, .systemOutput:
+    primary = appLocalizedFriendlyAudioPrimary(item.value.primaryText)
+    secondary = item.value.secondaryText.map(appLocalizedFriendlyAudioSecondary)
+  case .wifiNetwork:
+    primary = appLocalizedOnlyKnownValue(item.value.primaryText, keys: ["Value unavailable"])
+    secondary = item.value.secondaryText
+  case .ipv4:
+    primary = appLocalizedIPv4Primary(item.value.primaryText)
+    secondary = item.value.secondaryText.map(appLocalizedIPv4Secondary)
+  case .dnsServers:
+    primary = appLocalizedOnlyKnownValue(
+      item.value.primaryText,
+      keys: ["No custom DNS servers", "Value unavailable"]
+    )
+    secondary = item.value.secondaryText
+  case .webProxy, .secureWebProxy:
+    primary = appLocalizedOnlyKnownValue(
+      item.value.primaryText,
+      keys: ["Off", "Value unavailable"]
+    )
+    secondary = item.value.secondaryText
+  case .displayMode, .displayRole, .displayActivity, .displayRotation,
+    .displayPosition, .outputVolume, .outputMute, .wifiPower,
+    .pointerSpeed, .naturalScrolling, .keyRepeatInterval, .initialKeyRepeatDelay,
+    .standardFunctionKeys:
+    primary = appLocalizedPresentationText(item.value.primaryText)
+    secondary = item.value.secondaryText.map(appLocalizedPresentationText)
+  }
+
+  guard let secondary, !secondary.isEmpty else { return primary }
+  return "\(primary) — \(secondary)"
+}
+
+private func appLocalizedOnlyKnownValue(_ value: String, keys: Set<String>) -> String {
+  keys.contains(value) ? appLocalizedRuntime(value) : value
+}
+
+private func appLocalizedKnownDisplayName(_ value: String) -> String {
+  if value == "Built-in display" || value == "External display" || value == "Another display" {
+    return appLocalizedRuntime(value)
+  }
+
+  let words = value.split(separator: " ")
+  if words.count == 3,
+    words[0] == "External",
+    words[1] == "display",
+    let number = Int64(words[2])
+  {
+    return appRuntimeLocalizedFormat(
+      "%@ %lld",
+      appLocalizedRuntime("External display"),
+      number
+    )
+  }
+  return value
+}
+
+private func appLocalizedMirroringValue(_ value: String) -> String {
+  if value == "Extended desktop" {
+    return appLocalizedRuntime(value)
+  }
+  guard value.hasPrefix("Mirrors ") else { return value }
+  let target = String(value.dropFirst("Mirrors ".count))
+  return appRuntimeLocalizedFormat("Mirrors %@", appLocalizedKnownDisplayName(target))
+}
+
+private func appLocalizedFriendlyAudioValue(_ value: String) -> String {
+  let parts = value.components(separatedBy: " — ")
+  guard parts.count == 2 else {
+    return appLocalizedFriendlyAudioPrimary(value)
+  }
+  return
+    "\(appLocalizedFriendlyAudioPrimary(parts[0])) — \(appLocalizedFriendlyAudioSecondary(parts[1]))"
+}
+
+private func appLocalizedFriendlyAudioPrimary(_ value: String) -> String {
+  appLocalizedOnlyKnownValue(
+    value,
+    keys: [
+      "No device saved",
+      "Selected input device",
+      "Selected output device",
+      "Selected alert output device",
+    ]
+  )
+}
+
+private func appLocalizedFriendlyAudioSecondary(_ value: String) -> String {
+  appLocalizedOnlyKnownValue(value, keys: ["Device name unavailable"])
+}
+
+private func appLocalizedIPv4Primary(_ value: String) -> String {
+  if value == "Automatic (DHCP)" || value == "Value unavailable" {
+    return appLocalizedRuntime(value)
+  }
+  guard value.hasPrefix("Manual — ") else { return value }
+  let address = String(value.dropFirst("Manual — ".count))
+  return "\(appLocalizedRuntime("Manual")) — \(address)"
+}
+
+private func appLocalizedIPv4Secondary(_ value: String) -> String {
+  value.components(separatedBy: " · ").map { component in
+    if component.hasPrefix("Subnet ") {
+      return appRuntimeLocalizedFormat(
+        "Subnet %@",
+        String(component.dropFirst("Subnet ".count))
+      )
+    }
+    if component.hasPrefix("Router ") {
+      return appRuntimeLocalizedFormat(
+        "Router %@",
+        String(component.dropFirst("Router ".count))
+      )
+    }
+    return component
+  }.joined(separator: " · ")
+}
+
+private func appLocalizedDisplayOperationValue(_ value: String) -> String {
+  value.split(separator: "\n", omittingEmptySubsequences: false).map { rawLine in
+    var line = String(rawLine)
+    if let separator = line.range(of: " • ") {
+      let identity = String(line[..<separator.lowerBound])
+      let localizedIdentity = appLocalizedKnownDisplayName(identity)
+      line.replaceSubrange(line.startIndex..<separator.lowerBound, with: localizedIdentity)
+    }
+    if let mirrorSeparator = line.range(of: " → ", options: .backwards) {
+      let targetStart = mirrorSeparator.upperBound
+      let target = String(line[targetStart...])
+      let localizedTarget = appLocalizedKnownDisplayName(target)
+      line.replaceSubrange(targetStart..<line.endIndex, with: localizedTarget)
+    }
+    return line
+  }.joined(separator: "\n")
+}
+
+/// Localizes the small, deterministic presentation phrases emitted by
+/// `DeskSetupPresentation` while leaving device names and user data untouched.
+func appLocalizedPresentationText(_ value: String) -> String {
+  let exact = appLocalizedRuntime(value)
+  if exact != value {
+    return exact
+  }
+
+  for separator in [" — ", " · "] where value.contains(separator) {
+    return value.components(separatedBy: separator)
+      .map(appLocalizedPresentationText)
+      .joined(separator: separator)
+  }
+
+  if value.hasPrefix("Mirrors ") {
+    return appRuntimeLocalizedFormat(
+      "Mirrors %@",
+      appLocalizedPresentationText(String(value.dropFirst("Mirrors ".count)))
+    )
+  }
+  if value.hasPrefix("Subnet ") {
+    return appRuntimeLocalizedFormat(
+      "Subnet %@",
+      String(value.dropFirst("Subnet ".count))
+    )
+  }
+  if value.hasPrefix("Router ") {
+    return appRuntimeLocalizedFormat(
+      "Router %@",
+      String(value.dropFirst("Router ".count))
+    )
+  }
+
+  if value.hasPrefix("Display ") || value.hasPrefix("External display ") {
+    let words = value.split(separator: " ")
+    if let numberIndex = words.firstIndex(where: { Int($0) != nil }),
+      let number = Int64(words[numberIndex])
+    {
+      let prefix = words[..<numberIndex].joined(separator: " ")
+      let suffix = words.dropFirst(numberIndex + 1).joined(separator: " ")
+      let numbered = appRuntimeLocalizedFormat("%@ %lld", appLocalizedRuntime(prefix), number)
+      return suffix.isEmpty
+        ? numbered
+        : appRuntimeLocalizedFormat("%@ %@", numbered, appLocalizedRuntime(suffix))
+    }
+  }
+
+  if let range = value.range(of: " at "), value.hasSuffix(" Hz") {
+    let dimensions = String(value[..<range.lowerBound])
+    let rateStart = range.upperBound
+    let rateEnd = value.index(value.endIndex, offsetBy: -" Hz".count)
+    let rate = String(value[rateStart..<rateEnd])
+    return appRuntimeLocalizedFormat("%@ at %@ Hz", dimensions, rate)
+  }
+
+  if value.hasSuffix(" seconds") {
+    let duration = String(value.dropLast(" seconds".count))
+    return appRuntimeLocalizedFormat("%@ seconds", duration)
+  }
+
+  return value
 }
 
 func appSnapshotItemLabel(_ item: SnapshotItem) -> String {

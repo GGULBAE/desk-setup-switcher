@@ -10,6 +10,7 @@ let package = Package(
   ],
   products: [
     .library(name: "DeskSetupCore", targets: ["DeskSetupCore"]),
+    .library(name: "DeskSetupPresentation", targets: ["DeskSetupPresentation"]),
     .library(name: "DeskSetupSystem", targets: ["DeskSetupSystem"]),
     .executable(name: "DeskSetupSwitcher", targets: ["DeskSetupSwitcher"]),
   ],
@@ -17,6 +18,11 @@ let package = Package(
     .target(
       name: "DeskSetupCore",
       path: "Sources/DeskSetupCore"
+    ),
+    .target(
+      name: "DeskSetupPresentation",
+      dependencies: ["DeskSetupCore"],
+      path: "Sources/DeskSetupPresentation"
     ),
     .target(
       name: "DeskSetupSystem",
@@ -38,7 +44,7 @@ let package = Package(
     ),
     .executableTarget(
       name: "DeskSetupSwitcher",
-      dependencies: ["DeskSetupCore", "DeskSetupSystem"],
+      dependencies: ["DeskSetupCore", "DeskSetupPresentation", "DeskSetupSystem"],
       path: "Sources/DeskSetupSwitcher",
       resources: [.process("Resources")],
       linkerSettings: [
@@ -50,6 +56,11 @@ let package = Package(
       name: "DeskSetupCoreTests",
       dependencies: ["DeskSetupCore"],
       path: "Tests/DeskSetupCoreTests"
+    ),
+    .testTarget(
+      name: "DeskSetupPresentationTests",
+      dependencies: ["DeskSetupCore", "DeskSetupPresentation"],
+      path: "Tests/DeskSetupPresentationTests"
     ),
     .testTarget(
       name: "DeskSetupSystemTests",

@@ -1,12 +1,15 @@
 # Desk Setup Switcher
 
-> **Pre-release 0.1.0 implementation candidate:** the native app, safe profile core, concrete macOS adapters, editor/apply UI, and no-Developer-ID packaging pipeline are implemented. Final local `make verify`, the 158-test inventory, all five opt-in read-only discovery gates, universal DMG/checksum verification, and a fresh `/Applications` smoke test pass. Repair commit `4e45328` is pushed and its GitHub Actions verification is green; no release is published, and live setting mutations, physical Intel, a live Keychain write, the downloaded/quarantined Gatekeeper path, and several manual workflows remain unverified.
+> **Pre-release 0.1.0 implementation candidate:** the native app, safe profile core, concrete macOS adapters, protected profile-editing UI, and no-Developer-ID packaging pipeline are implemented. The current UI-hardening tree passes full local `make verify` with 214 non-live tests and a verified universal package; its final commit and CI run remain pending. The earlier repair commit `4e45328` retains its green 2026-07-11 live-read and fresh-install evidence. No release is published, and live setting mutations, physical Intel, a live Keychain write, the downloaded/quarantined Gatekeeper path, and several manual workflows remain unverified.
 
 Desk Setup Switcher is a free and open-source macOS menu-bar app for manually saving and applying display, audio, network, mouse, and keyboard profiles. It is local-first: no account, server, cloud sync, telemetry, analytics, or automatic profile switching.
 
 ## What is implemented
 
 - A native SwiftUI `MenuBarExtra` app with `LSUIElement`, Settings, profile capture, editing, ordering, import/export, readiness, normal/force previews, itemized results, and a 15-second display confirmation flow.
+- App-lifetime profile drafts with save/discard/cancel protection across selection, replacement, and ordinary quit paths. `⌘S` saves a valid dirty draft, fixed save/revert controls remain outside the editor scroll area, and current-settings capture updates only the reviewable draft until the user saves.
+- Value-first profile summaries and apply previews with technical identifiers behind disclosures, a curated icon picker that preserves imported symbols, one primary Apply action, secondary availability/available-items actions, bounded profile scrolling, and text reasons for disabled actions.
+- Detected-device condition pickers, preserved disconnected values, advanced raw-identifier entry, validated IP/CIDR and location entry, separate app-desired/macOS login-item states, explicit About links, text diagnostic severity, and accessibility announcements plus display-confirmation keyboard/value metadata.
 - Versioned profile JSON, semantic/resource validation, safe actionable validation errors, migration scaffolding, permission-restricted Application Support persistence, last-known-good backup, corruption quarantine, and exclusive-create export.
 - A capability-driven adapter contract and transaction engine with deterministic ordering, no-op filtering, pre-execution state/rollback revalidation, one active transaction, reverse rollback after fatal failure, and protected high-risk rollback tokens.
 - Read-only display, audio, network, input, USB/hardware, and authorized-location discovery using macOS frameworks.
@@ -22,18 +25,20 @@ Evidence is intentionally split by confidence level:
 
 | Evidence | Current result |
 | --- | --- |
-| Full local gate | Final `make verify` passed on 2026-07-11: lint/policy, 158 tests (83 XCTest + 75 Swift Testing), Swift/Xcode Debug and Release, Xcode Analyze, packaging, checksum, and mounted-DMG checks |
+| Current UI-hardening full gate | `make verify` passed on 2026-07-12: localization/policy lint, 214 tests (111 XCTest + 103 Swift Testing), Swift and universal Xcode Debug/Release, Analyze, DMG creation, checksum, mounted-image resources, architectures, and ad-hoc signature classification. The 55 presentation-specific tests comprise 28 draft and 27 presentation/condition cases |
+| Current local universal package | The no-Developer-ID DMG verified `arm64 x86_64`, bundle metadata, icon, English/Korean resources, `/Applications` link, ad-hoc app signature, and SHA-256 `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68` |
+| Historical full local gate | Repair baseline `4e45328` passed `make verify` on 2026-07-11: lint/policy, 158 tests (83 XCTest + 75 Swift Testing), Swift/Xcode Debug and Release, Xcode Analyze, packaging, checksum, and mounted-DMG checks |
 | Default test behavior | Six opt-in cases skip by default: five read-only hardware cases and one Keychain-write round trip |
-| Live read-only discovery | Display, audio, network, input, and readiness-context smoke tests passed on an Apple M5 Mac running macOS 26.5.2 |
-| Local universal package | The post-fix no-Developer-ID DMG verified `arm64 x86_64`, bundle metadata, icon, English/Korean resources, `/Applications` link, ad-hoc app signature, and SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f` |
-| CI universal package | [Actions run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) uploaded unsigned artifact ID `8249295840`; its downloaded checksum file verified CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. Local and CI DMGs are not byte-for-byte reproducible |
-| Manual packaged app | A recorded local-DMG fresh copy to `/Applications` launched background-only/menu-bar-only; the Korean popover, Settings, and an accessibility label passed inspection |
-| Snapshot profile | The fresh install created one schema-v1 **Ready** profile from a read-only snapshot with all four setting groups; because it was a zero-operation plan, both Apply and Force Apply were disabled |
-| Login item | Default-on `SMAppService` registration succeeded and Background Task Management reported `[enabled, allowed, notified]`; UI opt-out disabled it and re-enable restored enabled status. Final cleanup opted out, leaving only disabled BTM history |
+| Historical live read-only discovery | On 2026-07-11, display, audio, network, input, and readiness-context smoke tests passed on an Apple M5 Mac running macOS 26.5.2; they were not rerun for the current UI tree |
+| Historical local universal package | The 2026-07-11 post-fix no-Developer-ID DMG verified `arm64 x86_64`, bundle metadata, icon, English/Korean resources, `/Applications` link, ad-hoc app signature, and SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f` |
+| Historical CI universal package | [Actions run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) uploaded unsigned artifact ID `8249295840`; its downloaded checksum file verified CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. Local and CI DMGs are not byte-for-byte reproducible |
+| Historical manual packaged app | The 2026-07-11 local-DMG copy launched from `/Applications` as background-only/menu-bar-only; the Korean popover, Settings, and one accessibility label passed inspection. This does not verify the current UI tree |
+| Historical snapshot profile | That fresh install created one schema-v1 **Ready** profile from a read-only snapshot with all four setting groups; because it was a zero-operation plan, both Apply and Force Apply were disabled |
+| Historical login item | Default-on `SMAppService` registration succeeded and Background Task Management reported `[enabled, allowed, notified]`; UI opt-out disabled it and re-enable restored enabled status. Final cleanup opted out, leaving only disabled BTM history |
 | Live mutations | **Not run** for display, audio, network, mouse, or keyboard |
 | Live Keychain write | **Not run**; the Keychain path is mock verified |
-| Remaining manual checks | Approval-required and failure/retry login-item states, actual login-at-boot after a reboot, full VoiceOver/keyboard/contrast, import/export, permission denial, Gatekeeper/quarantine, physical Intel, and mutation/rollback procedures are pending |
-| CI and release | Repair commit `4e45328` was pushed; [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) succeeded on 2026-07-11 under macOS 15, Xcode 16.4, and Swift 6.1.2. Full `make verify` and unsigned-package upload passed. No release is published |
+| Remaining manual checks | No current-tree screenshot walkthrough or full VoiceOver/keyboard/focus/contrast/text-size audit was run. Approval-required and failure/retry login-item states, actual login-at-boot after a reboot, import/export, TCC permission denial/grant, Gatekeeper/quarantine, physical Intel, and mutation/rollback procedures are pending |
+| CI and release | Repair commit `4e45328` and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) remain the latest verified pushed baseline. The current UI tree has no final commit or CI evidence. No release is published |
 
 See the [support matrix](docs/SUPPORT-MATRIX.md) and [completion ledger](docs/COMPLETION-CRITERIA.md) for capability-level evidence and explicit manual procedures.
 
@@ -66,6 +71,8 @@ make clean
 
 `make verify` is the primary gate: lint, tests, Debug/Release Swift and universal Xcode builds, Xcode Analyze, no-Developer-ID DMG creation, checksum validation, ad-hoc signature inspection, and mounted-DMG verification. It must not perform live discovery or a setting mutation.
 
+`make lint` also validates English/Korean key parity, duplicate keys, format-placeholder compatibility, and statically discoverable localized UI keys. Passing this structural check is not a rendered bilingual walkthrough or a linguistic-quality audit.
+
 The following gate opts into the repository's read-only hardware discovery tests. It still does not apply settings:
 
 ```sh
@@ -86,7 +93,7 @@ Read [docs/PRIVACY.md](docs/PRIVACY.md) and [SECURITY.md](SECURITY.md).
 
 `make package` creates `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg` and its `.sha256` file with a universal app and `/Applications` link. The “unsigned” filename means no Developer ID identity: the contained app is ad-hoc signed for code integrity and to meet the packaging design's signature prerequisite, but is not notarized. `make verify-package` checks the checksum, mounts the image read-only, and validates metadata, resources, both architectures, and signature class.
 
-The final local artifact passes verification and its fresh `/Applications` install passed the smoke checks above, including default-on login-item registration and UI opt-out/re-enable. It is not published; quarantine/Gatekeeper, approval-required and retry states, and actual login-at-boot after a reboot remain untested. Developer ID signing and notarization are optional external release-operator work, not current project claims. See [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+The current UI tree produced and verified the replacement universal package and checksum above, but it has not been installed or smoke-tested. The 2026-07-11 baseline artifact retains the recorded fresh `/Applications` checks, including default-on login-item registration and UI opt-out/re-enable. Nothing is published; quarantine/Gatekeeper, approval-required and retry states, and actual login-at-boot after a reboot remain untested. Developer ID signing and notarization are optional external release-operator work, not current project claims. See [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
 
 ## Project tracking
 

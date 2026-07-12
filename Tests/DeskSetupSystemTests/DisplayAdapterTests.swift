@@ -119,6 +119,29 @@ struct DisplayAdapterTests {
     #expect(calls.map(\.commitScope) == [.appOnly, .sessionOnly, .sessionOnly])
   }
 
+  @Test("an unnamed built-in display has a friendly preview label")
+  func unnamedBuiltInPreviewIsFriendly() async throws {
+    var displays = makeDisplays()
+    displays[0].identity.productName = nil
+    let api = MockDisplaySystemAPI(displays: displays)
+    let adapter = CoreGraphicsDisplayAdapter(systemAPI: api)
+    let snapshot = try await adapter.snapshot()
+    var settings = try displaySettings(from: snapshot)
+    settings.displays[1].origin.value = DisplayPoint(x: 1_900, y: 0)
+
+    let plan = try await adapter.plan(
+      .display(settings),
+      from: snapshot,
+      mode: .normal
+    )
+    let preview = try #require(plan.operations.first?.preview)
+
+    #expect(preview.previousValue.contains("Built-in display"))
+    #expect(preview.desiredValue.contains("Built-in display"))
+    #expect(!preview.previousValue.contains("11111111"))
+    #expect(!preview.desiredValue.contains("11111111"))
+  }
+
   @Test("unsupported mode, rotation, and active state become omissions")
   func unsupportedPropertiesAreOmitted() async throws {
     let api = MockDisplaySystemAPI(displays: makeDisplays())

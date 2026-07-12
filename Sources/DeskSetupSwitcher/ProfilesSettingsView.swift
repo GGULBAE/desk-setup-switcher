@@ -3,12 +3,17 @@ import SwiftUI
 #if canImport(DeskSetupCore)
   import DeskSetupCore
 #endif
+#if canImport(DeskSetupPresentation)
+  import DeskSetupPresentation
+#endif
 
 struct ProfilesSettingsView: View {
   @EnvironmentObject private var model: ApplicationModel
-  @State private var selection: UUID?
-  @State private var draft: DeskProfile?
+  @EnvironmentObject private var profileEditor: ProfileEditorModel
   @State private var profilePendingDeletion: DeskProfile?
+  @State private var deferredAction: DeferredProfileAction?
+  @State private var isUnsavedPromptPresented = false
+  @State private var isResolvingUnsavedPrompt = false
 
   var body: some View {
     VStack(spacing: 12) {
@@ -29,7 +34,7 @@ struct ProfilesSettingsView: View {
           .accessibilityLabel(
             appLocalized("Profile storage status: \(model.storageStatus)"))
         Spacer()
-        Button("Import…") { model.importProfiles() }
+        Button("Import…") { requestDeferredAction(.importProfiles) }
           .disabled(model.isProfileMutationLocked)
           .accessibilityHint("Selects and validates a local profile JSON file")
         Button("Export…") { model.exportProfiles() }
@@ -47,18 +52,51 @@ struct ProfilesSettingsView: View {
       }
     }
     .onAppear {
-      selection = model.selectedProfileID ?? model.profiles.first?.id
-      loadDraft()
-    }
-    .onChange(of: selection) {
-      model.selectProfile(id: selection)
-      loadDraft()
+      profileEditor.initialize(
+        profiles: model.profiles,
+        preferredProfileID: model.selectedProfileID
+      )
+      if profileEditor.session.pendingSelection != nil {
+        isUnsavedPromptPresented = true
+      }
     }
     .onChange(of: model.profiles) {
-      if let selection, !model.profiles.contains(where: { $0.id == selection }) {
-        self.selection = model.selectedProfileID ?? model.profiles.first?.id
+      synchronizeEditor()
+    }
+    .onChange(of: model.selectedProfileID) {
+      synchronizeEditor()
+    }
+    .confirmationDialog(
+      "Save changes before continuing?",
+      isPresented: $isUnsavedPromptPresented
+    ) {
+      Button("Save and Continue") {
+        isResolvingUnsavedPrompt = true
+        Task {
+          await saveAndContinue()
+          isResolvingUnsavedPrompt = false
+          if profileEditor.session.pendingSelection != nil || deferredAction != nil {
+            isUnsavedPromptPresented = true
+          }
+        }
       }
-      loadDraft()
+      Button("Discard Changes", role: .destructive) {
+        isResolvingUnsavedPrompt = true
+        discardAndContinue()
+        isResolvingUnsavedPrompt = false
+      }
+      Button("Cancel", role: .cancel) {
+        cancelDeferredAction()
+      }
+    } message: {
+      Text("This profile has changes that have not been saved.")
+    }
+    .onChange(of: isUnsavedPromptPresented) {
+      if !isUnsavedPromptPresented, !isResolvingUnsavedPrompt,
+        profileEditor.session.pendingSelection != nil || deferredAction != nil
+      {
+        cancelDeferredAction()
+      }
     }
     .confirmationDialog(
       "Delete this profile?",
@@ -106,10 +144,10 @@ struct ProfilesSettingsView: View {
 
   private var sidebar: some View {
     VStack(spacing: 8) {
-      List(selection: $selection) {
+      List(selection: selectionBinding) {
         ForEach(model.profiles) { profile in
           HStack {
-            Image(systemName: profile.symbolName)
+            Image(systemName: appResolvedProfileSymbolName(profile.symbolName))
               .frame(width: 20)
               .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -139,103 +177,397 @@ struct ProfilesSettingsView: View {
 
       HStack(spacing: 6) {
         Button {
-          model.createProfile()
+          requestDeferredAction(.create)
         } label: {
           Label("New Profile", systemImage: "plus")
         }
         .labelStyle(.iconOnly)
         .accessibilityLabel("Create profile")
+        .help("Create profile")
 
         Button {
-          if let selection { model.duplicateProfile(id: selection) }
+          if let selection = profileEditor.selectedProfileID {
+            requestDeferredAction(.duplicate(selection))
+          }
         } label: {
           Label("Duplicate Profile", systemImage: "plus.square.on.square")
         }
         .labelStyle(.iconOnly)
-        .disabled(selection == nil)
+        .disabled(profileEditor.selectedProfileID == nil)
         .accessibilityLabel("Duplicate selected profile")
+        .help("Duplicate selected profile")
 
         Button {
-          if let profile = selectedProfile { profilePendingDeletion = profile }
+          if let profile = selectedProfile {
+            requestDeferredAction(.delete(profile))
+          }
         } label: {
           Label("Delete Profile", systemImage: "trash")
         }
         .labelStyle(.iconOnly)
-        .disabled(selection == nil)
+        .disabled(profileEditor.selectedProfileID == nil)
         .accessibilityLabel("Delete selected profile")
+        .help("Delete selected profile")
 
         Spacer()
 
         Button {
-          if let selection { model.moveProfile(id: selection, by: -1) }
+          if let selection = profileEditor.selectedProfileID {
+            model.moveProfile(id: selection, by: -1)
+          }
         } label: {
           Label("Move Up", systemImage: "chevron.up")
         }
         .labelStyle(.iconOnly)
         .disabled(!canMove(by: -1))
         .accessibilityLabel("Move selected profile up")
+        .help("Move selected profile up")
 
         Button {
-          if let selection { model.moveProfile(id: selection, by: 1) }
+          if let selection = profileEditor.selectedProfileID {
+            model.moveProfile(id: selection, by: 1)
+          }
         } label: {
           Label("Move Down", systemImage: "chevron.down")
         }
         .labelStyle(.iconOnly)
         .disabled(!canMove(by: 1))
         .accessibilityLabel("Move selected profile down")
+        .help("Move selected profile down")
       }
     }
   }
 
   @ViewBuilder
   private var editor: some View {
-    if draft != nil {
-      ProfileEditorForm(
-        profile: draftBinding,
-        conditionContext: model.lastConditionContext
-      ) {
-        if let draft { model.updateProfile(draft) }
-      } updateFromCurrentSettings: {
-        if let selection { model.updateProfileFromCurrentSettings(id: selection) }
+    VStack(spacing: 0) {
+      if profileEditor.draft != nil {
+        ProfileEditorForm(
+          profile: draftBinding,
+          conditionContext: model.lastConditionContext
+        )
+        Divider()
+        editorActionBar
+      } else {
+        ContentUnavailableView(
+          "Select a Profile",
+          systemImage: "sidebar.left",
+          description: Text("Choose a profile in the sidebar or create a new one.")
+        )
       }
-    } else {
-      ContentUnavailableView(
-        "Select a Profile",
-        systemImage: "sidebar.left",
-        description: Text("Choose a profile in the sidebar or create a new one.")
-      )
     }
   }
 
   private var draftBinding: Binding<DeskProfile> {
     Binding(
-      get: { draft ?? DeskProfile(name: "") },
-      set: { draft = $0 }
+      get: { profileEditor.draft ?? DeskProfile(name: "") },
+      set: { profileEditor.replaceDraft($0) }
     )
   }
 
   private var selectedProfile: DeskProfile? {
-    guard let selection else { return nil }
+    guard let selection = profileEditor.selectedProfileID else { return nil }
     return model.profiles.first { $0.id == selection }
   }
 
-  private func loadDraft() {
-    draft = selectedProfile
-  }
-
   private func canMove(by offset: Int) -> Bool {
-    guard let selection,
+    guard let selection = profileEditor.selectedProfileID,
       let index = model.profiles.firstIndex(where: { $0.id == selection })
     else { return false }
     return model.profiles.indices.contains(index + offset)
+  }
+
+  private var selectionBinding: Binding<UUID?> {
+    Binding(
+      get: { profileEditor.selectedProfileID },
+      set: { requestedID in
+        let requestedProfile = requestedID.flatMap { id in
+          model.profiles.first { $0.id == id }
+        }
+        switch profileEditor.requestSelection(requestedProfile) {
+        case .selected(let target):
+          persistSelection(target)
+        case .requiresDecision:
+          isUnsavedPromptPresented = true
+        case .unchanged:
+          break
+        }
+      }
+    )
+  }
+
+  private var editorActionBar: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Label(editorActivityTitle, systemImage: editorActivitySymbol)
+          .font(.caption)
+          .foregroundStyle(editorActivityIsError ? .red : .secondary)
+          .accessibilityLabel(editorActivityAccessibilityLabel)
+        Spacer()
+      }
+
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 10) {
+          captureSettingsButton
+          Spacer()
+          revertDraftButton
+          saveDraftButton
+        }
+
+        VStack(alignment: .trailing, spacing: 6) {
+          HStack {
+            Spacer()
+            captureSettingsButton
+          }
+          HStack(spacing: 10) {
+            Spacer()
+            revertDraftButton
+            saveDraftButton
+          }
+        }
+      }
+    }
+    .padding(.horizontal, 10)
+    .padding(.vertical, 8)
+    .background(.bar)
+  }
+
+  private var captureSettingsButton: some View {
+    Button("Update Draft from Current Settings") {
+      requestDeferredAction(.captureCurrentSettings)
+    }
+    .accessibilityHint("Reads the current Mac and updates only this unsaved draft")
+    .disabled(profileEditor.activity.isBusy)
+  }
+
+  private var revertDraftButton: some View {
+    Button("Revert Changes") {
+      profileEditor.revertDraft()
+    }
+    .disabled(!profileEditor.isDirty || profileEditor.activity.isBusy)
+  }
+
+  private var saveDraftButton: some View {
+    Button("Save Profile") {
+      Task { await saveCurrentDraft() }
+    }
+    .keyboardShortcut("s")
+    .buttonStyle(.borderedProminent)
+    .disabled(!canSaveDraft)
+  }
+
+  private var canSaveDraft: Bool {
+    guard let draft = profileEditor.draft else { return false }
+    return profileEditor.isDirty
+      && !profileEditor.activity.isBusy
+      && !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  private var editorActivityIsError: Bool {
+    if case .error = profileEditor.activity { return true }
+    return false
+  }
+
+  private var editorActivityTitle: String {
+    switch profileEditor.activity {
+    case .saved:
+      appLocalized("All changes are saved.")
+    case .changed:
+      appLocalized("Unsaved changes")
+    case .saving:
+      appLocalized("Saving profile…")
+    case .capturing:
+      appLocalized("Reading current settings…")
+    case .message(let message), .error(let message):
+      message
+    }
+  }
+
+  private var editorActivitySymbol: String {
+    switch profileEditor.activity {
+    case .saved: "checkmark.circle"
+    case .changed: "pencil.circle"
+    case .saving, .capturing: "hourglass"
+    case .message: "info.circle"
+    case .error: "exclamationmark.triangle"
+    }
+  }
+
+  private var editorActivityAccessibilityLabel: String {
+    appLocalized("Profile editor status: \(editorActivityTitle)")
+  }
+
+  private func synchronizeEditor() {
+    profileEditor.synchronize(
+      profiles: model.profiles,
+      preferredProfileID: model.selectedProfileID
+    )
+  }
+
+  private func requestDeferredAction(_ action: DeferredProfileAction) {
+    guard profileEditor.isDirty else {
+      performDeferredAction(action)
+      return
+    }
+    deferredAction = action
+    isUnsavedPromptPresented = true
+  }
+
+  private func cancelDeferredAction() {
+    if profileEditor.session.pendingSelection != nil {
+      profileEditor.resolvePendingSelection(.cancel)
+    }
+    deferredAction = nil
+    isUnsavedPromptPresented = false
+  }
+
+  private func discardAndContinue() {
+    if profileEditor.session.pendingSelection != nil {
+      if case .selected(let target) = profileEditor.resolvePendingSelection(.discard) {
+        persistSelection(target)
+      }
+      return
+    }
+
+    let action = deferredAction
+    deferredAction = nil
+    profileEditor.revertDraft()
+    if let action {
+      performDeferredAction(action)
+    }
+  }
+
+  private func saveAndContinue() async {
+    if profileEditor.session.pendingSelection != nil {
+      guard
+        case .saveRequired(let candidate, _) =
+          profileEditor.resolvePendingSelection(.save)
+      else { return }
+      profileEditor.beginSaving()
+      switch await model.updateProfile(candidate) {
+      case .saved(let persisted):
+        switch profileEditor.completeSave(with: persisted) {
+        case .savedAndSelected(let target):
+          persistSelection(target)
+        case .saved:
+          profileEditor.finishWithError(
+            appLocalized("The pending profile selection was no longer available."))
+        case .rejected:
+          profileEditor.finishWithError(
+            appLocalized("The saved profile did not match the active draft."))
+        }
+      case .rejected(let message):
+        profileEditor.finishWithError(message)
+      }
+      return
+    }
+
+    guard let action = deferredAction else { return }
+    deferredAction = nil
+    guard await saveCurrentDraft() else {
+      deferredAction = action
+      return
+    }
+    performDeferredAction(action)
+  }
+
+  @discardableResult
+  private func saveCurrentDraft() async -> Bool {
+    guard let candidate = profileEditor.session.saveCandidate() else { return false }
+    profileEditor.beginSaving()
+    switch await model.updateProfile(candidate) {
+    case .saved(let persisted):
+      switch profileEditor.completeSave(with: persisted) {
+      case .saved:
+        return true
+      case .savedAndSelected(let target):
+        persistSelection(target)
+        return true
+      case .rejected:
+        profileEditor.finishWithError(
+          appLocalized("The saved profile did not match the active draft."))
+        return false
+      }
+    case .rejected(let message):
+      profileEditor.finishWithError(message)
+      return false
+    }
+  }
+
+  private func captureCurrentSettingsIntoDraft() async {
+    guard let targetID = profileEditor.draft?.id else { return }
+    profileEditor.beginCapture()
+    switch await model.captureCurrentProfileSettings() {
+    case .captured(let snapshot):
+      guard profileEditor.draft?.id == targetID else {
+        profileEditor.finishWithError(
+          appLocalized("The selected profile changed before the snapshot finished."))
+        return
+      }
+      guard
+        SettingGroup.safeApplicationSequence.contains(where: {
+          snapshot.profileSettings.payload(for: $0) != nil
+        })
+      else {
+        profileEditor.finishWithError(
+          appLocalized("No settings could be added safely from this snapshot."))
+        return
+      }
+      let previousSettings = profileEditor.draft?.settings
+      profileEditor.replaceSettingsFromSnapshot(
+        snapshot.profileSettings,
+        expectedProfileID: targetID
+      )
+      profileEditor.finishWithMessage(
+        previousSettings == snapshot.profileSettings
+          ? appLocalized("The draft already matches the current settings.")
+          : appLocalized("Current settings were added to the draft. Review and save them."))
+    case .rejected(let message):
+      profileEditor.finishWithError(message)
+    }
+  }
+
+  private func persistSelection(_ target: ProfileSelectionTarget) {
+    model.selectProfile(id: target.profileID)
+  }
+
+  private func performDeferredAction(_ action: DeferredProfileAction) {
+    switch action {
+    case .create:
+      model.createProfile()
+    case .duplicate(let id):
+      model.duplicateProfile(id: id)
+    case .delete(let profile):
+      profilePendingDeletion = model.profiles.first(where: { $0.id == profile.id }) ?? profile
+    case .importProfiles:
+      model.importProfiles()
+    case .captureCurrentSettings:
+      Task { await captureCurrentSettingsIntoDraft() }
+    }
+  }
+}
+
+private enum DeferredProfileAction: Identifiable {
+  case create
+  case duplicate(UUID)
+  case delete(DeskProfile)
+  case importProfiles
+  case captureCurrentSettings
+
+  var id: String {
+    switch self {
+    case .create: "create"
+    case .duplicate(let id): "duplicate-\(id.uuidString)"
+    case .delete(let profile): "delete-\(profile.id.uuidString)"
+    case .importProfiles: "import"
+    case .captureCurrentSettings: "capture-current-settings"
+    }
   }
 }
 
 private struct ProfileEditorForm: View {
   @Binding var profile: DeskProfile
   let conditionContext: ConditionContext
-  let save: () -> Void
-  let updateFromCurrentSettings: () -> Void
 
   var body: some View {
     Form {
@@ -245,8 +577,29 @@ private struct ProfileEditorForm: View {
         TextField("Description", text: $profile.profileDescription, axis: .vertical)
           .lineLimit(2...4)
           .accessibilityLabel("Profile description")
-        TextField("SF Symbol", text: $profile.symbolName)
-          .accessibilityHint("Enter a system symbol name, such as display.2")
+        Picker("Icon", selection: $profile.symbolName) {
+          ForEach(iconChoices, id: \.symbolName) { choice in
+            Label(appLocalizedRuntime(choice.title), systemImage: choice.symbolName)
+              .tag(choice.symbolName)
+          }
+          if !profileIconChoices.contains(where: { $0.symbolName == profile.symbolName }) {
+            Label(
+              appLocalized("Imported icon"),
+              systemImage: appResolvedProfileSymbolName(profile.symbolName)
+            )
+            .tag(profile.symbolName)
+          }
+        }
+        .accessibilityLabel("Profile icon")
+        if !profileIconChoices.contains(where: { $0.symbolName == profile.symbolName }) {
+          DisclosureGroup("Technical Information") {
+            LabeledContent("Imported symbol name") {
+              Text(profile.symbolName)
+                .font(.caption.monospaced())
+                .textSelection(.enabled)
+            }
+          }
+        }
         Toggle("Enabled", isOn: $profile.isEnabled)
       }
 
@@ -255,29 +608,25 @@ private struct ProfileEditorForm: View {
           appLocalized("Displays"),
           systemImage: "display.2",
           isOn: $profile.settings.display.isIncluded,
-          detail: appLocalized(
-            "\(profile.settings.display.value.displays.count) captured displays")
+          detail: summaryPreview(for: .display)
         )
         groupToggle(
           appLocalized("Audio"),
           systemImage: "speaker.wave.2",
           isOn: $profile.settings.audio.isIncluded,
-          detail: appLocalized(
-            "\(includedOptionCount(profile.settings.audio.value)) included options")
+          detail: summaryPreview(for: .audio)
         )
         groupToggle(
           appLocalized("Network"),
           systemImage: "network",
           isOn: $profile.settings.network.isIncluded,
-          detail: appLocalized(
-            "\(includedOptionCount(profile.settings.network.value)) included options")
+          detail: summaryPreview(for: .network)
         )
         groupToggle(
           appLocalized("Mouse & Keyboard"),
           systemImage: "keyboard",
           isOn: $profile.settings.input.isIncluded,
-          detail: appLocalized(
-            "\(includedOptionCount(profile.settings.input.value)) included options")
+          detail: summaryPreview(for: .input)
         )
 
         if profile.settings.display.isIncluded {
@@ -297,11 +646,13 @@ private struct ProfileEditorForm: View {
       Section("Readiness conditions") {
         ConditionEditorView(
           conditionSet: $profile.conditions,
-          availableDisplays: profile.settings.display.value.displays.map(\.identity),
+          availableDisplays: detectedConditionDisplays,
           availableAudioInputUIDs: conditionContext.audioInputUIDs.sorted(),
           availableAudioOutputUIDs: conditionContext.audioOutputUIDs.sorted(),
           availableHardwareIdentifiers: conditionContext.hardwareIdentifiers.sorted(),
-          currentWiFiSSID: conditionContext.wifiSSID
+          currentWiFiSSID: conditionContext.wifiSSID,
+          currentIPAddresses: conditionContext.ipAddresses.sorted(),
+          currentLocation: conditionContext.location
         )
       }
 
@@ -343,20 +694,13 @@ private struct ProfileEditorForm: View {
         }
       }
 
-      HStack {
-        Button("Update from Current Settings", action: updateFromCurrentSettings)
-          .accessibilityHint("Reads the current Mac without changing any setting")
-        Spacer()
-        Button("Save Profile", action: save)
-          .keyboardShortcut("s")
-          .disabled(profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-      }
     }
     .formStyle(.grouped)
   }
 
   private var displayOptions: some View {
     DisclosureGroup("Display options") {
+      summaryRows(for: .display)
       ForEach($profile.settings.display.value.displays) { $display in
         VStack(alignment: .leading, spacing: 6) {
           Text(display.identity.productName ?? appLocalized("Detected display"))
@@ -375,6 +719,7 @@ private struct ProfileEditorForm: View {
 
   private var audioOptions: some View {
     DisclosureGroup("Audio options") {
+      summaryRows(for: .audio)
       Toggle("Default input device", isOn: $profile.settings.audio.value.defaultInputUID.isIncluded)
       Toggle(
         "Default output device", isOn: $profile.settings.audio.value.defaultOutputUID.isIncluded)
@@ -386,6 +731,7 @@ private struct ProfileEditorForm: View {
 
   private var networkOptions: some View {
     DisclosureGroup("Network options") {
+      summaryRows(for: .network)
       Toggle("Wi-Fi power", isOn: $profile.settings.network.value.wifiPower.isIncluded)
       Toggle("Wi-Fi network", isOn: $profile.settings.network.value.wifiSSID.isIncluded)
       Toggle("IPv4 configuration", isOn: $profile.settings.network.value.ipv4.isIncluded)
@@ -397,6 +743,7 @@ private struct ProfileEditorForm: View {
 
   private var inputOptions: some View {
     DisclosureGroup("Mouse and keyboard options") {
+      summaryRows(for: .input)
       Label(
         "Experimental: macOS does not document the stability of these global preference keys.",
         systemImage: "testtube.2"
@@ -436,37 +783,89 @@ private struct ProfileEditorForm: View {
     }
   }
 
-  private func includedOptionCount(_ settings: AudioProfileSettings) -> String {
-    let values = [
-      settings.defaultInputUID.isIncluded,
-      settings.defaultOutputUID.isIncluded,
-      settings.systemOutputUID.isIncluded,
-      settings.outputVolume.isIncluded,
-      settings.outputMuted.isIncluded,
-    ]
-    return "\(values.filter { $0 }.count)"
+  @ViewBuilder
+  private func summaryRows(for group: SettingGroup) -> some View {
+    if let summary = presentationBuilder.summary(for: group, in: profile.settings) {
+      VStack(alignment: .leading, spacing: 6) {
+        ForEach(Array(summary.items.enumerated()), id: \.offset) { _, item in
+          LabeledContent {
+            Text(appProfileSummaryValue(item))
+              .multilineTextAlignment(.trailing)
+          } label: {
+            Text(appLocalizedPresentationText(item.label))
+          }
+          .accessibilityElement(children: .combine)
+        }
+
+        if !summary.technicalDetails.isEmpty {
+          DisclosureGroup("Technical Information") {
+            ForEach(Array(summary.technicalDetails.enumerated()), id: \.offset) { _, detail in
+              LabeledContent(appLocalizedRuntime(detail.label)) {
+                Text(detail.value)
+                  .font(.caption.monospaced())
+                  .textSelection(.enabled)
+              }
+            }
+          }
+        }
+      }
+      .padding(.vertical, 4)
+    }
   }
 
-  private func includedOptionCount(_ settings: NetworkProfileSettings) -> String {
-    let values = [
-      settings.wifiPower.isIncluded,
-      settings.wifiSSID.isIncluded,
-      settings.ipv4.isIncluded,
-      settings.dnsServers.isIncluded,
-      settings.webProxy.isIncluded,
-      settings.secureWebProxy.isIncluded,
-    ]
-    return "\(values.filter { $0 }.count)"
+  private func summaryPreview(for group: SettingGroup) -> String {
+    guard let summary = presentationBuilder.summary(for: group, in: profile.settings),
+      !summary.items.isEmpty
+    else {
+      return appLocalized("No included values")
+    }
+
+    let visible = summary.items.prefix(2).map(appProfileSummaryValue)
+    let remaining = summary.items.count - visible.count
+    if remaining > 0 {
+      return appLocalized("\(visible.joined(separator: " · ")) and \(remaining) more")
+    }
+    return visible.joined(separator: " · ")
   }
 
-  private func includedOptionCount(_ settings: InputProfileSettings) -> String {
-    let values = [
-      settings.pointerSpeed.isIncluded,
-      settings.naturalScrolling.isIncluded,
-      settings.keyRepeatInterval.isIncluded,
-      settings.initialKeyRepeatDelay.isIncluded,
-      settings.useStandardFunctionKeys.isIncluded,
-    ]
-    return "\(values.filter { $0 }.count)"
+  private var presentationBuilder: ProfilePresentationBuilder {
+    ProfilePresentationBuilder()
+  }
+
+  private var detectedConditionDisplays: [DisplayIdentity] {
+    conditionContext.displays.sorted {
+      displayChoiceSortKey($0) < displayChoiceSortKey($1)
+    }
+  }
+
+  private func displayChoiceSortKey(_ identity: DisplayIdentity) -> String {
+    let name = identity.productName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let builtInOrder = identity.isBuiltIn ? "0" : "1"
+    let technicalTieBreaker =
+      identity.uuid?.uuidString
+      ?? [identity.vendorID, identity.modelID, identity.serialNumber]
+      .map { $0.map(String.init) ?? "" }
+      .joined(separator: ":")
+    return "\(builtInOrder)|\(name)|\(technicalTieBreaker)"
+  }
+
+  private var iconChoices: [ProfileIconChoice] {
+    profileIconChoices
   }
 }
+
+private struct ProfileIconChoice {
+  let symbolName: String
+  let title: String
+}
+
+private let profileIconChoices: [ProfileIconChoice] = [
+  .init(symbolName: "display.2", title: "Displays"),
+  .init(symbolName: "laptopcomputer.and.iphone", title: "Devices"),
+  .init(symbolName: "house", title: "Home"),
+  .init(symbolName: "building.2", title: "Office"),
+  .init(symbolName: "gamecontroller", title: "Gaming"),
+  .init(symbolName: "headphones", title: "Audio"),
+  .init(symbolName: "video", title: "Video calls"),
+  .init(symbolName: "keyboard", title: "Mouse & Keyboard"),
+]

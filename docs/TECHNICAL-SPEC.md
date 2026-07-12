@@ -11,6 +11,8 @@ The repository targets both `arm64-apple-macos14.0` and `x86_64-apple-macos14.0`
 ```text
 DeskSetupSwitcherApp (SwiftUI, menu bar, settings, permissions)
         |
+DeskSetupPresentation (draft state, friendly summaries, action/input presentation)
+        |
 DeskSetupCore (models, validation, conditions, persistence, planning)
         |
 DeskSetupSystem (display, audio, network, input, conditions, Keychain)
@@ -18,11 +20,12 @@ DeskSetupSystem (display, audio, network, input, conditions, Keychain)
 Public macOS frameworks / explicitly isolated experimental preferences
 ```
 
-UI code never calls Core Graphics, Core Audio, CoreWLAN, SystemConfiguration, or preference mutation directly. `DeskSetupCore` has no dependency on SwiftUI and tests use mock adapters.
+UI code never calls Core Graphics, Core Audio, CoreWLAN, SystemConfiguration, or preference mutation directly. `DeskSetupPresentation` depends on Core value types but not SwiftUI, AppKit, or system adapters. `DeskSetupCore` has no dependency on UI frameworks and tests use mock adapters.
 
 ## Concurrency
 
 - UI models and dialogs are `@MainActor`.
+- One app-lifetime `ProfileEditorModel` owns the pure draft session across Settings scene recreation. Profile saves and current-settings capture return typed asynchronous results before the UI changes draft state.
 - Profile persistence and transaction coordination are actors.
 - Only one apply transaction may run at a time.
 - The UI can cancel before execution. In-flight transaction cancellation between planned operations is not currently exposed; fatal failures and explicit high-risk rollback are the implemented interruption/recovery paths.
@@ -64,6 +67,14 @@ Canonical data lives under `~/Library/Application Support/Desk Setup Switcher/`.
 
 Export uses a user-selected destination. Import reads only the selected file and passes the same size, schema, and semantic validation. Secrets use Keychain; profiles and backups never contain passwords.
 
+## Profile draft and presentation state
+
+`ProfileDraftSession` stores the selected saved profile, the user-editable draft, and an optional pending selection target. Dirty comparison covers name, description, symbol, enabled state, settings/inclusion values, and conditions; last-application and storage metadata are not user-editable draft fields. Selection or replacement while dirty requires a typed save, discard, or cancel resolution.
+
+Save marks the session clean only after `ProfileStore` returns the persisted value. Immediately before update, `ApplicationModel` reloads the authoritative profile and merges only editable draft fields so a stale draft cannot overwrite a newer last-application result or timestamp. A current-settings refresh calls the read-only snapshot coordinator, returns a typed snapshot result, and replaces draft settings without persisting until explicit save.
+
+`DeskSetupPresentation` also owns deterministic included-value summaries, technical-detail separation, operation preview text, menu action availability/reasons, detected condition choices, and typed IP/CIDR/location input validation. Localization and accessibility delivery remain app-layer responsibilities so device names and other user data are never treated as localization keys.
+
 ## Adapter contract
 
 Every setting adapter exposes the same operations:
@@ -99,7 +110,7 @@ A failure is fatal only when continuing could create an inconsistent or unsafe c
 
 ## Capability and permission behavior
 
-Capabilities are values, not thrown control flow. Permission denial produces an unavailable item and leaves unrelated groups operational. The app explains location use before its explicit permission action and when a location condition is added; a complete SSID-triggered permission UX matrix is still pending. Listing or selecting a Core Audio input device does not start microphone capture and must not request microphone permission.
+Capabilities are values, not thrown control flow. Permission denial produces an unavailable item and leaves unrelated groups operational. The app explains location use before its explicit permission action and when a location condition is added; a complete SSID-triggered permission UX matrix is still pending. Login-item UI presents the app's desired setting separately from macOS registration status and emphasizes only mismatch/approval/error states. This presentation does not alter TCC or `SMAppService` semantics. Listing or selecting a Core Audio input device does not start microphone capture and must not request microphone permission.
 
 ## Stable device identity
 
@@ -118,21 +129,24 @@ Structured local log entries contain timestamp, severity, component, safe event 
 
 ## App lifecycle
 
-`MenuBarExtra` hosts the primary UI. `LSUIElement` requests an accessory/menu-bar lifecycle. A Settings scene provides profile management, permissions, login item, sanitized diagnostics, import/export, licenses, and support status. A fresh final-DMG install launched from `/Applications` background-only/menu-bar-only. `SMAppService.mainApp` controls login-at-launch; registration failure remains visible and nonfatal. Default-on registration succeeded, Background Task Management reported `[enabled, allowed, notified]`, UI opt-out disabled it, and re-enable restored enabled status. Final cleanup opted out and left only disabled BTM history. Approval-required/retry states and actual login-at-boot after a reboot remain untested.
+`MenuBarExtra` hosts the primary UI. `LSUIElement` requests an accessory/menu-bar lifecycle. A Settings scene provides profile management, permissions, login item, sanitized diagnostics, import/export, licenses, and support status. The app owns profile draft state above the Settings scene and prompts save/discard/cancel before ordinary termination when the draft is dirty; an active apply transaction retains its existing termination deferral. A 2026-07-11 final-DMG baseline launched from `/Applications` background-only/menu-bar-only. `SMAppService.mainApp` controls login-at-launch; registration failure remains visible and nonfatal. Baseline default-on registration succeeded, Background Task Management reported `[enabled, allowed, notified]`, UI opt-out disabled it, and re-enable restored enabled status. Final cleanup opted out and left only disabled BTM history. Current-tree approval-required/retry states and actual login-at-boot after a reboot remain untested.
 
 ## Testing policy
 
 - Unit: serialization, migration, validation, conditions, identity matching, CIDR, planning, redaction, error classification, rollback order.
+- Presentation unit: saved/draft transitions, save/discard/cancel, external metadata refresh, snapshot-to-draft, included-value summaries, identifier disclosure, menu action reasons, detected choices, and typed condition input validation.
 - Mock integration: success, partial force apply, fatal failure and reverse rollback, rollback failure, denied permission, missing device, corrupt storage, import/export.
 - Live safe tests: opt-in read-only display, audio, network, input, and readiness-context discovery. Basic login-item registration/status/opt-out/re-enable is manually smoke tested; approval/retry/reboot paths remain pending.
 - Live mutation: never in CI and never locally without an explicit environment flag and user action.
 
-All fixtures use synthetic names, addresses, and device identifiers.
+All fixtures use synthetic names, documentation-only addresses, and non-personal device identifiers.
 
-Final local `make verify` passes with 158 tests (83 XCTest + 75 Swift Testing); six explicit opt-in cases skip by default. The five read-only display/audio/network/input/readiness cases also pass when enabled on an Apple M5 Mac running macOS 26.5.2. A fresh install created one schema-v1 Ready profile from a read-only snapshot with all four groups, and its zero-operation plan kept Apply and Force Apply disabled. There is no live mutation, live Keychain-write, or physical Intel evidence.
+The current UI-hardening tree passes full local `make verify` with 214 default non-live tests: 111 XCTest cases with five skipped opt-in live reads and 103 Swift Testing cases with one skipped opt-in Keychain write. The 55 presentation-specific cases comprise 28 draft XCTest cases and 27 presentation/condition Swift Testing cases. Swift and universal Xcode Debug/Release, Analyze, DMG/checksum, mounted resources/architectures, and ad-hoc signature classification pass. The current local DMG SHA-256 is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`; final commit and current-tree CI are pending.
+
+The five read-only display/audio/network/input/readiness cases passed on the 2026-07-11 baseline when explicitly enabled on an Apple M5 Mac running macOS 26.5.2. Its fresh install created one schema-v1 Ready profile from a read-only snapshot with all four groups, and its zero-operation plan kept Apply and Force Apply disabled. They were not rerun for the current UI tree. There is no live mutation, live Keychain-write, physical Intel, current-tree screenshot, full VoiceOver/keyboard, or TCC matrix evidence.
 
 ## Static and release verification
 
-Canonical commands are `build`, `test`, `lint`, `analyze`, `package`, `verify-package`, `verify`, and `clean` through the checked-in Makefile. `verify` runs format/lint and source-policy checks, tests, Swift and universal Xcode Debug/Release builds, Xcode Analyze, DMG creation, checksum validation, mounted-DMG inspection, signature classification, and `git diff --check`. CI performs no live discovery or system mutation. Initial run `29154880831` for `0d8f510` exposed the Swift 6.1 actor-isolation issue. Repair commit `4e45328` is pushed, and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) passed full `make verify` and unsigned-package upload on 2026-07-11 under macOS 15/Xcode 16.4/Swift 6.1.2.
+Canonical commands are `build`, `test`, `lint`, `analyze`, `package`, `verify-package`, `verify`, and `clean` through the checked-in Makefile. `lint` includes source-policy checks and English/Korean key-parity, duplicate-key, format-placeholder, and static-localization-key validation. `verify` runs format/lint, tests, Swift and universal Xcode Debug/Release builds, Xcode Analyze, DMG creation, checksum validation, mounted-DMG inspection, signature classification, and `git diff --check`. CI performs no live discovery or system mutation. Initial run `29154880831` for `0d8f510` exposed the Swift 6.1 actor-isolation issue. Repair commit `4e45328` is pushed, and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) passed full `make verify` and unsigned-package upload on 2026-07-11 under macOS 15/Xcode 16.4/Swift 6.1.2. This CI run predates the current UI tree.
 
-Packaging builds with automatic signing disabled, then ad-hoc signs the staged app. The verifier requires `Signature=adhoc`, no identity authority, and a structurally valid signature. Local post-fix DMG SHA-256 is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`; downloaded CI artifact ID `8249295840` verified CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. The DMGs are not byte-for-byte reproducible. These signatures provide code integrity only: the app has no Developer ID identity, no notarization, and no verified Gatekeeper trust path.
+Packaging builds with automatic signing disabled, then ad-hoc signs the staged app. The verifier requires `Signature=adhoc`, no identity authority, and a structurally valid signature. The historical local post-fix DMG SHA-256 is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`; downloaded CI artifact ID `8249295840` verified historical CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. The DMGs are not byte-for-byte reproducible, and neither checksum describes a current UI-tree package. These signatures provide code integrity only: the app has no Developer ID identity, no notarization, and no verified Gatekeeper trust path.
