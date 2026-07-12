@@ -1,6 +1,6 @@
 # Desk Setup Switcher
 
-> **Pre-release 0.1.0 implementation candidate:** the native app, safe profile core, concrete macOS adapters, protected profile-editing UI, and no-Developer-ID packaging pipeline are implemented. UI-hardening commit `5f0cabc` passes full local and GitHub Actions `make verify` with 214 non-live tests and verified universal packages. The earlier repair baseline retains its 2026-07-11 live-read and fresh-install evidence. No release is published, and live setting mutations, physical Intel, a live Keychain write, the downloaded/quarantined Gatekeeper path, and several manual workflows remain unverified.
+> **Pre-release 0.1.0 implementation candidate:** the native app, safe profile core, concrete macOS adapters, protected profile-editing UI, and no-Developer-ID packaging pipeline are implemented. The current menu-simplification follow-up passes full local `make verify` with 214 non-live tests and a verified universal package; UI-hardening commit `5f0cabc` remains the latest matching GitHub Actions baseline. The earlier repair baseline retains its 2026-07-11 live-read and fresh-install evidence. No release is published, and live setting mutations, physical Intel, a live Keychain write, the downloaded/quarantined Gatekeeper path, and several manual workflows remain unverified.
 
 Desk Setup Switcher is a free and open-source macOS menu-bar app for manually saving and applying display, audio, network, mouse, and keyboard profiles. It is local-first: no account, server, cloud sync, telemetry, analytics, or automatic profile switching.
 
@@ -8,7 +8,7 @@ Desk Setup Switcher is a free and open-source macOS menu-bar app for manually sa
 
 - A native SwiftUI `MenuBarExtra` app with `LSUIElement`, Settings, profile capture, editing, ordering, import/export, readiness, normal/force previews, itemized results, and a 15-second display confirmation flow.
 - App-lifetime profile drafts with save/discard/cancel protection across selection, replacement, and ordinary quit paths. `⌘S` saves a valid dirty draft, fixed save/revert controls remain outside the editor scroll area, and current-settings capture updates only the reviewable draft until the user saves.
-- Value-first profile summaries and apply previews with technical identifiers behind disclosures, a curated icon picker that preserves imported symbols, one primary Apply action, secondary availability/available-items actions, bounded profile scrolling, and text reasons for disabled actions.
+- Value-first profile summaries and apply previews with technical identifiers behind disclosures, a curated icon picker that preserves imported symbols, one primary Apply action, a visible per-profile Edit action that opens the Profiles tab, available-items apply under the secondary menu, bounded profile scrolling, automatic readiness refresh when the menu opens, and text reasons for disabled actions.
 - Detected-device condition pickers, preserved disconnected values, advanced raw-identifier entry, validated IP/CIDR and location entry, separate app-desired/macOS login-item states, explicit About links, text diagnostic severity, and accessibility announcements plus display-confirmation keyboard/value metadata.
 - Versioned profile JSON, semantic/resource validation, safe actionable validation errors, migration scaffolding, permission-restricted Application Support persistence, last-known-good backup, corruption quarantine, and exclusive-create export.
 - A capability-driven adapter contract and transaction engine with deterministic ordering, no-op filtering, pre-execution state/rollback revalidation, one active transaction, reverse rollback after fatal failure, and protected high-risk rollback tokens.
@@ -25,8 +25,8 @@ Evidence is intentionally split by confidence level:
 
 | Evidence | Current result |
 | --- | --- |
-| Current UI-hardening full gate | `make verify` passed on 2026-07-12: localization/policy lint, 214 tests (111 XCTest + 103 Swift Testing), Swift and universal Xcode Debug/Release, Analyze, DMG creation, checksum, mounted-image resources, architectures, and ad-hoc signature classification. The 55 presentation-specific tests comprise 28 draft and 27 presentation/condition cases |
-| Current local universal package | The no-Developer-ID DMG verified `arm64 x86_64`, bundle metadata, icon, English/Korean resources, `/Applications` link, ad-hoc app signature, and SHA-256 `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68` |
+| Current menu-follow-up full gate | `make verify` passed on 2026-07-12: localization/policy lint, 214 tests (111 XCTest + 103 Swift Testing), Swift and universal Xcode Debug/Release, Analyze, DMG creation, checksum, mounted-image resources, architectures, and ad-hoc signature classification. The 55 presentation-specific tests comprise 28 draft and 27 presentation/condition cases |
+| Current local universal package | The no-Developer-ID DMG verified `arm64 x86_64`, bundle metadata, icon, English/Korean resources, `/Applications` link, ad-hoc app signature, and SHA-256 `a6c539267b1103537d041c6181ee822356db69c91ecf8e6467ccd8c7154d6473` |
 | Historical full local gate | Repair baseline `4e45328` passed `make verify` on 2026-07-11: lint/policy, 158 tests (83 XCTest + 75 Swift Testing), Swift/Xcode Debug and Release, Xcode Analyze, packaging, checksum, and mounted-DMG checks |
 | Default test behavior | Six opt-in cases skip by default: five read-only hardware cases and one Keychain-write round trip |
 | Historical live read-only discovery | On 2026-07-11, display, audio, network, input, and readiness-context smoke tests passed on an Apple M5 Mac running macOS 26.5.2; they were not rerun for the current UI tree |
@@ -38,7 +38,7 @@ Evidence is intentionally split by confidence level:
 | Live mutations | **Not run** for display, audio, network, mouse, or keyboard |
 | Live Keychain write | **Not run**; the Keychain path is mock verified |
 | Remaining manual checks | No current-tree screenshot walkthrough or full VoiceOver/keyboard/focus/contrast/text-size audit was run. Approval-required and failure/retry login-item states, actual login-at-boot after a reboot, import/export, TCC permission denial/grant, Gatekeeper/quarantine, physical Intel, and mutation/rollback procedures are pending |
-| Current CI universal package | UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967): full `make verify` and unsigned artifact ID `8256718472` upload succeeded. The downloaded checksum file verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`; local and CI DMGs are not byte-for-byte reproducible. No release is published |
+| Latest CI universal package | UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967): full `make verify` and unsigned artifact ID `8256718472` upload succeeded. The downloaded checksum file verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`; this predates the local menu-simplification follow-up. No release is published |
 
 See the [support matrix](docs/SUPPORT-MATRIX.md) and [completion ledger](docs/COMPLETION-CRITERIA.md) for capability-level evidence and explicit manual procedures.
 

@@ -6,7 +6,6 @@
 "Apply" = "Apply";
 "Normal apply requires every included setting and condition to be ready." = "Normal apply requires every included setting and condition to be ready.";
 "Force Apply…" = "Force Apply…";
-"Review Availability…" = "Review Availability…";
 "Shows a current read-only plan and every availability explanation." = "Shows a current read-only plan and every availability explanation.";
 "Previews omissions, then applies only the currently available settings." = "Previews omissions, then applies only the currently available settings.";
 "Last result: %@" = "Last result: %@";
@@ -700,11 +699,12 @@
 "No Enabled Profiles" = "No Enabled Profiles";
 "Enable a profile in Settings before applying it." = "Enable a profile in Settings before applying it.";
 "Manage Profiles" = "Manage Profiles";
+"Edit Profile" = "Edit Profile";
+"Edit %@" = "Edit %@";
 "Checking Readiness…" = "Checking Readiness…";
 "Preview and apply this complete profile." = "Preview and apply this complete profile.";
 "Apply Available Settings…" = "Apply Available Settings…";
 "More Profile Actions" = "More Profile Actions";
-"Review availability or apply only currently available settings." = "Review availability or apply only currently available settings.";
 "Enable this profile to apply it." = "Enable this profile to apply it.";
 "Checking whether this profile can be applied…" = "Checking whether this profile can be applied…";
 "This profile is being applied." = "This profile is being applied.";

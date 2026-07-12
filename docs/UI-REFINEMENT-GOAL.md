@@ -13,9 +13,13 @@
 - 기준 스크린샷에는 실제 장치 식별정보가 포함될 수 있어 저장소에 추가하지 않는다. 이 문서의 관찰과 완료 기준을 영구 기준으로 사용한다.
 - 현재 구현: 앱 생명주기 초안 보호, 값 중심 요약·미리보기, 메뉴 행동 계층, 조건 선택·검증, 권한/About/진단/접근성 메타데이터, 영문·한국어 구조 검사가 소스에 반영되고 전체 `make verify`가 통과했다.
 - 현재 자동 증거: 기본 비라이브 스위트 214개가 통과했다. XCTest 111개 중 5개와 Swift Testing 103개 중 1개는 명시적 옵트인 테스트라 건너뛰었고, 프레젠테이션 전용 55개는 초안 XCTest 28개와 표시·조건 Swift Testing 27개다.
-- 현재 로컬 증거: universal Debug/Release, Analyze, DMG·체크섬·마운트·리소스·아키텍처·ad-hoc 서명 분류가 통과했고 로컬 DMG SHA-256은 `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`이다.
+- 현재 로컬 증거: 완료 후 메뉴 단순화까지 포함한 트리에서 universal Debug/Release, Analyze, DMG·체크섬·마운트·리소스·아키텍처·ad-hoc 서명 분류가 통과했고 로컬 DMG SHA-256은 `a6c539267b1103537d041c6181ee822356db69c91ecf8e6467ccd8c7154d6473`이다.
 - 현재 구현 증거: UI-hardening 커밋 `5f0cabc`가 `origin/master`에 push되었고 [GitHub Actions `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967)에서 전체 `make verify`와 unsigned artifact ID `8256718472` 업로드가 성공했다. 다운로드한 CI DMG SHA-256은 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`로 체크섬 파일과 일치했다.
 - 현재 증거 경계: 현재 트리 스크린샷, 전체 키보드·VoiceOver, TCC, 실제 하드웨어 읽기·변경, Keychain write는 수행하지 않았다.
+
+### 완료 후 메뉴 단순화
+
+2026-07-12 후속 사용자 요청으로 프로필별 `가용성 검토`와 메뉴의 수동 `준비 상태 새로 고침` 컨트롤을 제거했다. 준비 상태는 메뉴를 열 때 계속 자동으로 읽는다. 각 프로필에는 해당 초안을 바로 선택해 Profiles 탭을 여는 `프로필 수정` 행동을 추가했고, 일반 설정 행동도 accessory 앱 활성화 뒤 공개 `OpenSettingsAction`을 호출하도록 교체했다. 다른 dirty 초안이 있으면 기존 저장·버리기·취소 보호를 그대로 사용한다. 내부 review-only 계획 모델과 결정론적 테스트는 회귀 검증을 위해 유지하지만 메뉴에서는 노출하지 않는다. 이 후속 트리는 live 플래그 없이 전체 로컬 `make verify`를 통과했으며 새 원격 CI는 아직 수행하지 않았다.
 
 ## 사용자 결과
 

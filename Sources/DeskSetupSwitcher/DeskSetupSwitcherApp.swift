@@ -102,6 +102,7 @@ struct DeskSetupSwitcherApp: App {
   @StateObject private var model: ApplicationModel
   @StateObject private var locationPermission: LocationPermissionController
   @StateObject private var profileEditor: ProfileEditorModel
+  @State private var selectedSettingsTab: SettingsTab = .profiles
 
   init() {
     let model = ApplicationModel()
@@ -121,7 +122,7 @@ struct DeskSetupSwitcherApp: App {
 
   var body: some Scene {
     MenuBarExtra {
-      MenuContentView()
+      MenuContentView(selectedSettingsTab: $selectedSettingsTab)
         .environmentObject(model)
         .environmentObject(locationPermission)
         .environmentObject(profileEditor)
@@ -133,7 +134,7 @@ struct DeskSetupSwitcherApp: App {
     .menuBarExtraStyle(.window)
 
     Settings {
-      SettingsView()
+      SettingsView(selectedTab: $selectedSettingsTab)
         .environmentObject(model)
         .environmentObject(locationPermission)
         .environmentObject(profileEditor)
@@ -143,8 +144,10 @@ struct DeskSetupSwitcherApp: App {
 }
 
 private struct MenuContentView: View {
+  @Environment(\.openSettings) private var openSettings
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var profileEditor: ProfileEditorModel
+  @Binding var selectedSettingsTab: SettingsTab
   @State private var isCaptureDraftPromptPresented = false
   @State private var captureDraftSaveError: String?
 
@@ -221,7 +224,9 @@ private struct MenuContentView: View {
             systemImage: "pause.rectangle",
             description: Text("Enable a profile in Settings before applying it.")
           )
-          SettingsLink {
+          Button {
+            presentSettings()
+          } label: {
             Label("Manage Profiles", systemImage: "slider.horizontal.3")
           }
         }
@@ -245,29 +250,6 @@ private struct MenuContentView: View {
 
       HStack {
         Button {
-          model.refreshReadinessFacts()
-        } label: {
-          Label(
-            model.isReadinessRefreshInProgress
-              ? appLocalized("Checking Readiness…") : appLocalized("Refresh Readiness"),
-            systemImage: model.isReadinessRefreshInProgress ? "hourglass" : "arrow.clockwise"
-          )
-        }
-        .disabled(model.isProfileMutationLocked || model.isReadinessRefreshInProgress)
-        .accessibilityLabel("Refresh Readiness")
-        .help("Reads current system facts without changing any setting.")
-
-        Spacer()
-
-        if let refreshedAt = model.readinessLastRefreshedAt {
-          Text(appLocalized("Updated \(refreshedAt.formatted(date: .omitted, time: .shortened))"))
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-        }
-      }
-
-      HStack {
-        Button {
           requestCaptureCurrentSettings()
         } label: {
           Label("Capture Current Settings", systemImage: "camera.metering.center.weighted")
@@ -280,7 +262,9 @@ private struct MenuContentView: View {
 
         Spacer()
 
-        SettingsLink {
+        Button {
+          presentSettings()
+        } label: {
           Label("Settings", systemImage: "gearshape")
         }
         .keyboardShortcut(",")
@@ -316,6 +300,22 @@ private struct MenuContentView: View {
       return
     }
     isCaptureDraftPromptPresented = true
+  }
+
+  private func editProfile(_ profile: DeskProfile) {
+    switch profileEditor.requestSelection(profile) {
+    case .selected(let target):
+      model.selectProfile(id: target.profileID)
+    case .requiresDecision, .unchanged:
+      break
+    }
+    presentSettings()
+  }
+
+  private func presentSettings() {
+    selectedSettingsTab = .profiles
+    NSApplication.shared.activate(ignoringOtherApps: true)
+    openSettings()
   }
 
   private func saveDraftThenCaptureCurrentSettings() async {
@@ -379,14 +379,16 @@ private struct MenuContentView: View {
 
         Spacer()
 
+        Button {
+          editProfile(profile)
+        } label: {
+          Label("Edit Profile", systemImage: "pencil")
+        }
+        .disabled(model.isProfileMutationLocked || profileEditor.activity.isBusy)
+        .accessibilityLabel(appLocalized("Edit \(profile.name)"))
+        .help("Edit Profile")
+
         Menu {
-          Button("Review Availability…") {
-            model.reviewAvailability(profile: profile)
-          }
-          .disabled(!actions.review.isEnabled)
-
-          Divider()
-
           Button("Apply Available Settings…") {
             model.prepareApply(profile: profile, mode: .force)
           }
@@ -401,7 +403,7 @@ private struct MenuContentView: View {
         }
         .menuStyle(.borderlessButton)
         .accessibilityLabel("More Profile Actions")
-        .help("Review availability or apply only currently available settings.")
+        .help("Previews omissions, then applies only the currently available settings.")
       }
     }
     .padding(10)
@@ -741,24 +743,36 @@ private struct SafetyConfirmationView: View {
   }
 }
 
+private enum SettingsTab: Hashable {
+  case profiles
+  case permissions
+  case diagnostics
+  case about
+}
+
 private struct SettingsView: View {
   @EnvironmentObject private var model: ApplicationModel
+  @Binding var selectedTab: SettingsTab
 
   var body: some View {
-    TabView {
+    TabView(selection: $selectedTab) {
       ProfilesSettingsView()
         .tabItem { Label("Profiles", systemImage: "rectangle.stack") }
+        .tag(SettingsTab.profiles)
 
       PermissionsSettingsView()
         .environmentObject(model)
         .tabItem { Label("Permissions", systemImage: "lock.shield") }
+        .tag(SettingsTab.permissions)
 
       DiagnosticsSettingsView()
         .environmentObject(model)
         .tabItem { Label("Diagnostics", systemImage: "stethoscope") }
+        .tag(SettingsTab.diagnostics)
 
       AboutSettingsView()
         .tabItem { Label("About", systemImage: "info.circle") }
+        .tag(SettingsTab.about)
     }
     .padding(20)
   }

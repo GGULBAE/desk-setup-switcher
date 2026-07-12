@@ -66,6 +66,11 @@ struct ProfilesSettingsView: View {
     .onChange(of: model.selectedProfileID) {
       synchronizeEditor()
     }
+    .onChange(of: profileEditor.session.pendingSelection) {
+      if profileEditor.session.pendingSelection != nil {
+        isUnsavedPromptPresented = true
+      }
+    }
     .confirmationDialog(
       "Save changes before continuing?",
       isPresented: $isUnsavedPromptPresented

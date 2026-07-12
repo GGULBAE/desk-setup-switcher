@@ -2,7 +2,7 @@
 
 ## Status
 
-Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. UI-hardening commit `5f0cabc` passes full local and [GitHub Actions](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967) `make verify` with 214 default non-live tests (111 XCTest + 103 Swift Testing), including 55 presentation-specific cases, plus universal Analyze/package/checksum verification and unsigned artifact upload. Local DMG SHA-256 is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`; downloaded CI artifact ID `8256718472` verified SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. The earlier repair baseline retains its 2026-07-11 five opt-in read-only hardware and fresh `/Applications` smoke evidence. This is not a public release or mutation proof: no live setting mutation, physical Intel run, live Keychain write, or quarantined Gatekeeper test exists. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. The current menu-simplification follow-up passes full local `make verify` with 214 default non-live tests (111 XCTest + 103 Swift Testing), including 55 presentation-specific cases, plus universal Analyze/package/checksum verification. Local DMG SHA-256 is `a6c539267b1103537d041c6181ee822356db69c91ecf8e6467ccd8c7154d6473`. UI-hardening commit `5f0cabc` remains the latest matching [GitHub Actions](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967) and unsigned-artifact baseline; it predates the local follow-up. The earlier repair baseline retains its 2026-07-11 five opt-in read-only hardware and fresh `/Applications` smoke evidence. This is not a public release or mutation proof: no live setting mutation, physical Intel run, live Keychain write, or quarantined Gatekeeper test exists. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
 ## Product promise
 
@@ -40,7 +40,7 @@ A user can create, inspect, edit, duplicate, delete, reorder, enable, import, an
 
 The app evaluates conditions and adapter capabilities, calculates a change plan, and skips no-op values.
 
-The menu exposes one primary Apply action per profile. Availability review and applying only available items are secondary actions. Disabled actions include a text-and-symbol reason. Profile summaries and previews lead with friendly included values; opaque identifiers remain available only under explicit technical disclosures.
+The menu exposes one primary Apply action and one direct Edit action per profile. Edit selects that profile, opens the Profiles tab through the public Settings action, and preserves the save/discard/cancel decision when another draft is dirty. Availability review is not exposed as a menu control; applying only available items remains a secondary action. Readiness refreshes automatically when the menu opens, without a manual refresh button. Disabled actions include a text-and-symbol reason. Profile summaries and previews lead with friendly included values; opaque identifiers remain available only under explicit technical disclosures.
 
 - Normal apply is available only when every enabled setting can be applied.
 - Force apply requires explicit confirmation, lists omissions first, and applies only supported/available values.

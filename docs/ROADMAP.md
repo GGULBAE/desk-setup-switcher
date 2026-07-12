@@ -45,12 +45,12 @@ Implemented and verified without live flags:
 
 - App-lifetime saved/draft state with dirty detection, save/discard/cancel replacement protection, external-refresh preservation, authoritative metadata merge, fixed save/revert status, `⌘S`, ordinary-quit protection, and read-only capture into the draft
 - Friendly included-value summaries and operation previews with technical details disclosed separately, preserved imported symbols, and deterministic localization at the UI boundary
-- One primary Apply action, secondary review/available-items actions, disabled-reason text and symbols, bounded profile scrolling, all-disabled empty state, and readiness refresh progress
+- One primary Apply action, direct per-profile editing into the Profiles tab, available-items apply as the remaining secondary action, disabled-reason text and symbols, bounded profile scrolling, all-disabled empty state, and automatic menu-open readiness refresh without a manual refresh control
 - Detected-device condition pickers, preserved disconnected values, advanced raw entry, typed IP/CIDR and location validation, and non-synthetic defaults
 - Separate app-desired and macOS login-item state, mismatch-only guidance, About links, text diagnostic severity, accessibility announcements, and display safety keyboard/value metadata
 - English/Korean catalog parity, duplicate-key, placeholder, and static-key validation
 
-Evidence: UI-hardening commit `5f0cabc` passes full local and [GitHub Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967) `make verify` with 214 default non-live tests: 111 XCTest with five skips plus 103 Swift Testing cases with one skip. The 55 presentation-specific cases are 28 draft XCTest cases and 27 presentation/condition Swift Testing cases. Universal builds, Analyze, DMG/checksum, mount, resources, architectures, ad-hoc signature classification, and unsigned-package upload pass. Local DMG SHA-256 is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`; downloaded CI artifact ID `8256718472` verifies SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. No live flag, current-run screenshot capture, TCC action, Keychain write, or setting mutation was used.
+Evidence: the current menu-simplification follow-up passes full local `make verify` with 214 default non-live tests: 111 XCTest with five skips plus 103 Swift Testing cases with one skip. The 55 presentation-specific cases are 28 draft XCTest cases and 27 presentation/condition Swift Testing cases. Universal builds, Analyze, DMG/checksum, mount, resources, architectures, and ad-hoc signature classification pass; local DMG SHA-256 is `a6c539267b1103537d041c6181ee822356db69c91ecf8e6467ccd8c7154d6473`. UI-hardening commit `5f0cabc` and [run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967) remain the latest matching remote CI/artifact evidence and predate this follow-up. No live flag, screenshot capture, TCC action, Keychain write, or setting mutation was used.
 
 Historical evidence retained from the 2026-07-11 baseline:
 
@@ -75,7 +75,7 @@ Remaining optional/manual evidence after the implementation milestone:
 - CI artifact ID `8249295840` verified CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`; the DMGs are not byte-for-byte reproducible
 - The artifact is correctly classified as no Developer ID and not notarized
 - CI and tag-triggered release workflows are implemented; CI passed for repair commit `4e45328`
-- Current UI-tree `make verify` produced and verified a universal local DMG with SHA-256 `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`
+- Current menu-follow-up `make verify` produced and verified a universal local DMG with SHA-256 `a6c539267b1103537d041c6181ee822356db69c91ecf8e6467ccd8c7154d6473`
 - UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967); unsigned artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`
 
 Remaining:
@@ -84,13 +84,13 @@ Remaining:
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
-## Current next task — non-mutating accessibility and permission walkthrough
+## Current next task — non-mutating menu navigation walkthrough
 
-Exercise the completed UI with synthetic, non-personal data without broadening its safety scope.
+Exercise the simplified menu and Settings navigation with synthetic, non-personal data without broadening its safety scope.
 
-- **Prerequisites:** a safe local test profile set, English and Korean app languages, and explicit user authorization before any actual location-permission request or login-item state change.
-- **Scope:** inspect long-content layouts, keyboard-only traversal, VoiceOver names/values/focus, permission explanations, and login-state mismatch/retry presentation. Do not apply settings, invoke mutation paths, write live Keychain data, or record personal identifiers.
-- **Acceptance:** record performed and unperformed cases separately, keep screenshots synthetic and sanitized, and update the support matrix and completion ledger without upgrading source/mock evidence to manual or hardware evidence.
-- **Verification:** rerun `make lint` and `git diff --check` for evidence-only documentation changes; use the full repository gate for any code change.
+- **Prerequisites:** launch a verified local build with synthetic profiles and keep every Apply, Capture, permission, login-item, and mutation action untouched.
+- **Scope:** check Settings closed/open/minimized, a previously selected About or Permissions tab, direct Edit on the current and another profile, dirty-draft Save/Discard/Cancel, `⌘,`, English/Korean labels, and the profile-specific VoiceOver edit name.
+- **Acceptance:** Settings always becomes visible on the Profiles tab, the requested profile is selected or protected by the dirty-draft decision, availability-review/manual-refresh controls stay absent, available-items apply remains reachable, and menu-open automatic readiness still updates state.
+- **Verification:** record performed and unperformed cases separately, keep any screenshots synthetic and sanitized, update README/support/completion evidence, and run `make lint` plus `git diff --check` for evidence-only changes.
 
 Release publication, Gatekeeper, physical Intel, full assistive-technology testing, and any live mutation-and-rollback procedure remain separate optional evidence work and require the authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

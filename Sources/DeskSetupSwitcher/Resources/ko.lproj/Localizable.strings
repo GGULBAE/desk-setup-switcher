@@ -6,7 +6,6 @@
 "Apply" = "적용";
 "Normal apply requires every included setting and condition to be ready." = "일반 적용을 사용하려면 포함된 모든 설정과 조건이 준비되어야 합니다.";
 "Force Apply…" = "강제 적용…";
-"Review Availability…" = "가용성 검토…";
 "Shows a current read-only plan and every availability explanation." = "현재 읽기 전용 계획과 모든 가용성 설명을 표시합니다.";
 "Previews omissions, then applies only the currently available settings." = "생략할 항목을 미리 보여 준 다음 현재 사용 가능한 설정만 적용합니다.";
 "Last result: %@" = "최근 결과: %@";
@@ -700,11 +699,12 @@
 "No Enabled Profiles" = "활성화된 프로필 없음";
 "Enable a profile in Settings before applying it." = "적용하기 전에 설정에서 프로필을 활성화하세요.";
 "Manage Profiles" = "프로필 관리";
+"Edit Profile" = "프로필 수정";
+"Edit %@" = "%@ 수정";
 "Checking Readiness…" = "준비 상태 확인 중…";
 "Preview and apply this complete profile." = "이 프로필의 전체 변경사항을 미리 보고 적용합니다.";
 "Apply Available Settings…" = "사용 가능한 항목만 적용…";
 "More Profile Actions" = "추가 프로필 작업";
-"Review availability or apply only currently available settings." = "적용 가능 여부를 확인하거나 현재 사용 가능한 설정만 적용합니다.";
 "Enable this profile to apply it." = "이 프로필을 활성화해야 적용할 수 있습니다.";
 "Checking whether this profile can be applied…" = "이 프로필을 적용할 수 있는지 확인 중입니다…";
 "This profile is being applied." = "이 프로필을 적용하고 있습니다.";
