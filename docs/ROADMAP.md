@@ -50,7 +50,7 @@ Implemented and verified without live flags:
 - Separate app-desired and macOS login-item state, mismatch-only guidance, About links, text diagnostic severity, accessibility announcements, and display safety keyboard/value metadata
 - English/Korean catalog parity, duplicate-key, placeholder, and static-key validation
 
-Evidence: the current UI-hardening tree passes full local `make verify` with 214 default non-live tests: 111 XCTest with five skips plus 103 Swift Testing cases with one skip. The 55 presentation-specific cases are 28 draft XCTest cases and 27 presentation/condition Swift Testing cases. Universal builds, Analyze, DMG/checksum, mount, resources, architectures, and ad-hoc signature classification pass; the local DMG SHA-256 is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`. No live flag, current-run screenshot capture, TCC action, Keychain write, or setting mutation was used.
+Evidence: UI-hardening commit `5f0cabc` passes full local and [GitHub Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967) `make verify` with 214 default non-live tests: 111 XCTest with five skips plus 103 Swift Testing cases with one skip. The 55 presentation-specific cases are 28 draft XCTest cases and 27 presentation/condition Swift Testing cases. Universal builds, Analyze, DMG/checksum, mount, resources, architectures, ad-hoc signature classification, and unsigned-package upload pass. Local DMG SHA-256 is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`; downloaded CI artifact ID `8256718472` verifies SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. No live flag, current-run screenshot capture, TCC action, Keychain write, or setting mutation was used.
 
 Historical evidence retained from the 2026-07-11 baseline:
 
@@ -58,9 +58,8 @@ Historical evidence retained from the 2026-07-11 baseline:
 - One accessibility-label inspection
 - Default-on login-item registration, enabled status, UI opt-out, re-enable, and final disabled cleanup
 
-Remaining before this milestone is done:
+Remaining optional/manual evidence after the implementation milestone:
 
-- Commit and push the complete milestone, then require green GitHub Actions and unsigned-artifact upload on that exact SHA
 - Perform a current-tree non-mutating English/Korean layout and keyboard walkthrough with synthetic data if a safe evidence path is available
 - Manually verify approval-required and failure/retry login-item states plus actual login-at-boot after a reboot
 - Complete the full English/Korean walkthrough
@@ -68,7 +67,7 @@ Remaining before this milestone is done:
 - Manually verify import/export replacement/no-overwrite and diagnostics clearing
 - Decide whether diagnostic export belongs in 0.1.0
 
-## M5 — Packaging and CI (current local package green; current CI pending)
+## M5 — Packaging and CI (current local package and CI green)
 
 - The 2026-07-11 post-fix full `make verify` locally passed lint, 158 tests (83 XCTest + 75 Swift Testing), universal builds, Analyze, packaging, checksum, and mounted-image inspection
 - Versioned DMG contains universal app, `/Applications` link, resources, and a verified ad-hoc integrity signature
@@ -77,19 +76,21 @@ Remaining before this milestone is done:
 - The artifact is correctly classified as no Developer ID and not notarized
 - CI and tag-triggered release workflows are implemented; CI passed for repair commit `4e45328`
 - Current UI-tree `make verify` produced and verified a universal local DMG with SHA-256 `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`
+- UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967); unsigned artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`
 
 Remaining:
 
-- Record the current UI commit's CI run and unsigned-package upload
 - Perform a quarantined Gatekeeper/Open Anyway install on a clean user account or Mac
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
-## Current next task — UI refinement closure
+## Current next task — non-mutating accessibility and permission walkthrough
 
-Close [UI-REFINEMENT-GOAL.md](UI-REFINEMENT-GOAL.md) without broadening its safety scope:
+Exercise the completed UI with synthetic, non-personal data without broadening its safety scope.
 
-- Commit and push the intended milestone, then require green CI and unsigned-package upload on the same final SHA.
-- Keep full assistive-technology, TCC, login approval/reboot, Gatekeeper, physical Intel, Keychain, and live mutation evidence explicitly pending unless separately authorized and actually performed.
+- **Prerequisites:** a safe local test profile set, English and Korean app languages, and explicit user authorization before any actual location-permission request or login-item state change.
+- **Scope:** inspect long-content layouts, keyboard-only traversal, VoiceOver names/values/focus, permission explanations, and login-state mismatch/retry presentation. Do not apply settings, invoke mutation paths, write live Keychain data, or record personal identifiers.
+- **Acceptance:** record performed and unperformed cases separately, keep screenshots synthetic and sanitized, and update the support matrix and completion ledger without upgrading source/mock evidence to manual or hardware evidence.
+- **Verification:** rerun `make lint` and `git diff --check` for evidence-only documentation changes; use the full repository gate for any code change.
 
 Release publication, Gatekeeper, physical Intel, full assistive-technology testing, and any live mutation-and-rollback procedure remain separate optional evidence work and require the authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

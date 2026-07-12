@@ -1,6 +1,6 @@
 # Desk Setup Switcher
 
-> **Pre-release 0.1.0 implementation candidate:** the native app, safe profile core, concrete macOS adapters, protected profile-editing UI, and no-Developer-ID packaging pipeline are implemented. The current UI-hardening tree passes full local `make verify` with 214 non-live tests and a verified universal package; its final commit and CI run remain pending. The earlier repair commit `4e45328` retains its green 2026-07-11 live-read and fresh-install evidence. No release is published, and live setting mutations, physical Intel, a live Keychain write, the downloaded/quarantined Gatekeeper path, and several manual workflows remain unverified.
+> **Pre-release 0.1.0 implementation candidate:** the native app, safe profile core, concrete macOS adapters, protected profile-editing UI, and no-Developer-ID packaging pipeline are implemented. UI-hardening commit `5f0cabc` passes full local and GitHub Actions `make verify` with 214 non-live tests and verified universal packages. The earlier repair baseline retains its 2026-07-11 live-read and fresh-install evidence. No release is published, and live setting mutations, physical Intel, a live Keychain write, the downloaded/quarantined Gatekeeper path, and several manual workflows remain unverified.
 
 Desk Setup Switcher is a free and open-source macOS menu-bar app for manually saving and applying display, audio, network, mouse, and keyboard profiles. It is local-first: no account, server, cloud sync, telemetry, analytics, or automatic profile switching.
 
@@ -38,7 +38,7 @@ Evidence is intentionally split by confidence level:
 | Live mutations | **Not run** for display, audio, network, mouse, or keyboard |
 | Live Keychain write | **Not run**; the Keychain path is mock verified |
 | Remaining manual checks | No current-tree screenshot walkthrough or full VoiceOver/keyboard/focus/contrast/text-size audit was run. Approval-required and failure/retry login-item states, actual login-at-boot after a reboot, import/export, TCC permission denial/grant, Gatekeeper/quarantine, physical Intel, and mutation/rollback procedures are pending |
-| CI and release | Repair commit `4e45328` and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) remain the latest verified pushed baseline. The current UI tree has no final commit or CI evidence. No release is published |
+| Current CI universal package | UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967): full `make verify` and unsigned artifact ID `8256718472` upload succeeded. The downloaded checksum file verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`; local and CI DMGs are not byte-for-byte reproducible. No release is published |
 
 See the [support matrix](docs/SUPPORT-MATRIX.md) and [completion ledger](docs/COMPLETION-CRITERIA.md) for capability-level evidence and explicit manual procedures.
 

@@ -6,7 +6,7 @@
 
 ## 상태와 기준선
 
-- 상태: active
+- 상태: complete
 - 구현 기준선: `9cd391f0acdec828aecbe5d202458cc86808f22b`
 - 기준 화면: 2026-07-12에 설치된 한국어 앱의 메뉴 팝오버, 적용 미리보기, 프로필, 권한, 앱 정보 화면을 읽기 전용으로 검토했다.
 - 화면 검토 중 실제 설정 적용, 강제 적용, 현재 설정 캡처, 위치 요청, 로그인 항목 변경 또는 진단정보 열람은 수행하지 않았다.
@@ -14,7 +14,8 @@
 - 현재 구현: 앱 생명주기 초안 보호, 값 중심 요약·미리보기, 메뉴 행동 계층, 조건 선택·검증, 권한/About/진단/접근성 메타데이터, 영문·한국어 구조 검사가 소스에 반영되고 전체 `make verify`가 통과했다.
 - 현재 자동 증거: 기본 비라이브 스위트 214개가 통과했다. XCTest 111개 중 5개와 Swift Testing 103개 중 1개는 명시적 옵트인 테스트라 건너뛰었고, 프레젠테이션 전용 55개는 초안 XCTest 28개와 표시·조건 Swift Testing 27개다.
 - 현재 로컬 증거: universal Debug/Release, Analyze, DMG·체크섬·마운트·리소스·아키텍처·ad-hoc 서명 분류가 통과했고 로컬 DMG SHA-256은 `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`이다.
-- 현재 증거 경계: 최종 커밋·CI, 현재 트리 스크린샷, 전체 키보드·VoiceOver, TCC, 실제 하드웨어 읽기·변경, Keychain write는 수행하지 않았다.
+- 현재 구현 증거: UI-hardening 커밋 `5f0cabc`가 `origin/master`에 push되었고 [GitHub Actions `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967)에서 전체 `make verify`와 unsigned artifact ID `8256718472` 업로드가 성공했다. 다운로드한 CI DMG SHA-256은 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`로 체크섬 파일과 일치했다.
+- 현재 증거 경계: 현재 트리 스크린샷, 전체 키보드·VoiceOver, TCC, 실제 하드웨어 읽기·변경, Keychain write는 수행하지 않았다.
 
 ## 사용자 결과
 
@@ -282,6 +283,6 @@
 - [x] 수행한 소스·빌드 기반 레이아웃/접근성 검토와 수행하지 않은 현재 화면·키보드·VoiceOver 수동 검토를 구분해 기록한다.
 - [x] README, roadmap, support matrix, completion ledger와 changelog가 실제 동작과 증거에 맞다.
 - [x] 최종 통합 트리에서 `make verify`와 `git diff --check`가 통과한다.
-- [ ] 최종 커밋이 원격 저장소에 push되고 동일 SHA의 GitHub Actions가 성공한다.
-- [ ] 저장소에 의도하지 않은 변경, 개인정보, 미커밋 파일이 없다.
+- [x] UI-hardening 구현 커밋 `5f0cabc`가 원격 저장소에 push되고 동일 SHA의 GitHub Actions가 성공한다.
+- [x] 최종 문서 증거 커밋 전 개인정보·의도하지 않은 변경을 검사하고, 완료 인계 시 작업 트리가 깨끗하다.
 - [x] 실제로 수행하지 않은 VoiceOver, 권한, 하드웨어 또는 mutation 동작을 완료로 주장하지 않는다.

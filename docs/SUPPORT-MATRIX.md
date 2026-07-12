@@ -20,8 +20,8 @@
 | macOS | 14 Sonoma or later | Deployment target is 14.0; the current UI tree passes full local `make verify` with 214 default non-live tests on macOS 26.5.2 with Xcode 26.6. The 158-test 2026-07-11 baseline remains recorded below for historical live-read/install evidence |
 | Apple Silicon | arm64 | Default tests and opt-in live-read smoke tests passed on an Apple M5 Mac |
 | Intel Mac | x86_64 | Current Debug/Release and packaged executable contain x86_64; no physical Intel Mac run |
-| Distribution | Direct no-Developer-ID DMG | Post-fix universal artifact, SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`, mount, metadata/resources, architectures, and ad-hoc app signature verified; not published and Gatekeeper path pending |
-| CI | GitHub Actions | Initial run `29154880831` recorded the Swift 6.1 actor-isolation failure. Repair commit `4e45328` is pushed; [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) passed full `make verify` and unsigned-package upload on macOS 15/Xcode 16.4/Swift 6.1.2. The current UI tree has no final commit or CI evidence yet |
+| Distribution | Direct no-Developer-ID DMG | UI-hardening local universal artifact, SHA-256 `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`, and downloaded CI artifact ID `8256718472`, SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`, passed checksum, mount, metadata/resources, architectures, and ad-hoc app-signature verification; not published and Gatekeeper path pending |
+| CI | GitHub Actions | UI-hardening commit `5f0cabc` passed full `make verify` and unsigned-package upload in [run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967). Initial failure run `29154880831` and repair run `29155207923` remain historical Swift 6.1 compatibility evidence |
 | App Store | Not required | No sandbox/App Store claim |
 | Signing/notarization | Optional | App is ad-hoc signed for integrity only; no Developer ID identity or notarization exists |
 
@@ -56,7 +56,7 @@
 
 The current UI-hardening tree passes full local `make verify` with 214 tests: 111 XCTest cases with five skipped opt-in live reads, plus 103 Swift Testing cases with one skipped opt-in Keychain write. The 55 presentation-specific cases comprise 28 draft XCTest cases and 27 presentation/condition Swift Testing cases. Localization lint covers English/Korean key parity, duplicate keys, format placeholders, and statically discoverable localized UI keys. Swift and universal Xcode Debug/Release, Analyze, package, checksum, mounted resources/architectures, and ad-hoc signature classification pass.
 
-No live flag was set. This evidence includes no current-tree screenshot walkthrough, full keyboard or VoiceOver run, TCC grant/deny action, login-item state mutation, hardware read, Keychain write, setting apply, or rollback. The verified replacement local DMG SHA-256 is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`; final commit and current-tree CI remain pending.
+No live flag was set. This evidence includes no current-tree screenshot walkthrough, full keyboard or VoiceOver run, TCC grant/deny action, login-item state mutation, hardware read, Keychain write, setting apply, or rollback. The verified replacement local DMG SHA-256 is `6413e352b3d170b82510b7125f3f8cd0f52b9e5140bfa0977801887d09340e68`. UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967), and downloaded artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`.
 
 ## System capabilities
 
