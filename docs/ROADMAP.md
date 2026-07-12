@@ -39,6 +39,8 @@ Evidence: injected/mock success and fault tests pass. The fresh snapshot profile
 
 ## M4 — UX and release hardening (in progress)
 
+The active implementation contract is [UI-REFINEMENT-GOAL.md](UI-REFINEMENT-GOAL.md). It prioritizes unsaved-draft protection, human-readable setting summaries, clearer menu/apply hierarchy, safer condition entry, accessibility feedback, and English/Korean parity without changing adapter or mutation semantics.
+
 Implemented or partially verified:
 
 - CRUD/reorder/snapshot/import/export/apply UI, permission explanations, diagnostics browsing/clear, icon, localization catalogs, accessibility labels, and keyboard shortcuts
@@ -69,11 +71,13 @@ Remaining:
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
-## Current next task — optional manual evidence and release publishing
+## Current next task — UI refinement implementation
 
-Choose and execute only the remaining evidence needed for a release decision:
+Execute [UI-REFINEMENT-GOAL.md](UI-REFINEMENT-GOAL.md) in verified milestones:
 
-- Release scope: decide whether to publish 0.1.0; if proceeding, run the selected Gatekeeper, login-item, non-mutating workflow, localization, and accessibility checks, then create the tag/release only from an accepted green commit.
-- Optional hardware scope: repeat safe launch/read-only coverage on physical Intel when available. Run any live display/audio/network/input mutation-and-rollback procedure only with separate explicit approval and the preflight/rollback controls in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
-- Non-goals: automatic switching, Developer ID/notarization without release credentials, vendor settings, private APIs, or inferring unrun hardware results.
-- Validation: preserve the green implementation evidence for `4e45328`, record redacted results for each authorized manual case, verify any published artifact/checksum independently, and refresh README/support/completion evidence. A mock or read-only result never satisfies a mutation row.
+- Protect dirty profile drafts before selection, snapshot, import, deletion, or other replacement flows.
+- Add testable human-readable summaries and menu/apply presentation states without exposing technical identifiers by default.
+- Refine the profile editor, menu, preview, conditions, permissions, About, accessibility feedback, and English/Korean copy.
+- Run non-mutating tests and UI checks, update the evidence ledger, push the final commit, and require green CI on the same SHA.
+
+Release publication, Gatekeeper, physical Intel, full assistive-technology testing, and any live mutation-and-rollback procedure remain separate optional evidence work and require the authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

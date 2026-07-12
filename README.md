@@ -90,6 +90,7 @@ The final local artifact passes verification and its fresh `/Applications` insta
 
 ## Project tracking
 
+- [Active UI refinement goal](docs/UI-REFINEMENT-GOAL.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Completion criteria](docs/COMPLETION-CRITERIA.md)
 - [Support matrix](docs/SUPPORT-MATRIX.md)
