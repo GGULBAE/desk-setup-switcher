@@ -14,18 +14,33 @@ final class LocationPermissionController: NSObject, ObservableObject, CLLocation
   @Published private(set) var authorizationStatus: CLAuthorizationStatus
   @Published private(set) var lastError: String?
 
-  private let manager: CLLocationManager
+  private let manager: CLLocationManager?
+  private let allowsSystemRequests: Bool
+  private let requestWhenInUseAuthorization: @MainActor () -> Void
+  private let requestLocation: @MainActor () -> Void
   var onReadinessFactsChanged: (() -> Void)?
 
-  override init() {
-    let manager = CLLocationManager()
-    self.manager = manager
-    authorizationStatus = manager.authorizationStatus
+  init(
+    manager: CLLocationManager? = nil,
+    allowsSystemRequests: Bool = true,
+    syntheticAuthorizationStatus: CLAuthorizationStatus? = nil,
+    requestWhenInUseAuthorization: (@MainActor () -> Void)? = nil,
+    requestLocation: (@MainActor () -> Void)? = nil
+  ) {
+    let activeManager = allowsSystemRequests ? (manager ?? CLLocationManager()) : nil
+    self.manager = activeManager
+    self.allowsSystemRequests = allowsSystemRequests
+    self.requestWhenInUseAuthorization =
+      requestWhenInUseAuthorization ?? { activeManager?.requestWhenInUseAuthorization() }
+    self.requestLocation = requestLocation ?? { activeManager?.requestLocation() }
+    authorizationStatus =
+      syntheticAuthorizationStatus ?? activeManager?.authorizationStatus ?? .denied
     super.init()
-    manager.delegate = self
+    guard let activeManager else { return }
+    activeManager.delegate = self
     if authorizationStatus == .authorizedAlways || authorizationStatus == .authorized {
       Task { @MainActor [weak self] in
-        self?.manager.requestLocation()
+        self?.requestLocation()
       }
     }
   }
@@ -47,11 +62,15 @@ final class LocationPermissionController: NSObject, ObservableObject, CLLocation
 
   func requestAccess() {
     lastError = nil
+    guard allowsSystemRequests else {
+      lastError = appLocalized("System access is disabled for this synthetic review.")
+      return
+    }
     switch authorizationStatus {
     case .notDetermined:
-      manager.requestWhenInUseAuthorization()
+      requestWhenInUseAuthorization()
     case .authorizedAlways, .authorized:
-      manager.requestLocation()
+      requestLocation()
     case .denied, .restricted:
       lastError = appLocalized(
         "Enable Location Services for Desk Setup Switcher in System Settings.")
@@ -64,9 +83,10 @@ final class LocationPermissionController: NSObject, ObservableObject, CLLocation
     let status = manager.authorizationStatus
     Task { @MainActor [weak self] in
       guard let self else { return }
+      guard allowsSystemRequests else { return }
       authorizationStatus = status
       if isAuthorized {
-        self.manager.requestLocation()
+        requestLocation()
       } else {
         await AuthorizedLocationCache.shared.clear()
         onReadinessFactsChanged?()
@@ -85,6 +105,7 @@ final class LocationPermissionController: NSObject, ObservableObject, CLLocation
     let timestamp = location.timestamp
     Task { @MainActor [weak self] in
       guard let self else { return }
+      guard allowsSystemRequests else { return }
       await AuthorizedLocationCache.shared.store(
         LocationRegion(
           latitude: latitude,
@@ -100,6 +121,7 @@ final class LocationPermissionController: NSObject, ObservableObject, CLLocation
 
   nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
     Task { @MainActor [weak self] in
+      guard self?.allowsSystemRequests == true else { return }
       self?.lastError = appLocalized("A current location is not available yet.")
     }
   }

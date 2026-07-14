@@ -1,0 +1,58 @@
+role=AXWindow | title=Desk Setup Switcher UI Audit | focused=1 | actions=AXRaise
+  role=AXGroup | focused=0
+    role=AXTabGroup | focused=0
+      role=AXRadioButton | description=프로필 | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=권한 | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=진단 | value=1 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=앱 정보 | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXGroup | focused=0
+        role=AXScrollArea | focused=0 | actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+          role=AXGroup | enabled=1
+            role=AXStaticText | value=최근 결과 | enabled=1
+            role=AXStaticText | value=합성 UI 검토 모드입니다. 아무것도 저장하거나 적용하지 않습니다. | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=최근 스냅샷 | enabled=1
+            role=AXStaticText | value=이 합성 검토에서는 시스템 접근을 사용하지 않습니다. | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=저장소 | enabled=1
+            role=AXStaticText | value=로컬 Application Support에만 저장 | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=원격 측정 | enabled=1
+            role=AXStaticText | value=없음 | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=실제 설정 변경 | enabled=1
+            role=AXStaticText | value=사용자가 확인한 경우에만 | enabled=1 | focused=0 | actions=AXShowMenu
+          role=AXHeading | description=준비 상태 정보 | enabled=1
+          role=AXGroup | enabled=1
+            role=AXStaticText | value=이 합성 검토에서는 시스템 접근을 사용하지 않습니다. | enabled=1
+            role=AXStaticText | value=마지막 새로 고침: 2023. 11. 15. 오전 7:13 | enabled=1
+            role=AXButton | description=준비 상태 새로 고침 | help=설정을 변경하지 않고 현재 시스템 상태를 읽습니다 | enabled=1 | focused=0 | actions=AXPress
+            role=AXStaticText | value=연결된 디스플레이 | enabled=1
+            role=AXStaticText | value=0개 감지 | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=Wi-Fi SSID | enabled=1
+            role=AXStaticText | value=사용 불가 | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=이더넷 | enabled=1
+            role=AXStaticText | value=연결되지 않음 | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=캐시된 위치 | enabled=1
+            role=AXStaticText | value=사용 불가 | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXDisclosureTriangle | description=오디오 입력 UID (0) | value=0 | enabled=1
+            role=AXDisclosureTriangle | description=오디오 출력 UID (0) | value=0 | enabled=1
+            role=AXDisclosureTriangle | description=USB 하드웨어 식별자 (0) | value=0 | enabled=1
+            role=AXDisclosureTriangle | description=로컬 IP 주소 (0) | value=0 | enabled=1
+          role=AXHeading | description=스냅샷 세부 정보 | enabled=1
+          role=AXGroup | enabled=1
+            role=AXStaticText | value=캡처됨 | enabled=1
+            role=AXStaticText | value=2023. 11. 15. 오전 7:13 | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXDisclosureTriangle | description=디스플레이 | value=0 | enabled=1
+            role=AXDisclosureTriangle | description=오디오 | value=0 | enabled=1
+          role=AXHeading | description=민감 정보가 제거된 로컬 이벤트 | enabled=1
+          role=AXGroup | enabled=1
+            role=AXStaticText | value=로컬 진단 이벤트가 없습니다. | enabled=1
+            role=AXButton | description=새로 고침 | enabled=1 | focused=0 | actions=AXPress
+            role=AXButton | description=이벤트 지우기… | enabled=0 | actions=AXPress
+          role=AXScrollBar | value=0 | enabled=1 | focused=0
+            role=AXValueIndicator | value=0
+            role=AXButton | actions=AXPress
+            role=AXButton | actions=AXPress
+            role=AXButton | actions=AXPress
+            role=AXButton | actions=AXPress
+  role=AXButton | enabled=1 | focused=0 | actions=AXPress
+  role=AXButton | help=이 버튼을 누르면 윈도우를 확대/축소합니다. | enabled=1 | focused=0 | actions=AXPress,AXZoomWindow,AXShowMenu
+    role=AXGroup | focused=0
+  role=AXButton | enabled=1 | focused=0 | actions=AXPress

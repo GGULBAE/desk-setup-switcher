@@ -1,0 +1,37 @@
+role=AXWindow | title=Desk Setup Switcher UI Audit | focused=1 | actions=AXRaise
+  role=AXGroup | focused=0
+    role=AXHeading | description=Desk Setup Switcher | enabled=1
+    role=AXButton | description=Capture Current Settings | help=Reads current settings without changing the Mac and creates a profile. | enabled=1 | focused=0 | actions=AXPress
+    role=AXButton | description=Settings | help=Settings | enabled=1 | focused=0 | actions=AXPress
+    role=AXButton | description=Quit Desk Setup Switcher | help=Quit Desk Setup Switcher | enabled=1 | focused=0 | actions=AXPress
+    role=AXScrollArea | focused=0 | actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+      role=AXOpaqueProviderGroup | enabled=1 | actions=AXScrollToTop,AXScrollToBottom
+        role=AXGroup | enabled=1 | actions=AXScrollToVisible
+          role=AXStaticText | value=Focus Workspace — Display, Audio, Network & Input | enabled=1 | actions=AXScrollToVisible
+          role=AXStaticText | value=Profile status: Ready | enabled=1 | actions=AXScrollToVisible
+          role=AXButton | description=Apply… Focus Workspace — Display, Audio, Network & Input | help=Preview and apply this complete profile. | enabled=1 | focused=0 | actions=AXScrollToVisible,AXPress
+          role=AXButton | description=Edit Focus Workspace — Display, Audio, Network & Input | help=Edit Profile | enabled=1 | focused=0 | actions=AXScrollToVisible,AXPress
+        role=AXGroup | enabled=1 | actions=AXScrollToVisible
+          role=AXStaticText | value=Portable Desk — Available Settings Only | enabled=1 | actions=AXScrollToVisible
+          role=AXStaticText | value=Profile status: Partial | enabled=1 | actions=AXScrollToVisible
+          role=AXButton | description=Apply Available… Portable Desk — Available Settings Only | help=Preview and apply only the currently available settings. | enabled=1 | focused=0 | actions=AXScrollToVisible,AXPress
+          role=AXButton | description=Edit Portable Desk — Available Settings Only | help=Edit Profile | enabled=1 | focused=0 | actions=AXScrollToVisible,AXPress
+    role=AXGroup | enabled=1
+      role=AXStaticText | value=Partial Capture | enabled=1
+      role=AXButton | description=Dismiss Capture Result | help=Dismiss Capture Result | enabled=1 | focused=0 | actions=AXPress
+      role=AXStaticText | value=1 applicable · 1 snapshot only | enabled=1
+      role=AXStaticText | value=0 unreadable · 1 permission required · 1 unsupported | enabled=1
+      role=AXStaticText | value=Wi-Fi network was not captured. | enabled=1
+      role=AXButton | description=Review Permissions | enabled=1 | focused=0 | actions=AXPress
+    role=AXGroup | enabled=1
+      role=AXStaticText | value=Partially Applied | enabled=1
+      role=AXButton | description=Dismiss Apply Result | help=Dismiss Apply Result | enabled=1 | focused=0 | actions=AXPress
+      role=AXStaticText | value=Focus Workspace — Display, Audio, Network & Input | enabled=1
+      role=AXStaticText | value=2 succeeded · 0 failed · 0 skipped · 1 unsupported | enabled=1
+      role=AXStaticText | value=1 not verified · 0 rollback failed | enabled=1
+      role=AXStaticText | value=7:13 AM | enabled=1
+      role=AXButton | description=Details | help=Shows itemized apply and read-back results | enabled=1 | focused=0 | actions=AXPress
+  role=AXButton | enabled=1 | focused=0 | actions=AXPress
+  role=AXButton | help=this button also has an action to zoom the window | enabled=1 | focused=0 | actions=AXPress,AXZoomWindow,AXShowMenu
+    role=AXGroup | focused=0
+  role=AXButton | enabled=1 | focused=0 | actions=AXPress

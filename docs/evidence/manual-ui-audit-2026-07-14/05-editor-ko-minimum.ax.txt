@@ -1,0 +1,136 @@
+role=AXWindow | title=Desk Setup Switcher UI Audit | focused=0 | actions=AXRaise
+  role=AXGroup | focused=0
+    role=AXTabGroup | focused=0
+      role=AXRadioButton | description=프로필 | value=1 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=권한 | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=진단 | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=앱 정보 | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXGroup | focused=0
+        role=AXGroup | enabled=1 | focused=0
+          role=AXScrollArea | focused=0 | actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+            role=AXOutline | enabled=1 | focused=1 | actions=AXShowMenu
+              role=AXRow | actions=AXShowDefaultUI,AXShowAlternateUI
+                role=AXCell | enabled=1 | focused=1
+                  role=AXUnknown | description=Focus Workspace — Display, Audio, Network & Input, 활성화됨 | enabled=1
+              role=AXRow | actions=AXShowDefaultUI,AXShowAlternateUI
+                role=AXCell | enabled=1 | focused=1
+                  role=AXUnknown | description=Portable Desk — Available Settings Only, 활성화됨 | enabled=1
+              role=AXRow | actions=AXShowDefaultUI,AXShowAlternateUI
+                role=AXCell | enabled=1 | focused=1
+                  role=AXUnknown | description=Archived Synthetic Profile, 비활성화됨 | enabled=1
+              role=AXColumn
+          role=AXButton | description=프로필 만들기 | help=프로필 만들기 | enabled=1 | focused=0 | actions=AXPress
+          role=AXButton | description=선택한 프로필 복제 | help=선택한 프로필 복제 | enabled=1 | focused=0 | actions=AXPress
+          role=AXButton | description=선택한 프로필 삭제 | help=선택한 프로필 삭제 | enabled=1 | focused=0 | actions=AXPress
+          role=AXButton | description=선택한 프로필을 위로 이동 | help=선택한 프로필을 위로 이동 | enabled=0 | actions=AXPress
+          role=AXButton | description=선택한 프로필을 아래로 이동 | help=선택한 프로필을 아래로 이동 | enabled=1 | focused=0 | actions=AXPress
+          role=AXScrollArea | focused=0 | actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+            role=AXHeading | description=프로필 | enabled=1
+            role=AXGroup | enabled=1 | focused=0
+              role=AXStaticText | value=이름 | enabled=1
+              role=AXTextField | description=프로필 이름 | value=Focus Workspace — Display, Audio, Network & Input | enabled=1 | focused=0 | actions=AXShowMenu,AXConfirm
+              role=AXStaticText | value=설명 | enabled=1
+              role=AXTextField | description=프로필 설명 | value=A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata. | enabled=1 | focused=0 | actions=AXShowMenu,AXConfirm
+              role=AXStaticText | value=아이콘 | enabled=1
+              role=AXPopUpButton | description=프로필 아이콘 | value=디스플레이 | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=활성화됨 | enabled=1
+              role=AXCheckBox | value=1 | enabled=1 | focused=0 | actions=AXPress
+            role=AXHeading | description=설정 | enabled=1
+            role=AXGroup | enabled=1
+              role=AXStaticText | value=이 프로필이 적용할 항목은 ‘포함’으로 선택하세요. 저장된 값을 확인하거나 편집하려면 카테고리를 펼치세요. | enabled=1
+            role=AXGroup | enabled=1
+              role=AXButton | description=디스플레이 | value=펼쳐짐 | help=이 설정 카테고리를 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=포함 | enabled=1
+              role=AXCheckBox | description=디스플레이 포함 | value=1 | enabled=1 | focused=0 | actions=AXPress
+              role=AXButton | description=주 디스플레이 | value=펼쳐짐 | help=이 설정의 대상 값을 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=포함 | enabled=1
+              role=AXCheckBox | description=주 디스플레이 포함 | value=1 | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=주 디스플레이 | enabled=1
+              role=AXPopUpButton | value=Built-in Retina Display | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=데스크탑의 기준이 될 디스플레이를 선택하세요. | enabled=1
+              role=AXGroup | enabled=1
+                role=AXHeading | description=Built-in Retina Display | enabled=1
+                role=AXButton | description=위치 | value=접힘 | help=이 설정의 대상 값을 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함 | enabled=1
+                role=AXCheckBox | description=위치 포함 | value=1 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함됨 · 0, 0 | enabled=1
+                role=AXButton | description=미러링 | value=접힘 | help=이 설정의 대상 값을 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함 | enabled=1
+                role=AXCheckBox | description=미러링 포함 | value=1 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함됨 · 확장 데스크톱 | enabled=1
+                role=AXButton | description=해상도 및 새로 고침 빈도 | value=접힘 | help=이 설정의 대상 값을 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함 | enabled=1
+                role=AXCheckBox | description=해상도 및 새로 고침 빈도 포함 | value=1 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함됨 · 1728×1117 · 60 Hz · 3,456×2,234픽셀 | enabled=1
+                role=AXGroup | enabled=1
+                  role=AXHeading | description=스냅샷 전용 | enabled=1
+                  role=AXStaticText | value=회전 | enabled=1
+                  role=AXStaticText | value=0° | enabled=1 | focused=0 | actions=AXShowMenu
+                  role=AXStaticText | value=활성 상태 | enabled=1
+                  role=AXStaticText | value=활성 | enabled=1 | focused=0 | actions=AXShowMenu
+                  role=AXStaticText | value=이 디스플레이 값은 스냅샷에는 보존되지만 현재 어댑터에서는 적용하지 않습니다. | enabled=1
+              role=AXGroup | enabled=1
+                role=AXHeading | description=Synthetic Wide Display | enabled=1
+                role=AXButton | description=위치 | value=접힘 | help=이 설정의 대상 값을 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함 | enabled=1
+                role=AXCheckBox | description=위치 포함 | value=1 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함됨 · 1728, 0 | enabled=1
+                role=AXButton | description=미러링 | value=접힘 | help=이 설정의 대상 값을 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함 | enabled=1
+                role=AXCheckBox | description=미러링 포함 | value=0 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=제외됨 · 확장 데스크톱 | enabled=1
+                role=AXButton | description=해상도 및 새로 고침 빈도 | value=접힘 | help=이 설정의 대상 값을 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함 | enabled=1
+                role=AXCheckBox | description=해상도 및 새로 고침 빈도 포함 | value=1 | enabled=1 | focused=0 | actions=AXPress
+                role=AXStaticText | value=포함됨 · 2560×1440 · 60 Hz | enabled=1
+                role=AXGroup | enabled=1
+                  role=AXHeading | description=스냅샷 전용 | enabled=1
+                  role=AXStaticText | value=회전 | enabled=1
+                  role=AXStaticText | value=0° | enabled=1 | focused=0 | actions=AXShowMenu
+                  role=AXStaticText | value=활성 상태 | enabled=1
+                  role=AXStaticText | value=활성 | enabled=1 | focused=0 | actions=AXShowMenu
+                  role=AXStaticText | value=이 디스플레이 값은 스냅샷에는 보존되지만 현재 어댑터에서는 적용하지 않습니다. | enabled=1
+            role=AXGroup | enabled=1
+              role=AXButton | description=오디오 | value=접힘 | help=이 설정 카테고리를 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=포함 | enabled=1
+              role=AXCheckBox | description=오디오 포함 | value=1 | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=포함됨 · 선택된 출력 기기 — 기기 이름을 확인할 수 없음 · 72% 외 3개 | enabled=1
+            role=AXGroup | enabled=1
+              role=AXButton | description=네트워크 | value=접힘 | help=이 설정 카테고리를 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=포함 | enabled=1
+              role=AXCheckBox | description=네트워크 포함 | value=1 | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=포함됨 · 켬 · Synthetic Studio | enabled=1
+            role=AXGroup | enabled=1
+              role=AXButton | description=마우스 및 키보드 | value=접힘 | help=이 설정 카테고리를 펼치거나 접습니다 | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=포함 | enabled=1
+              role=AXCheckBox | description=마우스 및 키보드 포함 | value=1 | enabled=1 | focused=0 | actions=AXPress
+              role=AXStaticText | value=포함됨 · 4.5 · 켬 외 3개 | enabled=1
+            role=AXHeading | description=최근 적용 | enabled=1
+            role=AXGroup | enabled=1
+              role=AXStaticText | value=상태 | enabled=1
+              role=AXStaticText | value=일부 사용 가능 | enabled=1 | focused=0 | actions=AXShowMenu
+              role=AXStaticText | value=시간 | enabled=1
+              role=AXStaticText | value=2023. 11. 15. 오전 7:13 | enabled=1 | focused=0 | actions=AXShowMenu
+              role=AXUnknown | description=오디오, 출력 음량, 성공, The saved target was applied. | enabled=1 | actions=Name:메뉴 보기
+Target:0x0
+Selector:(null)
+              role=AXUnknown | description=네트워크, Wi-Fi 네트워크, 건너뜀, Read-back was unavailable. | enabled=1 | actions=Name:메뉴 보기
+Target:0x0
+Selector:(null)
+            role=AXScrollBar | value=0 | enabled=1 | focused=0
+              role=AXValueIndicator | value=0
+              role=AXButton | actions=AXPress
+              role=AXButton | actions=AXPress
+              role=AXButton | actions=AXPress
+              role=AXButton | actions=AXPress
+          role=AXStaticText | value=프로필 편집기 상태: 모든 변경사항이 저장되었습니다. | enabled=1
+          role=AXButton | description=현재 설정으로 초안 업데이트 | help=현재 Mac을 읽어 이 저장되지 않은 초안만 업데이트합니다 | enabled=1 | focused=0 | actions=AXPress
+          role=AXButton | description=변경사항 되돌리기 | enabled=0 | actions=AXPress
+          role=AXButton | description=프로필 저장 | enabled=0 | actions=AXPress
+          role=AXStaticText | value=프로필 저장소 상태: 합성 UI 검토 모드입니다. 아무것도 저장하거나 적용하지 않습니다. | enabled=1
+          role=AXButton | description=가져오기… | help=로컬 프로필 JSON 파일을 선택하고 유효성을 검사합니다 | enabled=1 | focused=0 | actions=AXPress
+          role=AXButton | description=내보내기… | help=모든 프로필을 새 로컬 JSON 파일로 내보냅니다 | enabled=1 | focused=0 | actions=AXPress
+  role=AXButton | enabled=1 | focused=0 | actions=AXPress
+  role=AXButton | help=이 버튼을 누르면 윈도우를 확대/축소합니다. | enabled=1 | focused=0 | actions=AXPress,AXZoomWindow,AXShowMenu
+    role=AXGroup | focused=0
+  role=AXButton | enabled=1 | focused=0 | actions=AXPress

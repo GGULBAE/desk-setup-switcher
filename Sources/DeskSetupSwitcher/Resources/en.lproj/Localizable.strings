@@ -1032,3 +1032,5 @@
 "Validation status" = "Validation status";
 "Invalid" = "Invalid";
 "Use Suggested Value" = "Use Suggested Value";
+"Synthetic UI audit mode. Nothing is saved or applied." = "Synthetic UI audit mode. Nothing is saved or applied.";
+"System access is disabled for this synthetic review." = "System access is disabled for this synthetic review.";

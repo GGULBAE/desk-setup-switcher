@@ -30,11 +30,26 @@ func appResolvedProfileSymbolName(_ symbolName: String) -> String {
 /// Device names, SSIDs, identifiers, and other user data intentionally fall
 /// back verbatim when they are not localization keys.
 func appLocalizedRuntime(_ value: String) -> String {
-  let exact = appRuntimeLocalizationBundle.localizedString(
-    forKey: value,
-    value: value,
-    table: "Localizable"
-  )
+  appLocalizedRuntime(value, bundle: appRuntimeLocalizationBundle)
+}
+
+/// Lets deterministic tests resolve both shipped localizations without changing
+/// the host process language or global user defaults.
+func appLocalizedRuntime(_ value: String, languageCode: String) -> String {
+  guard
+    let path = appRuntimeLocalizationBundle.path(
+      forResource: languageCode,
+      ofType: "lproj"
+    ),
+    let bundle = Bundle(path: path)
+  else {
+    return value
+  }
+  return appLocalizedRuntime(value, bundle: bundle)
+}
+
+private func appLocalizedRuntime(_ value: String, bundle: Bundle) -> String {
+  let exact = appLocalizedRuntimeKey(value, bundle: bundle)
   if exact != value {
     return exact
   }
@@ -42,13 +57,17 @@ func appLocalizedRuntime(_ value: String) -> String {
   if value.hasPrefix("Inverted condition: ") {
     return appRuntimeLocalizedFormat(
       "Inverted condition: %@",
-      appLocalizedRuntime(String(value.dropFirst("Inverted condition: ".count)))
+      bundle: bundle,
+      appLocalizedRuntime(
+        String(value.dropFirst("Inverted condition: ".count)),
+        bundle: bundle
+      )
     )
   }
 
   for group in SettingGroup.allCases {
     let raw = group.rawValue
-    let title = appSettingGroupTitle(group)
+    let title = appLocalizedSettingGroupTitle(group, bundle: bundle)
     let templates: [(String, String)] = [
       (
         "No adapter is registered for the \(raw) settings group.",
@@ -71,7 +90,7 @@ func appLocalizedRuntime(_ value: String) -> String {
       ),
     ]
     if let template = templates.first(where: { $0.0 == value })?.1 {
-      return appRuntimeLocalizedFormat(template, title)
+      return appRuntimeLocalizedFormat(template, bundle: bundle, title)
     }
   }
 
@@ -79,7 +98,8 @@ func appLocalizedRuntime(_ value: String) -> String {
     if value == "The required \(source) readiness facts are unavailable." {
       return appRuntimeLocalizedFormat(
         "The required %@ readiness facts are unavailable.",
-        appLocalizedRuntime(source.capitalized)
+        bundle: bundle,
+        appLocalizedRuntime(source.capitalized, bundle: bundle)
       )
     }
   }
@@ -87,21 +107,31 @@ func appLocalizedRuntime(_ value: String) -> String {
   if value.hasPrefix("Wi-Fi interface ") {
     return appRuntimeLocalizedFormat(
       "Wi-Fi interface %@",
+      bundle: bundle,
       String(value.dropFirst("Wi-Fi interface ".count))
     )
   }
   if value.hasPrefix("Interface ") {
     return appRuntimeLocalizedFormat(
       "Interface %@",
+      bundle: bundle,
       String(value.dropFirst("Interface ".count))
     )
   }
   for family in ["ipv4", "ipv6"] where value == "Local \(family) address" {
-    return appRuntimeLocalizedFormat("Local %@ address", family.uppercased())
+    return appRuntimeLocalizedFormat(
+      "Local %@ address",
+      bundle: bundle,
+      family.uppercased()
+    )
   }
 
   if let count = integer(in: value, prefix: "Core Audio reported ", suffix: " device(s).") {
-    return appRuntimeLocalizedFormat("Core Audio reported %lld device(s).", count)
+    return appRuntimeLocalizedFormat(
+      "Core Audio reported %lld device(s).",
+      bundle: bundle,
+      count
+    )
   }
   if let count = integer(
     in: value,
@@ -110,6 +140,7 @@ func appLocalizedRuntime(_ value: String) -> String {
   ) {
     return appRuntimeLocalizedFormat(
       "Core Audio reported %lld device(s); identifiers were omitted.",
+      bundle: bundle,
       count
     )
   }
@@ -120,6 +151,7 @@ func appLocalizedRuntime(_ value: String) -> String {
   ) {
     return appRuntimeLocalizedFormat(
       "Core Audio could not read software volume (OSStatus %lld).",
+      bundle: bundle,
       status
     )
   }
@@ -130,6 +162,7 @@ func appLocalizedRuntime(_ value: String) -> String {
   ) {
     return appRuntimeLocalizedFormat(
       "Core Audio could not read software mute (OSStatus %lld).",
+      bundle: bundle,
       status
     )
   }
@@ -140,12 +173,12 @@ func appLocalizedRuntime(_ value: String) -> String {
   ) {
     return appRuntimeLocalizedFormat(
       "Network snapshot available for %lld interface(s); no addresses or SSIDs logged.",
+      bundle: bundle,
       count
     )
   }
 
   for role in ["default input", "default output", "system output"] {
-    let localizedRole = appLocalizedRuntime(role.capitalized)
     let templates: [(String, String)] = [
       ("No \(role) device UID was saved.", "No %@ device UID was saved."),
       ("The saved \(role) device is absent.", "The saved %@ device is absent."),
@@ -165,23 +198,35 @@ func appLocalizedRuntime(_ value: String) -> String {
       ("Change the \(role) device", "Change the %@ device"),
     ]
     if let template = templates.first(where: { $0.0 == value })?.1 {
-      return appRuntimeLocalizedFormat(template, localizedRole)
+      return appRuntimeLocalizedFormat(
+        template,
+        bundle: bundle,
+        appLocalizedRuntimeKey(role.capitalized, bundle: bundle)
+      )
     }
   }
 
   let inputKeys: [(String, String)] = [
-    ("com.apple.mouse.scaling", appLocalizedRuntime("Pointer speed")),
-    ("com.apple.swipescrolldirection", appLocalizedRuntime("Natural scrolling")),
-    ("KeyRepeat", appLocalizedRuntime("Key repeat")),
-    ("InitialKeyRepeat", appLocalizedRuntime("Initial key repeat delay")),
-    ("com.apple.keyboard.fnState", appLocalizedRuntime("Function-key behavior")),
+    ("com.apple.mouse.scaling", "Pointer speed"),
+    ("com.apple.swipescrolldirection", "Natural scrolling"),
+    ("KeyRepeat", "Key repeat"),
+    ("InitialKeyRepeat", "Initial key repeat delay"),
+    ("com.apple.keyboard.fnState", "Function-key behavior"),
   ]
-  for (key, title) in inputKeys {
+  for (key, titleKey) in inputKeys {
     if value == "Updated the experimental \(key) preference." {
-      return appRuntimeLocalizedFormat("Updated the experimental %@ preference.", title)
+      return appRuntimeLocalizedFormat(
+        "Updated the experimental %@ preference.",
+        bundle: bundle,
+        appLocalizedRuntimeKey(titleKey, bundle: bundle)
+      )
     }
     if value == "The saved \(key) value is outside the safe range." {
-      return appRuntimeLocalizedFormat("The saved %@ value is outside the safe range.", title)
+      return appRuntimeLocalizedFormat(
+        "The saved %@ value is outside the safe range.",
+        bundle: bundle,
+        appLocalizedRuntimeKey(titleKey, bundle: bundle)
+      )
     }
   }
 
@@ -475,13 +520,35 @@ func appSnapshotItemLabel(_ item: SnapshotItem) -> String {
   return appLocalizedRuntime(item.label)
 }
 
-private func appRuntimeLocalizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
-  let format = appRuntimeLocalizationBundle.localizedString(
+private func appRuntimeLocalizedFormat(
+  _ key: String,
+  bundle: Bundle = appRuntimeLocalizationBundle,
+  _ arguments: CVarArg...
+) -> String {
+  let format = appLocalizedRuntimeKey(key, bundle: bundle)
+  return String(format: format, locale: Locale.current, arguments: arguments)
+}
+
+private func appLocalizedRuntimeKey(
+  _ key: String,
+  bundle: Bundle = appRuntimeLocalizationBundle
+) -> String {
+  bundle.localizedString(
     forKey: key,
     value: key,
     table: "Localizable"
   )
-  return String(format: format, locale: Locale.current, arguments: arguments)
+}
+
+private func appLocalizedSettingGroupTitle(_ group: SettingGroup, bundle: Bundle) -> String {
+  let key =
+    switch group {
+    case .display: "Displays"
+    case .audio: "Audio"
+    case .network: "Network"
+    case .input: "Mouse & Keyboard"
+    }
+  return appLocalizedRuntimeKey(key, bundle: bundle)
 }
 
 private func integer(in value: String, prefix: String, suffix: String) -> Int64? {

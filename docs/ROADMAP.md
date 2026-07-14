@@ -81,7 +81,19 @@ The active contract is [APPLY-RELIABILITY-UX-GOAL.md](APPLY-RELIABILITY-UX-GOAL.
 - Post-apply read-only replanning that reclassifies a succeeded-but-still-required operation as not verified, plus immediate input-preference read-back
 - Inclusion/disclosure separation, typed controls, read-only snapshot-only fields, and field-specific pre-save validation with localized non-color/accessibility metadata
 
-Evidence: integrated non-live `make verify` passed on 2026-07-14 with lint/localization policy, 290 default cases (124 XCTest with five opt-in skips plus 166 Swift Testing with one opt-in skip), zero failures, Swift Debug/Release, universal Xcode Debug/Release, Analyze, DMG/checksum, mounted resources/architectures, and ad-hoc signature classification. Separately, `git diff --check` passed. The verified universal DMG SHA-256 is `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`. The behavior-focused commit containing this evidence is the local milestone boundary; its final clean status is reported at handoff. No live setting mutation, hardware rollback, TCC action, full VoiceOver run, UI automation, Developer ID signing/notarization, release, push, or new CI run was performed for this follow-up.
+Historical evidence: integrated non-live `make verify` passed on 2026-07-14 with lint/localization policy, 290 default cases (124 XCTest with five opt-in skips plus 166 Swift Testing with one opt-in skip), zero failures, Swift Debug/Release, universal Xcode Debug/Release, Analyze, DMG/checksum, mounted resources/architectures, and ad-hoc signature classification. The verified universal DMG SHA-256 was `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`. No live setting mutation, hardware rollback, TCC action, full VoiceOver run, UI automation, Developer ID signing/notarization, release, push, or new CI run was performed for this follow-up.
+
+## M4.2 — Final-source synthetic UI audit (locally verified; interaction gaps recorded)
+
+- DEBUG-only English/Korean audit fixtures cover menu overview, editor, validation, denied-permission presentation, diagnostics, minimum layout, and simulated large text
+- The audit model uses a temporary store and injected empty adapters while blocking capture, apply, profile persistence, readiness, login-item, diagnostic, and Core Location request paths
+- Settings switches at a fixed 760-point breakpoint between horizontal and vertical `AnyLayout` arrangements; the former draggable split divider is intentionally no longer part of the UX
+- Profile rows expose one combined accessibility description instead of duplicate name/state elements
+- Runtime localization tests load English and Korean bundles deterministically and assert exact formatted output
+
+Evidence: the [manual UI audit](MANUAL-UI-AUDIT-2026-07-14.md) records 12 current-source PNGs and 12 nonempty read-only AX logs. Static English/Korean standard, 680×480 minimum, simulated `.accessibility3`, validation, permission, and diagnostics states passed visual, AX-structure, and privacy review. `UIAuditSafetyTests` proves the public audit actions do not invoke injected system/storage/login/permission dependencies. All five opt-in live-read tests passed separately without mutation. Final non-live `make verify` passed 297 default cases (129 XCTest plus 168 Swift Testing cases, six opt-in skips), zero failures, all Swift/Xcode Debug/Release and universal build gates, Analyze, and package verification. The current DMG SHA-256 is `fa42df665ca453165dd041fe5112a8f1a6d2314bd31512ef9371b12289132122`.
+
+The actual MenuBarExtra Settings click/reopen path and same-window 980→680→980 selection/disclosure/unsaved-value/focus preservation remain pending because no user result was supplied and no UI automation was substituted. Full keyboard-only, VoiceOver, real macOS text-size, TCC, login approval/retry/reboot, Keychain, Gatekeeper, physical Intel, import/export, and mutation/rollback evidence also remains pending.
 
 ## M5 — Packaging and CI (current local package verified; historical CI green)
 
@@ -93,7 +105,8 @@ Evidence: integrated non-live `make verify` passed on 2026-07-14 with lint/local
 - CI and tag-triggered release workflows are implemented; CI passed for repair commit `4e45328`
 - Current header/editor follow-up `make verify` produced and verified a universal local DMG with SHA-256 `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`
 - UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967); unsigned artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`
-- The 2026-07-14 apply-reliability `make verify` produced and mounted `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`, verified `x86_64 arm64`, resources, checksum, and ad-hoc/no-Developer-ID signature status; SHA-256 is `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`
+- The 2026-07-14 apply-reliability `make verify` produced and mounted its then-current universal package with SHA-256 `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`; this is historical package evidence
+- The final-source UI-audit `make verify` produced and mounted the current `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`, verified `x86_64 arm64`, resources, checksum, and ad-hoc/no-Developer-ID signature status; SHA-256 is `fa42df665ca453165dd041fe5112a8f1a6d2314bd31512ef9371b12289132122`
 
 Remaining:
 
@@ -103,6 +116,6 @@ Remaining:
 
 ## Current next task — optional manual and release evidence
 
-The implementation and non-live package gate are complete locally. The next useful evidence is a non-mutating English/Korean layout, keyboard, and VoiceOver walkthrough with synthetic data, followed by the remaining import/export, permission, login approval/retry/reboot, and Gatekeeper checks under their documented authorization boundaries. A push, new CI run, tag, or publication is a separate operator decision and was not part of this local goal.
+The implementation, static English/Korean layout/AX audit, live-read smoke gate, and non-live package gate are complete locally. The next useful evidence is a user-driven actual MenuBarExtra Settings click/reopen and same-window resize state/focus check, followed by a keyboard-only and VoiceOver walkthrough. Import/export, permission, login approval/retry/reboot, and Gatekeeper checks remain under their documented authorization boundaries. A push, new CI run, tag, or publication is a separate operator decision and was not part of this local goal.
 
 Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

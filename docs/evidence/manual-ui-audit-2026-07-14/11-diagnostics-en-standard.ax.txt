@@ -1,0 +1,58 @@
+role=AXWindow | title=Desk Setup Switcher UI Audit | focused=1 | actions=AXRaise
+  role=AXGroup | focused=0
+    role=AXTabGroup | focused=0
+      role=AXRadioButton | description=Profiles | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=Permissions | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=Diagnostics | value=1 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=About | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXGroup | focused=0
+        role=AXScrollArea | focused=0 | actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+          role=AXGroup | enabled=1
+            role=AXStaticText | value=Last result | enabled=1
+            role=AXStaticText | value=Synthetic UI audit mode. Nothing is saved or applied. | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=Last snapshot | enabled=1
+            role=AXStaticText | value=System access is disabled for this synthetic review. | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=Storage | enabled=1
+            role=AXStaticText | value=Local Application Support only | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=Telemetry | enabled=1
+            role=AXStaticText | value=None | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=Live mutations | enabled=1
+            role=AXStaticText | value=User-confirmed only | enabled=1 | focused=0 | actions=AXShowMenu
+          role=AXHeading | description=Readiness facts | enabled=1
+          role=AXGroup | enabled=1
+            role=AXStaticText | value=System access is disabled for this synthetic review. | enabled=1
+            role=AXStaticText | value=Last refreshed 11/15/2023, 7:13 AM | enabled=1
+            role=AXButton | description=Refresh Readiness | help=Reads current system facts without changing any setting | enabled=1 | focused=0 | actions=AXPress
+            role=AXStaticText | value=Connected displays | enabled=1
+            role=AXStaticText | value=0 detected | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=Wi-Fi SSID | enabled=1
+            role=AXStaticText | value=Unavailable | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=Ethernet | enabled=1
+            role=AXStaticText | value=Not connected | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=Cached location | enabled=1
+            role=AXStaticText | value=Unavailable | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXDisclosureTriangle | description=Audio input UIDs (0) | value=0 | enabled=1
+            role=AXDisclosureTriangle | description=Audio output UIDs (0) | value=0 | enabled=1
+            role=AXDisclosureTriangle | description=USB hardware identifiers (0) | value=0 | enabled=1
+            role=AXDisclosureTriangle | description=Local IP addresses (0) | value=0 | enabled=1
+          role=AXHeading | description=Snapshot details | enabled=1
+          role=AXGroup | enabled=1
+            role=AXStaticText | value=Captured | enabled=1
+            role=AXStaticText | value=11/15/2023, 7:13 AM | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXDisclosureTriangle | description=Displays | value=0 | enabled=1
+            role=AXDisclosureTriangle | description=Audio | value=0 | enabled=1
+          role=AXHeading | description=Redacted local events | enabled=1
+          role=AXGroup | enabled=1
+            role=AXStaticText | value=No local diagnostic events. | enabled=1
+            role=AXButton | description=Refresh | enabled=1 | focused=0 | actions=AXPress
+            role=AXButton | description=Clear Events… | enabled=0 | actions=AXPress
+          role=AXScrollBar | value=0 | enabled=1 | focused=0
+            role=AXValueIndicator | value=0
+            role=AXButton | actions=AXPress
+            role=AXButton | actions=AXPress
+            role=AXButton | actions=AXPress
+            role=AXButton | actions=AXPress
+  role=AXButton | enabled=1 | focused=0 | actions=AXPress
+  role=AXButton | help=this button also has an action to zoom the window | enabled=1 | focused=0 | actions=AXPress,AXZoomWindow,AXShowMenu
+    role=AXGroup | focused=0
+  role=AXButton | enabled=1 | focused=0 | actions=AXPress

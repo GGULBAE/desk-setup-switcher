@@ -21,13 +21,8 @@ struct ProfilesSettingsView: View {
 
   var body: some View {
     VStack(spacing: 12) {
-      HSplitView {
-        sidebar
-          .frame(minWidth: 220, idealWidth: 250, maxWidth: 300)
-        editor
-          .frame(minWidth: 390, maxWidth: .infinity, maxHeight: .infinity)
-      }
-      .disabled(model.isProfileMutationLocked)
+      profileWorkspace
+        .disabled(model.isProfileMutationLocked)
 
       Divider()
 
@@ -152,6 +147,39 @@ struct ProfilesSettingsView: View {
     }
   }
 
+  private var profileWorkspace: some View {
+    GeometryReader { geometry in
+      let usesCompactLayout = geometry.size.width < 760
+
+      // The fixed breakpoint intentionally replaces the draggable HSplitView.
+      // AnyLayout keeps the sidebar/editor identity stable while the window is resized.
+      let layout =
+        usesCompactLayout
+        ? AnyLayout(VStackLayout(spacing: 0))
+        : AnyLayout(HStackLayout(spacing: 0))
+
+      layout {
+        sidebar
+          .frame(
+            minWidth: usesCompactLayout ? 0 : 220,
+            idealWidth: usesCompactLayout ? nil : 250,
+            maxWidth: usesCompactLayout ? .infinity : 300,
+            minHeight: usesCompactLayout ? 120 : 0,
+            idealHeight: usesCompactLayout ? 150 : nil,
+            maxHeight: usesCompactLayout ? 170 : .infinity
+          )
+        Divider()
+        editor
+          .frame(
+            minWidth: usesCompactLayout ? 0 : 390,
+            maxWidth: .infinity,
+            minHeight: usesCompactLayout ? 190 : 0,
+            maxHeight: .infinity
+          )
+      }
+    }
+  }
+
   private var sidebar: some View {
     VStack(spacing: 8) {
       List(selection: selectionBinding) {
@@ -168,6 +196,7 @@ struct ProfilesSettingsView: View {
             }
           }
           .tag(Optional(profile.id))
+          .accessibilityElement(children: .ignore)
           .accessibilityLabel(
             appLocalized(
               "\(profile.name), \(profile.isEnabled ? appLocalized("enabled") : appLocalized("disabled"))"
@@ -617,6 +646,7 @@ private enum DeferredProfileAction: Identifiable {
 }
 
 private struct ProfileEditorForm: View {
+  @Environment(\.uiAuditConfiguration) private var uiAuditConfiguration
   @Binding var profile: DeskProfile
   let conditionContext: ConditionContext
   let systemSnapshot: SystemSnapshotResult?
@@ -781,6 +811,9 @@ private struct ProfileEditorForm: View {
     .onChange(of: requestedValidationFocus) {
       guard let fieldID = requestedValidationFocus else { return }
       revealAndFocus(fieldID)
+    }
+    .onAppear {
+      configureSyntheticAuditDisclosure()
     }
   }
 
@@ -1763,6 +1796,21 @@ private struct ProfileEditorForm: View {
       await Task.yield()
       focusedField = focusTarget
       requestedValidationFocus = nil
+    }
+  }
+
+  private func configureSyntheticAuditDisclosure() {
+    guard uiAuditConfiguration.isEnabled else { return }
+    switch uiAuditConfiguration.variant {
+    case .editor:
+      groupDisclosure.expand(.display)
+      optionDisclosure.expand(.init(group: .display, key: "primary"))
+    case .validation:
+      if let firstValidationItem {
+        revealAndFocus(firstValidationItem.fieldID)
+      }
+    case .overview, .permissions, .diagnostics:
+      break
     }
   }
 

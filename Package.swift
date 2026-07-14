@@ -67,5 +67,10 @@ let package = Package(
       dependencies: ["DeskSetupCore", "DeskSetupSystem"],
       path: "Tests/DeskSetupSystemTests"
     ),
+    .testTarget(
+      name: "DeskSetupSwitcherTests",
+      dependencies: ["DeskSetupCore", "DeskSetupSystem", "DeskSetupSwitcher"],
+      path: "Tests/DeskSetupSwitcherTests"
+    ),
   ]
 )

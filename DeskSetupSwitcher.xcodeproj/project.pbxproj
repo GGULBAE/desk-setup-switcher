@@ -40,6 +40,7 @@
 		B0C67EEC0F9BEE53CADDD2AA = { isa = PBXBuildFile; fileRef = 8CD3B7FF43331DAADE2C6A26; };
 		0D30220FCB5261EF167D6ABE = { isa = PBXBuildFile; fileRef = 4000D47C28CF4BACECA2A22E; };
 		FB3DF64FA30F4E46E1B64C4A = { isa = PBXBuildFile; fileRef = CBEE885B4A633F3B2C06DC0D; };
+		C1711E8DA16B2493680F748E = { isa = PBXBuildFile; fileRef = 54C3C8A0074367253BD39F0F; };
 		CD23CC853FC6845468EBB916 = { isa = PBXBuildFile; fileRef = 6670F813CFF27985C55E019F; };
 		393A6F101B5D8F4111976BF4 = { isa = PBXBuildFile; fileRef = 80F3BD3E9EE188611E2C82FA; };
 		B676A55A8D2B3D40F4836289 = { isa = PBXBuildFile; fileRef = 1F5AEF3D9175DA4FA07DC10D; };
@@ -119,6 +120,7 @@
 		8CD3B7FF43331DAADE2C6A26 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/LocationPermissionController.swift"; sourceTree = "<group>"; };
 		4000D47C28CF4BACECA2A22E = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/ProfileEditorModel.swift"; sourceTree = "<group>"; };
 		CBEE885B4A633F3B2C06DC0D = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/ProfilesSettingsView.swift"; sourceTree = "<group>"; };
+		54C3C8A0074367253BD39F0F = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/UIAuditFixtures.swift"; sourceTree = "<group>"; };
 		6670F813CFF27985C55E019F = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/UserFacingLocalization.swift"; sourceTree = "<group>"; };
 		80F3BD3E9EE188611E2C82FA = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSystem/Audio/AudioSystemAPI.swift"; sourceTree = "<group>"; };
 		1F5AEF3D9175DA4FA07DC10D = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSystem/Audio/CoreAudioAdapter.swift"; sourceTree = "<group>"; };
@@ -235,6 +237,7 @@
 				8CD3B7FF43331DAADE2C6A26,
 				4000D47C28CF4BACECA2A22E,
 				CBEE885B4A633F3B2C06DC0D,
+				54C3C8A0074367253BD39F0F,
 				6670F813CFF27985C55E019F,
 				80F3BD3E9EE188611E2C82FA,
 				1F5AEF3D9175DA4FA07DC10D,
@@ -408,6 +411,7 @@
 				B0C67EEC0F9BEE53CADDD2AA,
 				0D30220FCB5261EF167D6ABE,
 				FB3DF64FA30F4E46E1B64C4A,
+				C1711E8DA16B2493680F748E,
 				CD23CC853FC6845468EBB916,
 				393A6F101B5D8F4111976BF4,
 				B676A55A8D2B3D40F4836289,

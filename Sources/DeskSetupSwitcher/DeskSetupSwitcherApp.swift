@@ -102,30 +102,94 @@ struct DeskSetupSwitcherApp: App {
   @StateObject private var model: ApplicationModel
   @StateObject private var locationPermission: LocationPermissionController
   @StateObject private var profileEditor: ProfileEditorModel
-  @State private var selectedSettingsTab: SettingsTab = .profiles
+  @State private var selectedSettingsTab: SettingsTab
+  private let uiAuditConfiguration: UIAuditConfiguration
+  #if DEBUG
+    private let auditWindowController: UIAuditWindowController?
+  #endif
 
   init() {
-    let model = ApplicationModel()
-    let locationPermission = LocationPermissionController()
+    let uiAuditConfiguration = UIAuditConfiguration.current
+    let model: ApplicationModel
+    let locationPermission: LocationPermissionController
+    #if DEBUG
+      if uiAuditConfiguration.isEnabled {
+        model = UIAuditFixtures.makeModel(configuration: uiAuditConfiguration)
+        locationPermission = LocationPermissionController(
+          allowsSystemRequests: false,
+          syntheticAuthorizationStatus: .denied
+        )
+      } else {
+        model = ApplicationModel()
+        locationPermission = LocationPermissionController()
+      }
+    #else
+      model = ApplicationModel()
+      locationPermission = LocationPermissionController()
+    #endif
     let profileEditor = ProfileEditorModel()
+    self.uiAuditConfiguration = uiAuditConfiguration
     _model = StateObject(wrappedValue: model)
     _locationPermission = StateObject(wrappedValue: locationPermission)
     _profileEditor = StateObject(wrappedValue: profileEditor)
-    appDelegate.model = model
-    appDelegate.profileEditor = profileEditor
+    let initialSettingsTab: SettingsTab
+    switch uiAuditConfiguration.variant {
+    case .permissions: initialSettingsTab = .permissions
+    case .diagnostics: initialSettingsTab = .diagnostics
+    case .overview, .editor, .validation: initialSettingsTab = .profiles
+    }
+    _selectedSettingsTab = State(initialValue: initialSettingsTab)
+    #if DEBUG
+      if uiAuditConfiguration.isEnabled, !uiAuditConfiguration.showsMenuBarExtra {
+        let auditRoot = UIAuditHostView(configuration: uiAuditConfiguration)
+          .environmentObject(model)
+          .environmentObject(locationPermission)
+          .environmentObject(profileEditor)
+          .uiAuditEnvironment(uiAuditConfiguration)
+        auditWindowController = UIAuditWindowController(
+          rootView: auditRoot,
+          initialContentSize: uiAuditConfiguration.auditSettingsSize
+        )
+      } else {
+        auditWindowController = nil
+      }
+    #endif
     locationPermission.onReadinessFactsChanged = { [weak model] in
       model?.refreshReadinessFacts()
     }
-    NSApplication.shared.setActivationPolicy(.accessory)
-    model.start()
+    if uiAuditConfiguration.isEnabled, !uiAuditConfiguration.showsMenuBarExtra {
+      NSApplication.shared.setActivationPolicy(.regular)
+    } else {
+      if !uiAuditConfiguration.isEnabled {
+        appDelegate.model = model
+        appDelegate.profileEditor = profileEditor
+      }
+      NSApplication.shared.setActivationPolicy(.accessory)
+      if !uiAuditConfiguration.isEnabled {
+        model.start()
+      }
+    }
+    #if DEBUG
+      if let auditWindowController {
+        DispatchQueue.main.async {
+          auditWindowController.showWindow(nil)
+          auditWindowController.window?.makeKeyAndOrderFront(nil)
+          NSApplication.shared.activate(ignoringOtherApps: true)
+        }
+      }
+    #endif
   }
 
   var body: some Scene {
-    MenuBarExtra {
+    MenuBarExtra(
+      isInserted: .constant(
+        !uiAuditConfiguration.isEnabled || uiAuditConfiguration.showsMenuBarExtra)
+    ) {
       MenuContentView(selectedSettingsTab: $selectedSettingsTab)
         .environmentObject(model)
         .environmentObject(locationPermission)
         .environmentObject(profileEditor)
+        .uiAuditEnvironment(uiAuditConfiguration)
     } label: {
       Label("Desk Setup Switcher", systemImage: "switch.2")
         .labelStyle(.iconOnly)
@@ -138,10 +202,84 @@ struct DeskSetupSwitcherApp: App {
         .environmentObject(model)
         .environmentObject(locationPermission)
         .environmentObject(profileEditor)
+        .uiAuditEnvironment(uiAuditConfiguration)
         .frame(minWidth: 680, minHeight: 480)
     }
   }
 }
+
+#if DEBUG
+  @MainActor
+  private final class UIAuditWindowController: NSWindowController {
+    init<Content: View>(rootView: Content, initialContentSize: CGSize?) {
+      let hostingController = NSHostingController(rootView: rootView)
+      let window = NSWindow(contentViewController: hostingController)
+      window.title = "Desk Setup Switcher UI Audit"
+      window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+      window.titleVisibility = .hidden
+      window.titlebarAppearsTransparent = true
+      window.isMovableByWindowBackground = true
+      window.isReleasedWhenClosed = false
+      hostingController.view.layoutSubtreeIfNeeded()
+      window.setContentSize(initialContentSize ?? hostingController.view.fittingSize)
+      if initialContentSize != nil {
+        window.contentMinSize = CGSize(width: 680, height: 480)
+      }
+      window.center()
+      super.init(window: window)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+      fatalError("init(coder:) has not been implemented")
+    }
+  }
+
+  private struct UIAuditHostView: View {
+    let configuration: UIAuditConfiguration
+    @State private var selectedSettingsTab: SettingsTab
+
+    init(configuration: UIAuditConfiguration) {
+      self.configuration = configuration
+      let initialTab: SettingsTab
+      switch configuration.variant {
+      case .permissions: initialTab = .permissions
+      case .diagnostics: initialTab = .diagnostics
+      case .overview, .editor, .validation: initialTab = .profiles
+      }
+      _selectedSettingsTab = State(initialValue: initialTab)
+    }
+
+    @ViewBuilder
+    var body: some View {
+      switch configuration.variant {
+      case .overview:
+        MenuContentView(selectedSettingsTab: $selectedSettingsTab)
+          .frame(width: overviewWidth)
+          .fixedSize(horizontal: false, vertical: true)
+      case .editor, .validation, .permissions, .diagnostics:
+        SettingsView(selectedTab: $selectedSettingsTab)
+          .frame(minWidth: 680, minHeight: 480)
+      }
+    }
+
+    private var overviewWidth: CGFloat {
+      configuration.displayMode == .largeText ? 460 : 368
+    }
+
+  }
+
+  extension UIAuditConfiguration {
+    fileprivate var auditSettingsSize: CGSize? {
+      guard variant != .overview else { return nil }
+      return switch displayMode {
+      case .standard: CGSize(width: 980, height: 720)
+      case .minimum: CGSize(width: 680, height: 480)
+      case .largeText: CGSize(width: 1_100, height: 820)
+      }
+    }
+  }
+#endif
 
 private enum DraftProtectedApplyKind: Equatable {
   case targetDraft

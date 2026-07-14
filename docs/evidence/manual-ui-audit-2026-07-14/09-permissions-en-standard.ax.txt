@@ -1,0 +1,30 @@
+role=AXWindow | title=Desk Setup Switcher UI Audit | focused=1 | actions=AXRaise
+  role=AXGroup | focused=0
+    role=AXTabGroup | focused=0
+      role=AXRadioButton | description=Profiles | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=Permissions | value=1 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=Diagnostics | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXRadioButton | description=About | value=0 | enabled=1 | focused=0 | actions=AXPress
+      role=AXGroup | focused=0
+        role=AXScrollArea | focused=0 | actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+          role=AXHeading | description=Login | enabled=1
+          role=AXGroup | enabled=1
+            role=AXStaticText | value=Launch Desk Setup Switcher at login | enabled=1
+            role=AXCheckBox | value=1 | enabled=1 | focused=0 | actions=AXPress
+            role=AXStaticText | value=App setting | enabled=1
+            role=AXStaticText | value=On | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=macOS registration | enabled=1
+            role=AXStaticText | value=Not enabled | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXStaticText | value=Login item status: Requested; approval is required in System Settings > General > Login Items. | enabled=1
+            role=AXButton | description=Refresh Status | enabled=1 | focused=0 | actions=AXPress
+            role=AXDisclosureTriangle | description=Why can these states differ? | value=0 | enabled=1
+          role=AXHeading | description=System permissions | enabled=1
+          role=AXGroup | enabled=1
+            role=AXStaticText | value=macOS can require Location Services to reveal a Wi-Fi network name and evaluate a location readiness condition. Desk Setup Switcher does not track location continuously. | enabled=1
+            role=AXStaticText | value=Location | enabled=1
+            role=AXStaticText | value=Denied | enabled=1 | focused=0 | actions=AXShowMenu
+            role=AXButton | description=Request Location Access | help=Shows the macOS permission prompt only after this explanation | enabled=1 | focused=0 | actions=AXPress
+  role=AXButton | enabled=1 | focused=0 | actions=AXPress
+  role=AXButton | help=this button also has an action to zoom the window | enabled=1 | focused=0 | actions=AXPress,AXZoomWindow,AXShowMenu
+    role=AXGroup | focused=0
+  role=AXButton | enabled=1 | focused=0 | actions=AXPress

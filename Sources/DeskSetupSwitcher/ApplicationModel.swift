@@ -141,6 +141,28 @@ private func makeDefaultDiagnosticLog() -> (any DiagnosticLogStoring)? {
 }
 
 @MainActor
+protocol LoginItemServicing: AnyObject {
+  var status: SMAppService.Status { get }
+  func register() throws
+  func unregister() throws
+}
+
+@MainActor
+private final class SystemLoginItemService: LoginItemServicing {
+  var status: SMAppService.Status {
+    SMAppService.mainApp.status
+  }
+
+  func register() throws {
+    try SMAppService.mainApp.register()
+  }
+
+  func unregister() throws {
+    try SMAppService.mainApp.unregister()
+  }
+}
+
+@MainActor
 final class ApplicationModel: ObservableObject {
   @Published private(set) var profiles: [DeskProfile] = []
   @Published private(set) var selectedProfileID: UUID?
@@ -181,13 +203,14 @@ final class ApplicationModel: ObservableObject {
   @Published private(set) var diagnosticEntries: [DiagnosticEntry] = []
   @Published private(set) var diagnosticStatus = appLocalized("No local diagnostic events.")
 
-  private let defaults = UserDefaults.standard
+  private let defaults: UserDefaults
   private let profileStore: ProfileStore
   private let profileImportExport: ProfileImportExport
   private let snapshotCoordinator: SystemSnapshotCoordinator
   private let conditionContextProvider: ConditionContextProvider
   private let applyEngine: ApplyEngine
   private let diagnosticLog: (any DiagnosticLogStoring)?
+  private let loginItemService: any LoginItemServicing
   private let launchAtLoginPreferenceKey = "launchAtLoginEnabled"
   private let launchAtLoginPreferenceCreatedKey = "launchAtLoginPreferenceCreated"
   private let displaySafetyConfirmationKey = "display-safety-confirmation"
@@ -197,6 +220,7 @@ final class ApplicationModel: ObservableObject {
   private var terminationRequestIsDeferred = false
   private var preparationGate = ProfilePreparationGate()
   private var preparationRequestTracker = LatestPreparationRequestTracker()
+  private var suppressesLiveSystemAccess = false
 
   var isProfileMutationLocked: Bool {
     isApplyTransactionInProgress
@@ -230,9 +254,16 @@ final class ApplicationModel: ObservableObject {
     snapshotCoordinator: SystemSnapshotCoordinator? = nil,
     conditionContextProvider: ConditionContextProvider = ConditionContextProvider(),
     applyEngine: ApplyEngine? = nil,
-    diagnosticLog: (any DiagnosticLogStoring)? = makeDefaultDiagnosticLog()
+    diagnosticLog: (any DiagnosticLogStoring)? = makeDefaultDiagnosticLog(),
+    defaults: UserDefaults = .standard,
+    loginItemService: (any LoginItemServicing)? = nil
   ) {
-    let adapters = LiveAdapterFactory.makeAdapters()
+    let adapters: [any SystemSettingsAdapter]
+    if snapshotCoordinator == nil || applyEngine == nil {
+      adapters = LiveAdapterFactory.makeAdapters()
+    } else {
+      adapters = []
+    }
     self.profileStore = profileStore
     self.profileImportExport = profileImportExport
     self.snapshotCoordinator = snapshotCoordinator ?? SystemSnapshotCoordinator(adapters: adapters)
@@ -241,9 +272,46 @@ final class ApplicationModel: ObservableObject {
       applyEngine
       ?? ApplyEngine(registry: (try? AdapterRegistry(adapters)) ?? AdapterRegistry())
     self.diagnosticLog = diagnosticLog
+    self.defaults = defaults
+    self.loginItemService = loginItemService ?? SystemLoginItemService()
   }
 
+  #if DEBUG
+    func configureForUIAudit(_ fixture: UIAuditFixtureState) {
+      suppressesLiveSystemAccess = true
+      profiles = fixture.profiles
+      selectedProfileID = fixture.selectedProfileID
+      lastSnapshot = fixture.snapshot
+      storageStatus = appLocalized("Synthetic UI audit mode. Nothing is saved or applied.")
+      snapshotStatus = appLocalized("System access is disabled for this synthetic review.")
+      lastMessage = appLocalized("Synthetic UI audit mode. Nothing is saved or applied.")
+      conditionContextStatus = appLocalized("System access is disabled for this synthetic review.")
+      readinessLastRefreshedAt = fixture.snapshot.capturedAt
+      launchAtLoginDesired = true
+      loginItemEnabled = false
+      loginItemStatus = appLocalized(
+        "Requested; approval is required in System Settings > General > Login Items.")
+      canRetryLoginItemRegistration = false
+      readinessByProfile = fixture.readinessByProfile
+      operationCountByProfile = fixture.operationCountByProfile
+      forceOperationCountByProfile = fixture.availableOperationCountByProfile
+      normalApplyAvailableByProfile = Dictionary(
+        uniqueKeysWithValues: fixture.readinessByProfile.compactMap { profileID, readiness in
+          readiness == .ready ? (profileID, true) : nil
+        }
+      )
+      forceApplyAvailableByProfile = Dictionary(
+        uniqueKeysWithValues: fixture.readinessByProfile.compactMap { profileID, readiness in
+          readiness == .partial ? (profileID, true) : nil
+        }
+      )
+      lastCaptureSummary = fixture.captureSummary
+      lastApplySummary = fixture.applySummary
+    }
+  #endif
+
   func start() {
+    guard !suppressesLiveSystemAccess else { return }
     guard !hasStarted else { return }
     hasStarted = true
 
@@ -261,6 +329,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func setLaunchAtLogin(_ enabled: Bool) {
+    guard !suppressesLiveSystemAccess else { return }
     launchAtLoginDesired = enabled
     defaults.set(enabled, forKey: launchAtLoginPreferenceKey)
     loginItemOperationFailure = nil
@@ -275,25 +344,27 @@ final class ApplicationModel: ObservableObject {
   }
 
   func retryLaunchAtLoginRegistration() {
+    guard !suppressesLiveSystemAccess else { return }
     guard launchAtLoginDesired else { return }
     loginItemOperationFailure = nil
     updateLoginItemRegistration(enabled: true)
   }
 
   func refreshLoginItemStatusFromSystem() {
+    guard !suppressesLiveSystemAccess else { return }
     refreshLoginItemStatus()
   }
 
   private func updateLoginItemRegistration(enabled: Bool) {
-    let status = SMAppService.mainApp.status
+    let status = loginItemService.status
 
     do {
       if enabled {
         if status != .enabled, status != .requiresApproval {
-          try SMAppService.mainApp.register()
+          try loginItemService.register()
         }
       } else if status == .enabled || status == .requiresApproval {
-        try SMAppService.mainApp.unregister()
+        try loginItemService.unregister()
       }
       loginItemOperationFailure = nil
       refreshLoginItemStatus()
@@ -316,6 +387,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func refreshReadinessFacts() {
+    guard !suppressesLiveSystemAccess else { return }
     guard !isProfileMutationLocked, !isReadinessRefreshInProgress else { return }
     isReadinessRefreshInProgress = true
     Task {
@@ -325,6 +397,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func createProfile() {
+    guard !suppressesLiveSystemAccess else { return }
     guard beginProfileStoreMutation() else { return }
     Task {
       defer { finishProfileStoreMutation() }
@@ -339,6 +412,10 @@ final class ApplicationModel: ObservableObject {
   }
 
   func updateProfile(_ saveCandidate: DeskProfile) async -> ProfileSaveResult {
+    if suppressesLiveSystemAccess {
+      return .rejected(
+        message: appLocalized("System access is disabled for this synthetic review."))
+    }
     if let validationError = appProfileDraftValidationError(saveCandidate) {
       reportProfileEditorFailure(code: "save-validation-failed", message: validationError)
       return .rejected(message: validationError)
@@ -373,6 +450,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func duplicateProfile(id: UUID) {
+    guard !suppressesLiveSystemAccess else { return }
     guard beginProfileStoreMutation() else { return }
     Task {
       defer { finishProfileStoreMutation() }
@@ -387,6 +465,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func deleteProfile(id: UUID) {
+    guard !suppressesLiveSystemAccess else { return }
     guard beginProfileStoreMutation() else { return }
     Task {
       defer { finishProfileStoreMutation() }
@@ -400,6 +479,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func moveProfile(id: UUID, by offset: Int) {
+    guard !suppressesLiveSystemAccess else { return }
     guard let currentIndex = profiles.firstIndex(where: { $0.id == id }) else { return }
     let destination = currentIndex + offset
     guard profiles.indices.contains(destination) else { return }
@@ -417,6 +497,10 @@ final class ApplicationModel: ObservableObject {
   }
 
   func selectProfile(id: UUID?) {
+    if suppressesLiveSystemAccess {
+      selectedProfileID = id
+      return
+    }
     guard beginProfileStoreMutation() else { return }
     selectedProfileID = id
     Task {
@@ -434,6 +518,10 @@ final class ApplicationModel: ObservableObject {
   /// The awaited variant prevents the apply plan from racing a pending store
   /// mutation and keeps the process-lifetime editor selection authoritative.
   func selectProfileAndWait(id: UUID?) async -> Bool {
+    if suppressesLiveSystemAccess {
+      selectedProfileID = id
+      return true
+    }
     guard beginProfileStoreMutation() else { return false }
     defer { finishProfileStoreMutation() }
     selectedProfileID = id
@@ -448,6 +536,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func importProfiles() {
+    guard !suppressesLiveSystemAccess else { return }
     guard !isProfileMutationLocked else { return }
     let panel = NSOpenPanel()
     panel.title = appLocalized("Import Desk Setup Profiles")
@@ -476,6 +565,10 @@ final class ApplicationModel: ObservableObject {
   }
 
   func confirmImportReplacement() {
+    guard !suppressesLiveSystemAccess else {
+      pendingImport = nil
+      return
+    }
     guard let request = pendingImport, beginProfileStoreMutation() else { return }
     pendingImport = nil
     Task {
@@ -496,6 +589,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func exportProfiles() {
+    guard !suppressesLiveSystemAccess else { return }
     let panel = NSSavePanel()
     panel.title = appLocalized("Export Desk Setup Profiles")
     panel.prompt = appLocalized("Export")
@@ -518,6 +612,12 @@ final class ApplicationModel: ObservableObject {
   }
 
   func createProfileFromCurrentSettings() async -> ProfileCreationCaptureResult {
+    if suppressesLiveSystemAccess {
+      return .rejected(
+        message: appLocalized("System access is disabled for this synthetic review."),
+        summary: lastCaptureSummary
+      )
+    }
     guard beginProfileStoreMutation() else {
       return .rejected(message: profileEditingLockedMessage)
     }
@@ -563,6 +663,12 @@ final class ApplicationModel: ObservableObject {
   }
 
   func captureCurrentProfileSettings() async -> ProfileSettingsCaptureResult {
+    if suppressesLiveSystemAccess {
+      return .rejected(
+        message: appLocalized("System access is disabled for this synthetic review."),
+        summary: lastCaptureSummary
+      )
+    }
     guard beginProfileStoreMutation() else {
       return .rejected(message: profileEditingLockedMessage)
     }
@@ -621,6 +727,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func prepareApply(profile: DeskProfile, mode: ApplyMode) {
+    guard !suppressesLiveSystemAccess else { return }
     guard !isProfileMutationLocked, preparationGate.begin(profileID: profile.id) else { return }
     let requestID = UUID()
     preparationRequestTracker.begin(requestID: requestID)
@@ -665,6 +772,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func executePendingApply() {
+    guard !suppressesLiveSystemAccess else { return }
     guard let request = pendingApply, !isProfileMutationLocked else {
       return
     }
@@ -839,6 +947,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func confirmHighRiskChanges() {
+    guard !suppressesLiveSystemAccess else { return }
     guard let state = safetyConfirmation, !isApplyTransactionInProgress else { return }
     safetyCountdownTask?.cancel()
     safetyCountdownTask = nil
@@ -972,6 +1081,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func revertHighRiskChanges() {
+    guard !suppressesLiveSystemAccess else { return }
     guard let state = safetyConfirmation else { return }
     safetyCountdownTask?.cancel()
     safetyCountdownTask = nil
@@ -1294,6 +1404,11 @@ final class ApplicationModel: ObservableObject {
   }
 
   func refreshDiagnostics() {
+    guard !suppressesLiveSystemAccess else {
+      diagnosticEntries = []
+      diagnosticStatus = appLocalized("System access is disabled for this synthetic review.")
+      return
+    }
     guard let diagnosticLog else {
       diagnosticEntries = []
       diagnosticStatus = appLocalized("Local diagnostic storage is unavailable.")
@@ -1317,6 +1432,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func clearDiagnostics() {
+    guard !suppressesLiveSystemAccess else { return }
     guard let diagnosticLog else { return }
     Task {
       do {
@@ -1535,7 +1651,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   private func reconcileLoginItemRegistrationAtStartup() {
-    let status = SMAppService.mainApp.status
+    let status = loginItemService.status
     if launchAtLoginDesired {
       if status == .notRegistered || status == .notFound {
         updateLoginItemRegistration(enabled: true)
@@ -1550,7 +1666,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   private func refreshLoginItemStatus() {
-    let status = SMAppService.mainApp.status
+    let status = loginItemService.status
     switch status {
     case .enabled:
       loginItemEnabled = true
