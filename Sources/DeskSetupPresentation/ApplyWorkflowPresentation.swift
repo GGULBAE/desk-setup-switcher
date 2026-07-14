@@ -239,7 +239,7 @@ public struct LatestPreparationRequestTracker: Equatable, Sendable {
   }
 }
 
-public enum CaptureItemDisposition: String, Equatable, Sendable {
+public enum CaptureItemDisposition: String, Hashable, Sendable {
   /// Saved and eligible to become an apply operation.
   case savedApplicable
   /// Saved for reference but deliberately excluded from application.
@@ -250,7 +250,7 @@ public enum CaptureItemDisposition: String, Equatable, Sendable {
 }
 
 /// Sanitized capture evidence. It carries no captured value or error detail.
-public struct CaptureSummaryItem: Equatable, Sendable {
+public struct CaptureSummaryItem: Hashable, Sendable {
   public var group: SettingGroup
   public var key: String
   public var disposition: CaptureItemDisposition
@@ -278,6 +278,9 @@ public enum ProfileCaptureStatus: String, Equatable, Sendable {
 
 /// Compact, value-free capture result used by the menu and settings editor.
 public struct ProfileCaptureSummary: Equatable, Sendable {
+  /// Value-free item classifications used to explain partial captures without
+  /// carrying device identifiers, SSIDs, addresses, or captured values into UI state.
+  public var items: [CaptureSummaryItem]
   public var status: ProfileCaptureStatus
   public var savedCount: Int
   public var applicableCount: Int
@@ -288,6 +291,7 @@ public struct ProfileCaptureSummary: Equatable, Sendable {
   public var wifiNetworkWasNotCaptured: Bool
 
   public init(items: [CaptureSummaryItem]) {
+    self.items = items
     applicableCount = items.count { $0.disposition == .savedApplicable }
     excludedCount = items.count { $0.disposition == .savedSnapshotOnly }
     unreadableCount = items.count { $0.disposition == .unreadable }

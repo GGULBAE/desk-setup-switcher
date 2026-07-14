@@ -134,8 +134,7 @@ struct DeskSetupSwitcherApp: App {
     _profileEditor = StateObject(wrappedValue: profileEditor)
     let initialSettingsTab: SettingsTab
     switch uiAuditConfiguration.variant {
-    case .permissions: initialSettingsTab = .permissions
-    case .diagnostics: initialSettingsTab = .diagnostics
+    case .permissions, .diagnostics: initialSettingsTab = .system
     case .overview, .editor, .validation: initialSettingsTab = .profiles
     }
     _selectedSettingsTab = State(initialValue: initialSettingsTab)
@@ -243,8 +242,7 @@ struct DeskSetupSwitcherApp: App {
       self.configuration = configuration
       let initialTab: SettingsTab
       switch configuration.variant {
-      case .permissions: initialTab = .permissions
-      case .diagnostics: initialTab = .diagnostics
+      case .permissions, .diagnostics: initialTab = .system
       case .overview, .editor, .validation: initialTab = .profiles
       }
       _selectedSettingsTab = State(initialValue: initialTab)
@@ -296,6 +294,7 @@ private struct DraftProtectedApplyPrompt: Identifiable, Equatable {
 
 private struct MenuContentView: View {
   @Environment(\.openSettings) private var openSettings
+  @Environment(\.uiAuditConfiguration) private var uiAuditConfiguration
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var profileEditor: ProfileEditorModel
   @Binding var selectedSettingsTab: SettingsTab
@@ -309,6 +308,8 @@ private struct MenuContentView: View {
   @State private var draftApplyRetryAfterError: DraftProtectedApplyPrompt?
   @State private var deferredApplyAfterPreviewDismissal: PendingApplyRequest?
   @State private var isApplyResultDetailsPresented = false
+  @State private var profilePendingDeletion: DeskProfile?
+  @State private var captureDetailsExpanded = false
 
   var body: some View {
     Group {
@@ -365,6 +366,23 @@ private struct MenuContentView: View {
       Button("Cancel", role: .cancel) {}
     } message: {
       Text("The open profile has changes that have not been saved.")
+    }
+    .confirmationDialog(
+      "Delete this profile?",
+      isPresented: Binding(
+        get: { profilePendingDeletion != nil },
+        set: { if !$0 { profilePendingDeletion = nil } }
+      ),
+      presenting: profilePendingDeletion
+    ) { profile in
+      Button(appLocalized("Delete \(profile.name)"), role: .destructive) {
+        deleteProfile(profile)
+      }
+      Button("Cancel", role: .cancel) {
+        profilePendingDeletion = nil
+      }
+    } message: { profile in
+      Text(profileDeletionMessage(profile))
     }
     .confirmationDialog(
       draftApplyDialogTitle,
@@ -444,6 +462,9 @@ private struct MenuContentView: View {
       // Opening the menu is an explicit, read-only refresh point so hot-plugged
       // devices and network changes do not leave readiness permanently stale.
       model.refreshReadinessFacts()
+      if uiAuditConfiguration.isEnabled, uiAuditConfiguration.variant == .overview {
+        captureDetailsExpanded = true
+      }
     }
     .onDisappear {
       transientCaptureTask?.cancel()
@@ -830,8 +851,8 @@ private struct MenuContentView: View {
     openSettings()
   }
 
-  private func presentPermissions() {
-    selectedSettingsTab = .permissions
+  private func presentSystemSettings() {
+    selectedSettingsTab = .system
     NSApplication.shared.activate(ignoringOtherApps: true)
     openSettings()
   }
@@ -936,11 +957,32 @@ private struct MenuContentView: View {
       )
       .font(.caption2)
       .foregroundStyle(.secondary)
+      DisclosureGroup(
+        "Why is this a partial capture?",
+        isExpanded: $captureDetailsExpanded
+      ) {
+        VStack(alignment: .leading, spacing: 9) {
+          Text(
+            "Usable settings were saved. The items below were kept as reference data or omitted without changing the Mac."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+
+          ForEach(captureIncompleteDispositions, id: \.self) { disposition in
+            let items = summary.items.filter { $0.disposition == disposition }
+            if !items.isEmpty {
+              captureDispositionRow(disposition, items: items)
+            }
+          }
+        }
+        .padding(.top, 4)
+      }
+      .font(.caption)
       if summary.wifiNetworkWasNotCaptured {
         Label("Wi-Fi network was not captured.", systemImage: "location.slash")
           .font(.caption)
-        Button("Review Permissions") {
-          presentPermissions()
+        Button("Review System Settings") {
+          presentSystemSettings()
         }
         .font(.caption)
       }
@@ -951,6 +993,120 @@ private struct MenuContentView: View {
       in: RoundedRectangle(cornerRadius: 9)
     )
     .accessibilityElement(children: .contain)
+  }
+
+  private var captureIncompleteDispositions: [CaptureItemDisposition] {
+    [.savedSnapshotOnly, .unreadable, .permissionRequired, .unsupported]
+  }
+
+  private func captureDispositionRow(
+    _ disposition: CaptureItemDisposition,
+    items: [CaptureSummaryItem]
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      HStack(spacing: 5) {
+        Image(systemName: captureDispositionSymbol(disposition))
+          .accessibilityHidden(true)
+        Text(captureDispositionTitle(disposition))
+          .fontWeight(.semibold)
+        Text(appLocalized("\(items.count) items"))
+          .foregroundStyle(.secondary)
+      }
+      Text(items.map(captureItemTitle).joined(separator: ", "))
+        .fixedSize(horizontal: false, vertical: true)
+      Text(captureDispositionExplanation(disposition))
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .accessibilityElement(children: .combine)
+  }
+
+  private func captureDispositionTitle(_ disposition: CaptureItemDisposition) -> String {
+    switch disposition {
+    case .savedApplicable: appLocalized("Applicable")
+    case .savedSnapshotOnly: appLocalized("Snapshot only")
+    case .unreadable: appLocalized("Unreadable")
+    case .permissionRequired: appLocalized("Permission required")
+    case .unsupported: appLocalized("Unsupported")
+    }
+  }
+
+  private func captureDispositionSymbol(_ disposition: CaptureItemDisposition) -> String {
+    switch disposition {
+    case .savedApplicable: "checkmark.circle"
+    case .savedSnapshotOnly: "camera"
+    case .unreadable: "eye.slash"
+    case .permissionRequired: "lock.trianglebadge.exclamationmark"
+    case .unsupported: "nosign"
+    }
+  }
+
+  private func captureDispositionExplanation(_ disposition: CaptureItemDisposition) -> String {
+    switch disposition {
+    case .savedApplicable:
+      appLocalized("This item was saved and can be applied.")
+    case .savedSnapshotOnly:
+      appLocalized(
+        "Saved for reference, but not applied because the current adapter cannot safely restore it."
+      )
+    case .unreadable:
+      appLocalized("macOS returned no compatible value, so this item was not added.")
+    case .permissionRequired:
+      appLocalized("macOS hid this value until the required permission is granted.")
+    case .unsupported:
+      appLocalized("The current adapter cannot safely capture or apply this item.")
+    }
+  }
+
+  private func captureItemTitle(_ item: CaptureSummaryItem) -> String {
+    if item.key.hasSuffix(".rotation") {
+      return appLocalized("Display rotation")
+    }
+    if item.key.hasSuffix(".active") {
+      return appLocalized("Display active state")
+    }
+    return switch item.key {
+    case "rotationDegrees":
+      appLocalized("Display rotation")
+    case "activeState":
+      appLocalized("Display active state")
+    case "network.ipv4", "ipv4", "ipv4Configuration":
+      appLocalized("IPv4 configuration")
+    case "network.dns", "dnsServers":
+      appLocalized("DNS servers")
+    case "network.webProxy", "webProxy":
+      appLocalized("Web proxy")
+    case "network.secureWebProxy", "secureWebProxy":
+      appLocalized("Secure web proxy")
+    case "network.serviceOrder":
+      appLocalized("Network service order")
+    case "wifi.ssid", "wifiSSID":
+      appLocalized("Current Wi-Fi network")
+    case "com.apple.mouse.scaling", "pointerSpeed":
+      appLocalized("Pointer speed")
+    case "com.apple.swipescrolldirection", "naturalScrolling":
+      appLocalized("Natural scrolling")
+    case "KeyRepeat", "keyRepeatInterval":
+      appLocalized("Key repeat")
+    case "InitialKeyRepeat", "initialKeyRepeatDelay":
+      appLocalized("Initial key repeat delay")
+    case "com.apple.keyboard.fnState", "useStandardFunctionKeys":
+      appLocalized("Standard function keys")
+    case "defaultInput", "defaultInputUID":
+      appLocalized("Default input device")
+    case "defaultOutput", "defaultOutputUID":
+      appLocalized("Default output device")
+    case "systemOutput", "systemOutputUID":
+      appLocalized("System output device")
+    case "outputVolume":
+      appLocalized("Output volume")
+    case "outputMute", "outputMuted":
+      appLocalized("Output mute")
+    case "snapshot":
+      appLocalized("Snapshot read")
+    default:
+      appSettingGroupTitle(item.group)
+    }
   }
 
   private func captureResultAnnouncement(_ summary: ProfileCaptureSummary) -> String {
@@ -1075,11 +1231,43 @@ private struct MenuContentView: View {
         .accessibilityLabel(appLocalized("Edit \(profile.name)"))
         .help("Edit Profile")
 
+        Button(role: .destructive) {
+          profilePendingDeletion = profile
+        } label: {
+          Label("Delete Profile", systemImage: "trash")
+            .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.bordered)
+        .disabled(
+          model.isProfileMutationLocked || profileEditor.activity.isBusy
+            || profileEditor.session.pendingSelection != nil
+        )
+        .accessibilityLabel(appLocalized("Delete \(profile.name)"))
+        .help(appLocalized("Delete \(profile.name)"))
       }
     }
     .padding(10)
     .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 9))
     .accessibilityElement(children: .contain)
+  }
+
+  private func profileDeletionMessage(_ profile: DeskProfile) -> String {
+    if profileEditor.isDirty, profileEditor.selectedProfileID == profile.id {
+      return appLocalized(
+        "This permanently removes \(profile.name) and discards its unsaved changes. This action cannot be undone."
+      )
+    }
+    return appLocalized(
+      "This removes \(profile.name) from local profile storage. This action cannot be undone."
+    )
+  }
+
+  private func deleteProfile(_ profile: DeskProfile) {
+    if profileEditor.isDirty, profileEditor.selectedProfileID == profile.id {
+      profileEditor.revertDraft()
+    }
+    model.deleteProfile(id: profile.id)
+    profilePendingDeletion = nil
   }
 
   private func primaryApplyActionState(
@@ -1598,8 +1786,7 @@ private struct SafetyConfirmationView: View {
 
 private enum SettingsTab: Hashable {
   case profiles
-  case permissions
-  case diagnostics
+  case system
   case about
 }
 
@@ -1613,15 +1800,10 @@ private struct SettingsView: View {
         .tabItem { Label("Profiles", systemImage: "rectangle.stack") }
         .tag(SettingsTab.profiles)
 
-      PermissionsSettingsView()
+      SystemSettingsView()
         .environmentObject(model)
-        .tabItem { Label("Permissions", systemImage: "lock.shield") }
-        .tag(SettingsTab.permissions)
-
-      DiagnosticsSettingsView()
-        .environmentObject(model)
-        .tabItem { Label("Diagnostics", systemImage: "stethoscope") }
-        .tag(SettingsTab.diagnostics)
+        .tabItem { Label("System", systemImage: "gearshape.2") }
+        .tag(SettingsTab.system)
 
       AboutSettingsView()
         .tabItem { Label("About", systemImage: "info.circle") }
@@ -1631,9 +1813,11 @@ private struct SettingsView: View {
   }
 }
 
-private struct PermissionsSettingsView: View {
+private struct SystemSettingsView: View {
+  @Environment(\.uiAuditConfiguration) private var uiAuditConfiguration
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var locationPermission: LocationPermissionController
+  @State private var showsAdvancedDiagnostics = false
 
   var body: some View {
     Form {
@@ -1701,12 +1885,56 @@ private struct PermissionsSettingsView: View {
         }
         .accessibilityHint("Shows the macOS permission prompt only after this explanation")
       }
+
+      Section("Troubleshooting") {
+        Text(
+          "Diagnostics are only needed when a capture or apply does not behave as expected. They contain redacted local status and no telemetry."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        Button("Open Advanced Diagnostics…") {
+          showsAdvancedDiagnostics = true
+        }
+        .accessibilityHint("Shows redacted local status, snapshot details, and recent events")
+      }
     }
     .formStyle(.grouped)
+    .sheet(isPresented: $showsAdvancedDiagnostics) {
+      AdvancedDiagnosticsSheet()
+        .environmentObject(model)
+    }
+    .onAppear {
+      if uiAuditConfiguration.isEnabled, uiAuditConfiguration.variant == .diagnostics {
+        showsAdvancedDiagnostics = true
+      }
+    }
   }
 
   private var loginItemStatesDiffer: Bool {
     model.launchAtLoginDesired != model.loginItemEnabled
+  }
+}
+
+private struct AdvancedDiagnosticsSheet: View {
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    VStack(spacing: 0) {
+      HStack(spacing: 10) {
+        Label("Advanced Diagnostics", systemImage: "stethoscope")
+          .font(.title3.bold())
+          .accessibilityAddTraits(.isHeader)
+        Spacer()
+        Button("Done") { dismiss() }
+          .keyboardShortcut(.cancelAction)
+      }
+      .padding(.horizontal, 20)
+      .padding(.vertical, 14)
+
+      Divider()
+      DiagnosticsSettingsView()
+    }
+    .frame(minWidth: 700, minHeight: 560)
   }
 }
 

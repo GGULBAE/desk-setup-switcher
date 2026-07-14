@@ -159,7 +159,7 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
         items.append(
           CaptureSummaryItem(
             group: item.group,
-            key: item.key,
+            key: sanitizedEvidenceKey(item),
             disposition: disposition
           )
         )
@@ -167,6 +167,25 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     }
 
     return ProfileCaptureSummary(items: items)
+  }
+
+  private func sanitizedEvidenceKey(_ item: CaptureSnapshotEvidence) -> String {
+    switch item.group {
+    case .display:
+      if item.key == "snapshot" || item.key.hasPrefix("capture.") {
+        return item.key
+      }
+      return "display.settings"
+    case .audio:
+      return item.key.hasPrefix("device:") ? "audio.device" : item.key
+    case .network:
+      if item.key.hasPrefix("interface.") || item.key.hasPrefix("address.") {
+        return "network.interface"
+      }
+      return item.key
+    case .input:
+      return item.key
+    }
   }
 
   private func snapshotOnly(

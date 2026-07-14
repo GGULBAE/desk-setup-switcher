@@ -1034,3 +1034,26 @@
 "Use Suggested Value" = "Use Suggested Value";
 "Synthetic UI audit mode. Nothing is saved or applied." = "Synthetic UI audit mode. Nothing is saved or applied.";
 "System access is disabled for this synthetic review." = "System access is disabled for this synthetic review.";
+
+/* Partial capture details and simplified system settings */
+"Why is this a partial capture?" = "Why is this a partial capture?";
+"Applicable" = "Applicable";
+"Usable settings were saved. The items below were kept as reference data or omitted without changing the Mac." = "Usable settings were saved. The items below were kept as reference data or omitted without changing the Mac.";
+"Review System Settings" = "Review System Settings";
+"%lld items" = "%lld items";
+"This item was saved and can be applied." = "This item was saved and can be applied.";
+"Saved for reference, but not applied because the current adapter cannot safely restore it." = "Saved for reference, but not applied because the current adapter cannot safely restore it.";
+"macOS returned no compatible value, so this item was not added." = "macOS returned no compatible value, so this item was not added.";
+"macOS hid this value until the required permission is granted." = "macOS hid this value until the required permission is granted.";
+"The current adapter cannot safely capture or apply this item." = "The current adapter cannot safely capture or apply this item.";
+"Display rotation" = "Display rotation";
+"Display active state" = "Display active state";
+"Snapshot read" = "Snapshot read";
+"This permanently removes %@ and discards its unsaved changes. This action cannot be undone." = "This permanently removes %@ and discards its unsaved changes. This action cannot be undone.";
+"System" = "System";
+"Troubleshooting" = "Troubleshooting";
+"Diagnostics are only needed when a capture or apply does not behave as expected. They contain redacted local status and no telemetry." = "Diagnostics are only needed when a capture or apply does not behave as expected. They contain redacted local status and no telemetry.";
+"Open Advanced Diagnostics…" = "Open Advanced Diagnostics…";
+"Shows redacted local status, snapshot details, and recent events" = "Shows redacted local status, snapshot details, and recent events";
+"Advanced Diagnostics" = "Advanced Diagnostics";
+"Done" = "Done";

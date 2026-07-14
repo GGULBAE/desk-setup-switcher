@@ -161,9 +161,9 @@ struct ProfilesSettingsView: View {
       layout {
         sidebar
           .frame(
-            minWidth: usesCompactLayout ? 0 : 220,
-            idealWidth: usesCompactLayout ? nil : 250,
-            maxWidth: usesCompactLayout ? .infinity : 300,
+            minWidth: usesCompactLayout ? 0 : 210,
+            idealWidth: usesCompactLayout ? nil : 230,
+            maxWidth: usesCompactLayout ? .infinity : 260,
             minHeight: usesCompactLayout ? 120 : 0,
             idealHeight: usesCompactLayout ? 150 : nil,
             maxHeight: usesCompactLayout ? 170 : .infinity
@@ -370,8 +370,8 @@ struct ProfilesSettingsView: View {
         }
       }
     }
-    .padding(.horizontal, 10)
-    .padding(.vertical, 8)
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
     .background(.bar)
   }
 
@@ -658,8 +658,85 @@ private struct ProfileEditorForm: View {
   @FocusState private var focusedField: DraftFieldIdentifier?
 
   var body: some View {
-    Form {
-      Section("Profile") {
+    ScrollView {
+      LazyVStack(alignment: .leading, spacing: 18) {
+        profileDetailsCard
+
+        if !validation.isValid {
+          validationSummary
+        }
+
+        settingsIntroduction
+
+        settingGroupEditor(
+          "Displays",
+          group: .display,
+          systemImage: "display.2",
+          isOn: $profile.settings.display.isIncluded,
+          summary: summaryPreview(for: .display)
+        ) {
+          displayOptions
+        }
+
+        settingGroupEditor(
+          "Audio",
+          group: .audio,
+          systemImage: "speaker.wave.2",
+          isOn: $profile.settings.audio.isIncluded,
+          summary: summaryPreview(for: .audio)
+        ) {
+          audioOptions
+        }
+
+        settingGroupEditor(
+          "Network",
+          group: .network,
+          systemImage: "network",
+          isOn: $profile.settings.network.isIncluded,
+          summary: summaryPreview(for: .network)
+        ) {
+          networkOptions
+        }
+
+        settingGroupEditor(
+          "Mouse & Keyboard",
+          group: .input,
+          systemImage: "keyboard",
+          isOn: $profile.settings.input.isIncluded,
+          summary: summaryPreview(for: .input)
+        ) {
+          inputOptions
+        }
+
+        if let lastApplication = profile.lastApplication {
+          lastApplicationCard(lastApplication)
+        }
+      }
+      .padding(.horizontal, 18)
+      .padding(.vertical, 16)
+      .frame(maxWidth: 860)
+      .frame(maxWidth: .infinity, alignment: .top)
+    }
+    .background(Color(nsColor: .windowBackgroundColor))
+    .onChange(of: profile.id) {
+      groupDisclosure.reset()
+      optionDisclosure.reset()
+      advancedNumberDisclosure.reset()
+      focusedField = nil
+      requestedValidationFocus = nil
+    }
+    .onChange(of: requestedValidationFocus) {
+      guard let fieldID = requestedValidationFocus else { return }
+      revealAndFocus(fieldID)
+    }
+    .onAppear {
+      configureSyntheticAuditDisclosure()
+    }
+  }
+
+  private var profileDetailsCard: some View {
+    GroupBox {
+      VStack(alignment: .leading, spacing: 12) {
         TextField("Name", text: $profile.name)
           .accessibilityLabel("Profile name")
           .focused($focusedField, equals: .profileName)
@@ -708,145 +785,108 @@ private struct ProfileEditorForm: View {
         }
         Toggle("Enabled", isOn: $profile.isEnabled)
       }
+      .padding(8)
+    } label: {
+      Label("Profile", systemImage: "person.crop.rectangle")
+        .font(.headline)
+        .accessibilityAddTraits(.isHeader)
+    }
+  }
 
-      if !validation.isValid {
-        validationSummary
-      }
+  private var settingsIntroduction: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      Label("Settings", systemImage: "slider.horizontal.3")
+        .font(.title3.bold())
+        .accessibilityAddTraits(.isHeader)
+      Text(
+        "Use Include to choose what this profile applies. Expand a category to review or edit its saved values."
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+    }
+    .padding(.horizontal, 4)
+  }
 
-      Section("Settings") {
-        Text(
-          "Use Include to choose what this profile applies. Expand a category to review or edit its saved values."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      }
-
-      settingGroupEditor(
-        "Displays",
-        group: .display,
-        systemImage: "display.2",
-        isOn: $profile.settings.display.isIncluded,
-        summary: summaryPreview(for: .display)
-      ) {
-        displayOptions
-      }
-
-      settingGroupEditor(
-        "Audio",
-        group: .audio,
-        systemImage: "speaker.wave.2",
-        isOn: $profile.settings.audio.isIncluded,
-        summary: summaryPreview(for: .audio)
-      ) {
-        audioOptions
-      }
-
-      settingGroupEditor(
-        "Network",
-        group: .network,
-        systemImage: "network",
-        isOn: $profile.settings.network.isIncluded,
-        summary: summaryPreview(for: .network)
-      ) {
-        networkOptions
-      }
-
-      settingGroupEditor(
-        "Mouse & Keyboard",
-        group: .input,
-        systemImage: "keyboard",
-        isOn: $profile.settings.input.isIncluded,
-        summary: summaryPreview(for: .input)
-      ) {
-        inputOptions
-      }
-
-      if let lastApplication = profile.lastApplication {
-        Section("Last application") {
-          LabeledContent(
-            "Status",
-            value: appApplicationStatusTitle(
-              lastApplication.status,
-              isAwaitingDisplayConfirmation: lastApplication.status == .applying
-                && lastApplication.items.contains { $0.key == "display-safety-confirmation" }
-            )
+  private func lastApplicationCard(_ lastApplication: ApplicationSummary) -> some View {
+    GroupBox {
+      VStack(alignment: .leading, spacing: 10) {
+        LabeledContent(
+          "Status",
+          value: appApplicationStatusTitle(
+            lastApplication.status,
+            isAwaitingDisplayConfirmation: lastApplication.status == .applying
+              && lastApplication.items.contains { $0.key == "display-safety-confirmation" }
           )
-          LabeledContent("Time", value: lastApplication.appliedAt.formatted())
-          if lastApplication.items.isEmpty {
-            Text("No itemized results were recorded.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          } else {
-            ForEach(Array(lastApplication.items.enumerated()), id: \.offset) { _, item in
-              VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline) {
-                  Text(appSettingGroupTitle(item.group))
-                    .font(.caption.bold())
-                  Text(appApplicationItemTitle(item.key))
-                  Spacer()
-                  Text(appApplicationItemStatusTitle(item.status))
-                    .font(.caption.bold())
-                }
-                Text(appLocalizedRuntime(item.message))
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-                  .textSelection(.enabled)
+        )
+        LabeledContent("Time", value: lastApplication.appliedAt.formatted())
+        if lastApplication.items.isEmpty {
+          Text("No itemized results were recorded.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          ForEach(Array(lastApplication.items.enumerated()), id: \.offset) { _, item in
+            VStack(alignment: .leading, spacing: 3) {
+              HStack(alignment: .firstTextBaseline) {
+                Text(appSettingGroupTitle(item.group))
+                  .font(.caption.bold())
+                Text(appApplicationItemTitle(item.key))
+                Spacer()
+                Text(appApplicationItemStatusTitle(item.status))
+                  .font(.caption.bold())
               }
-              .padding(.vertical, 2)
-              .accessibilityElement(children: .combine)
+              Text(appLocalizedRuntime(item.message))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
             }
+            .padding(.vertical, 2)
+            .accessibilityElement(children: .combine)
           }
         }
       }
-
-    }
-    .formStyle(.grouped)
-    .onChange(of: profile.id) {
-      groupDisclosure.reset()
-      optionDisclosure.reset()
-      advancedNumberDisclosure.reset()
-      focusedField = nil
-      requestedValidationFocus = nil
-    }
-    .onChange(of: requestedValidationFocus) {
-      guard let fieldID = requestedValidationFocus else { return }
-      revealAndFocus(fieldID)
-    }
-    .onAppear {
-      configureSyntheticAuditDisclosure()
+      .padding(8)
+    } label: {
+      Text("Last application")
+        .font(.headline)
+        .accessibilityAddTraits(.isHeader)
     }
   }
 
   private var validationSummary: some View {
-    Section {
-      Label(
-        "Fix the highlighted fields before saving.",
-        systemImage: "exclamationmark.triangle.fill"
-      )
-      .foregroundStyle(.red)
-      .accessibilityLabel("Profile validation failed")
-      .accessibilityHint("Review the first issue or choose a highlighted field")
-
-      if let item = firstValidationItem {
-        Button {
-          revealAndFocus(item.fieldID)
-        } label: {
-          HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(item.message)
-              .multilineTextAlignment(.leading)
-            Spacer(minLength: 8)
-            Image(systemName: "arrow.forward.circle")
-              .accessibilityHidden(true)
-          }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-          "\(appLocalized("First validation issue")): \(item.message)"
+    GroupBox {
+      VStack(alignment: .leading, spacing: 10) {
+        Label(
+          "Fix the highlighted fields before saving.",
+          systemImage: "exclamationmark.triangle.fill"
         )
-        .accessibilityHint("Moves keyboard focus to the invalid field")
+        .foregroundStyle(.red)
+        .accessibilityLabel("Profile validation failed")
+        .accessibilityHint("Review the first issue or choose a highlighted field")
+
+        if let item = firstValidationItem {
+          Button {
+            revealAndFocus(item.fieldID)
+          } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+              Text(item.message)
+                .multilineTextAlignment(.leading)
+              Spacer(minLength: 8)
+              Image(systemName: "arrow.forward.circle")
+                .accessibilityHidden(true)
+            }
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(
+            "\(appLocalized("First validation issue")): \(item.message)"
+          )
+          .accessibilityHint("Moves keyboard focus to the invalid field")
+        }
       }
-    } header: {
+      .padding(8)
+    } label: {
       Text("Review Before Saving")
+        .font(.headline)
+        .accessibilityAddTraits(.isHeader)
     }
   }
 
@@ -1349,66 +1389,71 @@ private struct ProfileEditorForm: View {
     let localizedTitle = appLocalized(title)
     let isExpanded = groupDisclosure.isExpanded(group)
 
-    Section {
-      HStack(spacing: 12) {
-        Button {
-          withAnimation(.easeInOut(duration: 0.16)) {
-            toggleExpandedGroup(group)
+    GroupBox {
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(spacing: 12) {
+          Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+              toggleExpandedGroup(group)
+            }
+          } label: {
+            HStack(spacing: 8) {
+              Label(localizedTitle, systemImage: systemImage)
+                .font(.headline)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .layoutPriority(1)
+              Spacer(minLength: 8)
+              Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
           }
-        } label: {
-          HStack(spacing: 8) {
-            Label(localizedTitle, systemImage: systemImage)
-              .font(.headline)
-              .lineLimit(2)
-              .multilineTextAlignment(.leading)
-              .layoutPriority(1)
-            Spacer(minLength: 8)
-            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-              .font(.caption.bold())
-              .foregroundStyle(.secondary)
-              .accessibilityHidden(true)
-          }
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .layoutPriority(1)
-        .accessibilityLabel(localizedTitle)
-        .accessibilityValue(isExpanded ? Text("Expanded") : Text("Collapsed"))
-        .accessibilityHint("Expands or collapses this settings category")
-        .accessibilityInvalid(firstValidationIssue(in: group) != nil)
-        .focused($focusedField, equals: .group(group))
+          .buttonStyle(.plain)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .layoutPriority(1)
+          .accessibilityLabel(localizedTitle)
+          .accessibilityValue(isExpanded ? Text("Expanded") : Text("Collapsed"))
+          .accessibilityHint("Expands or collapses this settings category")
+          .accessibilityInvalid(firstValidationIssue(in: group) != nil)
+          .focused($focusedField, equals: .group(group))
 
-        compactIncludeToggle(
-          isOn: isOn,
-          accessibilityLabel: appLocalized("Include \(localizedTitle)")
-        )
-      }
-
-      if let issue = validation.issue(for: .group(group)) {
-        inlineValidationMessage(
-          validationMessage(for: issue),
-          fieldID: issue.fieldID
-        )
-      } else if !isExpanded, let issue = firstValidationIssue(in: group) {
-        inlineValidationMessage(
-          validationMessage(for: issue),
-          fieldID: issue.fieldID
-        )
-      }
-
-      if isExpanded {
-        content()
-          .padding(.leading, 4)
-      } else {
-        Text(groupStateSummary(group, isIncluded: isOn.wrappedValue, summary: summary))
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(3)
-          .accessibilityLabel(
-            groupStateSummary(group, isIncluded: isOn.wrappedValue, summary: summary)
+          compactIncludeToggle(
+            isOn: isOn,
+            accessibilityLabel: appLocalized("Include \(localizedTitle)")
           )
+        }
+
+        if let issue = validation.issue(for: .group(group)) {
+          inlineValidationMessage(
+            validationMessage(for: issue),
+            fieldID: issue.fieldID
+          )
+        } else if !isExpanded, let issue = firstValidationIssue(in: group) {
+          inlineValidationMessage(
+            validationMessage(for: issue),
+            fieldID: issue.fieldID
+          )
+        }
+
+        if isExpanded {
+          Divider()
+          VStack(alignment: .leading, spacing: 14) {
+            content()
+          }
+        } else {
+          Text(groupStateSummary(group, isIncluded: isOn.wrappedValue, summary: summary))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(3)
+            .accessibilityLabel(
+              groupStateSummary(group, isIncluded: isOn.wrappedValue, summary: summary)
+            )
+        }
       }
+      .padding(8)
     }
   }
 
@@ -1493,7 +1538,15 @@ private struct ProfileEditorForm: View {
         )
       }
     }
-    .padding(.vertical, 3)
+    .padding(12)
+    .background(
+      Color(nsColor: .controlBackgroundColor).opacity(0.7),
+      in: RoundedRectangle(cornerRadius: 10)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 10)
+        .stroke(Color.secondary.opacity(0.12))
+    }
   }
 
   private func compactIncludeToggle(
@@ -1510,7 +1563,7 @@ private struct ProfileEditorForm: View {
       }
       .labelsHidden()
       .toggleStyle(.switch)
-      .controlSize(.small)
+      .controlSize(.regular)
       .fixedSize()
       .accessibilityLabel(accessibilityLabel)
       .accessibilityValue(isOn.wrappedValue ? Text("Included") : Text("Excluded"))

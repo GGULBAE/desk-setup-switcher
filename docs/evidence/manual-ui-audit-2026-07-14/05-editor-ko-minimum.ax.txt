@@ -3,8 +3,7 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
     role=AXGroup title= description= value= help= enabled= actions=
       role=AXTabGroup title= description= value= help= enabled= actions=
         role=AXRadioButton title= description=프로필 value=1 help= enabled=1 actions=AXPress
-        role=AXRadioButton title= description=권한 value=0 help= enabled=1 actions=AXPress
-        role=AXRadioButton title= description=진단 value=0 help= enabled=1 actions=AXPress
+        role=AXRadioButton title= description=시스템 value=0 help= enabled=1 actions=AXPress
         role=AXRadioButton title= description=앱 정보 value=0 help= enabled=1 actions=AXPress
         role=AXGroup title= description= value= help= enabled= actions=
           role=AXGroup title= description= value= help= enabled=1 actions=
@@ -26,65 +25,16 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
             role=AXButton title= description=선택한 프로필을 위로 이동 value= help=선택한 프로필을 위로 이동 enabled=0 actions=AXPress
             role=AXButton title= description=선택한 프로필을 아래로 이동 value= help=선택한 프로필을 아래로 이동 enabled=1 actions=AXPress
             role=AXScrollArea title= description= value= help= enabled= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
-              role=AXHeading title= description=프로필 value= help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXStaticText title= description= value=이름 help= enabled=1 actions=
-                role=AXTextField title= description=프로필 이름 value=Focus Workspace — Display, Audio, Network & Input help= enabled=1 actions=AXShowMenu,AXConfirm
-                role=AXStaticText title= description= value=설명 help= enabled=1 actions=
-                role=AXTextField title= description=프로필 설명 value=A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata. help= enabled=1 actions=AXShowMenu,AXConfirm
-                role=AXStaticText title= description= value=아이콘 help= enabled=1 actions=
-                role=AXPopUpButton title= description=프로필 아이콘 value=디스플레이 help= enabled=1 actions=AXPress
-                role=AXStaticText title= description= value=활성화됨 help= enabled=1 actions=
-                role=AXCheckBox title= description= value=1 help= enabled=1 actions=AXPress
-              role=AXHeading title= description=설정 value= help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXStaticText title= description= value=이 프로필이 적용할 항목은 ‘포함’으로 선택하세요. 저장된 값을 확인하거나 편집하려면 카테고리를 펼치세요. help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=디스플레이 value=접힘 help=이 설정 카테고리를 펼치거나 접습니다 enabled=1 actions=AXPress
-                role=AXCheckBox title= description=디스플레이 포함 value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=포함됨 · Built-in Retina Display · 1728 × 1117 · 60Hz 외 7개 help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=오디오 value=펼쳐짐 help=이 설정 카테고리를 펼치거나 접습니다 enabled=1 actions=AXPress
-                role=AXCheckBox title= description=오디오 포함 value=1 help= enabled=1 actions=
-                role=AXButton title= description=기본 입력 기기 value=펼쳐짐 help=이 설정의 대상 값을 펼치거나 접습니다 enabled=1 actions=AXPress
-                role=AXCheckBox title= description=기본 입력 기기 포함 value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=기기 help= enabled=1 actions=
-                role=AXPopUpButton title= description= value=Synthetic Microphone help= enabled=1 actions=AXPress
-                role=AXDisclosureTriangle title= description=고급 value=0 help= enabled=1 actions=
-                role=AXButton title= description=기본 출력 기기 value=펼쳐짐 help=이 설정의 대상 값을 펼치거나 접습니다 enabled=1 actions=AXPress
-                role=AXCheckBox title= description=기본 출력 기기 포함 value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=기기 help= enabled=1 actions=
-                role=AXPopUpButton title= description= value=Synthetic Speakers help= enabled=1 actions=AXPress
-                role=AXDisclosureTriangle title= description=고급 value=0 help= enabled=1 actions=
-                role=AXButton title= description=시스템 출력 기기 value=접힘 help=이 설정의 대상 값을 펼치거나 접습니다 enabled=1 actions=AXPress
-                role=AXCheckBox title= description=시스템 출력 기기 포함 value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=포함됨 · Synthetic Speakers help= enabled=1 actions=
-                role=AXButton title= description=출력 음량 value=접힘 help=이 설정의 대상 값을 펼치거나 접습니다 enabled=1 actions=AXPress
-                role=AXCheckBox title= description=출력 음량 포함 value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=포함됨 · 72% help= enabled=1 actions=
-                role=AXButton title= description=출력 음소거 value=접힘 help=이 설정의 대상 값을 펼치거나 접습니다 enabled=1 actions=AXPress
-                role=AXCheckBox title= description=출력 음소거 포함 value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=포함됨 · 끔 help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=네트워크 value=접힘 help=이 설정 카테고리를 펼치거나 접습니다 enabled=1 actions=AXPress
-                role=AXCheckBox title= description=네트워크 포함 value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=포함됨 · 켬 · Synthetic Studio help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=마우스 및 키보드 value=접힘 help=이 설정 카테고리를 펼치거나 접습니다 enabled=1 actions=AXPress
-                role=AXCheckBox title= description=마우스 및 키보드 포함 value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=포함됨 · 4.5 · 켬 외 3개 help= enabled=1 actions=
-              role=AXHeading title= description=최근 적용 value= help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXStaticText title= description= value=상태 help= enabled=1 actions=
-                role=AXStaticText title= description= value=일부 사용 가능 help= enabled=1 actions=AXShowMenu
-                role=AXStaticText title= description= value=시간 help= enabled=1 actions=
-                role=AXStaticText title= description= value=2023. 11. 15. 오전 7:13 help= enabled=1 actions=AXShowMenu
-                role=AXUnknown title= description=오디오, 출력 음량, 성공, The saved target was applied. value= help= enabled=1 actions=Name:메뉴 보기
-Target:0x0
-Selector:(null)
-                role=AXUnknown title= description=네트워크, Wi-Fi 네트워크, 건너뜀, Read-back was unavailable. value= help= enabled=1 actions=Name:메뉴 보기
-Target:0x0
-Selector:(null)
+              role=AXOpaqueProviderGroup title= description= value= help= enabled=1 actions=AXScrollToTop,AXScrollToBottom
+                role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXHeading title= description=프로필 value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXTextField title= description=프로필 이름 value=Focus Workspace — Display, Audio, Network & Input help= enabled=1 actions=AXShowMenu,AXConfirm,AXScrollToVisible
+                  role=AXTextField title= description=프로필 설명 value=A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata. help= enabled=1 actions=AXShowMenu,AXConfirm,AXScrollToVisible
+                  role=AXStaticText title= description= value=아이콘 help= enabled=1 actions=AXScrollToVisible
+                  role=AXPopUpButton title= description=프로필 아이콘 value=디스플레이 help= enabled=1 actions=AXPress,AXScrollToVisible
+                  role=AXCheckBox title= description=활성화됨 value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                role=AXHeading title= description=설정 value= help= enabled=1 actions=AXScrollToVisible
+                role=AXStaticText title= description= value=이 프로필이 적용할 항목은 ‘포함’으로 선택하세요. 저장된 값을 확인하거나 편집하려면 카테고리를 펼치세요. help= enabled=1 actions=AXScrollToVisible
               role=AXScrollBar title= description= value=0 help= enabled=1 actions=
                 role=AXValueIndicator title= description= value=0 help= enabled= actions=
                 role=AXButton title= description= value= help= enabled= actions=AXPress
@@ -120,14 +70,14 @@ Selector:(null)
             role=AXMenuItem title=Finder에서 ‘리그 오브 레전드’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=시스템 설정 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘시스템 설정’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=카카오톡 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘카카오톡’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=ChatGPT description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘ChatGPT’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Mail description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘Mail’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=MapleStory description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘MapleStory’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Notion description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Notion’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=QuickTime Player description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘QuickTime Player’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Safari description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Safari’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Tabby description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
@@ -136,10 +86,10 @@ Selector:(null)
             role=AXMenuItem title=Finder에서 ‘Visual Studio Code’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=문서 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=6. AI 리포트.png description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘6. AI 리포트.png’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=과학_G6-G7-6월_2026-07-04_cQNMVz4SqC95GoTW2skQ.mp4 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘과학_G6-G7-6월_2026-07-04_cQNMVz4SqC95GoTW2skQ.mp4’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=annotated_1fps.mp4 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘annotated_1fps.mp4’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Desk-Setup-Switcher-0.1.0-unsigned.dmg description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Desk-Setup-Switcher-0.1.0-unsigned.dmg’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=NKeepCleaner description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick

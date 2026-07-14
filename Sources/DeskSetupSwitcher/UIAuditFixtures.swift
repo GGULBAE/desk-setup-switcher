@@ -368,10 +368,35 @@ extension View {
 
     private static func partialCaptureSummary() -> ProfileCaptureSummary {
       ProfileCaptureSummary(items: [
+        .init(group: .display, key: "display.0.primary", disposition: .savedApplicable),
+        .init(group: .display, key: "display.0.origin", disposition: .savedApplicable),
+        .init(group: .display, key: "display.0.mirroring", disposition: .savedApplicable),
         .init(group: .display, key: "display.0.mode", disposition: .savedApplicable),
+        .init(group: .audio, key: "defaultInput", disposition: .savedApplicable),
+        .init(group: .audio, key: "defaultOutput", disposition: .savedApplicable),
+        .init(group: .audio, key: "systemOutput", disposition: .savedApplicable),
+        .init(group: .audio, key: "outputVolume", disposition: .savedApplicable),
+        .init(group: .audio, key: "outputMute", disposition: .savedApplicable),
+        .init(group: .network, key: "wifi.power", disposition: .savedApplicable),
+        .init(group: .network, key: "wifi.ssid", disposition: .savedApplicable),
+        .init(group: .input, key: "KeyRepeat", disposition: .savedApplicable),
+        .init(group: .input, key: "InitialKeyRepeat", disposition: .savedApplicable),
         .init(group: .display, key: "display.0.rotation", disposition: .savedSnapshotOnly),
-        .init(group: .network, key: "wifi.ssid", disposition: .permissionRequired),
-        .init(group: .network, key: "network.dns", disposition: .unsupported),
+        .init(group: .display, key: "display.0.active", disposition: .savedSnapshotOnly),
+        .init(group: .network, key: "network.ipv4", disposition: .savedSnapshotOnly),
+        .init(group: .network, key: "network.dns", disposition: .savedSnapshotOnly),
+        .init(group: .input, key: "com.apple.mouse.scaling", disposition: .unreadable),
+        .init(
+          group: .input,
+          key: "com.apple.swipescrolldirection",
+          disposition: .unreadable
+        ),
+        .init(
+          group: .input,
+          key: "com.apple.keyboard.fnState",
+          disposition: .unreadable
+        ),
+        .init(group: .network, key: "network.serviceOrder", disposition: .unsupported),
       ])
     }
 

@@ -1034,3 +1034,26 @@
 "Use Suggested Value" = "제안 값 사용";
 "Synthetic UI audit mode. Nothing is saved or applied." = "합성 UI 검토 모드입니다. 아무것도 저장하거나 적용하지 않습니다.";
 "System access is disabled for this synthetic review." = "이 합성 검토에서는 시스템 접근을 사용하지 않습니다.";
+
+/* 일부 캡처 상세 및 간소화한 시스템 설정 */
+"Why is this a partial capture?" = "왜 일부만 캡처되었나요?";
+"Applicable" = "적용 가능";
+"Usable settings were saved. The items below were kept as reference data or omitted without changing the Mac." = "사용 가능한 설정은 저장했습니다. 아래 항목은 Mac을 변경하지 않고 참고용으로 보관하거나 제외했습니다.";
+"Review System Settings" = "시스템 설정 확인";
+"%lld items" = "%lld개 항목";
+"This item was saved and can be applied." = "이 항목은 저장되었으며 적용할 수 있습니다.";
+"Saved for reference, but not applied because the current adapter cannot safely restore it." = "참고용으로 저장했지만 현재 어댑터가 안전하게 복원할 수 없어 적용하지 않습니다.";
+"macOS returned no compatible value, so this item was not added." = "macOS가 호환 가능한 값을 반환하지 않아 이 항목을 추가하지 않았습니다.";
+"macOS hid this value until the required permission is granted." = "필요한 권한을 허용할 때까지 macOS가 이 값을 숨겼습니다.";
+"The current adapter cannot safely capture or apply this item." = "현재 어댑터는 이 항목을 안전하게 캡처하거나 적용할 수 없습니다.";
+"Display rotation" = "디스플레이 회전";
+"Display active state" = "디스플레이 활성 상태";
+"Snapshot read" = "스냅샷 읽기";
+"This permanently removes %@ and discards its unsaved changes. This action cannot be undone." = "‘%@’ 프로필과 저장하지 않은 변경사항을 영구적으로 삭제합니다. 이 작업은 취소할 수 없습니다.";
+"System" = "시스템";
+"Troubleshooting" = "문제 해결";
+"Diagnostics are only needed when a capture or apply does not behave as expected. They contain redacted local status and no telemetry." = "진단은 캡처나 적용이 예상대로 동작하지 않을 때만 필요합니다. 민감 정보를 제거한 로컬 상태만 포함하며 텔레메트리는 없습니다.";
+"Open Advanced Diagnostics…" = "고급 진단 열기…";
+"Shows redacted local status, snapshot details, and recent events" = "민감 정보를 제거한 로컬 상태, 스냅샷 상세, 최근 이벤트를 표시합니다";
+"Advanced Diagnostics" = "고급 진단";
+"Done" = "완료";

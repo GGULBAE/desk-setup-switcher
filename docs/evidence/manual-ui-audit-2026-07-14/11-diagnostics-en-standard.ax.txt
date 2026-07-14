@@ -3,60 +3,91 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
     role=AXGroup title= description= value= help= enabled= actions=
       role=AXTabGroup title= description= value= help= enabled= actions=
         role=AXRadioButton title= description=Profiles value=0 help= enabled=1 actions=AXPress
-        role=AXRadioButton title= description=Permissions value=0 help= enabled=1 actions=AXPress
-        role=AXRadioButton title= description=Diagnostics value=1 help= enabled=1 actions=AXPress
+        role=AXRadioButton title= description=System value=1 help= enabled=1 actions=AXPress
         role=AXRadioButton title= description=About value=0 help= enabled=1 actions=AXPress
         role=AXGroup title= description= value= help= enabled= actions=
           role=AXScrollArea title= description= value= help= enabled= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+            role=AXHeading title= description=Login value= help= enabled=1 actions=
             role=AXGroup title= description= value= help= enabled=1 actions=
-              role=AXStaticText title= description= value=Last result help= enabled=1 actions=
-              role=AXStaticText title= description= value=Synthetic UI audit mode. Nothing is saved or applied. help= enabled=1 actions=AXShowMenu
-              role=AXStaticText title= description= value=Last snapshot help= enabled=1 actions=
-              role=AXStaticText title= description= value=System access is disabled for this synthetic review. help= enabled=1 actions=AXShowMenu
-              role=AXStaticText title= description= value=Storage help= enabled=1 actions=
-              role=AXStaticText title= description= value=Local Application Support only help= enabled=1 actions=AXShowMenu
-              role=AXStaticText title= description= value=Telemetry help= enabled=1 actions=
-              role=AXStaticText title= description= value=None help= enabled=1 actions=AXShowMenu
-              role=AXStaticText title= description= value=Live mutations help= enabled=1 actions=
-              role=AXStaticText title= description= value=User-confirmed only help= enabled=1 actions=AXShowMenu
-            role=AXHeading title= description=Readiness facts value= help= enabled=1 actions=
+              role=AXStaticText title= description= value=Launch Desk Setup Switcher at login help= enabled=1 actions=
+              role=AXCheckBox title= description= value=1 help= enabled=1 actions=AXPress
+              role=AXStaticText title= description= value=App setting help= enabled=1 actions=
+              role=AXStaticText title= description= value=On help= enabled=1 actions=AXShowMenu
+              role=AXStaticText title= description= value=macOS registration help= enabled=1 actions=
+              role=AXStaticText title= description= value=Not enabled help= enabled=1 actions=AXShowMenu
+              role=AXStaticText title= description= value=Login item status: Requested; approval is required in System Settings > General > Login Items. help= enabled=1 actions=
+              role=AXButton title= description=Refresh Status value= help= enabled=1 actions=AXPress
+              role=AXDisclosureTriangle title= description=Why can these states differ? value=0 help= enabled=1 actions=
+            role=AXHeading title= description=System permissions value= help= enabled=1 actions=
             role=AXGroup title= description= value= help= enabled=1 actions=
-              role=AXStaticText title= description= value=System access is disabled for this synthetic review. help= enabled=1 actions=
-              role=AXStaticText title= description= value=Last refreshed 11/15/2023, 7:13 AM help= enabled=1 actions=
-              role=AXButton title= description=Refresh Readiness value= help=Reads current system facts without changing any setting enabled=1 actions=AXPress
-              role=AXStaticText title= description= value=Connected displays help= enabled=1 actions=
-              role=AXStaticText title= description= value=0 detected help= enabled=1 actions=AXShowMenu
-              role=AXStaticText title= description= value=Wi-Fi SSID help= enabled=1 actions=
-              role=AXStaticText title= description= value=Unavailable help= enabled=1 actions=AXShowMenu
-              role=AXStaticText title= description= value=Ethernet help= enabled=1 actions=
-              role=AXStaticText title= description= value=Not connected help= enabled=1 actions=AXShowMenu
-              role=AXStaticText title= description= value=Cached location help= enabled=1 actions=
-              role=AXStaticText title= description= value=Unavailable help= enabled=1 actions=AXShowMenu
-              role=AXDisclosureTriangle title= description=Audio input UIDs (0) value=0 help= enabled=1 actions=
-              role=AXDisclosureTriangle title= description=Audio output UIDs (0) value=0 help= enabled=1 actions=
-              role=AXDisclosureTriangle title= description=USB hardware identifiers (0) value=0 help= enabled=1 actions=
-              role=AXDisclosureTriangle title= description=Local IP addresses (0) value=0 help= enabled=1 actions=
-            role=AXHeading title= description=Snapshot details value= help= enabled=1 actions=
+              role=AXStaticText title= description= value=macOS can require Location Services to reveal a Wi-Fi network name and evaluate a location readiness condition. Desk Setup Switcher does not track location continuously. help= enabled=1 actions=
+              role=AXStaticText title= description= value=Location help= enabled=1 actions=
+              role=AXStaticText title= description= value=Denied help= enabled=1 actions=AXShowMenu
+              role=AXButton title= description=Request Location Access value= help=Shows the macOS permission prompt only after this explanation enabled=1 actions=AXPress
+            role=AXHeading title= description=Troubleshooting value= help= enabled=1 actions=
             role=AXGroup title= description= value= help= enabled=1 actions=
-              role=AXStaticText title= description= value=Captured help= enabled=1 actions=
-              role=AXStaticText title= description= value=11/15/2023, 7:13 AM help= enabled=1 actions=AXShowMenu
-              role=AXDisclosureTriangle title= description=Displays value=0 help= enabled=1 actions=
-              role=AXDisclosureTriangle title= description=Audio value=0 help= enabled=1 actions=
-            role=AXHeading title= description=Redacted local events value= help= enabled=1 actions=
-            role=AXGroup title= description= value= help= enabled=1 actions=
-              role=AXStaticText title= description= value=No local diagnostic events. help= enabled=1 actions=
-              role=AXButton title= description=Refresh value= help= enabled=1 actions=AXPress
-              role=AXButton title= description=Clear Events… value= help= enabled=0 actions=AXPress
+              role=AXStaticText title= description= value=Diagnostics are only needed when a capture or apply does not behave as expected. They contain redacted local status and no telemetry. help= enabled=1 actions=
+              role=AXButton title= description=Open Advanced Diagnostics… value= help=Shows redacted local status, snapshot details, and recent events enabled=1 actions=AXPress
             role=AXScrollBar title= description= value=0 help= enabled=1 actions=
               role=AXValueIndicator title= description= value=0 help= enabled= actions=
               role=AXButton title= description= value= help= enabled= actions=AXPress
               role=AXButton title= description= value= help= enabled= actions=AXPress
               role=AXButton title= description= value= help= enabled= actions=AXPress
               role=AXButton title= description= value= help= enabled= actions=AXPress
-    role=AXButton title= description= value= help= enabled=1 actions=AXPress
-    role=AXButton title= description= value= help=this button also has an action to zoom the window enabled=1 actions=AXPress,AXZoomWindow,AXShowMenu
+    role=AXButton title= description= value= help= enabled=0 actions=AXPress
+    role=AXButton title= description= value= help= enabled=1 actions=AXPress,AXShowMenu
       role=AXGroup title= description= value= help= enabled= actions=
     role=AXButton title= description= value= help= enabled=1 actions=AXPress
+    role=AXSheet title= description= value= help= enabled= actions=AXRaise
+      role=AXGroup title= description= value= help= enabled= actions=
+        role=AXHeading title= description=Advanced Diagnostics value= help= enabled=1 actions=
+        role=AXButton title= description=Done value= help= enabled=1 actions=AXPress
+        role=AXScrollArea title= description= value= help= enabled= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+          role=AXGroup title= description= value= help= enabled=1 actions=
+            role=AXStaticText title= description= value=Last result help= enabled=1 actions=
+            role=AXStaticText title= description= value=Synthetic UI audit mode. Nothing is saved or applied. help= enabled=1 actions=AXShowMenu
+            role=AXStaticText title= description= value=Last snapshot help= enabled=1 actions=
+            role=AXStaticText title= description= value=System access is disabled for this synthetic review. help= enabled=1 actions=AXShowMenu
+            role=AXStaticText title= description= value=Storage help= enabled=1 actions=
+            role=AXStaticText title= description= value=Local Application Support only help= enabled=1 actions=AXShowMenu
+            role=AXStaticText title= description= value=Telemetry help= enabled=1 actions=
+            role=AXStaticText title= description= value=None help= enabled=1 actions=AXShowMenu
+            role=AXStaticText title= description= value=Live mutations help= enabled=1 actions=
+            role=AXStaticText title= description= value=User-confirmed only help= enabled=1 actions=AXShowMenu
+          role=AXHeading title= description=Readiness facts value= help= enabled=1 actions=
+          role=AXGroup title= description= value= help= enabled=1 actions=
+            role=AXStaticText title= description= value=System access is disabled for this synthetic review. help= enabled=1 actions=
+            role=AXStaticText title= description= value=Last refreshed 11/15/2023, 7:13 AM help= enabled=1 actions=
+            role=AXButton title= description=Refresh Readiness value= help=Reads current system facts without changing any setting enabled=1 actions=AXPress
+            role=AXStaticText title= description= value=Connected displays help= enabled=1 actions=
+            role=AXStaticText title= description= value=0 detected help= enabled=1 actions=AXShowMenu
+            role=AXStaticText title= description= value=Wi-Fi SSID help= enabled=1 actions=
+            role=AXStaticText title= description= value=Unavailable help= enabled=1 actions=AXShowMenu
+            role=AXStaticText title= description= value=Ethernet help= enabled=1 actions=
+            role=AXStaticText title= description= value=Not connected help= enabled=1 actions=AXShowMenu
+            role=AXStaticText title= description= value=Cached location help= enabled=1 actions=
+            role=AXStaticText title= description= value=Unavailable help= enabled=1 actions=AXShowMenu
+            role=AXDisclosureTriangle title= description=Audio input UIDs (0) value=0 help= enabled=1 actions=
+            role=AXDisclosureTriangle title= description=Audio output UIDs (0) value=0 help= enabled=1 actions=
+            role=AXDisclosureTriangle title= description=USB hardware identifiers (0) value=0 help= enabled=1 actions=
+            role=AXDisclosureTriangle title= description=Local IP addresses (0) value=0 help= enabled=1 actions=
+          role=AXHeading title= description=Snapshot details value= help= enabled=1 actions=
+          role=AXGroup title= description= value= help= enabled=1 actions=
+            role=AXStaticText title= description= value=Captured help= enabled=1 actions=
+            role=AXStaticText title= description= value=11/15/2023, 7:13 AM help= enabled=1 actions=AXShowMenu
+            role=AXDisclosureTriangle title= description=Displays value=0 help= enabled=1 actions=
+            role=AXDisclosureTriangle title= description=Audio value=0 help= enabled=1 actions=
+          role=AXHeading title= description=Redacted local events value= help= enabled=1 actions=
+          role=AXGroup title= description= value= help= enabled=1 actions=
+            role=AXStaticText title= description= value=No local diagnostic events. help= enabled=1 actions=
+            role=AXButton title= description=Refresh value= help= enabled=1 actions=AXPress
+            role=AXButton title= description=Clear Events… value= help= enabled=0 actions=AXPress
+          role=AXScrollBar title= description= value=0 help= enabled=1 actions=
+            role=AXValueIndicator title= description= value=0 help= enabled= actions=
+            role=AXButton title= description= value= help= enabled= actions=AXPress
+            role=AXButton title= description= value= help= enabled= actions=AXPress
+            role=AXButton title= description= value= help= enabled= actions=AXPress
+            role=AXButton title= description= value= help= enabled= actions=AXPress
   role=AXMenuBar title= description= value= help= enabled=1 actions=AXCancel
     role=AXMenuBarItem title=Apple description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
       role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
@@ -71,12 +102,10 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
             role=AXMenuItem title=응용 프로그램 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=ChatGPT description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘ChatGPT’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Mail description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘Mail’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=MapleStory description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘MapleStory’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Notion description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Notion’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=QuickTime Player description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘QuickTime Player’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Safari description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Safari’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Tabby description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
@@ -89,10 +118,12 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
             role=AXMenuItem title=Finder에서 ‘리그 오브 레전드’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=시스템 설정 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘시스템 설정’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=카카오톡 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘카카오톡’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=문서 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=6. AI 리포트.png description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘6. AI 리포트.png’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=annotated_1fps.mp4 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘annotated_1fps.mp4’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Desk-Setup-Switcher-0.1.0-unsigned.dmg description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Desk-Setup-Switcher-0.1.0-unsigned.dmg’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=NKeepCleaner description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
@@ -190,10 +221,10 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
         role=AXMenuItem title=Emoji & Symbols description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
     role=AXMenuBarItem title=View description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
       role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
-        role=AXMenuItem title=Enter Full Screen description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Enter Full Screen description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
     role=AXMenuBarItem title=Window description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
       role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
-        role=AXMenuItem title=Close description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Close description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
         role=AXMenuItem title=Close All description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
         role=AXMenuItem title=Minimize description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
         role=AXMenuItem title=Minimize All description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
@@ -228,10 +259,7 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
             role=AXMenuItem title=Quarters description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Return to Previous Size description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
-        role=AXMenuItem title=Full Screen Tile description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
-            role=AXMenuItem title=Left of Screen description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Right of Screen description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Full Screen Tile description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
         role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
         role=AXMenuItem title=Remove Window from Set description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
         role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick

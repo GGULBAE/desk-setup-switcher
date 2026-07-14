@@ -40,6 +40,11 @@ struct ProfileCaptureSummaryBuilderTests {
     )
 
     #expect(summary.status == .partial)
+    #expect(
+      summary.items.contains(
+        .init(group: .network, key: "wifi.ssid", disposition: .permissionRequired)
+      )
+    )
     #expect(summary.applicableCount == 5)
     #expect(summary.excludedCount == 3)
     #expect(summary.permissionRequiredCount == 1)
@@ -80,8 +85,34 @@ struct ProfileCaptureSummaryBuilderTests {
 
     #expect(summary.status == .failure)
     #expect(summary.unreadableCount == 1)
+    #expect(
+      summary.items.filter { $0.disposition == .unreadable }
+        == [.init(group: .display, key: "snapshot", disposition: .unreadable)]
+    )
     #expect(summary.savedCount == 0)
     #expect(summary.permissionRequiredCount == 0)
     #expect(summary.unsupportedCount == 0)
+  }
+
+  @Test("incomplete device evidence keeps no runtime identifier")
+  func incompleteDeviceEvidenceIsSanitized() {
+    let runtimeID = "6A1C2DD1-5FB0-4D83-A4FA-2FA127EDC978"
+    let summary = ProfileCaptureSummaryBuilder().summary(
+      settings: ProfileSettings(),
+      evidence: [
+        .init(
+          group: .display,
+          key: "display.\(runtimeID)",
+          state: .unreadable
+        )
+      ]
+    )
+
+    #expect(
+      summary.items == [
+        .init(group: .display, key: "display.settings", disposition: .unreadable)
+      ]
+    )
+    #expect(!summary.items.contains { $0.key.contains(runtimeID) })
   }
 }

@@ -3,8 +3,7 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
     role=AXGroup title= description= value= help= enabled= actions=
       role=AXTabGroup title= description= value= help= enabled= actions=
         role=AXRadioButton title= description=Profiles value=1 help= enabled=1 actions=AXPress
-        role=AXRadioButton title= description=Permissions value=0 help= enabled=1 actions=AXPress
-        role=AXRadioButton title= description=Diagnostics value=0 help= enabled=1 actions=AXPress
+        role=AXRadioButton title= description=System value=0 help= enabled=1 actions=AXPress
         role=AXRadioButton title= description=About value=0 help= enabled=1 actions=AXPress
         role=AXGroup title= description= value= help= enabled= actions=
           role=AXGroup title= description= value= help= enabled=1 actions=
@@ -26,65 +25,46 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
             role=AXButton title= description=Move selected profile up value= help=Move selected profile up enabled=0 actions=AXPress
             role=AXButton title= description=Move selected profile down value= help=Move selected profile down enabled=1 actions=AXPress
             role=AXScrollArea title= description= value= help= enabled= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
-              role=AXHeading title= description=Profile value= help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXStaticText title= description= value=Name help= enabled=1 actions=
-                role=AXTextField title= description=Profile name value=Focus Workspace — Display, Audio, Network & Input help= enabled=1 actions=AXShowMenu,AXConfirm
-                role=AXStaticText title= description= value=Description help= enabled=1 actions=
-                role=AXTextField title= description=Profile description value=A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata. help= enabled=1 actions=AXShowMenu,AXConfirm
-                role=AXStaticText title= description= value=Icon help= enabled=1 actions=
-                role=AXPopUpButton title= description=Profile icon value=Displays help= enabled=1 actions=AXPress
-                role=AXStaticText title= description= value=Enabled help= enabled=1 actions=
-                role=AXCheckBox title= description= value=1 help= enabled=1 actions=AXPress
-              role=AXHeading title= description=Settings value= help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXStaticText title= description= value=Use Include to choose what this profile applies. Expand a category to review or edit its saved values. help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=Displays value=Collapsed help=Expands or collapses this settings category enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Displays value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=Included · Built-in Retina Display · 1728 × 1117 at 60 Hz and 7 more help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=Audio value=Expanded help=Expands or collapses this settings category enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Audio value=1 help= enabled=1 actions=
-                role=AXButton title= description=Default input device value=Expanded help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Default input device value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=Device help= enabled=1 actions=
-                role=AXPopUpButton title= description= value=Synthetic Microphone help= enabled=1 actions=AXPress
-                role=AXDisclosureTriangle title= description=Advanced value=0 help= enabled=1 actions=
-                role=AXButton title= description=Default output device value=Expanded help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Default output device value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=Device help= enabled=1 actions=
-                role=AXPopUpButton title= description= value=Synthetic Speakers help= enabled=1 actions=AXPress
-                role=AXDisclosureTriangle title= description=Advanced value=0 help= enabled=1 actions=
-                role=AXButton title= description=System output device value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include System output device value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=Included · Synthetic Speakers help= enabled=1 actions=
-                role=AXButton title= description=Output volume value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Output volume value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=Included · 72% help= enabled=1 actions=
-                role=AXButton title= description=Output mute value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Output mute value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=Included · Off help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=Network value=Collapsed help=Expands or collapses this settings category enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Network value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=Included · On · Synthetic Studio help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=Mouse & Keyboard value=Collapsed help=Expands or collapses this settings category enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Mouse & Keyboard value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=Included · 4.5 · On and 3 more help= enabled=1 actions=
-              role=AXHeading title= description=Last application value= help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXStaticText title= description= value=Status help= enabled=1 actions=
-                role=AXStaticText title= description= value=Partial help= enabled=1 actions=AXShowMenu
-                role=AXStaticText title= description= value=Time help= enabled=1 actions=
-                role=AXStaticText title= description= value=11/15/2023, 7:13 AM help= enabled=1 actions=AXShowMenu
-                role=AXUnknown title= description=Audio, Output volume, Succeeded, The saved target was applied. value= help= enabled=1 actions=Name:show menu
-Target:0x0
-Selector:(null)
-                role=AXUnknown title= description=Network, Wi-Fi network, Skipped, Read-back was unavailable. value= help= enabled=1 actions=Name:show menu
-Target:0x0
-Selector:(null)
+              role=AXOpaqueProviderGroup title= description= value= help= enabled=1 actions=AXScrollToTop,AXScrollToBottom
+                role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXHeading title= description=Profile value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXTextField title= description=Profile name value=Focus Workspace — Display, Audio, Network & Input help= enabled=1 actions=AXShowMenu,AXConfirm,AXScrollToVisible
+                  role=AXTextField title= description=Profile description value=A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata. help= enabled=1 actions=AXShowMenu,AXConfirm,AXScrollToVisible
+                  role=AXStaticText title= description= value=Icon help= enabled=1 actions=AXScrollToVisible
+                  role=AXPopUpButton title= description=Profile icon value=Displays help= enabled=1 actions=AXPress,AXScrollToVisible
+                  role=AXCheckBox title= description=Enabled value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                role=AXHeading title= description=Settings value= help= enabled=1 actions=AXScrollToVisible
+                role=AXStaticText title= description= value=Use Include to choose what this profile applies. Expand a category to review or edit its saved values. help= enabled=1 actions=AXScrollToVisible
+                role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXButton title= description=Displays value=Collapsed help=Expands or collapses this settings category enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Displays value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= value=Included · Built-in Retina Display · 1728 × 1117 at 60 Hz and 7 more help= enabled=1 actions=AXScrollToVisible
+                role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXButton title= description=Audio value=Expanded help=Expands or collapses this settings category enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Audio value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXButton title= description=Default input device value=Expanded help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Default input device value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= value=Device help= enabled=1 actions=AXScrollToVisible
+                  role=AXPopUpButton title= description= value=Synthetic Microphone help= enabled=1 actions=AXPress,AXScrollToVisible
+                  role=AXDisclosureTriangle title= description=Advanced value=0 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXButton title= description=Default output device value=Expanded help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Default output device value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= value=Device help= enabled=1 actions=AXScrollToVisible
+                  role=AXPopUpButton title= description= value=Synthetic Speakers help= enabled=1 actions=AXPress,AXScrollToVisible
+                  role=AXDisclosureTriangle title= description=Advanced value=0 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXButton title= description=System output device value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include System output device value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= value=Included · Synthetic Speakers help= enabled=1 actions=AXScrollToVisible
+                  role=AXButton title= description=Output volume value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Output volume value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= value=Included · 72% help= enabled=1 actions=AXScrollToVisible
+                  role=AXButton title= description=Output mute value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Output mute value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= value=Included · Off help= enabled=1 actions=AXScrollToVisible
+                role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXButton title= description=Network value=Collapsed help=Expands or collapses this settings category enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Network value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= value=Included · On · Synthetic Studio help= enabled=1 actions=AXScrollToVisible
               role=AXScrollBar title= description= value=0 help= enabled=1 actions=
                 role=AXValueIndicator title= description= value=0 help= enabled= actions=
                 role=AXButton title= description= value= help= enabled= actions=AXPress
@@ -116,12 +96,10 @@ Selector:(null)
             role=AXMenuItem title=응용 프로그램 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=ChatGPT description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘ChatGPT’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Mail description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘Mail’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=MapleStory description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘MapleStory’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Notion description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Notion’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=QuickTime Player description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘QuickTime Player’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Safari description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Safari’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Tabby description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
@@ -134,10 +112,12 @@ Selector:(null)
             role=AXMenuItem title=Finder에서 ‘리그 오브 레전드’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=시스템 설정 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘시스템 설정’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=카카오톡 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘카카오톡’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=문서 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=6. AI 리포트.png description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘6. AI 리포트.png’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=annotated_1fps.mp4 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘annotated_1fps.mp4’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Desk-Setup-Switcher-0.1.0-unsigned.dmg description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Desk-Setup-Switcher-0.1.0-unsigned.dmg’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=NKeepCleaner description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick

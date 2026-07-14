@@ -3,8 +3,7 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
     role=AXGroup title= description= value= help= enabled= actions=
       role=AXTabGroup title= description= value= help= enabled= actions=
         role=AXRadioButton title= description=프로필 value=0 help= enabled=1 actions=AXPress
-        role=AXRadioButton title= description=권한 value=1 help= enabled=1 actions=AXPress
-        role=AXRadioButton title= description=진단 value=0 help= enabled=1 actions=AXPress
+        role=AXRadioButton title= description=시스템 value=1 help= enabled=1 actions=AXPress
         role=AXRadioButton title= description=앱 정보 value=0 help= enabled=1 actions=AXPress
         role=AXGroup title= description= value= help= enabled= actions=
           role=AXScrollArea title= description= value= help= enabled= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
@@ -25,6 +24,16 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
               role=AXStaticText title= description= value=위치 help= enabled=1 actions=
               role=AXStaticText title= description= value=거부됨 help= enabled=1 actions=AXShowMenu
               role=AXButton title= description=위치 접근 요청 value= help=이 설명을 표시한 후에만 macOS 권한 요청을 표시합니다 enabled=1 actions=AXPress
+            role=AXHeading title= description=문제 해결 value= help= enabled=1 actions=
+            role=AXGroup title= description= value= help= enabled=1 actions=
+              role=AXStaticText title= description= value=진단은 캡처나 적용이 예상대로 동작하지 않을 때만 필요합니다. 민감 정보를 제거한 로컬 상태만 포함하며 텔레메트리는 없습니다. help= enabled=1 actions=
+              role=AXButton title= description=고급 진단 열기… value= help=민감 정보를 제거한 로컬 상태, 스냅샷 상세, 최근 이벤트를 표시합니다 enabled=1 actions=AXPress
+            role=AXScrollBar title= description= value=0 help= enabled=1 actions=
+              role=AXValueIndicator title= description= value=0 help= enabled= actions=
+              role=AXButton title= description= value= help= enabled= actions=AXPress
+              role=AXButton title= description= value= help= enabled= actions=AXPress
+              role=AXButton title= description= value= help= enabled= actions=AXPress
+              role=AXButton title= description= value= help= enabled= actions=AXPress
     role=AXButton title= description= value= help= enabled=1 actions=AXPress
     role=AXButton title= description= value= help=이 버튼을 누르면 윈도우를 확대/축소합니다. enabled=1 actions=AXPress,AXZoomWindow,AXShowMenu
       role=AXGroup title= description= value= help= enabled= actions=
@@ -47,14 +56,14 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
             role=AXMenuItem title=Finder에서 ‘리그 오브 레전드’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=시스템 설정 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘시스템 설정’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=카카오톡 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘카카오톡’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=ChatGPT description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘ChatGPT’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Mail description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘Mail’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=MapleStory description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘MapleStory’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Notion description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Notion’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=QuickTime Player description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘QuickTime Player’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Safari description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Safari’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Tabby description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
@@ -63,10 +72,10 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
             role=AXMenuItem title=Finder에서 ‘Visual Studio Code’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=문서 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=6. AI 리포트.png description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘6. AI 리포트.png’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=과학_G6-G7-6월_2026-07-04_cQNMVz4SqC95GoTW2skQ.mp4 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘과학_G6-G7-6월_2026-07-04_cQNMVz4SqC95GoTW2skQ.mp4’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=annotated_1fps.mp4 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘annotated_1fps.mp4’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Desk-Setup-Switcher-0.1.0-unsigned.dmg description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Desk-Setup-Switcher-0.1.0-unsigned.dmg’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=NKeepCleaner description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick

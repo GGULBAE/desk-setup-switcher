@@ -3,8 +3,7 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
     role=AXGroup title= description= value= help= enabled= actions=
       role=AXTabGroup title= description= value= help= enabled= actions=
         role=AXRadioButton title= description=Profiles value=1 help= enabled=1 actions=AXPress
-        role=AXRadioButton title= description=Permissions value=0 help= enabled=1 actions=AXPress
-        role=AXRadioButton title= description=Diagnostics value=0 help= enabled=1 actions=AXPress
+        role=AXRadioButton title= description=System value=0 help= enabled=1 actions=AXPress
         role=AXRadioButton title= description=About value=0 help= enabled=1 actions=AXPress
         role=AXGroup title= description= value= help= enabled= actions=
           role=AXGroup title= description= value= help= enabled=1 actions=
@@ -26,94 +25,65 @@ role=AXApplication title=Desk Setup Switcher description= value= help= enabled= 
             role=AXButton title= description=Move selected profile up value= help=Move selected profile up enabled=0 actions=AXPress
             role=AXButton title= description=Move selected profile down value= help=Move selected profile down enabled=1 actions=AXPress
             role=AXScrollArea title= description= value= help= enabled= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
-              role=AXHeading title= description=Profile value= help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXStaticText title= description= value=Name help= enabled=1 actions=
-                role=AXTextField title= description=Profile name value=Validation Sample help= enabled=1 actions=AXShowMenu,AXConfirm
-                role=AXStaticText title= description= value=Description help= enabled=1 actions=
-                role=AXTextField title= description=Profile description value=A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata. help= enabled=1 actions=AXShowMenu,AXConfirm
-                role=AXStaticText title= description= value=Icon help= enabled=1 actions=
-                role=AXPopUpButton title= description=Profile icon value=Displays help= enabled=1 actions=AXPress
-                role=AXStaticText title= description= value=Enabled help= enabled=1 actions=
-                role=AXCheckBox title= description= value=1 help= enabled=1 actions=AXPress
-              role=AXHeading title= description=Review Before Saving value= help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXStaticText title= description= value=Profile validation failed help=Review the first issue or choose a highlighted field enabled=1 actions=
-                role=AXButton title= description=First validation issue: Choose one primary display. value= help=Moves keyboard focus to the invalid field enabled=1 actions=AXPress
-              role=AXHeading title= description=Settings value= help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXStaticText title= description= value=Use Include to choose what this profile applies. Expand a category to review or edit its saved values. help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=Displays value=Expanded help=Expands or collapses this settings category enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Displays value=1 help= enabled=1 actions=
-                role=AXButton title= description=Primary display value=Expanded help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Primary display value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=Primary display help= enabled=1 actions=
-                role=AXPopUpButton title= description= value=Choose a display help=Invalid value. Choose one primary display. enabled=1 actions=AXPress
-                role=AXStaticText title= description= value=Select the display that should anchor the desktop. help= enabled=1 actions=
-                role=AXButton title= description=Validation error: Choose one primary display. value= help=Moves keyboard focus to the invalid field enabled=1 actions=AXPress
-                role=AXGroup title= description= value= help= enabled=1 actions=
-                  role=AXHeading title= description=Built-in Retina Display value= help= enabled=1 actions=
-                  role=AXButton title= description=Position value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                  role=AXCheckBox title= description=Include Position value=1 help= enabled=1 actions=
-                  role=AXStaticText title= description= value=Included · 0, 0 help= enabled=1 actions=
-                  role=AXButton title= description=Mirroring value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                  role=AXCheckBox title= description=Include Mirroring value=1 help= enabled=1 actions=
-                  role=AXStaticText title= description= value=Included · Extended desktop help= enabled=1 actions=
-                  role=AXButton title= description=Resolution and refresh rate value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                  role=AXCheckBox title= description=Include Resolution and refresh rate value=1 help= enabled=1 actions=
-                  role=AXStaticText title= description= value=Included · 1728×1117 · 60 Hz · 3,456×2,234 pixels help= enabled=1 actions=
-                  role=AXGroup title= description= value= help= enabled=1 actions=
-                    role=AXHeading title= description=Snapshot only value= help= enabled=1 actions=
-                    role=AXStaticText title= description= value=Rotation help= enabled=1 actions=
-                    role=AXStaticText title= description= value=0° help= enabled=1 actions=AXShowMenu
-                    role=AXStaticText title= description= value=Active state help= enabled=1 actions=
-                    role=AXStaticText title= description= value=Active help= enabled=1 actions=AXShowMenu
-                    role=AXStaticText title= description= value=This display value is preserved for snapshots, but the current adapter does not apply it. help= enabled=1 actions=
-                role=AXGroup title= description= value= help= enabled=1 actions=
-                  role=AXHeading title= description=Synthetic Wide Display value= help= enabled=1 actions=
-                  role=AXButton title= description=Position value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                  role=AXCheckBox title= description=Include Position value=1 help= enabled=1 actions=
-                  role=AXStaticText title= description= value=Included · 1728, 0 help= enabled=1 actions=
-                  role=AXButton title= description=Mirroring value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                  role=AXCheckBox title= description=Include Mirroring value=0 help= enabled=1 actions=
-                  role=AXStaticText title= description= value=Excluded · Extended desktop help= enabled=1 actions=
-                  role=AXButton title= description=Resolution and refresh rate value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXPress
-                  role=AXCheckBox title= description=Include Resolution and refresh rate value=1 help= enabled=1 actions=
-                  role=AXStaticText title= description= value=Included · 2560×1440 · 60 Hz help= enabled=1 actions=
-                  role=AXGroup title= description= value= help= enabled=1 actions=
-                    role=AXHeading title= description=Snapshot only value= help= enabled=1 actions=
-                    role=AXStaticText title= description= value=Rotation help= enabled=1 actions=
-                    role=AXStaticText title= description= value=0° help= enabled=1 actions=AXShowMenu
-                    role=AXStaticText title= description= value=Active state help= enabled=1 actions=
-                    role=AXStaticText title= description= value=Active help= enabled=1 actions=AXShowMenu
-                    role=AXStaticText title= description= value=This display value is preserved for snapshots, but the current adapter does not apply it. help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=Audio value=Collapsed help=Expands or collapses this settings category enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Audio value=1 help= enabled=1 actions=
-                role=AXButton title= description=Validation error: Choose a value. value= help=Moves keyboard focus to the invalid field enabled=1 actions=AXPress
-                role=AXStaticText title= description= value=Included · Selected output device — Device name unavailable · 72% and 3 more help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=Network value=Collapsed help=Expands or collapses this settings category enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Network value=1 help= enabled=1 actions=
-                role=AXButton title= description=Validation error: Enter a value. value= help=Moves keyboard focus to the invalid field enabled=1 actions=AXPress
-                role=AXStaticText title= description= value=Included · On · Value unavailable help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXButton title= description=Mouse & Keyboard value=Collapsed help=Expands or collapses this settings category enabled=1 actions=AXPress
-                role=AXCheckBox title= description=Include Mouse & Keyboard value=1 help= enabled=1 actions=
-                role=AXStaticText title= description= value=Included · 4.5 · On and 3 more help= enabled=1 actions=
-              role=AXHeading title= description=Last application value= help= enabled=1 actions=
-              role=AXGroup title= description= value= help= enabled=1 actions=
-                role=AXStaticText title= description= value=Status help= enabled=1 actions=
-                role=AXStaticText title= description= value=Partial help= enabled=1 actions=AXShowMenu
-                role=AXStaticText title= description= value=Time help= enabled=1 actions=
-                role=AXStaticText title= description= value=11/15/2023, 7:13 AM help= enabled=1 actions=AXShowMenu
-                role=AXUnknown title= description=Audio, Output volume, Succeeded, The saved target was applied. value= help= enabled=1 actions=Name:show menu
-Target:0x0
-Selector:(null)
-                role=AXUnknown title= description=Network, Wi-Fi network, Skipped, Read-back was unavailable. value= help= enabled=1 actions=Name:show menu
-Target:0x0
-Selector:(null)
+              role=AXOpaqueProviderGroup title= description= value= help= enabled=1 actions=AXScrollToTop,AXScrollToBottom
+                role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXHeading title= description=Profile value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXTextField title= description=Profile name value=Validation Sample help= enabled=1 actions=AXShowMenu,AXConfirm,AXScrollToVisible
+                  role=AXTextField title= description=Profile description value=A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata. help= enabled=1 actions=AXShowMenu,AXConfirm,AXScrollToVisible
+                  role=AXStaticText title= description= value=Icon help= enabled=1 actions=AXScrollToVisible
+                  role=AXPopUpButton title= description=Profile icon value=Displays help= enabled=1 actions=AXPress,AXScrollToVisible
+                  role=AXCheckBox title= description=Enabled value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXHeading title= description=Review Before Saving value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXStaticText title= description= value=Profile validation failed help=Review the first issue or choose a highlighted field enabled=1 actions=AXScrollToVisible
+                  role=AXButton title= description=First validation issue: Choose one primary display. value= help=Moves keyboard focus to the invalid field enabled=1 actions=AXScrollToVisible,AXPress
+                role=AXHeading title= description=Settings value= help= enabled=1 actions=AXScrollToVisible
+                role=AXStaticText title= description= value=Use Include to choose what this profile applies. Expand a category to review or edit its saved values. help= enabled=1 actions=AXScrollToVisible
+                role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                  role=AXButton title= description=Displays value=Expanded help=Expands or collapses this settings category enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Displays value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXButton title= description=Primary display value=Expanded help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Primary display value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= value=Primary display help= enabled=1 actions=AXScrollToVisible
+                  role=AXPopUpButton title= description= value=Choose a display help=Invalid value. Choose one primary display. enabled=1 actions=AXPress,AXScrollToVisible
+                  role=AXStaticText title= description= value=Select the display that should anchor the desktop. help= enabled=1 actions=AXScrollToVisible
+                  role=AXButton title= description=Validation error: Choose one primary display. value= help=Moves keyboard focus to the invalid field enabled=1 actions=AXScrollToVisible,AXPress
+                  role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                    role=AXHeading title= description=Built-in Retina Display value= help= enabled=1 actions=AXScrollToVisible
+                    role=AXButton title= description=Position value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXCheckBox title= description=Include Position value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXStaticText title= description= value=Included · 0, 0 help= enabled=1 actions=AXScrollToVisible
+                    role=AXButton title= description=Mirroring value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXCheckBox title= description=Include Mirroring value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXStaticText title= description= value=Included · Extended desktop help= enabled=1 actions=AXScrollToVisible
+                    role=AXButton title= description=Resolution and refresh rate value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXCheckBox title= description=Include Resolution and refresh rate value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXStaticText title= description= value=Included · 1728×1117 · 60 Hz · 3,456×2,234 pixels help= enabled=1 actions=AXScrollToVisible
+                    role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                      role=AXHeading title= description=Snapshot only value= help= enabled=1 actions=AXScrollToVisible
+                      role=AXStaticText title= description= value=Rotation help= enabled=1 actions=AXScrollToVisible
+                      role=AXStaticText title= description= value=0° help= enabled=1 actions=AXScrollToVisible
+                      role=AXStaticText title= description= value=Active state help= enabled=1 actions=AXScrollToVisible
+                      role=AXStaticText title= description= value=Active help= enabled=1 actions=AXScrollToVisible
+                      role=AXStaticText title= description= value=This display value is preserved for snapshots, but the current adapter does not apply it. help= enabled=1 actions=AXScrollToVisible
+                  role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                    role=AXHeading title= description=Synthetic Wide Display value= help= enabled=1 actions=AXScrollToVisible
+                    role=AXButton title= description=Position value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXCheckBox title= description=Include Position value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXStaticText title= description= value=Included · 1728, 0 help= enabled=1 actions=AXScrollToVisible
+                    role=AXButton title= description=Mirroring value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXCheckBox title= description=Include Mirroring value=0 help= enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXStaticText title= description= value=Excluded · Extended desktop help= enabled=1 actions=AXScrollToVisible
+                    role=AXButton title= description=Resolution and refresh rate value=Collapsed help=Expands or collapses this setting's target value enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXCheckBox title= description=Include Resolution and refresh rate value=1 help= enabled=1 actions=AXScrollToVisible,AXPress
+                    role=AXStaticText title= description= value=Included · 2560×1440 · 60 Hz help= enabled=1 actions=AXScrollToVisible
+                    role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+                      role=AXHeading title= description=Snapshot only value= help= enabled=1 actions=AXScrollToVisible
+                      role=AXStaticText title= description= value=Rotation help= enabled=1 actions=AXScrollToVisible
+                      role=AXStaticText title= description= value=0° help= enabled=1 actions=AXScrollToVisible
+                      role=AXStaticText title= description= value=Active state help= enabled=1 actions=AXScrollToVisible
+                      role=AXStaticText title= description= value=Active help= enabled=1 actions=AXScrollToVisible
+                      role=AXStaticText title= description= value=This display value is preserved for snapshots, but the current adapter does not apply it. help= enabled=1 actions=AXScrollToVisible
               role=AXScrollBar title= description= value=0 help= enabled=1 actions=
                 role=AXValueIndicator title= description= value=0 help= enabled= actions=
                 role=AXButton title= description= value= help= enabled= actions=AXPress
@@ -145,12 +115,10 @@ Selector:(null)
             role=AXMenuItem title=응용 프로그램 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=ChatGPT description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘ChatGPT’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Mail description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘Mail’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=MapleStory description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘MapleStory’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Notion description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Notion’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=QuickTime Player description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘QuickTime Player’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Safari description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Safari’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Tabby description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
@@ -163,10 +131,12 @@ Selector:(null)
             role=AXMenuItem title=Finder에서 ‘리그 오브 레전드’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=시스템 설정 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘시스템 설정’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=카카오톡 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘카카오톡’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=문서 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=6. AI 리포트.png description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
-            role=AXMenuItem title=Finder에서 ‘6. AI 리포트.png’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=annotated_1fps.mp4 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘annotated_1fps.mp4’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Desk-Setup-Switcher-0.1.0-unsigned.dmg description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=Finder에서 ‘Desk-Setup-Switcher-0.1.0-unsigned.dmg’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
             role=AXMenuItem title=NKeepCleaner description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
