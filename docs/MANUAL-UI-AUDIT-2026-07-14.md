@@ -37,6 +37,20 @@ The required same-window 980→680→980 interaction still needs an explicit use
 
 The later inline-delete-confirmation correction is source/build verified but is not depicted in these 12 static captures. Its confirmation is deliberately part of the profile card rather than a system dialog, avoiding the observed MenuBarExtra dismissal, and its list viewport now reserves additional height while confirmation is open to avoid clipping either action. The later capture-permission correction is also absent: current source explains and requests undetermined Location access, routes denied access to macOS System Settings or an explicit Wi-Fi-free path, and omits snapshot-only/unreadable/unsupported noise from the result card. Injected tests cover these actions without live TCC mutation. User-driven delete and TCC click-throughs remain the appropriate final interaction checks.
 
+## Current capture-permission click-through
+
+This check is intentionally user-driven. Do not use UI automation, AX actions, AppleScript, or an automated TCC reset. Start from the installed package with DMG SHA-256 `8760d68754f3bc1eebca37319bd0d2bfc29b6b3d90832532e0a64cd072506a9b`. Record only pass/fail and visible generic state text; do not record or screenshot an actual SSID, IP address, location, or device identifier.
+
+1. Record the current Desk Setup Switcher Location permission so it can be restored afterward.
+2. If the app is already denied or restricted, select **Capture**. Confirm that the explanation offers **Open macOS System Settings**, **Capture Without Wi-Fi**, and **Cancel** without displaying a Wi-Fi name.
+3. Select **Capture Without Wi-Fi**. Confirm that applicable settings are captured and that snapshot-only, unreadable, unsupported, and network-service-order categories do not appear as partial-capture errors.
+4. Repeat **Capture**, then select **Open macOS System Settings**. Confirm that System Settings opens; navigate manually to Privacy & Security > Location Services. The app deliberately uses the public application-open path rather than a private preference-pane URL.
+5. Grant Location access, return to the app, and select **Capture** again. When Wi-Fi is connected and macOS exposes its name, confirm that the current Wi-Fi option can be captured and no permission-needed card remains. A disconnected interface or a still-hidden name must remain nonfatal and must not block unrelated settings.
+6. On a clean account where authorization is genuinely **Not Determined**, select **Capture**, verify the app's purpose explanation appears before the macOS prompt, then choose the intended macOS response. If this Mac is already determined, record this branch as not run instead of resetting TCC automatically.
+7. Restore the original Location permission. Delete any temporary profile through the app if it is no longer needed.
+
+This read-only capture check must not apply a profile or change display, audio, network, mouse, or keyboard settings. Completing only the denied branch does not prove the first-request prompt or granted Wi-Fi behavior; record each branch independently.
+
 ## Evidence boundary and pending checks
 
 The synthetic host is evidence for the contained SwiftUI content only. It does not prove the actual MenuBarExtra chrome, status-item anchor, or menu placement. The optional DEBUG-only synthetic MenuBarExtra path suppresses production dependencies, but its gear-button click and Settings reactivation require a user's direct click.
