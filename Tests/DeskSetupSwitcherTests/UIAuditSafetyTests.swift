@@ -144,6 +144,28 @@ import Testing
       #expect(recorder.invocations == ["settings"])
       #expect(controller.lastError == nil)
     }
+
+    @Test("tray permission actions establish a stable settings window before system UI")
+    func permissionActionUsesStableSettingsWindow() async {
+      var events: [String] = []
+      let coordinator = StablePermissionActionCoordinator(
+        presentSettings: {
+          events.append("app-settings")
+        },
+        waitForPresentation: {
+          events.append("presentation-settled")
+        }
+      )
+
+      let task = coordinator.perform {
+        events.append("system-permission-action")
+      }
+
+      #expect(events == ["app-settings"])
+      await task.value
+      #expect(
+        events == ["app-settings", "presentation-settled", "system-permission-action"])
+    }
   }
 
   private actor RecordingConditionReaders: ConditionDisplayReading, ConditionAudioReading,

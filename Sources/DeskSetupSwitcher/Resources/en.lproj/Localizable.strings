@@ -1063,6 +1063,9 @@
 "Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere." = "Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere.";
 "Location Access Is Off" = "Location Access Is Off";
 "Open macOS System Settings" = "Open macOS System Settings";
+"Opens macOS System Settings to change Location access" = "Opens macOS System Settings to change Location access";
+"Refreshes the current location used by readiness checks" = "Refreshes the current location used by readiness checks";
+"After changing Location access, return to the menu bar and capture again." = "After changing Location access, return to the menu bar and capture again.";
 "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi." = "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi.";
 "macOS System Settings could not be opened." = "macOS System Settings could not be opened.";
 "Captured %lld applicable settings. Location access is needed to include the current Wi-Fi network." = "Captured %lld applicable settings. Location access is needed to include the current Wi-Fi network.";

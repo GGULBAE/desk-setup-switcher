@@ -373,7 +373,7 @@ private struct MenuContentView: View {
         Task { await performCapture() }
       }
       Button("Continue") {
-        Task { await requestLocationAccessAndCapture() }
+        requestLocationAccessAndCaptureFromStableWindow()
       }
       Button("Cancel", role: .cancel) {}
     } message: {
@@ -383,7 +383,7 @@ private struct MenuContentView: View {
     }
     .alert("Location Access Is Off", isPresented: $isCaptureLocationSettingsPresented) {
       Button("Open macOS System Settings") {
-        locationPermission.openSystemSettings()
+        openLocationSystemSettingsFromStableWindow()
       }
       Button("Capture Without Wi-Fi") {
         Task { await performCapture() }
@@ -614,6 +614,28 @@ private struct MenuContentView: View {
       await performCapture()
       return
     }
+  }
+
+  private func requestLocationAccessAndCaptureFromStableWindow() {
+    stablePermissionActionCoordinator.perform {
+      await requestLocationAccessAndCapture()
+    }
+  }
+
+  private func requestLocationAccessFromStableWindow() {
+    stablePermissionActionCoordinator.perform {
+      locationPermission.requestAccess()
+    }
+  }
+
+  private func openLocationSystemSettingsFromStableWindow() {
+    stablePermissionActionCoordinator.perform {
+      locationPermission.openSystemSettings()
+    }
+  }
+
+  private var stablePermissionActionCoordinator: StablePermissionActionCoordinator {
+    StablePermissionActionCoordinator(presentSettings: presentSystemSettings)
   }
 
   private func editProfile(_ profile: DeskProfile) {
@@ -878,14 +900,14 @@ private struct MenuContentView: View {
 
   private func presentSettings() {
     selectedSettingsTab = .profiles
-    NSApplication.shared.activate(ignoringOtherApps: true)
     openSettings()
+    NSApplication.shared.activate(ignoringOtherApps: true)
   }
 
   private func presentSystemSettings() {
     selectedSettingsTab = .system
-    NSApplication.shared.activate(ignoringOtherApps: true)
     openSettings()
+    NSApplication.shared.activate(ignoringOtherApps: true)
   }
 
   private func saveDraftThenCaptureCurrentSettings() async {
@@ -1037,9 +1059,9 @@ private struct MenuContentView: View {
   private func handleCapturePermissionAction() {
     switch locationPermission.authorizationStatus {
     case .notDetermined:
-      isCaptureLocationExplanationPresented = true
+      requestLocationAccessFromStableWindow()
     case .denied, .restricted:
-      locationPermission.openSystemSettings()
+      openLocationSystemSettingsFromStableWindow()
     case .authorizedAlways, .authorized:
       presentSystemSettings()
     @unknown default:
@@ -1814,6 +1836,35 @@ private struct SafetyConfirmationView: View {
   }
 }
 
+@MainActor
+struct StablePermissionActionCoordinator {
+  typealias PresentationWait = @MainActor () async -> Void
+
+  private let presentSettings: @MainActor () -> Void
+  private let waitForPresentation: PresentationWait
+
+  init(
+    presentSettings: @escaping @MainActor () -> Void,
+    waitForPresentation: @escaping PresentationWait = {
+      try? await Task.sleep(for: .milliseconds(250))
+    }
+  ) {
+    self.presentSettings = presentSettings
+    self.waitForPresentation = waitForPresentation
+  }
+
+  @discardableResult
+  func perform(
+    _ action: @escaping @MainActor () async -> Void
+  ) -> Task<Void, Never> {
+    presentSettings()
+    return Task { @MainActor in
+      await waitForPresentation()
+      await action()
+    }
+  }
+}
+
 private enum SettingsTab: Hashable {
   case profiles
   case system
@@ -1907,13 +1958,15 @@ private struct SystemSettingsView: View {
           "macOS can require Location Services to reveal a Wi-Fi network name and evaluate a location readiness condition. Desk Setup Switcher does not track location continuously."
         )
         LabeledContent("Location", value: locationPermission.statusText)
-        Button(
-          locationPermission.isAuthorized
-            ? appLocalized("Refresh Current Location") : appLocalized("Request Location Access")
-        ) {
-          locationPermission.requestAccess()
+        Button(locationPermissionActionTitle) {
+          performLocationPermissionAction()
         }
-        .accessibilityHint("Shows the macOS permission prompt only after this explanation")
+        .accessibilityHint(locationPermissionActionHint)
+        if !locationPermission.isAuthorized {
+          Text("After changing Location access, return to the menu bar and capture again.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
       }
 
       Section("Troubleshooting") {
@@ -1942,6 +1995,43 @@ private struct SystemSettingsView: View {
 
   private var loginItemStatesDiffer: Bool {
     model.launchAtLoginDesired != model.loginItemEnabled
+  }
+
+  private var locationPermissionActionTitle: String {
+    switch locationPermission.authorizationStatus {
+    case .notDetermined:
+      appLocalized("Request Location Access")
+    case .denied, .restricted:
+      appLocalized("Open macOS System Settings")
+    case .authorizedAlways, .authorized:
+      appLocalized("Refresh Current Location")
+    @unknown default:
+      appLocalized("Open macOS System Settings")
+    }
+  }
+
+  private var locationPermissionActionHint: String {
+    switch locationPermission.authorizationStatus {
+    case .notDetermined:
+      appLocalized("Shows the macOS permission prompt only after this explanation")
+    case .denied, .restricted:
+      appLocalized("Opens macOS System Settings to change Location access")
+    case .authorizedAlways, .authorized:
+      appLocalized("Refreshes the current location used by readiness checks")
+    @unknown default:
+      appLocalized("Opens macOS System Settings to change Location access")
+    }
+  }
+
+  private func performLocationPermissionAction() {
+    switch locationPermission.authorizationStatus {
+    case .notDetermined, .authorizedAlways, .authorized:
+      locationPermission.requestAccess()
+    case .denied, .restricted:
+      locationPermission.openSystemSettings()
+    @unknown default:
+      locationPermission.openSystemSettings()
+    }
   }
 }
 
