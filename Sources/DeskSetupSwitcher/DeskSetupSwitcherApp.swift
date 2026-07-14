@@ -902,7 +902,9 @@ private struct MenuContentView: View {
   }
 
   private var profileListHeight: CGFloat {
-    min(max(CGFloat(enabledProfiles.count) * 132, 124), 360)
+    let baseHeight = min(max(CGFloat(enabledProfiles.count) * 132, 124), 360)
+    let deletionConfirmationAllowance: CGFloat = profilePendingDeletion == nil ? 0 : 72
+    return min(baseHeight + deletionConfirmationAllowance, 360)
   }
 
   private func captureResultBanner(_ summary: ProfileCaptureSummary) -> some View {
