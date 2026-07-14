@@ -1,0 +1,28 @@
+Installed permission-handoff interaction — 2026-07-14
+
+Source and package
+- Source commit: 600d6f77c6180d4f7d58f950111d7db55393fdb4
+- Installed package DMG SHA-256: df674b37e2a2fe9a94d37435313265069e27f6130ae05ad02b8ae822ac00e8b6
+- The installed app was the universal, ad-hoc-signed bundle already verified from that package.
+
+Authorization and safety boundary
+- The user explicitly authorized one scoped automatic interaction with the installed menu-bar app.
+- The interaction was limited to Capture, the app-owned privacy explanation, Continue, Settings open/close/reopen, and read-only accessibility inspection.
+- No profile was applied. No display, audio, network, mouse, keyboard, login-item, Keychain, or TCC setting was changed.
+- TCC was not reset, and no macOS grant or deny choice was made.
+- No SSID, IP address, exact location, device identifier, profile name, or user path was retained.
+
+Observed installed behavior
+- The actual status item exposed the Capture and Settings controls.
+- Selecting Capture displayed the app-owned Location purpose explanation with Continue, Cancel, and a Wi-Fi-free capture choice.
+- Selecting Continue created an app-owned System window before any possible system-permission focus transfer. The window was present at both 100 ms and 600 ms, remained a standard app window, and showed the generic Location state as Allowed.
+- macOS did not show a new grant/deny prompt because the authorization state resolved as already allowed. The full denied/granted TCC matrix therefore remains unverified.
+- A second authorized capture completed without an actionable permission result card. The exact result-card action was not live-reproduced; deterministic tests cover that it uses the same stable System-window handoff.
+- The actual Settings gear opened the Profiles window, the window closed normally, and the same gear reopened it successfully.
+
+Rollback and retained evidence
+- The complete profile/diagnostic store was backed up before interaction and restored afterward.
+- The profile count was three before and after, and the preflight and restored profile-store SHA-256 values matched.
+- Temporary profiles, test diagnostics, cropped screenshots, and the temporary backup directory were removed.
+- The installed app was relaunched normally with the live-interaction environment flag cleared.
+- Screenshots were not committed because they contained live profile presentation; this file retains only sanitized observations.
