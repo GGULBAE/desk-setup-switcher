@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import ServiceManagement
+import SwiftUI
 import UniformTypeIdentifiers
 
 #if canImport(DeskSetupCore)
@@ -9,6 +10,9 @@ import UniformTypeIdentifiers
 #endif
 #if canImport(DeskSetupSystem)
   import DeskSetupSystem
+#endif
+#if canImport(DeskSetupPresentation)
+  import DeskSetupPresentation
 #endif
 
 func appLocalized(_ value: String.LocalizationValue) -> String {
@@ -27,6 +31,17 @@ func appReadinessTitle(_ readiness: ProfileReadiness) -> String {
   case .applying: appLocalized("Applying")
   case .applied: appLocalized("Applied")
   case .failed: appLocalized("Failed")
+  }
+}
+
+func appApplyResultStatusTitle(_ status: ApplyResultOverallStatus) -> String {
+  switch status {
+  case .success: appLocalized("Applied")
+  case .partial: appLocalized("Partially Applied")
+  case .failure: appLocalized("Apply Failed")
+  case .rolledBack: appLocalized("Rolled Back")
+  case .rollbackFailed: appLocalized("Rollback Failed")
+  case .notVerified: appLocalized("Not Verified")
   }
 }
 
@@ -90,8 +105,6 @@ struct PendingApplyRequest: Identifiable, Sendable {
   let id = UUID()
   let profile: DeskProfile
   let preparation: ApplyPreparation
-  let conditions: ConditionEvaluation
-  let isReviewOnly: Bool
 }
 
 struct PendingImportRequest: Identifiable, Sendable {
@@ -112,13 +125,13 @@ enum ProfileSaveResult: Equatable, Sendable {
 }
 
 enum ProfileSettingsCaptureResult: Equatable, Sendable {
-  case captured(SystemSnapshotResult)
-  case rejected(message: String)
+  case captured(snapshot: SystemSnapshotResult, summary: ProfileCaptureSummary)
+  case rejected(message: String, summary: ProfileCaptureSummary? = nil)
 }
 
 enum ProfileCreationCaptureResult: Equatable, Sendable {
-  case created(DeskProfile)
-  case rejected(message: String)
+  case created(profile: DeskProfile, summary: ProfileCaptureSummary)
+  case rejected(message: String, summary: ProfileCaptureSummary? = nil)
 }
 
 private func makeDefaultDiagnosticLog() -> (any DiagnosticLogStoring)? {
@@ -147,6 +160,7 @@ final class ApplicationModel: ObservableObject {
   @Published private(set) var canRetryLoginItemRegistration = false
   @Published private(set) var readinessByProfile: [UUID: ProfileReadiness] = [:]
   @Published private(set) var operationCountByProfile: [UUID: Int] = [:]
+  @Published private(set) var forceOperationCountByProfile: [UUID: Int] = [:]
   @Published private(set) var normalApplyAvailableByProfile: [UUID: Bool] = [:]
   @Published private(set) var forceApplyAvailableByProfile: [UUID: Bool] = [:]
   @Published private(set) var normalApplyRejectionReasonsByProfile: [UUID: [ApplyRejectionReason]] =
@@ -157,6 +171,10 @@ final class ApplicationModel: ObservableObject {
   @Published private(set) var pendingApply: PendingApplyRequest?
   @Published private(set) var pendingImport: PendingImportRequest?
   @Published private(set) var lastApplyResult: ApplyExecutionResult?
+  @Published private(set) var lastApplyVerification: PostApplyVerificationResult?
+  @Published private(set) var lastApplySummary: ApplyResultSummary?
+  @Published private(set) var lastCaptureSummary: ProfileCaptureSummary?
+  @Published private(set) var preparingProfileIDs: Set<UUID> = []
   @Published private(set) var safetyConfirmation: SafetyConfirmationState?
   @Published private(set) var isApplyTransactionInProgress = false
   @Published private(set) var isProfileStoreMutationInProgress = false
@@ -168,7 +186,6 @@ final class ApplicationModel: ObservableObject {
   private let profileImportExport: ProfileImportExport
   private let snapshotCoordinator: SystemSnapshotCoordinator
   private let conditionContextProvider: ConditionContextProvider
-  private let conditionEvaluator: ConditionEvaluator
   private let applyEngine: ApplyEngine
   private let diagnosticLog: (any DiagnosticLogStoring)?
   private let launchAtLoginPreferenceKey = "launchAtLoginEnabled"
@@ -178,6 +195,8 @@ final class ApplicationModel: ObservableObject {
   private var safetyCountdownTask: Task<Void, Never>?
   private var loginItemOperationFailure: LoginItemOperationFailure?
   private var terminationRequestIsDeferred = false
+  private var preparationGate = ProfilePreparationGate()
+  private var preparationRequestTracker = LatestPreparationRequestTracker()
 
   var isProfileMutationLocked: Bool {
     isApplyTransactionInProgress
@@ -210,7 +229,6 @@ final class ApplicationModel: ObservableObject {
     profileImportExport: ProfileImportExport = ProfileImportExport(),
     snapshotCoordinator: SystemSnapshotCoordinator? = nil,
     conditionContextProvider: ConditionContextProvider = ConditionContextProvider(),
-    conditionEvaluator: ConditionEvaluator = ConditionEvaluator(),
     applyEngine: ApplyEngine? = nil,
     diagnosticLog: (any DiagnosticLogStoring)? = makeDefaultDiagnosticLog()
   ) {
@@ -219,7 +237,6 @@ final class ApplicationModel: ObservableObject {
     self.profileImportExport = profileImportExport
     self.snapshotCoordinator = snapshotCoordinator ?? SystemSnapshotCoordinator(adapters: adapters)
     self.conditionContextProvider = conditionContextProvider
-    self.conditionEvaluator = conditionEvaluator
     self.applyEngine =
       applyEngine
       ?? ApplyEngine(registry: (try? AdapterRegistry(adapters)) ?? AdapterRegistry())
@@ -322,6 +339,10 @@ final class ApplicationModel: ObservableObject {
   }
 
   func updateProfile(_ saveCandidate: DeskProfile) async -> ProfileSaveResult {
+    if let validationError = appProfileDraftValidationError(saveCandidate) {
+      reportProfileEditorFailure(code: "save-validation-failed", message: validationError)
+      return .rejected(message: validationError)
+    }
     guard beginProfileStoreMutation() else {
       return .rejected(message: profileEditingLockedMessage)
     }
@@ -409,6 +430,23 @@ final class ApplicationModel: ObservableObject {
     }
   }
 
+  /// Persists a selection before a protected cross-profile apply continues.
+  /// The awaited variant prevents the apply plan from racing a pending store
+  /// mutation and keeps the process-lifetime editor selection authoritative.
+  func selectProfileAndWait(id: UUID?) async -> Bool {
+    guard beginProfileStoreMutation() else { return false }
+    defer { finishProfileStoreMutation() }
+    selectedProfileID = id
+    do {
+      try await profileStore.selectProfile(id: id)
+      return true
+    } catch {
+      await refreshProfiles()
+      reportStorageError(error)
+      return false
+    }
+  }
+
   func importProfiles() {
     guard !isProfileMutationLocked else { return }
     let panel = NSOpenPanel()
@@ -484,20 +522,26 @@ final class ApplicationModel: ObservableObject {
       return .rejected(message: profileEditingLockedMessage)
     }
     defer { finishProfileStoreMutation() }
+    lastCaptureSummary = nil
     snapshotStatus = appLocalized("Reading current settings without changing them…")
 
     let snapshot = await snapshotCoordinator.capture()
     lastSnapshot = snapshot
     snapshotStatus = snapshotSummary(snapshot)
     recordSnapshotDiagnostic(snapshot)
+    let captureSummary = profileCaptureSummary(snapshot)
 
     guard
+      captureSummary.canCreateProfile,
       SettingGroup.safeApplicationSequence.contains(where: {
         snapshot.profileSettings.payload(for: $0) != nil
       })
     else {
+      lastCaptureSummary = captureSummary
       return .rejected(
-        message: appLocalized("No settings could be added safely from this snapshot."))
+        message: appLocalized("No settings could be added safely from this snapshot."),
+        summary: captureSummary
+      )
     }
 
     do {
@@ -509,7 +553,8 @@ final class ApplicationModel: ObservableObject {
       let created = try await profileStore.createProfile(profile, selecting: true)
       await refreshProfiles(
         message: appLocalized("Created \(created.name) from the current settings."))
-      return .created(created)
+      lastCaptureSummary = captureSummary
+      return .created(profile: created, summary: captureSummary)
     } catch {
       let message = profileStorageUserMessage(for: error)
       reportStorageError(error)
@@ -522,19 +567,43 @@ final class ApplicationModel: ObservableObject {
       return .rejected(message: profileEditingLockedMessage)
     }
     defer { finishProfileStoreMutation() }
+    lastCaptureSummary = nil
     snapshotStatus = appLocalized("Reading current settings without changing them…")
 
     let snapshot = await snapshotCoordinator.capture()
     lastSnapshot = snapshot
     snapshotStatus = snapshotSummary(snapshot)
     recordSnapshotDiagnostic(snapshot)
-    return .captured(snapshot)
+    let captureSummary = profileCaptureSummary(snapshot)
+    guard captureSummary.canCreateProfile else {
+      lastCaptureSummary = captureSummary
+      return .rejected(
+        message: appLocalized("No settings could be added safely from this snapshot."),
+        summary: captureSummary
+      )
+    }
+    lastCaptureSummary = captureSummary
+    return .captured(snapshot: snapshot, summary: captureSummary)
+  }
+
+  func dismissCaptureSummary() {
+    lastCaptureSummary = nil
+  }
+
+  func dismissApplySummary() {
+    lastApplySummary = nil
+    lastApplyVerification = nil
   }
 
   func readiness(for profile: DeskProfile) -> ProfileReadiness {
-    operationalStatusByProfile[profile.id]
-      ?? readinessByProfile[profile.id]
-      ?? .unavailable
+    ProfileStatusLifetime.visibleReadiness(
+      calculated: readinessByProfile[profile.id],
+      operational: operationalStatusByProfile[profile.id]
+    )
+  }
+
+  func isPreparingApply(for profile: DeskProfile) -> Bool {
+    preparingProfileIDs.contains(profile.id)
   }
 
   func canApplyNormally(_ profile: DeskProfile) -> Bool {
@@ -552,54 +621,42 @@ final class ApplicationModel: ObservableObject {
   }
 
   func prepareApply(profile: DeskProfile, mode: ApplyMode) {
-    prepareApply(profile: profile, mode: mode, isReviewOnly: false)
-  }
-
-  func reviewAvailability(profile: DeskProfile) {
-    prepareApply(profile: profile, mode: .normal, isReviewOnly: true)
-  }
-
-  private func prepareApply(
-    profile: DeskProfile,
-    mode: ApplyMode,
-    isReviewOnly: Bool
-  ) {
-    guard !isProfileMutationLocked else { return }
+    guard !isProfileMutationLocked, preparationGate.begin(profileID: profile.id) else { return }
+    let requestID = UUID()
+    preparationRequestTracker.begin(requestID: requestID)
+    preparingProfileIDs = preparationGate.activeProfileIDs
     operationalStatusByProfile[profile.id] = nil
     lastMessage = appLocalized("Calculating a read-only change plan for \(profile.name)…")
     Task {
-      let context = await captureReadinessContext()
-      let conditions = conditionEvaluator.evaluate(profile.conditions, in: context)
+      defer {
+        preparationGate.end(profileID: profile.id)
+        preparingProfileIDs = preparationGate.activeProfileIDs
+      }
       let preparation = await applyEngine.prepare(
         profile: profile,
         mode: mode,
-        conditionsSatisfied: conditions.isMatched
+        conditionsSatisfied: true
       )
+      guard preparationRequestTracker.shouldPresent(requestID: requestID) else { return }
       pendingApply = PendingApplyRequest(
         profile: profile,
-        preparation: preparation,
-        conditions: conditions,
-        isReviewOnly: isReviewOnly
+        preparation: preparation
       )
       readinessByProfile[profile.id] = preparation.readiness.status
-      operationCountByProfile[profile.id] = preparation.operations.count
       let isAvailable = preparation.canExecute && !preparation.operations.isEmpty
       if mode == .normal {
+        operationCountByProfile[profile.id] = preparation.operations.count
         normalApplyAvailableByProfile[profile.id] = isAvailable
         normalApplyRejectionReasonsByProfile[profile.id] = preparation.rejectionReasons
       } else {
+        forceOperationCountByProfile[profile.id] = preparation.operations.count
         forceApplyAvailableByProfile[profile.id] = isAvailable
         forceApplyRejectionReasonsByProfile[profile.id] = preparation.rejectionReasons
       }
-      if isReviewOnly {
-        lastMessage = appLocalized(
-          "Reviewing availability for \(profile.name) does not change any setting.")
-      } else {
-        lastMessage =
-          preparation.canExecute
-          ? appLocalized("Review the planned changes before applying \(profile.name).")
-          : appLocalized("The change plan explains why \(profile.name) cannot be applied.")
-      }
+      lastMessage =
+        preparation.canExecute
+        ? appLocalized("Review the planned changes before applying \(profile.name).")
+        : appLocalized("The change plan explains why \(profile.name) cannot be applied.")
     }
   }
 
@@ -608,10 +665,12 @@ final class ApplicationModel: ObservableObject {
   }
 
   func executePendingApply() {
-    guard let request = pendingApply, !request.isReviewOnly, !isProfileMutationLocked else {
+    guard let request = pendingApply, !isProfileMutationLocked else {
       return
     }
     pendingApply = nil
+    lastApplySummary = nil
+    lastApplyVerification = nil
     isApplyTransactionInProgress = true
     operationalStatusByProfile[request.profile.id] = .applying
     lastMessage = appLocalized(
@@ -620,42 +679,57 @@ final class ApplicationModel: ObservableObject {
     Task {
       defer { finishApplyTransaction() }
       guard let currentProfile = profiles.first(where: { $0.id == request.profile.id }) else {
-        operationalStatusByProfile[request.profile.id] = .failed
-        lastMessage = appLocalized("The profile was removed before it could be applied.")
+        let message = appLocalized("The profile was removed before it could be applied.")
+        let result = ApplyRequestFailureResultBuilder().result(
+          preparation: request.preparation,
+          completedAt: Date(),
+          message: message
+        )
+        lastApplyResult = result
+        lastApplyVerification = nil
+        publishApplySummary(
+          ApplyResultSummary(
+            profileID: request.profile.id,
+            profileName: request.profile.name,
+            appliedAt: result.completedAt,
+            itemResults: result.itemResults
+          )
+        )
+        operationalStatusByProfile[request.profile.id] = nil
+        lastMessage = message
+        recordDiagnostic(
+          severity: .warning,
+          component: "apply",
+          code: "profile-removed-before-execution",
+          message: appLocalized("An apply request ended before any setting was changed.")
+        )
         return
       }
 
-      let currentContext = await captureReadinessContext()
-      let currentConditions = conditionEvaluator.evaluate(
-        currentProfile.conditions,
-        in: currentContext
-      )
       let currentPreparation = await applyEngine.prepare(
         profile: currentProfile,
         mode: request.preparation.mode,
-        conditionsSatisfied: currentConditions.isMatched
+        conditionsSatisfied: true
       )
 
       guard currentProfile == request.profile,
-        currentConditions == request.conditions,
         currentPreparation.isExecutionEquivalent(to: request.preparation)
       else {
         operationalStatusByProfile[request.profile.id] = nil
         pendingApply = PendingApplyRequest(
           profile: currentProfile,
-          preparation: currentPreparation,
-          conditions: currentConditions,
-          isReviewOnly: request.isReviewOnly
+          preparation: currentPreparation
         )
         readinessByProfile[currentProfile.id] = currentPreparation.readiness.status
-        operationCountByProfile[currentProfile.id] = currentPreparation.operations.count
         let isAvailable =
           currentPreparation.canExecute && !currentPreparation.operations.isEmpty
         if currentPreparation.mode == .normal {
+          operationCountByProfile[currentProfile.id] = currentPreparation.operations.count
           normalApplyAvailableByProfile[currentProfile.id] = isAvailable
           normalApplyRejectionReasonsByProfile[currentProfile.id] =
             currentPreparation.rejectionReasons
         } else {
+          forceOperationCountByProfile[currentProfile.id] = currentPreparation.operations.count
           forceApplyAvailableByProfile[currentProfile.id] = isAvailable
           forceApplyRejectionReasonsByProfile[currentProfile.id] =
             currentPreparation.rejectionReasons
@@ -669,6 +743,7 @@ final class ApplicationModel: ObservableObject {
       let result = await applyEngine.execute(currentPreparation)
       let safetyConfirmationID = result.safetyConfirmationID
       var presentedResult = result
+      var verification: PostApplyVerificationResult?
       if safetyConfirmationID != nil {
         presentedResult.status = .applying
         presentedResult.itemResults.append(
@@ -678,8 +753,27 @@ final class ApplicationModel: ObservableObject {
               "Display changes are temporary and are waiting for confirmation.")
           )
         )
+      } else if result.didExecute {
+        verification = await verifySuccessfulOperations(
+          in: result,
+          against: currentProfile
+        )
+        if verification?.notVerifiedCount ?? 0 > 0,
+          presentedResult.status == .applied
+        {
+          presentedResult.status = .partial
+        }
       }
       lastApplyResult = presentedResult
+      if safetyConfirmationID == nil {
+        if let finalStatus = updateLastApplyPresentation(
+          profile: currentProfile,
+          verification: verification
+        ) {
+          presentedResult.status = finalStatus
+          lastApplyResult?.status = finalStatus
+        }
+      }
       operationalStatusByProfile[currentProfile.id] = presentedResult.status
       if let safetyConfirmationID {
         armSafetyCountdown(
@@ -694,10 +788,20 @@ final class ApplicationModel: ObservableObject {
             "Display changes for \(currentProfile.name) are temporary. Confirm or revert them within 15 seconds."
           )
         } else {
-          lastMessage =
-            result.status == .applied
-            ? appLocalized("Applied \(currentProfile.name).")
-            : appLocalized("\(currentProfile.name) finished with failures.")
+          if let count = verification?.notVerifiedCount, count > 0 {
+            lastMessage = appLocalized(
+              "Applied \(currentProfile.name), but \(count) settings could not be verified by read-back."
+            )
+          } else {
+            lastMessage =
+              presentedResult.status == .applied
+              ? appLocalized("Applied \(currentProfile.name).")
+              : presentedResult.status == .partial
+                ? appLocalized(
+                  "\(currentProfile.name) finished with failed, skipped, unavailable, or unverified settings."
+                )
+                : appLocalized("\(currentProfile.name) finished with failures.")
+          }
         }
         await persistApplicationSummary(
           presentedResult.applicationSummary,
@@ -711,9 +815,14 @@ final class ApplicationModel: ObservableObject {
         await refreshReadiness()
       }
       recordDiagnostic(
-        severity: result.status == .failed ? .error : .info,
+        severity:
+          presentedResult.status == .failed
+          ? .error
+          : verification?.notVerifiedCount ?? 0 > 0 ? .warning : .info,
         component: "apply-engine",
-        code: result.status.rawValue,
+        code:
+          verification?.notVerifiedCount ?? 0 > 0
+          ? "read-back-not-verified" : presentedResult.status.rawValue,
         message:
           appLocalized(
             "Apply completed with \(result.itemResults.count) item results and \(result.rollbackResults.count) immediate rollback results."
@@ -800,17 +909,57 @@ final class ApplicationModel: ObservableObject {
         )
       }
 
-      let summary = resolveSafetyOutcome(
+      var summary = resolveSafetyOutcome(
         outcome,
         rollbackResults: resolution.rollbackResults,
         profileID: state.profileID
       )
-      operationalStatusByProfile[state.profileID] = summary.status
-      if resolution.status == .confirmed, summary.status == .failed {
-        lastMessage = appLocalized(
-          "The display changes were kept, but one or more other profile items failed."
-        )
+      var verification: PostApplyVerificationResult?
+      if resolution.status == .confirmed,
+        let profile = profiles.first(where: { $0.id == state.profileID }),
+        let result = lastApplyResult
+      {
+        verification = await verifySuccessfulOperations(in: result, against: profile)
+        if verification?.notVerifiedCount ?? 0 > 0 {
+          if lastApplyResult?.status == .applied {
+            lastApplyResult?.status = .partial
+          }
+          if summary.status == .applied {
+            summary.status = .partial
+          }
+        }
       }
+      if let profile = profiles.first(where: { $0.id == state.profileID }) {
+        if let finalStatus = updateLastApplyPresentation(
+          profile: profile,
+          verification: verification
+        ) {
+          summary.status = finalStatus
+          lastApplyResult?.status = finalStatus
+        }
+      }
+      if resolution.status == .confirmed {
+        switch ConfirmedSafetyMessageKind(
+          status: summary.status,
+          notVerifiedCount: verification?.notVerifiedCount ?? 0
+        ) {
+        case .kept:
+          lastMessage = appLocalized("Kept the display changes.")
+        case .partial:
+          lastMessage = appLocalized(
+            "The display changes were kept, but some settings failed, were skipped, or were unavailable."
+          )
+        case .failed:
+          lastMessage = appLocalized(
+            "The display changes were kept, but one or more other profile items failed."
+          )
+        case .notVerified:
+          lastMessage = appLocalized(
+            "The display changes were kept, but read-back could not verify every applied setting."
+          )
+        }
+      }
+      operationalStatusByProfile[state.profileID] = summary.status
       await persistApplicationSummary(summary, profileID: state.profileID)
       recordDiagnostic(
         severity: resolution.status == .confirmed ? .info : .warning,
@@ -873,19 +1022,28 @@ final class ApplicationModel: ObservableObject {
   }
 
   private func refreshReadiness() async {
-    let context = await captureReadinessContext()
+    _ = await captureReadinessContext()
+    // Editor choices such as friendly audio names and supported display modes
+    // come from a separate read-only snapshot. The profile plans below remain
+    // authoritative for execution and never reuse this UI catalog as host state.
+    let editorSnapshot = await snapshotCoordinator.capture()
+    lastSnapshot = editorSnapshot
+    snapshotStatus = snapshotSummary(editorSnapshot)
     guard !profiles.isEmpty else {
       readinessByProfile = [:]
       operationCountByProfile = [:]
+      forceOperationCountByProfile = [:]
       normalApplyAvailableByProfile = [:]
       forceApplyAvailableByProfile = [:]
       normalApplyRejectionReasonsByProfile = [:]
       forceApplyRejectionReasonsByProfile = [:]
+      operationalStatusByProfile = [:]
       return
     }
 
     var statuses: [UUID: ProfileReadiness] = [:]
     var operationCounts: [UUID: Int] = [:]
+    var forceOperationCounts: [UUID: Int] = [:]
     var normalAvailability: [UUID: Bool] = [:]
     var forceAvailability: [UUID: Bool] = [:]
     var normalRejectionReasons: [UUID: [ApplyRejectionReason]] = [:]
@@ -894,17 +1052,17 @@ final class ApplicationModel: ObservableObject {
       guard profile.isEnabled else {
         statuses[profile.id] = .unavailable
         operationCounts[profile.id] = 0
+        forceOperationCounts[profile.id] = 0
         normalAvailability[profile.id] = false
         forceAvailability[profile.id] = false
         normalRejectionReasons[profile.id] = [.profileDisabled]
         forceRejectionReasons[profile.id] = [.profileDisabled]
         continue
       }
-      let conditions = conditionEvaluator.evaluate(profile.conditions, in: context)
       let preparation = await applyEngine.prepare(
         profile: profile,
         mode: .normal,
-        conditionsSatisfied: conditions.isMatched
+        conditionsSatisfied: true
       )
       statuses[profile.id] = preparation.readiness.status
       operationCounts[profile.id] = preparation.operations.count
@@ -915,22 +1073,28 @@ final class ApplicationModel: ObservableObject {
         let forcePreparation = await applyEngine.prepare(
           profile: profile,
           mode: .force,
-          conditionsSatisfied: conditions.isMatched
+          conditionsSatisfied: true
         )
         forceAvailability[profile.id] =
           forcePreparation.canExecute && !forcePreparation.operations.isEmpty
+        forceOperationCounts[profile.id] = forcePreparation.operations.count
         forceRejectionReasons[profile.id] = forcePreparation.rejectionReasons
       } else {
         forceAvailability[profile.id] = false
+        forceOperationCounts[profile.id] = 0
         forceRejectionReasons[profile.id] = preparation.rejectionReasons
       }
     }
     readinessByProfile = statuses
     operationCountByProfile = operationCounts
+    forceOperationCountByProfile = forceOperationCounts
     normalApplyAvailableByProfile = normalAvailability
     forceApplyAvailableByProfile = forceAvailability
     normalApplyRejectionReasonsByProfile = normalRejectionReasons
     forceApplyRejectionReasonsByProfile = forceRejectionReasons
+    operationalStatusByProfile = ProfileStatusLifetime.retainingActiveOperations(
+      operationalStatusByProfile
+    )
   }
 
   private func captureReadinessContext() async -> ConditionContext {
@@ -958,6 +1122,65 @@ final class ApplicationModel: ObservableObject {
     } catch {
       reportStorageError(error)
     }
+  }
+
+  private func verifySuccessfulOperations(
+    in result: ApplyExecutionResult,
+    against profile: DeskProfile
+  ) async -> PostApplyVerificationResult {
+    let successfulOperations = PostApplyVerificationResult.readBackTargets(in: result)
+    guard !successfulOperations.isEmpty else {
+      return PostApplyVerificationResult.classify(
+        executedOperations: [],
+        readBackPreparation: result.preparation,
+        intentionalOmissions:
+          result.preparation.mode == .force ? result.preparation.omissions : []
+      )
+    }
+
+    // `prepare` performs fresh read-only snapshots before planning. Reusing the
+    // same mode keeps force omissions intentional while detecting any executed
+    // target that still appears as a required operation.
+    let readBackPreparation = await applyEngine.prepare(
+      profile: profile,
+      mode: result.preparation.mode,
+      conditionsSatisfied: true
+    )
+    return PostApplyVerificationResult.classify(
+      executedOperations: successfulOperations,
+      readBackPreparation: readBackPreparation,
+      intentionalOmissions:
+        result.preparation.mode == .force ? result.preparation.omissions : []
+    )
+  }
+
+  private func updateLastApplyPresentation(
+    profile: DeskProfile,
+    verification: PostApplyVerificationResult?
+  ) -> ProfileReadiness? {
+    lastApplyVerification = verification
+    guard let result = lastApplyResult, result.preparation.profileID == profile.id else {
+      lastApplySummary = nil
+      return nil
+    }
+    let summary = ApplyResultSummary(
+      profileID: profile.id,
+      profileName: profile.name,
+      appliedAt: result.completedAt,
+      itemResults: result.itemResults,
+      rollbackResults: result.rollbackResults,
+      verification: verification
+    )
+    publishApplySummary(summary)
+    return summary.status.profileReadiness
+  }
+
+  private func publishApplySummary(_ summary: ApplyResultSummary) {
+    lastApplySummary = summary
+    let announcement = appLocalized(
+      "\(appApplyResultStatusTitle(summary.status)) for \(summary.profileName). \(summary.succeededCount) succeeded, \(summary.failedCount) failed, \(summary.notVerifiedCount) not verified."
+    )
+    AccessibilityNotification.Announcement(announcement).post()
   }
 
   private func armSafetyCountdown(confirmationID: UUID, profileID: UUID) {
@@ -1007,7 +1230,7 @@ final class ApplicationModel: ObservableObject {
     if resolution.status == .unknownOrExpired {
       operationalStatusByProfile[state.profileID] = .partial
       lastMessage = appLocalized("The display confirmation had already expired.")
-      let summary = resolveSafetyOutcome(
+      var summary = resolveSafetyOutcome(
         SafetyOutcome(
           profileStatus: .partial,
           itemStatus: .skipped,
@@ -1018,6 +1241,13 @@ final class ApplicationModel: ObservableObject {
         profileID: state.profileID
       )
       operationalStatusByProfile[state.profileID] = summary.status
+      if let profile = profiles.first(where: { $0.id == state.profileID }) {
+        if let finalStatus = updateLastApplyPresentation(profile: profile, verification: nil) {
+          summary.status = finalStatus
+          lastApplyResult?.status = finalStatus
+          operationalStatusByProfile[state.profileID] = finalStatus
+        }
+      }
       await persistApplicationSummary(summary, profileID: state.profileID)
       await refreshReadiness()
       return
@@ -1030,7 +1260,7 @@ final class ApplicationModel: ObservableObject {
       ? appLocalized("Automatic display rollback failed; review the itemized result immediately.")
       : appLocalized("Restored the previous display configuration.")
 
-    let summary = resolveSafetyOutcome(
+    var summary = resolveSafetyOutcome(
       SafetyOutcome(
         profileStatus: failed ? .failed : .partial,
         itemStatus: failed ? .rollbackFailed : .rolledBack,
@@ -1043,6 +1273,13 @@ final class ApplicationModel: ObservableObject {
       profileID: state.profileID
     )
     operationalStatusByProfile[state.profileID] = summary.status
+    if let profile = profiles.first(where: { $0.id == state.profileID }) {
+      if let finalStatus = updateLastApplyPresentation(profile: profile, verification: nil) {
+        summary.status = finalStatus
+        lastApplyResult?.status = finalStatus
+        operationalStatusByProfile[state.profileID] = finalStatus
+      }
+    }
     await persistApplicationSummary(summary, profileID: state.profileID)
     recordDiagnostic(
       severity: failed ? .error : .warning,
@@ -1119,6 +1356,30 @@ final class ApplicationModel: ObservableObject {
     let unsupported = items.filter { $0.state == .unsupported }.count
     return appLocalized(
       "Snapshot: \(detected) detected, \(stored) storable, \(unreadable) unreadable, \(permission) permission required, \(unsupported) unsupported."
+    )
+  }
+
+  private func profileCaptureSummary(
+    _ snapshot: SystemSnapshotResult
+  ) -> ProfileCaptureSummary {
+    let evidence = snapshot.groups.flatMap { group in
+      let itemEvidence = group.items.map {
+        CaptureSnapshotEvidence(group: group.group, key: $0.key, state: $0.state)
+      }
+      let failureEvidence = group.failures.map {
+        CaptureSnapshotEvidence(
+          group: group.group,
+          key:
+            $0.stage == .snapshot || $0.stage == .snapshotContract
+            ? "snapshot" : "capture.\($0.stage.rawValue)",
+          state: .unreadable
+        )
+      }
+      return itemEvidence + failureEvidence
+    }
+    return ProfileCaptureSummaryBuilder().summary(
+      settings: snapshot.profileSettings,
+      evidence: evidence
     )
   }
 

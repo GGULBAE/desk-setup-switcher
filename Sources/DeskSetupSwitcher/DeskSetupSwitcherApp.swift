@@ -143,6 +143,19 @@ struct DeskSetupSwitcherApp: App {
   }
 }
 
+private enum DraftProtectedApplyKind: Equatable {
+  case targetDraft
+  case otherDraft(openProfileID: UUID, openProfileName: String)
+}
+
+private struct DraftProtectedApplyPrompt: Identifiable, Equatable {
+  let id = UUID()
+  let targetProfileID: UUID
+  let targetProfileName: String
+  let mode: ApplyMode
+  let kind: DraftProtectedApplyKind
+}
+
 private struct MenuContentView: View {
   @Environment(\.openSettings) private var openSettings
   @EnvironmentObject private var model: ApplicationModel
@@ -153,6 +166,11 @@ private struct MenuContentView: View {
   @State private var captureOperationError: String?
   @State private var transientCaptureMessage: String?
   @State private var transientCaptureTask: Task<Void, Never>?
+  @State private var draftProtectedApply: DraftProtectedApplyPrompt?
+  @State private var applyDraftSaveError: String?
+  @State private var draftApplyRetryAfterError: DraftProtectedApplyPrompt?
+  @State private var deferredApplyAfterPreviewDismissal: PendingApplyRequest?
+  @State private var isApplyResultDetailsPresented = false
 
   var body: some View {
     Group {
@@ -167,10 +185,32 @@ private struct MenuContentView: View {
       item: Binding(
         get: { model.pendingApply },
         set: { if $0 == nil { model.cancelPendingApply() } }
-      )
+      ),
+      onDismiss: resumeDeferredApplyAfterPreviewDismissal
     ) { request in
-      ApplyPreviewView(request: request)
-        .environmentObject(model)
+      ApplyPreviewView(
+        request: request,
+        onConfirm: { confirmPendingApply(request) }
+      )
+      .environmentObject(model)
+    }
+    .sheet(isPresented: $isApplyResultDetailsPresented) {
+      if let summary = model.lastApplySummary,
+        let result = model.lastApplyResult
+      {
+        ApplyResultDetailsView(
+          summary: summary,
+          result: result,
+          verification: model.lastApplyVerification
+        )
+      } else {
+        ContentUnavailableView(
+          "No Apply Result",
+          systemImage: "clock.arrow.circlepath",
+          description: Text("Apply a profile to see itemized results.")
+        )
+        .frame(width: 440, height: 260)
+      }
     }
     .confirmationDialog(
       "Save changes before capturing a new profile?",
@@ -179,6 +219,7 @@ private struct MenuContentView: View {
       Button("Save and Capture") {
         Task { await saveDraftThenCaptureCurrentSettings() }
       }
+      .disabled(!openDraftIsValid)
       Button("Discard Changes and Capture", role: .destructive) {
         profileEditor.revertDraft()
         Task { await performCapture() }
@@ -186,6 +227,47 @@ private struct MenuContentView: View {
       Button("Cancel", role: .cancel) {}
     } message: {
       Text("The open profile has changes that have not been saved.")
+    }
+    .confirmationDialog(
+      draftApplyDialogTitle,
+      isPresented: Binding(
+        get: { draftProtectedApply != nil },
+        set: { if !$0 { cancelDraftProtectedApply() } }
+      )
+    ) {
+      if let prompt = draftProtectedApply {
+        switch prompt.kind {
+        case .targetDraft:
+          Button("Save and Apply") {
+            beginSaveDraftThenApply(prompt)
+          }
+          .keyboardShortcut(.defaultAction)
+          .disabled(!openDraftIsValid)
+        case .otherDraft(let openProfileID, let openProfileName):
+          Button(appLocalized("Save \(openProfileName) and Apply \(prompt.targetProfileName)")) {
+            beginSaveDraftThenApply(prompt)
+          }
+          .keyboardShortcut(.defaultAction)
+          .disabled(!openDraftIsValid)
+          Button(
+            appLocalized(
+              "Discard Changes to \(openProfileName) and Apply \(prompt.targetProfileName)"
+            ),
+            role: .destructive
+          ) {
+            beginDiscardDraftThenApply(
+              prompt,
+              expectedOpenProfileID: openProfileID
+            )
+          }
+        }
+        Button("Cancel", role: .cancel) {
+          cancelDraftProtectedApply()
+        }
+        .keyboardShortcut(.cancelAction)
+      }
+    } message: {
+      Text(draftApplyDialogMessage)
     }
     .alert(
       "Could Not Save Profile",
@@ -208,6 +290,17 @@ private struct MenuContentView: View {
       Button("OK") { captureOperationError = nil }
     } message: {
       Text(captureOperationError ?? "")
+    }
+    .alert(
+      "Could Not Save Before Applying",
+      isPresented: Binding(
+        get: { applyDraftSaveError != nil },
+        set: { if !$0 { dismissApplyDraftSaveError() } }
+      )
+    ) {
+      Button("OK") { dismissApplyDraftSaveError() }
+    } message: {
+      Text(applyDraftSaveError ?? "")
     }
     .onAppear {
       // Opening the menu is an explicit, read-only refresh point so hot-plugged
@@ -308,6 +401,14 @@ private struct MenuContentView: View {
           .foregroundStyle(.secondary)
           .transition(.opacity)
       }
+
+      if let summary = model.lastCaptureSummary, summary.status != .complete {
+        captureResultBanner(summary)
+      }
+
+      if let summary = model.lastApplySummary {
+        applyResultCard(summary)
+      }
     }
     .padding(14)
   }
@@ -335,8 +436,264 @@ private struct MenuContentView: View {
     presentSettings()
   }
 
+  private func requestApply(_ profile: DeskProfile, mode: ApplyMode) {
+    let decision = DirtyApplyProtectionDecision.evaluate(
+      targetProfileID: profile.id,
+      openDraftProfileID: profileEditor.selectedProfileID,
+      isDraftDirty: profileEditor.isDirty,
+      hasPendingSelection: profileEditor.session.pendingSelection != nil
+    )
+
+    switch decision {
+    case .applyNow:
+      model.prepareApply(profile: profile, mode: mode)
+
+    case .saveTargetBeforeApply:
+      draftProtectedApply = DraftProtectedApplyPrompt(
+        targetProfileID: profile.id,
+        targetProfileName: profile.name,
+        mode: mode,
+        kind: .targetDraft
+      )
+
+    case .resolveOtherDraft(let openProfileID):
+      let openName = profileEditor.draft?.name ?? appLocalized("Open profile")
+      switch profileEditor.requestSelection(profile) {
+      case .requiresDecision:
+        draftProtectedApply = DraftProtectedApplyPrompt(
+          targetProfileID: profile.id,
+          targetProfileName: profile.name,
+          mode: mode,
+          kind: .otherDraft(
+            openProfileID: openProfileID,
+            openProfileName: openName
+          )
+        )
+      case .selected:
+        model.prepareApply(profile: profile, mode: mode)
+      case .unchanged:
+        applyDraftSaveError = appLocalized(
+          "The open draft changed before the apply decision. Try again."
+        )
+      }
+
+    case .blockedByPendingSelection:
+      applyDraftSaveError = appLocalized(
+        "Finish the open profile decision before applying another profile."
+      )
+    }
+  }
+
+  /// The editor can remain open while a preview is visible. Re-evaluate draft
+  /// protection at the final confirmation boundary so edits made after the
+  /// preview cannot be bypassed by applying the older persisted profile.
+  private func confirmPendingApply(_ request: PendingApplyRequest) {
+    let decision = DirtyApplyProtectionDecision.evaluate(
+      targetProfileID: request.profile.id,
+      openDraftProfileID: profileEditor.selectedProfileID,
+      isDraftDirty: profileEditor.isDirty,
+      hasPendingSelection: profileEditor.session.pendingSelection != nil
+    )
+    guard decision == .applyNow else {
+      deferredApplyAfterPreviewDismissal = request
+      model.cancelPendingApply()
+      return
+    }
+    model.executePendingApply()
+  }
+
+  private func resumeDeferredApplyAfterPreviewDismissal() {
+    guard let request = deferredApplyAfterPreviewDismissal else { return }
+    deferredApplyAfterPreviewDismissal = nil
+    requestApply(request.profile, mode: request.preparation.mode)
+  }
+
+  private var draftApplyDialogTitle: String {
+    guard let prompt = draftProtectedApply else {
+      return appLocalized("Unsaved Profile Changes")
+    }
+    switch prompt.kind {
+    case .targetDraft:
+      return appLocalized("Save changes before applying this profile?")
+    case .otherDraft:
+      return appLocalized("Resolve unsaved changes before applying another profile?")
+    }
+  }
+
+  private var draftApplyDialogMessage: String {
+    guard let prompt = draftProtectedApply else { return "" }
+    switch prompt.kind {
+    case .targetDraft:
+      return appLocalized(
+        "\(prompt.targetProfileName) has unsaved changes. Save those exact values before building the apply preview."
+      )
+    case .otherDraft(_, let openProfileName):
+      return appLocalized(
+        "Choose what to do with \(openProfileName) before applying \(prompt.targetProfileName)."
+      )
+    }
+  }
+
+  private func beginSaveDraftThenApply(_ prompt: DraftProtectedApplyPrompt) {
+    let candidate: DeskProfile
+    let expectsSelectionChange: Bool
+    switch prompt.kind {
+    case .targetDraft:
+      guard let saveCandidate = profileEditor.session.saveCandidate() else {
+        applyDraftSaveError = appLocalized("The open profile could not be prepared for saving.")
+        return
+      }
+      candidate = saveCandidate
+      expectsSelectionChange = false
+
+    case .otherDraft:
+      guard
+        case .saveRequired(let saveCandidate, let target) =
+          profileEditor.resolvePendingSelection(.save),
+        target.profileID == prompt.targetProfileID
+      else {
+        applyDraftSaveError = appLocalized(
+          "The open profile decision changed before it could be saved."
+        )
+        return
+      }
+      candidate = saveCandidate
+      expectsSelectionChange = true
+    }
+
+    let validation = ProfileDraftValidator().validate(candidate)
+    guard !candidate.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      validation.isValid
+    else {
+      applyDraftSaveError =
+        validation.issues.first.map {
+          appLocalizedDraftValidationMessage($0.message)
+        } ?? appLocalized("Enter a profile name before saving and applying.")
+      return
+    }
+
+    draftProtectedApply = nil
+    profileEditor.beginSaving()
+    Task {
+      await persistDraftAndApply(
+        candidate,
+        prompt: prompt,
+        expectsSelectionChange: expectsSelectionChange
+      )
+    }
+  }
+
+  private var openDraftIsValid: Bool {
+    guard let draft = profileEditor.draft else { return false }
+    return !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && ProfileDraftValidator().validate(draft).isValid
+  }
+
+  private func persistDraftAndApply(
+    _ candidate: DeskProfile,
+    prompt: DraftProtectedApplyPrompt,
+    expectsSelectionChange: Bool
+  ) async {
+    var coordinator = DirtyApplySaveCoordinator(
+      targetProfileID: prompt.targetProfileID,
+      mode: prompt.mode,
+      destination:
+        expectsSelectionChange
+        ? .selectedTarget(profileID: prompt.targetProfileID)
+        : .persistedTarget
+    )
+    switch await model.updateProfile(candidate) {
+    case .saved(let persisted):
+      let completion = profileEditor.completeSave(with: persisted)
+      switch coordinator.handle(
+        .saveSucceeded(profile: persisted, completion: completion)
+      ) {
+      case .prepare(let profile, let mode):
+        model.prepareApply(profile: profile, mode: mode)
+
+      case .selectAndPrepare(let profileID, let mode):
+        guard await model.selectProfileAndWait(id: profileID),
+          let targetProfile = model.profiles.first(where: { $0.id == profileID })
+        else {
+          applyDraftSaveError = appLocalized(
+            "The target profile changed before the apply preview could be prepared."
+          )
+          return
+        }
+        model.prepareApply(profile: targetProfile, mode: mode)
+
+      case .none:
+        if expectsSelectionChange {
+          applyDraftSaveError = appLocalized(
+            "The target profile changed before the apply preview could be prepared."
+          )
+        } else {
+          applyDraftSaveError = appLocalized(
+            "The saved profile did not match the active draft."
+          )
+        }
+      }
+
+    case .rejected(let message):
+      _ = coordinator.handle(.saveRejected)
+      profileEditor.finishWithError(message)
+      draftApplyRetryAfterError = prompt
+      applyDraftSaveError = message
+    }
+  }
+
+  private func beginDiscardDraftThenApply(
+    _ prompt: DraftProtectedApplyPrompt,
+    expectedOpenProfileID: UUID
+  ) {
+    guard profileEditor.selectedProfileID == expectedOpenProfileID,
+      case .selected(let target) = profileEditor.resolvePendingSelection(.discard),
+      target.profileID == prompt.targetProfileID
+    else {
+      applyDraftSaveError = appLocalized(
+        "The open profile decision changed before the draft could be discarded."
+      )
+      return
+    }
+    draftProtectedApply = nil
+    Task {
+      guard await model.selectProfileAndWait(id: prompt.targetProfileID),
+        let targetProfile = model.profiles.first(where: {
+          $0.id == prompt.targetProfileID
+        })
+      else {
+        applyDraftSaveError = appLocalized(
+          "The target profile is no longer available to apply."
+        )
+        return
+      }
+      model.prepareApply(profile: targetProfile, mode: prompt.mode)
+    }
+  }
+
+  private func cancelDraftProtectedApply() {
+    if case .otherDraft? = draftProtectedApply?.kind {
+      _ = profileEditor.resolvePendingSelection(.cancel)
+    }
+    draftProtectedApply = nil
+  }
+
+  private func dismissApplyDraftSaveError() {
+    applyDraftSaveError = nil
+    if let retry = draftApplyRetryAfterError {
+      draftApplyRetryAfterError = nil
+      draftProtectedApply = retry
+    }
+  }
+
   private func presentSettings() {
     selectedSettingsTab = .profiles
+    NSApplication.shared.activate(ignoringOtherApps: true)
+    openSettings()
+  }
+
+  private func presentPermissions() {
+    selectedSettingsTab = .permissions
     NSApplication.shared.activate(ignoringOtherApps: true)
     openSettings()
   }
@@ -345,6 +702,11 @@ private struct MenuContentView: View {
     guard profileEditor.session.pendingSelection == nil,
       let candidate = profileEditor.session.saveCandidate()
     else { return }
+
+    if let validationError = appProfileDraftValidationError(candidate) {
+      captureDraftSaveError = validationError
+      return
+    }
 
     profileEditor.beginSaving()
     switch await model.updateProfile(candidate) {
@@ -368,17 +730,31 @@ private struct MenuContentView: View {
     transientCaptureMessage = nil
 
     switch await model.createProfileFromCurrentSettings() {
-    case .created:
-      let message = appLocalized("Captured current settings without changing the Mac.")
-      transientCaptureMessage = message
-      AccessibilityNotification.Announcement(message).post()
-      transientCaptureTask = Task { @MainActor in
-        try? await Task.sleep(for: .seconds(3))
-        guard !Task.isCancelled else { return }
-        transientCaptureMessage = nil
-        transientCaptureTask = nil
+    case .created(_, let summary):
+      let message =
+        summary.status == .complete
+        ? appLocalized("Captured current settings without changing the Mac.")
+        : appLocalized(
+          "Captured \(summary.applicableCount) applicable settings with \(summary.excludedCount) snapshot-only and \(summary.omittedCount) unavailable items."
+        )
+      if summary.status == .complete {
+        transientCaptureMessage = message
       }
-    case .rejected(let message):
+      AccessibilityNotification.Announcement(message).post()
+      if summary.status == .complete {
+        transientCaptureTask = Task { @MainActor in
+          try? await Task.sleep(for: .seconds(3))
+          guard !Task.isCancelled else { return }
+          transientCaptureMessage = nil
+          transientCaptureTask = nil
+        }
+      }
+    case .rejected(let message, let summary):
+      if let summary {
+        AccessibilityNotification.Announcement(
+          captureResultAnnouncement(summary)
+        ).post()
+      }
       captureOperationError = message
     }
   }
@@ -387,9 +763,133 @@ private struct MenuContentView: View {
     min(max(CGFloat(enabledProfiles.count) * 132, 124), 360)
   }
 
+  private func captureResultBanner(_ summary: ProfileCaptureSummary) -> some View {
+    VStack(alignment: .leading, spacing: 7) {
+      HStack(alignment: .firstTextBaseline) {
+        Label(
+          summary.status == .failure
+            ? appLocalized("Capture Failed") : appLocalized("Partial Capture"),
+          systemImage: summary.status == .failure
+            ? "xmark.octagon" : "exclamationmark.triangle"
+        )
+        .font(.caption.bold())
+        Spacer()
+        Button {
+          model.dismissCaptureSummary()
+        } label: {
+          Label("Dismiss Capture Result", systemImage: "xmark")
+            .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Dismiss Capture Result")
+        .help("Dismiss Capture Result")
+      }
+      Text(
+        appLocalized(
+          "\(summary.applicableCount) applicable · \(summary.excludedCount) snapshot only"
+        )
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      Text(
+        appLocalized(
+          "\(summary.unreadableCount) unreadable · \(summary.permissionRequiredCount) permission required · \(summary.unsupportedCount) unsupported"
+        )
+      )
+      .font(.caption2)
+      .foregroundStyle(.secondary)
+      if summary.wifiNetworkWasNotCaptured {
+        Label("Wi-Fi network was not captured.", systemImage: "location.slash")
+          .font(.caption)
+        Button("Review Permissions") {
+          presentPermissions()
+        }
+        .font(.caption)
+      }
+    }
+    .padding(10)
+    .background(
+      (summary.status == .failure ? Color.red : Color.orange).opacity(0.12),
+      in: RoundedRectangle(cornerRadius: 9)
+    )
+    .accessibilityElement(children: .contain)
+  }
+
+  private func captureResultAnnouncement(_ summary: ProfileCaptureSummary) -> String {
+    appLocalized(
+      "\(summary.applicableCount) applicable, \(summary.excludedCount) snapshot only, \(summary.unreadableCount) unreadable, \(summary.permissionRequiredCount) permission required, and \(summary.unsupportedCount) unsupported."
+    )
+  }
+
+  private func applyResultCard(_ summary: ApplyResultSummary) -> some View {
+    VStack(alignment: .leading, spacing: 7) {
+      HStack(alignment: .firstTextBaseline) {
+        Label(
+          appApplyResultStatusTitle(summary.status),
+          systemImage: applyResultStatusSymbol(summary.status)
+        )
+        .font(.caption.bold())
+        Spacer()
+        Button {
+          model.dismissApplySummary()
+        } label: {
+          Label("Dismiss Apply Result", systemImage: "xmark")
+            .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Dismiss Apply Result")
+        .help("Dismiss Apply Result")
+      }
+
+      Text(summary.profileName)
+        .font(.caption)
+        .lineLimit(1)
+      Text(
+        appLocalized(
+          "\(summary.succeededCount) succeeded · \(summary.failedCount) failed · \(summary.skippedCount) skipped · \(summary.unsupportedCount) unsupported"
+        )
+      )
+      .font(.caption2)
+      .foregroundStyle(.secondary)
+      if summary.notVerifiedCount > 0 || summary.rollbackFailedCount > 0 {
+        Text(
+          appLocalized(
+            "\(summary.notVerifiedCount) not verified · \(summary.rollbackFailedCount) rollback failed"
+          )
+        )
+        .font(.caption2.bold())
+      }
+      HStack {
+        Text(summary.appliedAt.formatted(date: .omitted, time: .shortened))
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+        Spacer()
+        Button("Details") {
+          isApplyResultDetailsPresented = true
+        }
+        .font(.caption)
+        .accessibilityHint("Shows itemized apply and read-back results")
+      }
+    }
+    .padding(10)
+    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 9))
+    .accessibilityElement(children: .contain)
+  }
+
+  private func applyResultStatusSymbol(_ status: ApplyResultOverallStatus) -> String {
+    switch status {
+    case .success: "checkmark.circle"
+    case .partial: "exclamationmark.circle"
+    case .failure: "xmark.octagon"
+    case .rolledBack: "arrow.uturn.backward.circle"
+    case .rollbackFailed: "exclamationmark.arrow.triangle.2.circlepath"
+    case .notVerified: "questionmark.circle"
+    }
+  }
+
   private func profileRow(_ profile: DeskProfile) -> some View {
     let readiness = model.readiness(for: profile)
-    let actions = profileActionState(profile, readiness: readiness)
+    let action = primaryApplyActionState(profile, readiness: readiness)
 
     return VStack(alignment: .leading, spacing: 8) {
       HStack {
@@ -404,7 +904,7 @@ private struct MenuContentView: View {
             appLocalized("Profile status: \(readinessTitle(readiness))"))
       }
 
-      if let reason = actions.apply.disabledReason {
+      if let reason = action.disabledReason {
         Label(appLocalizedRuntime(reason.defaultMessage), systemImage: reason.symbolName)
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -412,14 +912,19 @@ private struct MenuContentView: View {
       }
 
       HStack {
-        Button("Apply") {
-          model.prepareApply(profile: profile, mode: .normal)
+        Button(appLocalizedRuntime(action.defaultLabel)) {
+          requestApply(profile, mode: action.mode)
         }
         .buttonStyle(.borderedProminent)
-        .disabled(!actions.apply.isEnabled)
+        .disabled(!action.isEnabled)
+        .accessibilityLabel(
+          appLocalized("\(appLocalizedRuntime(action.defaultLabel)) \(profile.name)")
+        )
         .help(
-          actions.apply.disabledReason.map { appLocalizedRuntime($0.defaultMessage) }
-            ?? appLocalized("Preview and apply this complete profile."))
+          action.disabledReason.map { appLocalizedRuntime($0.defaultMessage) }
+            ?? (action.kind == .availableItems
+              ? appLocalized("Preview and apply only the currently available settings.")
+              : appLocalized("Preview and apply this complete profile.")))
 
         Spacer()
 
@@ -439,19 +944,21 @@ private struct MenuContentView: View {
     .accessibilityElement(children: .contain)
   }
 
-  private func profileActionState(
+  private func primaryApplyActionState(
     _ profile: DeskProfile,
     readiness: ProfileReadiness
-  ) -> MenuProfileActionState {
-    MenuProfileActionState(
+  ) -> PrimaryApplyActionState {
+    PrimaryApplyActionState(
       profile: profile,
       readiness: readiness,
-      normalApplyAvailable: model.canApplyNormally(profile),
-      forceApplyAvailable: model.canForceApply(profile),
+      normalOperationCount: model.operationCountByProfile[profile.id] ?? 0,
+      availableOperationCount: model.forceOperationCountByProfile[profile.id] ?? 0,
+      isPreparing: model.isPreparingApply(for: profile),
       isRefreshing: model.isReadinessRefreshInProgress,
-      isTransactionLocked: model.isProfileMutationLocked,
-      rejectionReasons: model.normalApplyRejectionReasonsByProfile[profile.id] ?? [],
-      forceRejectionReasons: model.forceApplyRejectionReasonsByProfile[profile.id]
+      hasUsableCachedReadiness: model.readinessByProfile[profile.id] != nil,
+      isTransactionLocked:
+        model.isApplyTransactionInProgress || model.isProfileStoreMutationInProgress,
+      isDisplayConfirmationPending: model.safetyConfirmation != nil
     )
   }
 
@@ -474,33 +981,21 @@ private struct MenuContentView: View {
 private struct ApplyPreviewView: View {
   @EnvironmentObject private var model: ApplicationModel
   let request: PendingApplyRequest
+  let onConfirm: () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       HStack {
         Label(
-          request.isReviewOnly
-            ? appLocalized("Availability Review")
-            : request.preparation.mode == .force
-              ? appLocalized("Force Apply Preview") : appLocalized("Apply Preview"),
-          systemImage: request.isReviewOnly
-            ? "eye"
-            : request.preparation.mode == .force
-              ? "exclamationmark.shield" : "list.bullet.clipboard"
+          request.preparation.mode == .force
+            ? appLocalized("Available Settings Preview") : appLocalized("Apply Preview"),
+          systemImage: request.preparation.mode == .force
+            ? "exclamationmark.shield" : "list.bullet.clipboard"
         )
         .font(.title2.bold())
         Spacer()
         Text(request.profile.name)
           .foregroundStyle(.secondary)
-      }
-
-      if request.isReviewOnly {
-        Label(
-          "Read-only review. No settings can be changed from this preview.",
-          systemImage: "eye"
-        )
-        .padding(10)
-        .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
       }
 
       if request.preparation.mode == .force {
@@ -523,19 +1018,6 @@ private struct ApplyPreviewView: View {
 
       ScrollView {
         VStack(alignment: .leading, spacing: 14) {
-          previewSection(appLocalized("Conditions"), systemImage: "checklist") {
-            if request.conditions.items.isEmpty {
-              Text("No readiness conditions.")
-            } else {
-              ForEach(request.conditions.items) { item in
-                Label(
-                  appLocalizedRuntime(item.explanation),
-                  systemImage: item.isMatched ? "checkmark.circle" : "xmark.circle"
-                )
-              }
-            }
-          }
-
           previewSection(
             appLocalized("Planned changes"),
             systemImage: "arrow.triangle.2.circlepath"
@@ -609,22 +1091,20 @@ private struct ApplyPreviewView: View {
 
       Divider()
       HStack {
-        Button(request.isReviewOnly ? appLocalized("Close") : appLocalized("Cancel")) {
+        Button("Cancel") {
           model.cancelPendingApply()
         }
         .keyboardShortcut(.cancelAction)
-        if !request.isReviewOnly {
-          Spacer()
-          Button(
-            request.preparation.mode == .force
-              ? appLocalized("Apply Available Settings") : appLocalized("Apply Profile")
-          ) {
-            model.executePendingApply()
-          }
-          .keyboardShortcut(.defaultAction)
-          .buttonStyle(.borderedProminent)
-          .disabled(!request.preparation.canExecute || model.isProfileMutationLocked)
+        Spacer()
+        Button(
+          request.preparation.mode == .force
+            ? appLocalized("Apply Available Settings") : appLocalized("Apply Profile")
+        ) {
+          onConfirm()
         }
+        .keyboardShortcut(.defaultAction)
+        .buttonStyle(.borderedProminent)
+        .disabled(!request.preparation.canExecute || model.isProfileMutationLocked)
       }
     }
     .padding(20)
@@ -730,6 +1210,213 @@ private struct ApplyPreviewView: View {
     case .safetyConfirmationCapacityReached:
       appLocalized(
         "Confirm or revert the previous display change before starting another high-risk change.")
+    }
+  }
+}
+
+private struct ApplyResultDetailsView: View {
+  @Environment(\.dismiss) private var dismiss
+  let summary: ApplyResultSummary
+  let result: ApplyExecutionResult
+  let verification: PostApplyVerificationResult?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      HStack(alignment: .firstTextBaseline) {
+        Label(statusTitle, systemImage: statusSymbol)
+          .font(.title2.bold())
+        Spacer()
+        Text(summary.profileName)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+
+      Text(recoveryGuidance)
+        .font(.callout)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+
+      Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 5) {
+        resultCount("Succeeded", summary.succeededCount)
+        resultCount("Failed", summary.failedCount)
+        resultCount("Skipped", summary.skippedCount)
+        resultCount("Unsupported", summary.unsupportedCount)
+        resultCount("Not verified", summary.notVerifiedCount)
+        resultCount("Rolled back", summary.rolledBackCount)
+        resultCount("Rollback failed", summary.rollbackFailedCount)
+      }
+      .font(.caption)
+
+      Divider()
+      ScrollView {
+        VStack(alignment: .leading, spacing: 16) {
+          resultSection("Apply Results", items: result.itemResults)
+          if !result.rollbackResults.isEmpty {
+            resultSection("Rollback Results", items: result.rollbackResults)
+          }
+
+          if let unexpected = verification?.unexpectedRemainingOperations,
+            !unexpected.isEmpty
+          {
+            VStack(alignment: .leading, spacing: 6) {
+              Label("Additional Read-back Changes", systemImage: "questionmark.circle")
+                .font(.headline)
+              Text(
+                "Read-back found additional changes that were not part of the completed operation. Refresh readiness before applying again."
+              )
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              ForEach(Array(unexpected.enumerated()), id: \.offset) { _, reference in
+                Label(
+                  appLocalized(
+                    "\(appSettingGroupTitle(reference.group)): \(appApplicationItemTitle(reference.key))"
+                  ),
+                  systemImage: "arrow.clockwise"
+                )
+                .font(.caption)
+              }
+            }
+          }
+        }
+      }
+
+      Divider()
+      HStack {
+        Text(summary.appliedAt.formatted())
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Spacer()
+        Button("Close") { dismiss() }
+          .keyboardShortcut(.cancelAction)
+      }
+    }
+    .padding(20)
+    .frame(minWidth: 520, idealWidth: 600, minHeight: 380, idealHeight: 500)
+  }
+
+  @ViewBuilder
+  private func resultCount(_ title: LocalizedStringKey, _ count: Int) -> some View {
+    GridRow {
+      Text(title)
+      Text(count, format: .number)
+        .monospacedDigit()
+    }
+  }
+
+  @ViewBuilder
+  private func resultSection(
+    _ title: LocalizedStringKey,
+    items: [ApplicationItemSummary]
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 7) {
+      Text(title)
+        .font(.headline)
+      if items.isEmpty {
+        Text("No item results were recorded.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      } else {
+        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+          resultItem(item)
+        }
+      }
+    }
+  }
+
+  private func resultItem(_ item: ApplicationItemSummary) -> some View {
+    let operation = ApplyOperationReference(item)
+    let verificationFailure = verification?.failureReason(for: operation)
+    let rollbackOperationIDs = Set(result.rollbackResults.map(\.id))
+    let isNotVerified =
+      item.status == .succeeded
+      && !rollbackOperationIDs.contains(item.id)
+      && verificationFailure != nil
+    return VStack(alignment: .leading, spacing: 3) {
+      HStack(alignment: .firstTextBaseline) {
+        Text(appSettingGroupTitle(item.group))
+          .font(.caption.bold())
+        Text(appApplicationItemTitle(item.key))
+        Spacer()
+        Label(
+          isNotVerified
+            ? appLocalized("Not Verified") : appApplicationItemStatusTitle(item.status),
+          systemImage: isNotVerified ? "questionmark.circle" : itemStatusSymbol(item.status)
+        )
+        .font(.caption.bold())
+      }
+      Text(
+        isNotVerified
+          ? verificationFailure == .readBackUnavailable
+            ? appLocalized(
+              "The write completed, but the current setting could not be read back safely."
+            )
+            : appLocalized("The write completed, but read-back still requires this change.")
+          : appLocalizedRuntime(item.message)
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+    }
+    .padding(.vertical, 3)
+    .accessibilityElement(children: .combine)
+  }
+
+  private var statusTitle: String {
+    switch summary.status {
+    case .success: appLocalized("Applied")
+    case .partial: appLocalized("Partially Applied")
+    case .failure: appLocalized("Apply Failed")
+    case .rolledBack: appLocalized("Rolled Back")
+    case .rollbackFailed: appLocalized("Rollback Failed")
+    case .notVerified: appLocalized("Not Verified")
+    }
+  }
+
+  private var statusSymbol: String {
+    switch summary.status {
+    case .success: "checkmark.circle"
+    case .partial: "exclamationmark.circle"
+    case .failure: "xmark.octagon"
+    case .rolledBack: "arrow.uturn.backward.circle"
+    case .rollbackFailed: "exclamationmark.arrow.triangle.2.circlepath"
+    case .notVerified: "questionmark.circle"
+    }
+  }
+
+  private var recoveryGuidance: String {
+    switch summary.status {
+    case .success:
+      appLocalized("All completed operations were confirmed by their result and read-back.")
+    case .partial:
+      appLocalized(
+        "Some settings were skipped, failed, or not verified. Review the items below before trying again."
+      )
+    case .failure:
+      appLocalized(
+        "No complete result was confirmed. Review failed items and current permissions before trying again."
+      )
+    case .rolledBack:
+      appLocalized(
+        "The previous configuration was restored. Review the rollback items before applying again.")
+    case .rollbackFailed:
+      appLocalized(
+        "The previous configuration may not be fully restored. Verify the affected settings in macOS now."
+      )
+    case .notVerified:
+      appLocalized(
+        "The write completed, but read-back could not confirm the requested state. Refresh and inspect the current settings."
+      )
+    }
+  }
+
+  private func itemStatusSymbol(_ status: ApplicationItemStatus) -> String {
+    switch status {
+    case .succeeded: "checkmark.circle"
+    case .failed: "xmark.octagon"
+    case .skipped: "forward.end"
+    case .unsupported: "nosign"
+    case .rolledBack: "arrow.uturn.backward.circle"
+    case .rollbackFailed: "exclamationmark.arrow.triangle.2.circlepath"
     }
   }
 }

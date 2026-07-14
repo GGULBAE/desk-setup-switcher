@@ -191,6 +191,14 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
     do {
       let write = try decoder.decode(InputPreferenceWrite.self, from: operation.payload)
       try api.setValue(write.value, for: write.key)
+      guard api.value(for: write.key) == write.value else {
+        return OperationResult(
+          operationID: operation.id,
+          status: .failed,
+          message:
+            "macOS accepted the experimental input preference write, but read-back did not confirm the requested value."
+        )
+      }
       return OperationResult(
         operationID: operation.id,
         status: .succeeded,
@@ -212,6 +220,13 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
       }
       let write = try decoder.decode(InputPreferenceWrite.self, from: rollbackPayload)
       try api.setValue(write.value, for: write.key)
+      guard api.value(for: write.key) == write.value else {
+        return OperationResult(
+          operationID: operation.id,
+          status: .rollbackFailed,
+          message: "The previous input preference could not be confirmed after rollback."
+        )
+      }
       return OperationResult(
         operationID: operation.id,
         status: .rolledBack,

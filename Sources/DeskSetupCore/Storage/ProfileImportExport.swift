@@ -5,19 +5,31 @@ public struct ImportedProfileDocument: Equatable, Sendable {
   public let document: ProfileDocument
   public let sourceURL: URL
   public let originalSchemaVersion: Int
+  public let wasNormalized: Bool
 
-  public init(document: ProfileDocument, sourceURL: URL, originalSchemaVersion: Int) {
+  public init(
+    document: ProfileDocument,
+    sourceURL: URL,
+    originalSchemaVersion: Int,
+    wasNormalized: Bool = false
+  ) {
     self.document = document
     self.sourceURL = sourceURL
     self.originalSchemaVersion = originalSchemaVersion
+    self.wasNormalized = wasNormalized
   }
 }
 
 public struct ProfileImportExport: Sendable {
   private let codec: ProfileJSONCodec
+  private let normalizer: ProfileApplicabilityNormalizer
 
-  public init(codec: ProfileJSONCodec = .init()) {
+  public init(
+    codec: ProfileJSONCodec = .init(),
+    normalizer: ProfileApplicabilityNormalizer = .init()
+  ) {
     self.codec = codec
+    self.normalizer = normalizer
   }
 
   public func importDocument(from sourceURL: URL) throws -> ImportedProfileDocument {
@@ -25,7 +37,8 @@ public struct ProfileImportExport: Sendable {
     return ImportedProfileDocument(
       document: decoded.document,
       sourceURL: sourceURL.standardizedFileURL,
-      originalSchemaVersion: decoded.originalSchemaVersion
+      originalSchemaVersion: decoded.originalSchemaVersion,
+      wasNormalized: decoded.wasNormalized
     )
   }
 
@@ -43,7 +56,7 @@ public struct ProfileImportExport: Sendable {
   }
 
   private func write(_ document: ProfileDocument, to destinationURL: URL) throws {
-    let data = try codec.encode(document)
+    let data = try codec.encode(normalizer.normalize(document))
     let descriptor = destinationURL.withUnsafeFileSystemRepresentation { path -> Int32 in
       guard let path else { return -1 }
       return Darwin.open(path, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)

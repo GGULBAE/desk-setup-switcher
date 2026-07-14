@@ -47,19 +47,19 @@ public struct NetworkAdapter: SystemSettingsAdapter {
         value: system.wifi?.ssid
       ),
       ipv4: .init(
-        isIncluded: primaryService?.ipv4 != nil,
+        isIncluded: false,
         value: primaryService?.ipv4
       ),
       dnsServers: .init(
-        isIncluded: !dnsServers.isEmpty,
+        isIncluded: false,
         value: dnsServers
       ),
       webProxy: .init(
-        isIncluded: primaryService?.webProxy != nil,
+        isIncluded: false,
         value: primaryService?.webProxy
       ),
       secureWebProxy: .init(
-        isIncluded: primaryService?.secureWebProxy != nil,
+        isIncluded: false,
         value: primaryService?.secureWebProxy
       )
     )

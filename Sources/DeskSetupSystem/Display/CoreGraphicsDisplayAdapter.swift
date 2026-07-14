@@ -64,8 +64,14 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
           isIncluded: display.currentMode != nil,
           value: display.currentMode ?? fallbackMode
         ),
-        rotationDegrees: SettingOption(value: display.rotationDegrees),
-        isActive: SettingOption(value: display.isActive)
+        rotationDegrees: SettingOption(
+          isIncluded: false,
+          value: display.rotationDegrees
+        ),
+        isActive: SettingOption(
+          isIncluded: false,
+          value: display.isActive
+        )
       )
       targets.append(target)
 
@@ -100,7 +106,10 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
       group: .display,
       capturedAt: now(),
       payload: .display(DisplayProfileSettings(displays: targets)),
-      items: items
+      items: items,
+      displayModeCatalog: displays.map {
+        DisplayModeCatalogEntry(identity: $0.identity, modes: $0.supportedModes)
+      }
     )
   }
 
@@ -443,9 +452,10 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
 
       if target.mode.isIncluded {
         let candidates = display.supportedModes + [display.currentMode].compactMap { $0 }
-        if let supportedMode = candidates.first(where: {
-          displayModesMatch($0, target.mode.value)
-        }) {
+        if let supportedMode = DisplayModeMatcher().match(
+          target.mode.value,
+          among: candidates
+        ) {
           finalTargets[configurationIndex].mode = supportedMode
         } else {
           record(

@@ -1,6 +1,6 @@
 # Roadmap
 
-The roadmap is evidence-based. “Implemented” means source exists; “verified” names the evidence boundary; “done” additionally requires current documentation and committed/pushed evidence. Dates are intentionally omitted because safety gates determine sequence.
+The roadmap is evidence-based. “Implemented” means source exists; “verified” names the evidence boundary; “done” additionally requires current documentation and the commit or push evidence required by that milestone's explicit contract. Dates are intentionally omitted because safety gates determine sequence.
 
 ## M0 — Repository and product contract (done)
 
@@ -39,9 +39,9 @@ Evidence: injected/mock success and fault tests pass. The fresh snapshot profile
 
 ## M4 — UX and release hardening (implemented; full local gate verified)
 
-The active implementation contract is [UI-REFINEMENT-GOAL.md](UI-REFINEMENT-GOAL.md). It prioritizes unsaved-draft protection, direct typed setting-value editing, a compact menu/apply hierarchy, legacy-condition compatibility, accessibility feedback, and English/Korean parity without changing adapter or mutation semantics.
+[UI-REFINEMENT-GOAL.md](UI-REFINEMENT-GOAL.md) records this completed baseline. Its menu, disclosure, and condition decisions are superseded where noted by the active [apply-reliability follow-up](APPLY-RELIABILITY-UX-GOAL.md).
 
-Implemented and verified without live flags:
+Historical M4 behavior implemented and verified without live flags (later replacements are listed in M4.1):
 
 - App-lifetime saved/draft state with dirty detection, save/discard/cancel replacement protection, external-refresh preservation, authoritative metadata merge, fixed save/revert status, `⌘S`, ordinary-quit protection, and read-only capture into the draft
 - Friendly included-value summaries and operation previews with technical details disclosed separately, preserved imported symbols, and deterministic localization at the UI boundary
@@ -52,7 +52,7 @@ Implemented and verified without live flags:
 - Separate app-desired and macOS login-item state, mismatch-only guidance, About links, text diagnostic severity, accessibility announcements, and display safety keyboard/value metadata
 - English/Korean catalog parity, duplicate-key, placeholder, and static-key validation
 
-Evidence: the current header/editor follow-up passes full local `make verify` with 215 default non-live tests: 112 XCTest with five skips plus 103 Swift Testing cases with one skip. The 56 presentation-specific cases are 29 draft XCTest cases and 27 presentation/condition Swift Testing cases. Universal builds, Analyze, DMG/checksum, mount, resources, architectures, and ad-hoc signature classification pass; local DMG SHA-256 is `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`. UI-hardening commit `5f0cabc` and [run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967) remain the latest matching remote CI/artifact evidence and predate this follow-up. No live flag, screenshot capture, TCC action, Keychain write, or setting mutation was used.
+Evidence: the historical header/editor follow-up passed full local `make verify` with 215 default tests: 112 XCTest with five skips plus 103 Swift Testing cases with one skip. The 56 presentation-specific cases were 29 draft XCTest cases and 27 presentation/condition Swift Testing cases. Universal builds, Analyze, DMG/checksum, mount, resources, architectures, and ad-hoc signature classification passed; local DMG SHA-256 was `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`. UI-hardening commit `5f0cabc` and [run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967) remain historical remote CI/artifact evidence and predate the apply-reliability follow-up. No live flag, screenshot capture, TCC action, Keychain write, or setting mutation was used.
 
 Historical evidence retained from the 2026-07-11 baseline:
 
@@ -69,7 +69,21 @@ Remaining optional/manual evidence after the implementation milestone:
 - Manually verify import/export replacement/no-overwrite and diagnostics clearing
 - Decide whether diagnostic export belongs in 0.1.0
 
-## M5 — Packaging and CI (current local package and CI green)
+## M4.1 — Apply reliability and safer editing (locally verified; no push/CI requested)
+
+The active contract is [APPLY-RELIABILITY-UX-GOAL.md](APPLY-RELIABILITY-UX-GOAL.md). The current source and deterministic synthetic tests implement:
+
+- One state-aware primary row action: normal Apply for complete executable plans and Apply Available for partial plans with executable operations, with zero-operation, lock, display-confirmation, refresh, and per-profile preparation reasons
+- An idempotent applicability normalizer at capture/decode/store/import/planning boundaries that preserves but excludes display rotation/active state and administrative IPv4/DNS/proxy values, and excludes groups with no applicable leaf
+- Dormant, round-trip-compatible legacy conditions that no longer invisibly block current manual readiness, preview, or execution
+- Dirty-draft resolution before Apply, followed by the existing fresh-profile/snapshot stale-plan defense
+- Value-free complete/partial/failure capture summaries and immediate compact/itemized apply results
+- Post-apply read-only replanning that reclassifies a succeeded-but-still-required operation as not verified, plus immediate input-preference read-back
+- Inclusion/disclosure separation, typed controls, read-only snapshot-only fields, and field-specific pre-save validation with localized non-color/accessibility metadata
+
+Evidence: integrated non-live `make verify` passed on 2026-07-14 with lint/localization policy, 290 default cases (124 XCTest with five opt-in skips plus 166 Swift Testing with one opt-in skip), zero failures, Swift Debug/Release, universal Xcode Debug/Release, Analyze, DMG/checksum, mounted resources/architectures, and ad-hoc signature classification. Separately, `git diff --check` passed. The verified universal DMG SHA-256 is `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`. The behavior-focused commit containing this evidence is the local milestone boundary; its final clean status is reported at handoff. No live setting mutation, hardware rollback, TCC action, full VoiceOver run, UI automation, Developer ID signing/notarization, release, push, or new CI run was performed for this follow-up.
+
+## M5 — Packaging and CI (current local package verified; historical CI green)
 
 - The 2026-07-11 post-fix full `make verify` locally passed lint, 158 tests (83 XCTest + 75 Swift Testing), universal builds, Analyze, packaging, checksum, and mounted-image inspection
 - Versioned DMG contains universal app, `/Applications` link, resources, and a verified ad-hoc integrity signature
@@ -79,6 +93,7 @@ Remaining optional/manual evidence after the implementation milestone:
 - CI and tag-triggered release workflows are implemented; CI passed for repair commit `4e45328`
 - Current header/editor follow-up `make verify` produced and verified a universal local DMG with SHA-256 `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`
 - UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967); unsigned artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`
+- The 2026-07-14 apply-reliability `make verify` produced and mounted `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`, verified `x86_64 arm64`, resources, checksum, and ad-hoc/no-Developer-ID signature status; SHA-256 is `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`
 
 Remaining:
 
@@ -86,13 +101,8 @@ Remaining:
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
-## Current next task — non-mutating header and profile-editor walkthrough
+## Current next task — optional manual and release evidence
 
-Exercise the simplified menu header and direct setting editor with synthetic, non-personal data without broadening its safety scope.
+The implementation and non-live package gate are complete locally. The next useful evidence is a non-mutating English/Korean layout, keyboard, and VoiceOver walkthrough with synthetic data, followed by the remaining import/export, permission, login approval/retry/reboot, and Gatekeeper checks under their documented authorization boundaries. A push, new CI run, tag, or publication is a separate operator decision and was not part of this local goal.
 
-- **Prerequisites:** launch a verified local build with synthetic profiles and keep every Apply, Capture, permission, login-item, and mutation action untouched.
-- **Scope:** check the top-right Capture/Settings/Quit layout without activating Capture or Quit, Settings closed/open/minimized, direct Edit, dirty-draft Save/Discard/Cancel, group and option expansion, value preservation after off/on, unsupported notices, `⌘,`, English/Korean labels, and VoiceOver names.
-- **Acceptance:** Settings always becomes visible on the Profiles tab, the requested profile is selected or protected by the dirty-draft decision, ellipsis/availability-review/available-items/manual-refresh controls stay absent, group and option expansion is clear, disabling and re-enabling preserves values, no condition editor is shown, and legacy condition data remains unchanged.
-- **Verification:** record performed and unperformed cases separately, keep any screenshots synthetic and sanitized, update README/support/completion evidence, and run `make lint` plus `git diff --check` for evidence-only changes.
-
-Release publication, Gatekeeper, physical Intel, full assistive-technology testing, and any live mutation-and-rollback procedure remain separate optional evidence work and require the authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

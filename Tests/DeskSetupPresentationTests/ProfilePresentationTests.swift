@@ -201,6 +201,22 @@ struct ProfilePresentationTests {
       ])
   }
 
+  @Test("Wi-Fi summaries preserve target whitespace but reject blank values")
+  func wifiSummariesPreserveExactTargetName() throws {
+    let target = "  Synthetic Target Wi-Fi  "
+    #expect(FriendlyValueFormatter.wifiNetworkName(target) == target)
+    #expect(FriendlyValueFormatter.wifiNetworkName(" \t\n ") == nil)
+    #expect(FriendlyValueFormatter.wifiNetworkName(nil) == nil)
+
+    let settings = ProfileSettings(
+      network: .init(value: .init(wifiSSID: .init(value: target)))
+    )
+    let summary = try #require(
+      ProfilePresentationBuilder().summary(for: .network, in: settings)
+    )
+    #expect(summary.items.first?.value.primaryText == target)
+  }
+
   @Test("operation preview keeps audio names visible and UIDs disclosed separately")
   func audioOperationPreviewHidesUIDs() {
     let operation = PlannedOperation(
@@ -393,6 +409,22 @@ struct ProfilePresentationTests {
     requireSendable(FriendlyDisplayValue(primaryText: "Synthetic"))
     requireSendable(ProfilePresentationBuilder())
     requireSendable(menuState(readiness: .ready))
+  }
+
+  @Test("same-name choices receive stable non-sensitive ordinals")
+  func friendlyNameDisambiguation() {
+    let labels = FriendlyNameDisambiguator().labels(
+      for: [
+        (id: "first", name: "Synthetic Display"),
+        (id: "unique", name: "Built-in Display"),
+        (id: "second", name: "Synthetic Display"),
+      ]
+    )
+
+    #expect(labels["first"] == "Synthetic Display 1")
+    #expect(labels["second"] == "Synthetic Display 2")
+    #expect(labels["unique"] == "Built-in Display")
+    #expect(!labels.values.contains { $0.contains("uid") })
   }
 
   private func menuState(

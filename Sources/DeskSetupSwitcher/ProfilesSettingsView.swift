@@ -17,6 +17,7 @@ struct ProfilesSettingsView: View {
   @State private var deferredAction: DeferredProfileAction?
   @State private var isUnsavedPromptPresented = false
   @State private var isResolvingUnsavedPrompt = false
+  @State private var requestedValidationFocus: DraftFieldIdentifier?
 
   var body: some View {
     VStack(spacing: 12) {
@@ -88,6 +89,7 @@ struct ProfilesSettingsView: View {
           }
         }
       }
+      .disabled(!draftCanBePersisted)
       Button("Discard Changes", role: .destructive) {
         isResolvingUnsavedPrompt = true
         discardAndContinue()
@@ -253,8 +255,11 @@ struct ProfilesSettingsView: View {
         ProfileEditorForm(
           profile: draftBinding,
           conditionContext: model.lastConditionContext,
-          systemSnapshot: model.lastSnapshot
+          systemSnapshot: model.lastSnapshot,
+          validation: currentDraftValidation,
+          requestedValidationFocus: $requestedValidationFocus
         )
+        .disabled(profileEditor.activity.isBusy)
         Divider()
         editorActionBar
       } else {
@@ -366,10 +371,25 @@ struct ProfilesSettingsView: View {
   }
 
   private var canSaveDraft: Bool {
-    guard let draft = profileEditor.draft else { return false }
     return profileEditor.isDirty
       && !profileEditor.activity.isBusy
-      && !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && draftCanBePersisted
+  }
+
+  private var currentDraftValidation: ProfileDraftValidation {
+    guard let draft = profileEditor.draft else {
+      return ProfileDraftValidation(issues: [])
+    }
+    return ProfileDraftValidator().validate(draft)
+  }
+
+  private var draftNameIsValid: Bool {
+    profileEditor.draft != nil
+      && currentDraftValidation.issue(for: .profileName) == nil
+  }
+
+  private var draftCanBePersisted: Bool {
+    profileEditor.draft != nil && draftNameIsValid && currentDraftValidation.isValid
   }
 
   private var editorActivityIsError: Bool {
@@ -447,6 +467,8 @@ struct ProfilesSettingsView: View {
   }
 
   private func saveAndContinue() async {
+    guard validateDraftBeforeSaving() else { return }
+
     if profileEditor.session.pendingSelection != nil {
       guard
         case .saveRequired(let candidate, _) =
@@ -482,6 +504,7 @@ struct ProfilesSettingsView: View {
 
   @discardableResult
   private func saveCurrentDraft() async -> Bool {
+    guard validateDraftBeforeSaving() else { return false }
     guard let candidate = profileEditor.session.saveCandidate() else { return false }
     profileEditor.beginSaving()
     switch await model.updateProfile(candidate) {
@@ -503,11 +526,25 @@ struct ProfilesSettingsView: View {
     }
   }
 
+  @discardableResult
+  private func validateDraftBeforeSaving() -> Bool {
+    guard draftCanBePersisted else {
+      requestedValidationFocus =
+        currentDraftValidation.firstInvalidField
+      AccessibilityNotification.Announcement(
+        appLocalized("Fix the highlighted fields before saving.")
+      )
+      .post()
+      return false
+    }
+    return true
+  }
+
   private func captureCurrentSettingsIntoDraft() async {
     guard let targetID = profileEditor.draft?.id else { return }
     profileEditor.beginCapture()
     switch await model.captureCurrentProfileSettings() {
-    case .captured(let snapshot):
+    case .captured(let snapshot, let summary):
       guard profileEditor.draft?.id == targetID else {
         profileEditor.finishWithError(
           appLocalized("The selected profile changed before the snapshot finished."))
@@ -530,8 +567,13 @@ struct ProfilesSettingsView: View {
       profileEditor.finishWithMessage(
         previousSettings == snapshot.profileSettings
           ? appLocalized("The draft already matches the current settings.")
-          : appLocalized("Current settings were added to the draft. Review and save them."))
-    case .rejected(let message):
+          : summary.status == .partial
+            ? appLocalized(
+              "Current settings replaced the draft settings with \(summary.excludedCount) snapshot-only and \(summary.omittedCount) unavailable items. Review and save them."
+            )
+            : appLocalized(
+              "Current settings replaced the draft settings. Review and save them."))
+    case .rejected(let message, _):
       profileEditor.finishWithError(message)
     }
   }
@@ -578,15 +620,39 @@ private struct ProfileEditorForm: View {
   @Binding var profile: DeskProfile
   let conditionContext: ConditionContext
   let systemSnapshot: SystemSnapshotResult?
+  let validation: ProfileDraftValidation
+  @Binding var requestedValidationFocus: DraftFieldIdentifier?
+  @State private var groupDisclosure = DisclosureState<SettingGroup>()
+  @State private var optionDisclosure = DisclosureState<OptionDisclosureID>()
+  @State private var advancedNumberDisclosure = DisclosureState<DraftFieldIdentifier>()
+  @FocusState private var focusedField: DraftFieldIdentifier?
 
   var body: some View {
     Form {
       Section("Profile") {
         TextField("Name", text: $profile.name)
           .accessibilityLabel("Profile name")
+          .focused($focusedField, equals: .profileName)
+          .accessibilityHint(validationAccessibilityHint(for: .profileName))
+          .accessibilityInvalid(validation.issue(for: .profileName) != nil)
+        if let issue = validation.issue(for: .profileName) {
+          inlineValidationMessage(
+            validationMessage(for: issue),
+            fieldID: .profileName
+          )
+        }
         TextField("Description", text: $profile.profileDescription, axis: .vertical)
           .lineLimit(2...4)
           .accessibilityLabel("Profile description")
+          .focused($focusedField, equals: .profileDescription)
+          .accessibilityHint(validationAccessibilityHint(for: .profileDescription))
+          .accessibilityInvalid(validation.issue(for: .profileDescription) != nil)
+        if let issue = validation.issue(for: .profileDescription) {
+          inlineValidationMessage(
+            validationMessage(for: issue),
+            fieldID: .profileDescription
+          )
+        }
         Picker("Icon", selection: $profile.symbolName) {
           ForEach(iconChoices, id: \.symbolName) { choice in
             Label(appLocalizedRuntime(choice.title), systemImage: choice.symbolName)
@@ -613,14 +679,21 @@ private struct ProfileEditorForm: View {
         Toggle("Enabled", isOn: $profile.isEnabled)
       }
 
+      if !validation.isValid {
+        validationSummary
+      }
+
       Section("Settings") {
-        Text("Turn on a category to edit the values this profile will apply.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Text(
+          "Use Include to choose what this profile applies. Expand a category to review or edit its saved values."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
       }
 
       settingGroupEditor(
         "Displays",
+        group: .display,
         systemImage: "display.2",
         isOn: $profile.settings.display.isIncluded,
         summary: summaryPreview(for: .display)
@@ -630,6 +703,7 @@ private struct ProfileEditorForm: View {
 
       settingGroupEditor(
         "Audio",
+        group: .audio,
         systemImage: "speaker.wave.2",
         isOn: $profile.settings.audio.isIncluded,
         summary: summaryPreview(for: .audio)
@@ -639,6 +713,7 @@ private struct ProfileEditorForm: View {
 
       settingGroupEditor(
         "Network",
+        group: .network,
         systemImage: "network",
         isOn: $profile.settings.network.isIncluded,
         summary: summaryPreview(for: .network)
@@ -648,6 +723,7 @@ private struct ProfileEditorForm: View {
 
       settingGroupEditor(
         "Mouse & Keyboard",
+        group: .input,
         systemImage: "keyboard",
         isOn: $profile.settings.input.isIncluded,
         summary: summaryPreview(for: .input)
@@ -695,6 +771,58 @@ private struct ProfileEditorForm: View {
 
     }
     .formStyle(.grouped)
+    .onChange(of: profile.id) {
+      groupDisclosure.reset()
+      optionDisclosure.reset()
+      advancedNumberDisclosure.reset()
+      focusedField = nil
+      requestedValidationFocus = nil
+    }
+    .onChange(of: requestedValidationFocus) {
+      guard let fieldID = requestedValidationFocus else { return }
+      revealAndFocus(fieldID)
+    }
+  }
+
+  private var validationSummary: some View {
+    Section {
+      Label(
+        "Fix the highlighted fields before saving.",
+        systemImage: "exclamationmark.triangle.fill"
+      )
+      .foregroundStyle(.red)
+      .accessibilityLabel("Profile validation failed")
+      .accessibilityHint("Review the first issue or choose a highlighted field")
+
+      if let item = firstValidationItem {
+        Button {
+          revealAndFocus(item.fieldID)
+        } label: {
+          HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(item.message)
+              .multilineTextAlignment(.leading)
+            Spacer(minLength: 8)
+            Image(systemName: "arrow.forward.circle")
+              .accessibilityHidden(true)
+          }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+          "\(appLocalized("First validation issue")): \(item.message)"
+        )
+        .accessibilityHint("Moves keyboard focus to the invalid field")
+      }
+    } header: {
+      Text("Review Before Saving")
+    }
+  }
+
+  private var firstValidationItem: EditorValidationItem? {
+    guard let issue = validation.issues.first else { return nil }
+    return EditorValidationItem(
+      fieldID: issue.fieldID,
+      message: validationMessage(for: issue)
+    )
   }
 
   @ViewBuilder
@@ -707,25 +835,84 @@ private struct ProfileEditorForm: View {
       .font(.caption)
       .foregroundStyle(.secondary)
     } else {
+      if !profile.settings.display.value.displays.isEmpty {
+        optionEditor(
+          "Primary display",
+          id: .init(group: .display, key: "primary"),
+          isOn: primaryDisplayIncludedBinding,
+          summary: primaryDisplaySummary,
+          validationFields: [.displayPrimary]
+        ) {
+          Picker(
+            "Primary display",
+            selection: primaryDisplaySelectionBinding()
+          ) {
+            if primaryDisplaySelectionIsAmbiguous {
+              Text("Choose a display").tag(invalidPrimaryDisplaySelectionID)
+            }
+            ForEach(profile.settings.display.value.displays) { display in
+              Text(displayName(display)).tag(display.id)
+            }
+          }
+          .accessibilityValue(primaryDisplaySummary)
+          .accessibilityHint(validationAccessibilityHint(for: .displayPrimary))
+          .accessibilityInvalid(validation.issue(for: .displayPrimary) != nil)
+          .focused($focusedField, equals: .displayPrimary)
+          Text("Select the display that should anchor the desktop.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+
       ForEach($profile.settings.display.value.displays) { $display in
         GroupBox {
           VStack(alignment: .leading, spacing: 10) {
-            optionEditor("Primary display", isOn: $display.isPrimary.isIncluded) {
-              Picker("Primary display value", selection: $display.isPrimary.value) {
-                Text("Primary").tag(true)
-                Text("Not primary").tag(false)
-              }
-              .pickerStyle(.segmented)
-            }
-
-            optionEditor("Position", isOn: $display.origin.isIncluded) {
+            optionEditor(
+              "Position",
+              id: .init(group: .display, ownerID: display.id, key: "position"),
+              isOn: $display.origin.isIncluded,
+              summary: "\(display.origin.value.x), \(display.origin.value.y)",
+              validationFields: [
+                .display(display.id, .originX),
+                .display(display.id, .originY),
+              ]
+            ) {
               HStack {
                 TextField("X position", value: $display.origin.value.x, format: .number)
+                  .focused(
+                    $focusedField,
+                    equals: .display(display.id, .originX)
+                  )
+                  .accessibilityHint(
+                    validationAccessibilityHint(
+                      for: .display(display.id, .originX)
+                    )
+                  )
+                  .accessibilityInvalid(
+                    validation.issue(for: .display(display.id, .originX)) != nil
+                  )
                 TextField("Y position", value: $display.origin.value.y, format: .number)
+                  .focused(
+                    $focusedField,
+                    equals: .display(display.id, .originY)
+                  )
+                  .accessibilityHint(
+                    validationAccessibilityHint(
+                      for: .display(display.id, .originY)
+                    )
+                  )
+                  .accessibilityInvalid(
+                    validation.issue(for: .display(display.id, .originY)) != nil
+                  )
               }
             }
 
-            optionEditor("Mirroring", isOn: $display.mirroring.isIncluded) {
+            optionEditor(
+              "Mirroring",
+              id: .init(group: .display, ownerID: display.id, key: "mirroring"),
+              isOn: $display.mirroring.isIncluded,
+              summary: mirroringSummary(display.mirroring.value)
+            ) {
               Picker(
                 "Display arrangement",
                 selection: mirroredDisplayBinding($display.mirroring.value)
@@ -746,58 +933,71 @@ private struct ProfileEditorForm: View {
               }
             }
 
-            optionEditor("Resolution and refresh rate", isOn: $display.mode.isIncluded) {
-              Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
-                GridRow {
-                  Text("Logical width")
-                  TextField("Logical width", value: $display.mode.value.width, format: .number)
-                }
-                GridRow {
-                  Text("Logical height")
-                  TextField("Logical height", value: $display.mode.value.height, format: .number)
-                }
-                GridRow {
-                  Text("Pixel width")
-                  TextField("Pixel width", value: $display.mode.value.pixelWidth, format: .number)
-                }
-                GridRow {
-                  Text("Pixel height")
-                  TextField("Pixel height", value: $display.mode.value.pixelHeight, format: .number)
-                }
-                GridRow {
-                  Text("Refresh rate")
-                  HStack {
-                    TextField(
-                      "Refresh rate",
-                      value: $display.mode.value.refreshRate,
-                      format: .number.precision(.fractionLength(0...2))
-                    )
-                    Text("Hz")
-                      .foregroundStyle(.secondary)
+            optionEditor(
+              "Resolution and refresh rate",
+              id: .init(group: .display, ownerID: display.id, key: "mode"),
+              isOn: $display.mode.isIncluded,
+              summary: displayModeSummary(display.mode.value),
+              validationFields: [
+                .display(display.id, .modeWidth),
+                .display(display.id, .modeHeight),
+                .display(display.id, .modePixelWidth),
+                .display(display.id, .modePixelHeight),
+                .display(display.id, .modeRefreshRate),
+              ]
+            ) {
+              let supportedModes = supportedDisplayModes(for: display)
+              if supportedModes.isEmpty {
+                LabeledContent("Saved mode", value: displayModeSummary(display.mode.value))
+                Label(
+                  "Supported display modes are unavailable. The saved mode is preserved.",
+                  systemImage: "exclamationmark.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              } else {
+                Picker(
+                  "Supported mode",
+                  selection: supportedDisplayModeBinding(
+                    $display.mode.value,
+                    supportedModes: supportedModes
+                  )
+                ) {
+                  ForEach(supportedModes, id: \.self) { mode in
+                    Text(displayModeSummary(mode)).tag(mode)
+                  }
+                  if DisplayModeMatcher().match(
+                    display.mode.value,
+                    among: supportedModes
+                  ) == nil {
+                    Text("Saved mode — currently unavailable")
+                      .tag(display.mode.value)
                   }
                 }
+                .focused(
+                  $focusedField,
+                  equals: .display(display.id, .modeWidth)
+                )
+                .accessibilityLabel("Display mode")
+                .accessibilityValue(displayModeSummary(display.mode.value))
+                .accessibilityHint(
+                  validationAccessibilityHint(
+                    for: .display(display.id, .modeWidth)
+                  )
+                )
+                .accessibilityInvalid(
+                  validationIssues(for: [
+                    .display(display.id, .modeWidth),
+                    .display(display.id, .modeHeight),
+                    .display(display.id, .modePixelWidth),
+                    .display(display.id, .modePixelHeight),
+                    .display(display.id, .modeRefreshRate),
+                  ]).isEmpty == false
+                )
               }
             }
 
-            optionEditor("Rotation", isOn: $display.rotationDegrees.isIncluded) {
-              Picker("Rotation", selection: $display.rotationDegrees.value) {
-                Text("0°").tag(0)
-                Text("90°").tag(90)
-                Text("180°").tag(180)
-                Text("270°").tag(270)
-              }
-              .pickerStyle(.segmented)
-              unsupportedDisplayOptionNotice
-            }
-
-            optionEditor("Active state", isOn: $display.isActive.isIncluded) {
-              Picker("Active state value", selection: $display.isActive.value) {
-                Text("Active").tag(true)
-                Text("Inactive").tag(false)
-              }
-              .pickerStyle(.segmented)
-              unsupportedDisplayOptionNotice
-            }
+            snapshotOnlyDisplayValues(display)
           }
         } label: {
           Label(displayName(display), systemImage: "display")
@@ -811,57 +1011,148 @@ private struct ProfileEditorForm: View {
   private var audioOptions: some View {
     audioDeviceOption(
       "Default input device",
+      key: "default-input-device",
       option: $profile.settings.audio.value.defaultInputUID,
-      scope: .input
+      scope: .input,
+      fieldID: .audio(.defaultInputDevice)
     )
     audioDeviceOption(
       "Default output device",
+      key: "default-output-device",
       option: $profile.settings.audio.value.defaultOutputUID,
-      scope: .output
+      scope: .output,
+      fieldID: .audio(.defaultOutputDevice)
     )
     audioDeviceOption(
       "System output device",
+      key: "system-output-device",
       option: $profile.settings.audio.value.systemOutputUID,
-      scope: .output
+      scope: .output,
+      fieldID: .audio(.systemOutputDevice)
     )
 
-    optionEditor("Output volume", isOn: $profile.settings.audio.value.outputVolume.isIncluded) {
-      HStack {
-        TextField(
-          "Volume percent",
-          value: percentageBinding($profile.settings.audio.value.outputVolume.value),
-          format: .number.precision(.fractionLength(0...1))
-        )
-        Text("%")
-          .foregroundStyle(.secondary)
+    optionEditor(
+      "Output volume",
+      id: .init(group: .audio, key: "output-volume"),
+      isOn: $profile.settings.audio.value.outputVolume.isIncluded,
+      summary: percentageSummary(profile.settings.audio.value.outputVolume.value),
+      hasSavedValue: profile.settings.audio.value.outputVolume.value != nil,
+      validationFields: [.audio(.outputVolume)],
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, profile.settings.audio.value.outputVolume.value == nil {
+          profile.settings.audio.value.outputVolume.value =
+            systemSnapshot?.profileSettings.audio.value.outputVolume.value ?? 0.5
+        }
+      }
+    ) {
+      if profile.settings.audio.value.outputVolume.value == nil {
+        chooseSuggestedValueButton(fieldID: .audio(.outputVolume)) {
+          profile.settings.audio.value.outputVolume.value =
+            systemSnapshot?.profileSettings.audio.value.outputVolume.value ?? 0.5
+        }
+      } else {
+        HStack(spacing: 10) {
+          Slider(
+            value: percentageSliderBinding($profile.settings.audio.value.outputVolume.value),
+            in: 0...100,
+            step: 1
+          ) {
+            Text("Volume percent")
+          } minimumValueLabel: {
+            Text("0")
+          } maximumValueLabel: {
+            Text("100")
+          }
+          TextField(
+            "Volume percent",
+            value: percentageBinding($profile.settings.audio.value.outputVolume.value),
+            format: .number.precision(.fractionLength(0...1))
+          )
+          .frame(width: 58)
+          .multilineTextAlignment(.trailing)
+          .focused($focusedField, equals: .audio(.outputVolume))
+          .accessibilityHint(
+            validationAccessibilityHint(for: .audio(.outputVolume))
+          )
+          Text("%")
+            .foregroundStyle(.secondary)
+        }
+        .accessibilityInvalid(validation.issue(for: .audio(.outputVolume)) != nil)
       }
       Text("Enter a value from 0 to 100 percent.")
         .font(.caption)
         .foregroundStyle(.secondary)
     }
 
-    optionEditor("Output mute", isOn: $profile.settings.audio.value.outputMuted.isIncluded) {
+    optionEditor(
+      "Output mute",
+      id: .init(group: .audio, key: "output-mute"),
+      isOn: $profile.settings.audio.value.outputMuted.isIncluded,
+      summary: booleanTargetSummary(profile.settings.audio.value.outputMuted.value),
+      hasSavedValue: profile.settings.audio.value.outputMuted.value != nil,
+      validationFields: [.audio(.outputMute)],
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, profile.settings.audio.value.outputMuted.value == nil {
+          profile.settings.audio.value.outputMuted.value =
+            systemSnapshot?.profileSettings.audio.value.outputMuted.value
+        }
+      }
+    ) {
       optionalBooleanPicker(
         "Output mute value",
-        selection: $profile.settings.audio.value.outputMuted.value
+        selection: $profile.settings.audio.value.outputMuted.value,
+        fieldID: .audio(.outputMute)
       )
     }
   }
 
   @ViewBuilder
   private var networkOptions: some View {
-    optionEditor("Wi-Fi power", isOn: $profile.settings.network.value.wifiPower.isIncluded) {
+    optionEditor(
+      "Wi-Fi power",
+      id: .init(group: .network, key: "wifi-power"),
+      isOn: $profile.settings.network.value.wifiPower.isIncluded,
+      summary: booleanTargetSummary(profile.settings.network.value.wifiPower.value),
+      hasSavedValue: profile.settings.network.value.wifiPower.value != nil,
+      validationFields: [.network(.wifiPower)],
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, profile.settings.network.value.wifiPower.value == nil {
+          profile.settings.network.value.wifiPower.value =
+            systemSnapshot?.profileSettings.network.value.wifiPower.value
+        }
+      }
+    ) {
       optionalBooleanPicker(
         "Wi-Fi power value",
-        selection: $profile.settings.network.value.wifiPower.value
+        selection: $profile.settings.network.value.wifiPower.value,
+        fieldID: .network(.wifiPower)
       )
     }
 
-    optionEditor("Wi-Fi network", isOn: $profile.settings.network.value.wifiSSID.isIncluded) {
+    optionEditor(
+      "Wi-Fi network",
+      id: .init(group: .network, key: "wifi-network"),
+      isOn: $profile.settings.network.value.wifiSSID.isIncluded,
+      summary: wifiNetworkSummary(profile.settings.network.value.wifiSSID.value),
+      hasSavedValue: profile.settings.network.value.wifiSSID.value != nil,
+      validationFields: [.network(.wifiSSID)],
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, profile.settings.network.value.wifiSSID.value == nil {
+          profile.settings.network.value.wifiSSID.value =
+            systemSnapshot?.profileSettings.network.value.wifiSSID.value
+            ?? conditionContext.wifiSSID
+        }
+      }
+    ) {
       TextField(
         "Network name",
         text: optionalStringBinding($profile.settings.network.value.wifiSSID.value)
       )
+      .focused($focusedField, equals: .network(.wifiSSID))
+      .accessibilityHint(
+        validationAccessibilityHint(for: .network(.wifiSSID))
+      )
+      .accessibilityInvalid(validation.issue(for: .network(.wifiSSID)) != nil)
       if let currentSSID = conditionContext.wifiSSID,
         currentSSID != profile.settings.network.value.wifiSSID.value
       {
@@ -869,54 +1160,15 @@ private struct ProfileEditorForm: View {
           profile.settings.network.value.wifiSSID.value = currentSSID
         }
       }
-    }
-
-    optionEditor("IPv4 configuration", isOn: $profile.settings.network.value.ipv4.isIncluded) {
-      Picker(
-        "IPv4 method",
-        selection: ipv4ModeBinding($profile.settings.network.value.ipv4.value)
-      ) {
-        Text("Choose").tag(Optional<IPv4EditorMode>.none)
-        Text("DHCP").tag(Optional(IPv4EditorMode.dhcp))
-        Text("Manual").tag(Optional(IPv4EditorMode.manual))
-      }
-      .pickerStyle(.segmented)
-
-      if ipv4ModeBinding($profile.settings.network.value.ipv4.value).wrappedValue == .manual {
-        TextField(
-          "IP address",
-          text: manualIPv4AddressBinding($profile.settings.network.value.ipv4.value)
-        )
-        TextField(
-          "Subnet mask",
-          text: manualIPv4SubnetBinding($profile.settings.network.value.ipv4.value)
-        )
-        TextField(
-          "Router (optional)",
-          text: manualIPv4RouterBinding($profile.settings.network.value.ipv4.value)
-        )
-      }
-      unsupportedNetworkOptionNotice
-    }
-
-    optionEditor("DNS servers", isOn: $profile.settings.network.value.dnsServers.isIncluded) {
-      TextField(
-        "DNS servers, separated by commas or new lines",
-        text: stringListBinding($profile.settings.network.value.dnsServers.value),
-        axis: .vertical
+      Label(
+        "Only networks already saved in macOS can be joined. This profile does not store a Wi-Fi password.",
+        systemImage: "key.horizontal"
       )
-      .lineLimit(2...5)
-      unsupportedNetworkOptionNotice
+      .font(.caption)
+      .foregroundStyle(.secondary)
     }
 
-    proxyOptionEditor(
-      "Web proxy",
-      option: $profile.settings.network.value.webProxy
-    )
-    proxyOptionEditor(
-      "Secure web proxy",
-      option: $profile.settings.network.value.secureWebProxy
-    )
+    snapshotOnlyNetworkValues
   }
 
   @ViewBuilder
@@ -928,93 +1180,281 @@ private struct ProfileEditorForm: View {
     .font(.caption)
     .foregroundStyle(.secondary)
 
-    optionEditor("Pointer speed", isOn: $profile.settings.input.value.pointerSpeed.isIncluded) {
-      optionalNumberField(
+    optionEditor(
+      "Pointer speed",
+      id: .init(group: .input, key: "pointer-speed"),
+      isOn: $profile.settings.input.value.pointerSpeed.isIncluded,
+      summary: numberSummary(profile.settings.input.value.pointerSpeed.value),
+      hasSavedValue: profile.settings.input.value.pointerSpeed.value != nil,
+      validationFields: [.input(.pointerSpeed)],
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, profile.settings.input.value.pointerSpeed.value == nil {
+          profile.settings.input.value.pointerSpeed.value =
+            systemSnapshot?.profileSettings.input.value.pointerSpeed.value ?? 4.5
+        }
+      }
+    ) {
+      optionalNumberSlider(
         "Pointer speed value",
         value: $profile.settings.input.value.pointerSpeed.value,
-        rangeDescription: "Allowed range: −1 to 10."
+        range: -1...10,
+        step: 0.25,
+        fallback: 4.5,
+        minimumLabel: "Slow",
+        maximumLabel: "Fast",
+        rangeDescription: "Allowed range: −1 to 10.",
+        fieldID: .input(.pointerSpeed)
       )
     }
 
     optionEditor(
       "Natural scrolling",
-      isOn: $profile.settings.input.value.naturalScrolling.isIncluded
+      id: .init(group: .input, key: "natural-scrolling"),
+      isOn: $profile.settings.input.value.naturalScrolling.isIncluded,
+      summary: booleanTargetSummary(profile.settings.input.value.naturalScrolling.value),
+      hasSavedValue: profile.settings.input.value.naturalScrolling.value != nil,
+      validationFields: [.input(.naturalScrolling)],
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, profile.settings.input.value.naturalScrolling.value == nil {
+          profile.settings.input.value.naturalScrolling.value =
+            systemSnapshot?.profileSettings.input.value.naturalScrolling.value
+        }
+      }
     ) {
       optionalBooleanPicker(
         "Natural scrolling value",
-        selection: $profile.settings.input.value.naturalScrolling.value
+        selection: $profile.settings.input.value.naturalScrolling.value,
+        fieldID: .input(.naturalScrolling)
       )
     }
 
-    optionEditor("Key repeat", isOn: $profile.settings.input.value.keyRepeatInterval.isIncluded) {
-      optionalNumberField(
+    optionEditor(
+      "Key repeat",
+      id: .init(group: .input, key: "key-repeat"),
+      isOn: $profile.settings.input.value.keyRepeatInterval.isIncluded,
+      summary: numberSummary(profile.settings.input.value.keyRepeatInterval.value),
+      hasSavedValue: profile.settings.input.value.keyRepeatInterval.value != nil,
+      validationFields: [.input(.keyRepeatInterval)],
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, profile.settings.input.value.keyRepeatInterval.value == nil {
+          profile.settings.input.value.keyRepeatInterval.value =
+            systemSnapshot?.profileSettings.input.value.keyRepeatInterval.value ?? 60
+        }
+      }
+    ) {
+      optionalNumberSlider(
         "Key repeat value",
         value: $profile.settings.input.value.keyRepeatInterval.value,
-        rangeDescription: "Allowed range: 1 to 120. Lower values repeat faster."
+        range: 1...120,
+        step: 1,
+        fallback: 60,
+        minimumLabel: "Fast",
+        maximumLabel: "Slow",
+        rangeDescription: "Allowed range: 1 to 120. Lower values repeat faster.",
+        fieldID: .input(.keyRepeatInterval)
       )
     }
 
     optionEditor(
       "Initial key repeat delay",
-      isOn: $profile.settings.input.value.initialKeyRepeatDelay.isIncluded
+      id: .init(group: .input, key: "initial-key-repeat-delay"),
+      isOn: $profile.settings.input.value.initialKeyRepeatDelay.isIncluded,
+      summary: numberSummary(profile.settings.input.value.initialKeyRepeatDelay.value),
+      hasSavedValue: profile.settings.input.value.initialKeyRepeatDelay.value != nil,
+      validationFields: [.input(.initialKeyRepeatDelay)],
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, profile.settings.input.value.initialKeyRepeatDelay.value == nil {
+          profile.settings.input.value.initialKeyRepeatDelay.value =
+            systemSnapshot?.profileSettings.input.value.initialKeyRepeatDelay.value ?? 150
+        }
+      }
     ) {
-      optionalNumberField(
+      optionalNumberSlider(
         "Initial key repeat delay value",
         value: $profile.settings.input.value.initialKeyRepeatDelay.value,
-        rangeDescription: "Allowed range: 1 to 300."
+        range: 1...300,
+        step: 1,
+        fallback: 150,
+        minimumLabel: "Short",
+        maximumLabel: "Long",
+        rangeDescription: "Allowed range: 1 to 300.",
+        fieldID: .input(.initialKeyRepeatDelay)
       )
     }
 
     optionEditor(
       "Use F1–F12 as standard function keys",
-      isOn: $profile.settings.input.value.useStandardFunctionKeys.isIncluded
+      id: .init(group: .input, key: "function-keys"),
+      isOn: $profile.settings.input.value.useStandardFunctionKeys.isIncluded,
+      summary: booleanTargetSummary(profile.settings.input.value.useStandardFunctionKeys.value),
+      hasSavedValue: profile.settings.input.value.useStandardFunctionKeys.value != nil,
+      validationFields: [.input(.standardFunctionKeys)],
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, profile.settings.input.value.useStandardFunctionKeys.value == nil {
+          profile.settings.input.value.useStandardFunctionKeys.value =
+            systemSnapshot?.profileSettings.input.value.useStandardFunctionKeys.value
+        }
+      }
     ) {
       optionalBooleanPicker(
         "Function key value",
-        selection: $profile.settings.input.value.useStandardFunctionKeys.value
+        selection: $profile.settings.input.value.useStandardFunctionKeys.value,
+        fieldID: .input(.standardFunctionKeys)
       )
     }
   }
 
   @ViewBuilder
   private func settingGroupEditor<Content: View>(
-    _ title: LocalizedStringKey,
+    _ title: String.LocalizationValue,
+    group: SettingGroup,
     systemImage: String,
     isOn: Binding<Bool>,
     summary: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
+    let localizedTitle = appLocalized(title)
+    let isExpanded = groupDisclosure.isExpanded(group)
+
     Section {
-      Toggle(isOn: isOn) {
-        Label(title, systemImage: systemImage)
-          .font(.headline)
+      HStack(spacing: 12) {
+        Button {
+          withAnimation(.easeInOut(duration: 0.16)) {
+            toggleExpandedGroup(group)
+          }
+        } label: {
+          HStack(spacing: 8) {
+            Label(localizedTitle, systemImage: systemImage)
+              .font(.headline)
+            Spacer(minLength: 8)
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+              .font(.caption.bold())
+              .foregroundStyle(.secondary)
+              .accessibilityHidden(true)
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(localizedTitle)
+        .accessibilityValue(isExpanded ? Text("Expanded") : Text("Collapsed"))
+        .accessibilityHint("Expands or collapses this settings category")
+        .accessibilityInvalid(firstValidationIssue(in: group) != nil)
+        .focused($focusedField, equals: .group(group))
+
+        Toggle("Include", isOn: isOn)
+          .toggleStyle(.switch)
+          .controlSize(.small)
+          .fixedSize()
+          .accessibilityLabel(appLocalized("Include \(localizedTitle)"))
+          .accessibilityValue(isOn.wrappedValue ? Text("Included") : Text("Excluded"))
       }
 
-      if isOn.wrappedValue {
+      if let issue = validation.issue(for: .group(group)) {
+        inlineValidationMessage(
+          validationMessage(for: issue),
+          fieldID: issue.fieldID
+        )
+      } else if !isExpanded, let issue = firstValidationIssue(in: group) {
+        inlineValidationMessage(
+          validationMessage(for: issue),
+          fieldID: issue.fieldID
+        )
+      }
+
+      if isExpanded {
         content()
           .padding(.leading, 4)
       } else {
-        Text(summary)
+        Text(groupStateSummary(group, isIncluded: isOn.wrappedValue, summary: summary))
           .font(.caption)
           .foregroundStyle(.secondary)
           .lineLimit(3)
+          .accessibilityLabel(
+            groupStateSummary(group, isIncluded: isOn.wrappedValue, summary: summary)
+          )
       }
     }
   }
 
   @ViewBuilder
   private func optionEditor<Content: View>(
-    _ title: LocalizedStringKey,
+    _ title: String.LocalizationValue,
+    id: OptionDisclosureID,
     isOn: Binding<Bool>,
+    summary: String,
+    hasSavedValue: Bool = true,
+    validationFields: [DraftFieldIdentifier] = [],
+    onIncludeChange: IncludeChangeAction? = nil,
     @ViewBuilder content: () -> Content
   ) -> some View {
+    let localizedTitle = appLocalized(title)
+    let isExpanded = optionDisclosure.isExpanded(id)
+
     VStack(alignment: .leading, spacing: 8) {
-      Toggle(title, isOn: isOn)
-      if isOn.wrappedValue {
+      HStack(spacing: 12) {
+        Button {
+          withAnimation(.easeInOut(duration: 0.16)) {
+            toggleExpandedOption(id)
+          }
+        } label: {
+          HStack(spacing: 8) {
+            Text(localizedTitle)
+              .fontWeight(.medium)
+            Spacer(minLength: 8)
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+              .font(.caption.bold())
+              .foregroundStyle(.secondary)
+              .accessibilityHidden(true)
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(localizedTitle)
+        .accessibilityValue(isExpanded ? Text("Expanded") : Text("Collapsed"))
+        .accessibilityHint("Expands or collapses this setting's target value")
+        .accessibilityInvalid(!validationIssues(for: validationFields).isEmpty)
+
+        Toggle(
+          "Include",
+          isOn: Binding(
+            get: { isOn.wrappedValue },
+            set: { newValue in
+              isOn.wrappedValue = newValue
+              onIncludeChange?.perform(newValue)
+            }
+          )
+        )
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .fixedSize()
+        .accessibilityLabel(appLocalized("Include \(localizedTitle)"))
+        .accessibilityValue(isOn.wrappedValue ? Text("Included") : Text("Excluded"))
+      }
+
+      if isExpanded {
         VStack(alignment: .leading, spacing: 8) {
           content()
         }
         .padding(.leading, 20)
+      } else {
+        Text(
+          optionStateSummary(
+            isIncluded: isOn.wrappedValue,
+            valueSummary: summary,
+            hasSavedValue: hasSavedValue
+          )
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.leading, 20)
+        .lineLimit(2)
+      }
+
+      ForEach(validationIssues(for: validationFields)) { issue in
+        inlineValidationMessage(
+          validationMessage(for: issue),
+          fieldID: issue.fieldID
+        )
       }
     }
     .padding(.vertical, 3)
@@ -1022,12 +1462,44 @@ private struct ProfileEditorForm: View {
 
   @ViewBuilder
   private func audioDeviceOption(
-    _ title: LocalizedStringKey,
+    _ title: String.LocalizationValue,
+    key: String,
     option: Binding<SettingOption<String?>>,
-    scope: AudioDeviceScope
+    scope: AudioDeviceScope,
+    fieldID: DraftFieldIdentifier
   ) -> some View {
-    optionEditor(title, isOn: option.isIncluded) {
-      let choices = audioDeviceChoices.filter { $0.scopes.contains(scope) }
+    let rawChoices = audioDeviceChoices.filter { $0.scopes.contains(scope) }
+    let labels = FriendlyNameDisambiguator().labels(
+      for: rawChoices.map { (id: $0.uid, name: $0.name) }
+    )
+    let choices = rawChoices.map { choice in
+      AudioDeviceChoice(
+        uid: choice.uid,
+        name: labels[choice.uid] ?? choice.name,
+        scopes: choice.scopes
+      )
+    }
+    let currentValue: String? =
+      if fieldID == .audio(.defaultInputDevice) {
+        systemSnapshot?.profileSettings.audio.value.defaultInputUID.value
+      } else if fieldID == .audio(.defaultOutputDevice) {
+        systemSnapshot?.profileSettings.audio.value.defaultOutputUID.value
+      } else {
+        systemSnapshot?.profileSettings.audio.value.systemOutputUID.value
+      }
+    optionEditor(
+      title,
+      id: .init(group: .audio, key: key),
+      isOn: option.isIncluded,
+      summary: audioDeviceSummary(option.wrappedValue.value, choices: choices),
+      hasSavedValue: option.wrappedValue.value != nil,
+      validationFields: [fieldID],
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, option.wrappedValue.value == nil {
+          option.wrappedValue.value = currentValue
+        }
+      }
+    ) {
       Picker("Device", selection: option.value) {
         Text("Choose a device").tag(Optional<String>.none)
         ForEach(choices) { choice in
@@ -1040,6 +1512,9 @@ private struct ProfileEditorForm: View {
             .tag(Optional(savedUID))
         }
       }
+      .focused($focusedField, equals: fieldID)
+      .accessibilityHint(validationAccessibilityHint(for: fieldID))
+      .accessibilityInvalid(validation.issue(for: fieldID) != nil)
 
       DisclosureGroup("Advanced") {
         TextField("Device UID", text: optionalStringBinding(option.value))
@@ -1050,7 +1525,8 @@ private struct ProfileEditorForm: View {
 
   private func optionalBooleanPicker(
     _ title: LocalizedStringKey,
-    selection: Binding<Bool?>
+    selection: Binding<Bool?>,
+    fieldID: DraftFieldIdentifier
   ) -> some View {
     Picker(title, selection: selection) {
       Text("Choose").tag(Optional<Bool>.none)
@@ -1058,61 +1534,311 @@ private struct ProfileEditorForm: View {
       Text("Off").tag(Optional(false))
     }
     .pickerStyle(.segmented)
+    .accessibilityLabel(title)
+    .accessibilityValue(booleanTargetSummary(selection.wrappedValue))
+    .accessibilityHint(validationAccessibilityHint(for: fieldID))
+    .accessibilityInvalid(validation.issue(for: fieldID) != nil)
+    .focused($focusedField, equals: fieldID)
   }
 
   @ViewBuilder
-  private func optionalNumberField(
+  private func optionalNumberSlider(
     _ title: LocalizedStringKey,
     value: Binding<Double?>,
-    rangeDescription: LocalizedStringKey
+    range: ClosedRange<Double>,
+    step: Double,
+    fallback: Double,
+    minimumLabel: LocalizedStringKey,
+    maximumLabel: LocalizedStringKey,
+    rangeDescription: LocalizedStringKey,
+    fieldID: DraftFieldIdentifier
   ) -> some View {
-    TextField(
-      title,
-      value: value,
-      format: .number.precision(.fractionLength(0...2))
-    )
+    if value.wrappedValue == nil {
+      chooseSuggestedValueButton(fieldID: fieldID) {
+        value.wrappedValue = fallback
+      }
+    } else {
+      HStack(spacing: 8) {
+        Text(minimumLabel)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Slider(
+          value: sliderBinding(value, fallback: fallback),
+          in: range,
+          step: step
+        )
+        .accessibilityLabel(title)
+        .accessibilityHint(validationAccessibilityHint(for: fieldID))
+        .accessibilityInvalid(validation.issue(for: fieldID) != nil)
+        .focused($focusedField, equals: fieldID)
+        Text(maximumLabel)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+
+      DisclosureGroup(
+        isExpanded: Binding(
+          get: { advancedNumberDisclosure.isExpanded(fieldID) },
+          set: { advancedNumberDisclosure.setExpanded($0, for: fieldID) }
+        )
+      ) {
+        LabeledContent {
+          TextField(
+            title,
+            value: value,
+            format: .number.precision(.fractionLength(0...2))
+          )
+          .frame(width: 66)
+          .multilineTextAlignment(.trailing)
+          .accessibilityHint(validationAccessibilityHint(for: fieldID))
+          .accessibilityInvalid(validation.issue(for: fieldID) != nil)
+        } label: {
+          Text(title)
+        }
+      } label: {
+        Text("Advanced")
+      }
+      .accessibilityHint("Expands or collapses the exact numeric value")
+    }
     Text(rangeDescription)
       .font(.caption)
       .foregroundStyle(.secondary)
   }
 
-  @ViewBuilder
-  private func proxyOptionEditor(
-    _ title: LocalizedStringKey,
-    option: Binding<SettingOption<ProxyConfiguration?>>
+  private func chooseSuggestedValueButton(
+    fieldID: DraftFieldIdentifier,
+    action: @escaping () -> Void
   ) -> some View {
-    optionEditor(title, isOn: option.isIncluded) {
-      Picker("Proxy mode", selection: proxyModeBinding(option.value)) {
-        Text("Choose").tag(Optional<ProxyEditorMode>.none)
-        Text("Disabled").tag(Optional(ProxyEditorMode.disabled))
-        Text("Enabled").tag(Optional(ProxyEditorMode.enabled))
-      }
-      .pickerStyle(.segmented)
-
-      if proxyModeBinding(option.value).wrappedValue == .enabled {
-        TextField("Proxy host", text: proxyHostBinding(option.value))
-        TextField("Proxy port", value: proxyPortBinding(option.value), format: .number)
-      }
-      unsupportedNetworkOptionNotice
+    HStack {
+      Label("Choose a value.", systemImage: "questionmark.circle")
+        .foregroundStyle(.secondary)
+      Spacer()
+      Button("Use Suggested Value", action: action)
+        .focused($focusedField, equals: fieldID)
+        .accessibilityHint(validationAccessibilityHint(for: fieldID))
+        .accessibilityInvalid(validation.issue(for: fieldID) != nil)
     }
   }
 
-  private var unsupportedDisplayOptionNotice: some View {
-    Label(
-      "This display value is preserved for snapshots, but the current adapter does not apply it.",
-      systemImage: "exclamationmark.circle"
-    )
-    .font(.caption)
-    .foregroundStyle(.secondary)
+  @ViewBuilder
+  private func snapshotOnlyDisplayValues(_ display: DisplayTargetSettings) -> some View {
+    GroupBox {
+      VStack(alignment: .leading, spacing: 7) {
+        snapshotOnlyValue("Rotation", value: "\(display.rotationDegrees.value)°")
+        snapshotOnlyValue(
+          "Active state",
+          value: display.isActive.value ? appLocalized("Active") : appLocalized("Inactive")
+        )
+        Label(
+          "This display value is preserved for snapshots, but the current adapter does not apply it.",
+          systemImage: "exclamationmark.circle"
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        if let issue = validation.issue(
+          for: .display(display.id, .rotationDegrees)
+        ) {
+          inlineValidationMessage(
+            validationMessage(for: issue),
+            fieldID: issue.fieldID
+          )
+        }
+      }
+    } label: {
+      Label("Snapshot only", systemImage: "camera")
+        .font(.subheadline.bold())
+    }
+    .accessibilityElement(children: .contain)
   }
 
-  private var unsupportedNetworkOptionNotice: some View {
-    Label(
-      "This network value is preserved for snapshots, but the current adapter does not apply administrative network settings.",
-      systemImage: "exclamationmark.circle"
+  private var snapshotOnlyNetworkValues: some View {
+    GroupBox {
+      VStack(alignment: .leading, spacing: 7) {
+        snapshotOnlyValue(
+          "IPv4 configuration",
+          value: ipv4SnapshotSummary(profile.settings.network.value.ipv4.value)
+        )
+        snapshotOnlyValue(
+          "DNS servers",
+          value: dnsSnapshotSummary(profile.settings.network.value.dnsServers.value)
+        )
+        snapshotOnlyValue(
+          "Web proxy",
+          value: proxySnapshotSummary(profile.settings.network.value.webProxy.value)
+        )
+        snapshotOnlyValue(
+          "Secure web proxy",
+          value: proxySnapshotSummary(profile.settings.network.value.secureWebProxy.value)
+        )
+        Label(
+          "This network value is preserved for snapshots, but the current adapter does not apply administrative network settings.",
+          systemImage: "exclamationmark.circle"
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        ForEach(snapshotOnlyNetworkValidationIssues) { issue in
+          inlineValidationMessage(
+            validationMessage(for: issue),
+            fieldID: issue.fieldID
+          )
+        }
+      }
+    } label: {
+      Label("Snapshot only", systemImage: "camera")
+        .font(.subheadline.bold())
+    }
+    .accessibilityElement(children: .contain)
+  }
+
+  private func snapshotOnlyValue(
+    _ title: LocalizedStringKey,
+    value: String
+  ) -> some View {
+    LabeledContent {
+      Text(value)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.trailing)
+    } label: {
+      Text(title)
+    }
+  }
+
+  private var snapshotOnlyNetworkValidationIssues: [DraftValidationIssue] {
+    validation.issues.filter { issue in
+      issue.group == .network
+        && issue.fieldID != .group(.network)
+        && issue.fieldID != .network(.wifiPower)
+        && issue.fieldID != .network(.wifiSSID)
+    }
+  }
+
+  private func validationIssues(
+    for fields: [DraftFieldIdentifier]
+  ) -> [DraftValidationIssue] {
+    fields.compactMap { validation.issue(for: $0) }
+  }
+
+  private func firstValidationIssue(in group: SettingGroup) -> DraftValidationIssue? {
+    validation.issues.first { $0.group == group }
+  }
+
+  private func validationMessage(for issue: DraftValidationIssue) -> String {
+    appLocalizedDraftValidationMessage(issue.message)
+  }
+
+  private func validationAccessibilityHint(for fieldID: DraftFieldIdentifier) -> Text {
+    guard let issue = validation.issue(for: fieldID) else { return Text(verbatim: "") }
+    return Text(
+      "\(appLocalized("Invalid value.")) \(validationMessage(for: issue))"
     )
-    .font(.caption)
-    .foregroundStyle(.secondary)
+  }
+
+  private func inlineValidationMessage(
+    _ message: String,
+    fieldID: DraftFieldIdentifier
+  ) -> some View {
+    Button {
+      revealAndFocus(fieldID)
+    } label: {
+      Label(message, systemImage: "exclamationmark.circle.fill")
+        .font(.caption)
+        .multilineTextAlignment(.leading)
+    }
+    .buttonStyle(.plain)
+    .foregroundStyle(.red)
+    .accessibilityLabel("\(appLocalized("Validation error")): \(message)")
+    .accessibilityHint("Moves keyboard focus to the invalid field")
+  }
+
+  private func revealAndFocus(_ fieldID: DraftFieldIdentifier) {
+    if let group = validationGroup(for: fieldID) {
+      groupDisclosure.expand(group)
+    }
+    if let option = disclosureOption(for: fieldID) {
+      optionDisclosure.expand(option)
+    }
+
+    let focusTarget = focusTarget(for: fieldID)
+    Task { @MainActor in
+      await Task.yield()
+      focusedField = focusTarget
+      requestedValidationFocus = nil
+    }
+  }
+
+  private func validationGroup(for fieldID: DraftFieldIdentifier) -> SettingGroup? {
+    for group in SettingGroup.safeApplicationSequence {
+      if fieldID == .group(group)
+        || fieldID.rawValue.hasPrefix("settings.\(group.rawValue).")
+      {
+        return group
+      }
+    }
+    return nil
+  }
+
+  private func disclosureOption(
+    for fieldID: DraftFieldIdentifier
+  ) -> OptionDisclosureID? {
+    if fieldID == .displayPrimary {
+      return .init(group: .display, key: "primary")
+    }
+    for display in profile.settings.display.value.displays {
+      if fieldID == .display(display.id, .originX)
+        || fieldID == .display(display.id, .originY)
+      {
+        return .init(group: .display, ownerID: display.id, key: "position")
+      }
+      if [
+        DisplayDraftField.modeWidth,
+        .modeHeight,
+        .modePixelWidth,
+        .modePixelHeight,
+        .modeRefreshRate,
+      ].contains(where: { fieldID == .display(display.id, $0) }) {
+        return .init(group: .display, ownerID: display.id, key: "mode")
+      }
+    }
+
+    let mappings: [(DraftFieldIdentifier, OptionDisclosureID)] = [
+      (.audio(.defaultInputDevice), .init(group: .audio, key: "default-input-device")),
+      (.audio(.defaultOutputDevice), .init(group: .audio, key: "default-output-device")),
+      (.audio(.systemOutputDevice), .init(group: .audio, key: "system-output-device")),
+      (.audio(.outputVolume), .init(group: .audio, key: "output-volume")),
+      (.audio(.outputMute), .init(group: .audio, key: "output-mute")),
+      (.network(.wifiPower), .init(group: .network, key: "wifi-power")),
+      (.network(.wifiSSID), .init(group: .network, key: "wifi-network")),
+      (.input(.pointerSpeed), .init(group: .input, key: "pointer-speed")),
+      (.input(.naturalScrolling), .init(group: .input, key: "natural-scrolling")),
+      (.input(.keyRepeatInterval), .init(group: .input, key: "key-repeat")),
+      (
+        .input(.initialKeyRepeatDelay),
+        .init(group: .input, key: "initial-key-repeat-delay")
+      ),
+      (.input(.standardFunctionKeys), .init(group: .input, key: "function-keys")),
+    ]
+    return mappings.first { $0.0 == fieldID }?.1
+  }
+
+  private func focusTarget(
+    for fieldID: DraftFieldIdentifier
+  ) -> DraftFieldIdentifier {
+    for display in profile.settings.display.value.displays
+    where [
+      DisplayDraftField.modeWidth,
+      .modeHeight,
+      .modePixelWidth,
+      .modePixelHeight,
+      .modeRefreshRate,
+    ].contains(where: { fieldID == .display(display.id, $0) }) {
+      return .display(display.id, .modeWidth)
+    }
+    if fieldID == .profileName || fieldID == .profileDescription
+      || disclosureOption(for: fieldID) != nil
+    {
+      return fieldID
+    }
+    return validationGroup(for: fieldID).map(DraftFieldIdentifier.group) ?? fieldID
   }
 
   private func summaryPreview(for group: SettingGroup) -> String {
@@ -1130,11 +1856,244 @@ private struct ProfileEditorForm: View {
     return visible.joined(separator: " · ")
   }
 
+  private func toggleExpandedGroup(_ group: SettingGroup) {
+    groupDisclosure.toggle(group)
+  }
+
+  private func toggleExpandedOption(_ option: OptionDisclosureID) {
+    optionDisclosure.toggle(option)
+  }
+
+  private func groupStateSummary(
+    _ group: SettingGroup,
+    isIncluded: Bool,
+    summary: String
+  ) -> String {
+    if isIncluded {
+      return "\(appLocalized("Included")) · \(summary)"
+    }
+
+    let count = savedValueCount(for: group)
+    if count == 0 {
+      return "\(appLocalized("Excluded")) · \(appLocalized("No saved values"))"
+    }
+    if count == 1 {
+      return appLocalized("Excluded · 1 saved value")
+    }
+    return appLocalized("Excluded · \(count) saved values")
+  }
+
+  private func optionStateSummary(
+    isIncluded: Bool,
+    valueSummary: String,
+    hasSavedValue: Bool
+  ) -> String {
+    let state = isIncluded ? appLocalized("Included") : appLocalized("Excluded")
+    guard hasSavedValue else {
+      return "\(state) · \(appLocalized("No saved value"))"
+    }
+    return "\(state) · \(valueSummary)"
+  }
+
+  private func savedValueCount(for group: SettingGroup) -> Int {
+    switch group {
+    case .display:
+      return profile.settings.display.value.displays.count * 6
+    case .audio:
+      let audio = profile.settings.audio.value
+      return [
+        audio.defaultInputUID.value,
+        audio.defaultOutputUID.value,
+        audio.systemOutputUID.value,
+      ].compactMap { $0 }.count
+        + [
+          audio.outputVolume.value.map { _ in 1 },
+          audio.outputMuted.value.map { _ in 1 },
+        ].compactMap { $0 }.count
+    case .network:
+      let network = profile.settings.network.value
+      return [
+        network.wifiPower.value.map { _ in 1 },
+        network.wifiSSID.value.map { _ in 1 },
+        network.ipv4.value.map { _ in 1 },
+        network.dnsServers.value.isEmpty ? nil : 1,
+        network.webProxy.value.map { _ in 1 },
+        network.secureWebProxy.value.map { _ in 1 },
+      ].compactMap { $0 }.count
+    case .input:
+      let input = profile.settings.input.value
+      return [
+        input.pointerSpeed.value,
+        input.naturalScrolling.value.map { $0 ? 1.0 : 0.0 },
+        input.keyRepeatInterval.value,
+        input.initialKeyRepeatDelay.value,
+        input.useStandardFunctionKeys.value.map { $0 ? 1.0 : 0.0 },
+      ].compactMap { $0 }.count
+    }
+  }
+
+  private func mirroringSummary(_ mirroring: DisplayMirroring) -> String {
+    switch mirroring {
+    case .extended:
+      return appLocalized("Extended desktop")
+    case .mirrors(let identity):
+      if let target = profile.settings.display.value.displays.first(where: {
+        $0.identity == identity
+      }) {
+        return appLocalized("Mirrors \(displayName(target))")
+      }
+      return appLocalized("Saved display — currently disconnected")
+    }
+  }
+
+  private func displayModeSummary(_ mode: DisplayMode) -> String {
+    let refreshRate = mode.refreshRate.formatted(
+      .number.precision(.fractionLength(0...2))
+    )
+    let base = "\(mode.width)×\(mode.height) · \(refreshRate) \(appLocalized("Hz"))"
+    guard mode.hasDistinctPixelDimensions else { return base }
+    let pixels = appLocalized("\(mode.pixelWidth)×\(mode.pixelHeight) pixels")
+    return "\(base) · \(pixels)"
+  }
+
+  private var primaryDisplayIncludedBinding: Binding<Bool> {
+    Binding(
+      get: {
+        let options = profile.settings.display.value.displays.map(\.isPrimary)
+        return !options.isEmpty && options.allSatisfy(\.isIncluded)
+      },
+      set: { isIncluded in
+        let selectedID =
+          profile.settings.display.value.displays.first(where: {
+            $0.isPrimary.value
+          })?.id ?? profile.settings.display.value.displays.first?.id
+        for index in profile.settings.display.value.displays.indices {
+          profile.settings.display.value.displays[index].isPrimary.isIncluded = isIncluded
+          if isIncluded {
+            profile.settings.display.value.displays[index].isPrimary.value =
+              profile.settings.display.value.displays[index].id == selectedID
+          }
+        }
+      }
+    )
+  }
+
+  private func primaryDisplaySelectionBinding() -> Binding<UUID> {
+    Binding(
+      get: {
+        let selected = profile.settings.display.value.displays.filter { $0.isPrimary.value }
+        return selected.count == 1 ? selected[0].id : invalidPrimaryDisplaySelectionID
+      },
+      set: { selectedID in
+        profile.settings.display.value.displays = DisplayPrimarySelectionEditor.selecting(
+          selectedID,
+          in: profile.settings.display.value.displays
+        )
+      }
+    )
+  }
+
+  private var primaryDisplaySummary: String {
+    let selected = profile.settings.display.value.displays.filter { $0.isPrimary.value }
+    guard selected.count == 1 else {
+      return appLocalized("Choose a display")
+    }
+    return displayName(selected[0])
+  }
+
+  private var primaryDisplaySelectionIsAmbiguous: Bool {
+    profile.settings.display.value.displays.count(where: { $0.isPrimary.value }) != 1
+  }
+
+  private func supportedDisplayModes(for display: DisplayTargetSettings) -> [DisplayMode] {
+    let entries = systemSnapshot?.displayModeCatalog ?? []
+    let identities = entries.map(\.identity)
+    guard
+      case .matched(let matchedIdentity) = DisplayIdentityMatcher().match(
+        display.identity,
+        among: identities
+      ), let entry = entries.first(where: { $0.identity == matchedIdentity })
+    else {
+      return []
+    }
+
+    return DisplayModeMatcher().deduplicated(entry.modes)
+  }
+
+  private func supportedDisplayModeBinding(
+    _ savedMode: Binding<DisplayMode>,
+    supportedModes: [DisplayMode]
+  ) -> Binding<DisplayMode> {
+    let matcher = DisplayModeMatcher()
+    return Binding(
+      get: {
+        matcher.match(savedMode.wrappedValue, among: supportedModes)
+          ?? savedMode.wrappedValue
+      },
+      set: { savedMode.wrappedValue = $0 }
+    )
+  }
+
+  private func audioDeviceSummary(
+    _ uid: String?,
+    choices: [AudioDeviceChoice]
+  ) -> String {
+    guard let uid, !uid.isEmpty else { return appLocalized("Choose a device") }
+    return choices.first(where: { $0.uid == uid })?.name
+      ?? appLocalized("Saved device — currently disconnected")
+  }
+
+  private func percentageSummary(_ value: Double?) -> String {
+    guard let value else { return appLocalized("Choose") }
+    return "\((value * 100).formatted(.number.precision(.fractionLength(0...1))))%"
+  }
+
+  private func numberSummary(_ value: Double?) -> String {
+    guard let value else { return appLocalized("Choose") }
+    return value.formatted(.number.precision(.fractionLength(0...2)))
+  }
+
+  private func booleanTargetSummary(_ value: Bool?) -> String {
+    guard let value else { return appLocalized("Choose") }
+    return value ? appLocalized("On") : appLocalized("Off")
+  }
+
+  private func wifiNetworkSummary(_ value: String?) -> String {
+    FriendlyValueFormatter.wifiNetworkName(value) ?? appLocalized("Choose")
+  }
+
+  private func ipv4SnapshotSummary(_ configuration: IPv4Configuration?) -> String {
+    switch configuration {
+    case .dhcp?: return appLocalized("DHCP")
+    case .manual?: return appLocalized("Manual")
+    case nil: return appLocalized("Not captured")
+    }
+  }
+
+  private func dnsSnapshotSummary(_ servers: [String]) -> String {
+    if servers.isEmpty { return appLocalized("Not captured") }
+    if servers.count == 1 { return appLocalized("1 server saved") }
+    return appLocalized("\(servers.count) servers saved")
+  }
+
+  private func proxySnapshotSummary(_ proxy: ProxyConfiguration?) -> String {
+    guard let proxy else { return appLocalized("Not captured") }
+    return proxy.enabled ? appLocalized("Enabled") : appLocalized("Disabled")
+  }
+
   private var presentationBuilder: ProfilePresentationBuilder {
     ProfilePresentationBuilder()
   }
 
   private func displayName(_ display: DisplayTargetSettings) -> String {
+    let candidates = profile.settings.display.value.displays.map {
+      (id: $0.id, name: baseDisplayName($0))
+    }
+    return FriendlyNameDisambiguator().labels(for: candidates)[display.id]
+      ?? baseDisplayName(display)
+  }
+
+  private func baseDisplayName(_ display: DisplayTargetSettings) -> String {
     let name = display.identity.productName?.trimmingCharacters(in: .whitespacesAndNewlines)
     if let name, !name.isEmpty {
       return name
@@ -1219,150 +2178,20 @@ private struct ProfileEditorForm: View {
     )
   }
 
-  private func stringListBinding(_ values: Binding<[String]>) -> Binding<String> {
+  private func percentageSliderBinding(_ value: Binding<Double?>) -> Binding<Double> {
     Binding(
-      get: { values.wrappedValue.joined(separator: ", ") },
-      set: { text in
-        values.wrappedValue =
-          text
-          .split(whereSeparator: { $0 == "," || $0 == "\n" })
-          .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-          .filter { !$0.isEmpty }
-      }
+      get: { min(max((value.wrappedValue ?? 0) * 100, 0), 100) },
+      set: { value.wrappedValue = $0 / 100 }
     )
   }
 
-  private func ipv4ModeBinding(
-    _ configuration: Binding<IPv4Configuration?>
-  ) -> Binding<IPv4EditorMode?> {
+  private func sliderBinding(
+    _ value: Binding<Double?>,
+    fallback: Double
+  ) -> Binding<Double> {
     Binding(
-      get: {
-        switch configuration.wrappedValue {
-        case .dhcp?: .dhcp
-        case .manual?: .manual
-        case nil: nil
-        }
-      },
-      set: { mode in
-        switch mode {
-        case .dhcp?:
-          configuration.wrappedValue = .dhcp
-        case .manual?:
-          if case .manual? = configuration.wrappedValue { return }
-          configuration.wrappedValue = .manual(address: "", subnetMask: "", router: nil)
-        case nil:
-          configuration.wrappedValue = nil
-        }
-      }
-    )
-  }
-
-  private func manualIPv4AddressBinding(
-    _ configuration: Binding<IPv4Configuration?>
-  ) -> Binding<String> {
-    Binding(
-      get: {
-        guard case .manual(let address, _, _)? = configuration.wrappedValue else { return "" }
-        return address
-      },
-      set: { address in
-        guard case .manual(_, let subnet, let router)? = configuration.wrappedValue else { return }
-        configuration.wrappedValue = .manual(
-          address: address,
-          subnetMask: subnet,
-          router: router
-        )
-      }
-    )
-  }
-
-  private func manualIPv4SubnetBinding(
-    _ configuration: Binding<IPv4Configuration?>
-  ) -> Binding<String> {
-    Binding(
-      get: {
-        guard case .manual(_, let subnet, _)? = configuration.wrappedValue else { return "" }
-        return subnet
-      },
-      set: { subnet in
-        guard case .manual(let address, _, let router)? = configuration.wrappedValue else { return }
-        configuration.wrappedValue = .manual(
-          address: address,
-          subnetMask: subnet,
-          router: router
-        )
-      }
-    )
-  }
-
-  private func manualIPv4RouterBinding(
-    _ configuration: Binding<IPv4Configuration?>
-  ) -> Binding<String> {
-    Binding(
-      get: {
-        guard case .manual(_, _, let router)? = configuration.wrappedValue else { return "" }
-        return router ?? ""
-      },
-      set: { router in
-        guard case .manual(let address, let subnet, _)? = configuration.wrappedValue else { return }
-        configuration.wrappedValue = .manual(
-          address: address,
-          subnetMask: subnet,
-          router: router.isEmpty ? nil : router
-        )
-      }
-    )
-  }
-
-  private func proxyModeBinding(
-    _ configuration: Binding<ProxyConfiguration?>
-  ) -> Binding<ProxyEditorMode?> {
-    Binding(
-      get: {
-        guard let proxy = configuration.wrappedValue else { return nil }
-        return proxy.enabled ? .enabled : .disabled
-      },
-      set: { mode in
-        guard let mode else {
-          configuration.wrappedValue = nil
-          return
-        }
-        var proxy =
-          configuration.wrappedValue
-          ?? ProxyConfiguration(enabled: false, host: "", port: 8080)
-        proxy.enabled = mode == .enabled
-        configuration.wrappedValue = proxy
-      }
-    )
-  }
-
-  private func proxyHostBinding(
-    _ configuration: Binding<ProxyConfiguration?>
-  ) -> Binding<String> {
-    Binding(
-      get: { configuration.wrappedValue?.host ?? "" },
-      set: { host in
-        var proxy =
-          configuration.wrappedValue
-          ?? ProxyConfiguration(enabled: true, host: "", port: 8080)
-        proxy.host = host
-        configuration.wrappedValue = proxy
-      }
-    )
-  }
-
-  private func proxyPortBinding(
-    _ configuration: Binding<ProxyConfiguration?>
-  ) -> Binding<Int> {
-    Binding(
-      get: { configuration.wrappedValue?.port ?? 8080 },
-      set: { port in
-        var proxy =
-          configuration.wrappedValue
-          ?? ProxyConfiguration(enabled: true, host: "", port: 8080)
-        proxy.port = port
-        configuration.wrappedValue = proxy
-      }
+      get: { value.wrappedValue ?? fallback },
+      set: { value.wrappedValue = $0 }
     )
   }
 
@@ -1384,14 +2213,45 @@ private struct AudioDeviceChoice: Identifiable {
   var id: String { uid }
 }
 
-private enum IPv4EditorMode: Hashable {
-  case dhcp
-  case manual
+private struct OptionDisclosureID: Hashable, Sendable {
+  let group: SettingGroup
+  var ownerID: UUID? = nil
+  let key: String
 }
 
-private enum ProxyEditorMode: Hashable {
-  case disabled
-  case enabled
+private struct IncludeChangeAction {
+  let perform: (Bool) -> Void
+
+  init(_ perform: @escaping (Bool) -> Void) {
+    self.perform = perform
+  }
+}
+
+private struct EditorValidationItem {
+  let fieldID: DraftFieldIdentifier
+  let message: String
+}
+
+private let invalidPrimaryDisplaySelectionID = UUID(
+  uuidString: "00000000-0000-0000-0000-000000000000"
+)!
+
+extension View {
+  /// SwiftUI has no dedicated macOS invalid-field modifier. Expose the same
+  /// semantic as high-priority custom accessibility content while the inline
+  /// hint supplies the localized corrective message.
+  @ViewBuilder
+  fileprivate func accessibilityInvalid(_ isInvalid: Bool) -> some View {
+    if isInvalid {
+      accessibilityCustomContent(
+        "Validation status",
+        "Invalid",
+        importance: .high
+      )
+    } else {
+      self
+    }
+  }
 }
 
 private struct ProfileIconChoice {

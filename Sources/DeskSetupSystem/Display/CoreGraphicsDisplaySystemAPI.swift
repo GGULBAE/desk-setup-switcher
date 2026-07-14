@@ -225,14 +225,7 @@ public struct CoreGraphicsDisplaySystemAPI: DisplaySystemAPI {
     else {
       return []
     }
-    var unique: [DisplayMode] = []
-    for mode in modes.map(makeDisplayMode)
-    where !unique.contains(where: {
-      displayModesMatch($0, mode)
-    }) {
-      unique.append(mode)
-    }
-    return unique
+    return DisplayModeMatcher().deduplicated(modes.map(makeDisplayMode))
   }
 
   private func makeDisplayMode(_ mode: CGDisplayMode) -> DisplayMode {
@@ -256,7 +249,8 @@ public struct CoreGraphicsDisplaySystemAPI: DisplaySystemAPI {
     if let available = CGDisplayCopyAllDisplayModes(displayID, nil) as? [CGDisplayMode] {
       candidates.append(contentsOf: available)
     }
-    return candidates.first { displayModesMatch(makeDisplayMode($0), desired) }
+    let matcher = DisplayModeMatcher()
+    return candidates.first { matcher.matches(makeDisplayMode($0), desired) }
   }
 
   private func resolve(

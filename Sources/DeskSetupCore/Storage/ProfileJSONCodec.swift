@@ -3,9 +3,14 @@ import Foundation
 public struct DecodedProfileDocument: Equatable, Sendable {
   public let document: ProfileDocument
   public let originalSchemaVersion: Int
+  public let wasNormalized: Bool
 
   public var wasMigrated: Bool {
     originalSchemaVersion != document.schemaVersion
+  }
+
+  public var requiresPersistence: Bool {
+    wasMigrated || wasNormalized
   }
 }
 
@@ -13,14 +18,17 @@ public struct ProfileJSONCodec: Sendable {
   public let limits: ProfileValidationLimits
   private let validator: ProfileDocumentValidator
   private let migrator: ProfileDocumentMigrator
+  private let normalizer: ProfileApplicabilityNormalizer
 
   public init(
     limits: ProfileValidationLimits = .standard,
-    migrator: ProfileDocumentMigrator = .init()
+    migrator: ProfileDocumentMigrator = .init(),
+    normalizer: ProfileApplicabilityNormalizer = .init()
   ) {
     self.limits = limits
     self.validator = ProfileDocumentValidator(limits: limits)
     self.migrator = migrator
+    self.normalizer = normalizer
   }
 
   public func encode(_ document: ProfileDocument) throws -> Data {
@@ -56,16 +64,19 @@ public struct ProfileJSONCodec: Sendable {
       }
       return date
     }
-    let document: ProfileDocument
+    let decodedDocument: ProfileDocument
     do {
-      document = try decoder.decode(ProfileDocument.self, from: migration.data)
+      decodedDocument = try decoder.decode(ProfileDocument.self, from: migration.data)
     } catch {
       throw ProfileStorageError.invalidJSON(String(describing: error))
     }
+    try validator.validate(decodedDocument)
+    let document = normalizer.normalize(decodedDocument)
     try validator.validate(document)
     return DecodedProfileDocument(
       document: document,
-      originalSchemaVersion: migration.originalVersion
+      originalSchemaVersion: migration.originalVersion,
+      wasNormalized: document != decodedDocument
     )
   }
 

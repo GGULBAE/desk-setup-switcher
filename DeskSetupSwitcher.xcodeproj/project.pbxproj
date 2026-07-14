@@ -16,6 +16,7 @@
 		77F17759BDFB8ACCA06A3340 = { isa = PBXBuildFile; fileRef = 8F4F613B039CCDF925D39E83; };
 		D6BA2BAE686714FB98EFB2B2 = { isa = PBXBuildFile; fileRef = F43EA553BCEADA173E8AAC71; };
 		A07BBC648E0EC9D04D055279 = { isa = PBXBuildFile; fileRef = E2E10A35868C518643D24330; };
+		B83C650D2283938D93C3EF90 = { isa = PBXBuildFile; fileRef = A0C1B758EF142ACB1375B2E7; };
 		B2B2C4B117856339B3AB83D1 = { isa = PBXBuildFile; fileRef = C3447FB4204613188A0FB9F8; };
 		F1094329DF4F10773C3AF429 = { isa = PBXBuildFile; fileRef = C9B5ABB26C739AFA1F519ADD; };
 		CA6FBE1461EF618D684B8AE3 = { isa = PBXBuildFile; fileRef = DFFF1EC03BEBA1B1B13939D8; };
@@ -25,9 +26,14 @@
 		40EF594BEC0ADB55C2F3CB54 = { isa = PBXBuildFile; fileRef = 297FF9548096F3ACB37F219A; };
 		85E31A4942A00E2104B13643 = { isa = PBXBuildFile; fileRef = A31719566B87E80590DF7FC5; };
 		1E537E53165E7AFF2C1A6488 = { isa = PBXBuildFile; fileRef = 36359FD870E2D91E91CD4034; };
+		D223B5D76EF35DADBD76915E = { isa = PBXBuildFile; fileRef = 6841B8865D54FA6E4544A973; };
 		4275D6E3389ABC9721BAAF1A = { isa = PBXBuildFile; fileRef = 7F3AB0F301C6792D8F0AC7E3; };
+		8DBA626876C6230A4CC3EF5A = { isa = PBXBuildFile; fileRef = B89F6EEC772EC82EF16B6D44; };
+		5448CB9EA489EB000260AB87 = { isa = PBXBuildFile; fileRef = 5BAE4E5E6ED173FC0F47E3E9; };
 		DF25FEE6B03F69DB62821EEB = { isa = PBXBuildFile; fileRef = E8E26A16EAEC0DD12825ECB3; };
+		8AF2A3AFC94514ABD81072AB = { isa = PBXBuildFile; fileRef = A769CCE0103F8F53B2F39069; };
 		4C529186C4955CBD92D55ECC = { isa = PBXBuildFile; fileRef = 924704D1ABB51BA72DCE1642; };
+		53272203DDC1C76497706331 = { isa = PBXBuildFile; fileRef = 0B4FA5BD57FD1E4B1776A100; };
 		B7295A7E23DD7C0C416F8E4D = { isa = PBXBuildFile; fileRef = C979D36473AA2EAA0A4498DD; };
 		2259C72C6B7504FEDC3FE03A = { isa = PBXBuildFile; fileRef = 7F5B05E62A9EE38AB1B3337A; };
 		15D978AC08DD143E078810F1 = { isa = PBXBuildFile; fileRef = 8531471F90CE83AA174E1246; };
@@ -89,6 +95,7 @@
 		8F4F613B039CCDF925D39E83 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Engine/SystemSettingsAdapter.swift"; sourceTree = "<group>"; };
 		F43EA553BCEADA173E8AAC71 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Models/Conditions.swift"; sourceTree = "<group>"; };
 		E2E10A35868C518643D24330 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Models/Profile.swift"; sourceTree = "<group>"; };
+		A0C1B758EF142ACB1375B2E7 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Models/ProfileApplicabilityNormalizer.swift"; sourceTree = "<group>"; };
 		C3447FB4204613188A0FB9F8 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Models/Settings.swift"; sourceTree = "<group>"; };
 		C9B5ABB26C739AFA1F519ADD = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Storage/ProfileDocumentMigrator.swift"; sourceTree = "<group>"; };
 		DFFF1EC03BEBA1B1B13939D8 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Storage/ProfileDocumentValidator.swift"; sourceTree = "<group>"; };
@@ -98,9 +105,14 @@
 		297FF9548096F3ACB37F219A = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Storage/ProfileStore.swift"; sourceTree = "<group>"; };
 		A31719566B87E80590DF7FC5 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Utilities/CIDR.swift"; sourceTree = "<group>"; };
 		36359FD870E2D91E91CD4034 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Utilities/DisplayIdentityMatcher.swift"; sourceTree = "<group>"; };
+		6841B8865D54FA6E4544A973 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ApplyWorkflowPresentation.swift"; sourceTree = "<group>"; };
 		7F3AB0F301C6792D8F0AC7E3 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ConditionPresentation.swift"; sourceTree = "<group>"; };
+		B89F6EEC772EC82EF16B6D44 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/DirtyApplyProtection.swift"; sourceTree = "<group>"; };
+		5BAE4E5E6ED173FC0F47E3E9 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ProfileCaptureSummaryBuilder.swift"; sourceTree = "<group>"; };
 		E8E26A16EAEC0DD12825ECB3 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ProfileDraftSession.swift"; sourceTree = "<group>"; };
+		A769CCE0103F8F53B2F39069 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ProfileDraftValidation.swift"; sourceTree = "<group>"; };
 		924704D1ABB51BA72DCE1642 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ProfilePresentation.swift"; sourceTree = "<group>"; };
+		0B4FA5BD57FD1E4B1776A100 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ProfileStatusLifetime.swift"; sourceTree = "<group>"; };
 		C979D36473AA2EAA0A4498DD = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/ApplicationModel.swift"; sourceTree = "<group>"; };
 		7F5B05E62A9EE38AB1B3337A = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/ConditionEditorView.swift"; sourceTree = "<group>"; };
 		8531471F90CE83AA174E1246 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/DeskSetupSwitcherApp.swift"; sourceTree = "<group>"; };
@@ -199,6 +211,7 @@
 				8F4F613B039CCDF925D39E83,
 				F43EA553BCEADA173E8AAC71,
 				E2E10A35868C518643D24330,
+				A0C1B758EF142ACB1375B2E7,
 				C3447FB4204613188A0FB9F8,
 				C9B5ABB26C739AFA1F519ADD,
 				DFFF1EC03BEBA1B1B13939D8,
@@ -208,9 +221,14 @@
 				297FF9548096F3ACB37F219A,
 				A31719566B87E80590DF7FC5,
 				36359FD870E2D91E91CD4034,
+				6841B8865D54FA6E4544A973,
 				7F3AB0F301C6792D8F0AC7E3,
+				B89F6EEC772EC82EF16B6D44,
+				5BAE4E5E6ED173FC0F47E3E9,
 				E8E26A16EAEC0DD12825ECB3,
+				A769CCE0103F8F53B2F39069,
 				924704D1ABB51BA72DCE1642,
+				0B4FA5BD57FD1E4B1776A100,
 				C979D36473AA2EAA0A4498DD,
 				7F5B05E62A9EE38AB1B3337A,
 				8531471F90CE83AA174E1246,
@@ -366,6 +384,7 @@
 				77F17759BDFB8ACCA06A3340,
 				D6BA2BAE686714FB98EFB2B2,
 				A07BBC648E0EC9D04D055279,
+				B83C650D2283938D93C3EF90,
 				B2B2C4B117856339B3AB83D1,
 				F1094329DF4F10773C3AF429,
 				CA6FBE1461EF618D684B8AE3,
@@ -375,9 +394,14 @@
 				40EF594BEC0ADB55C2F3CB54,
 				85E31A4942A00E2104B13643,
 				1E537E53165E7AFF2C1A6488,
+				D223B5D76EF35DADBD76915E,
 				4275D6E3389ABC9721BAAF1A,
+				8DBA626876C6230A4CC3EF5A,
+				5448CB9EA489EB000260AB87,
 				DF25FEE6B03F69DB62821EEB,
+				8AF2A3AFC94514ABD81072AB,
 				4C529186C4955CBD92D55ECC,
+				53272203DDC1C76497706331,
 				B7295A7E23DD7C0C416F8E4D,
 				2259C72C6B7504FEDC3FE03A,
 				15D978AC08DD143E078810F1,

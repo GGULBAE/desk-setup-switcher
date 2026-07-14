@@ -8,19 +8,19 @@ The architecture isolates risky macOS mutations from profile semantics and UI. M
 
 ### DeskSetupCore
 
-Pure Swift domain types, versioned document encoding, import validation, condition evaluation, readiness derivation, device matching, plan construction, transaction coordination, result models, redaction, and rotating diagnostic storage. It does not import SwiftUI or concrete system frameworks.
+Pure Swift domain types, versioned document encoding, import validation, idempotent profile-applicability normalization, condition evaluation, readiness derivation, device matching, plan construction, transaction coordination, result models, redaction, and rotating diagnostic storage. It does not import SwiftUI or concrete system frameworks.
 
 ### DeskSetupPresentation
 
-Pure Swift presentation state built on `DeskSetupCore` value types: saved/draft profile sessions, pending selection decisions, friendly included-value summaries, operation previews, menu action availability/reasons, and legacy condition choice/input-validation utilities retained as regression support rather than bound Settings controls. It does not import SwiftUI, AppKit, or concrete system frameworks. Swift Package Manager exposes it as a separate target; the generated single-app Xcode project compiles the same sources into the app target.
+Pure Swift presentation state built on `DeskSetupCore` value types: saved/draft profile sessions, pending selection and dirty-Apply decisions, friendly included-value summaries, operation previews, state-aware primary Apply actions, value-free capture summaries, post-apply verification/result classification, field validation, and legacy condition choice/input-validation utilities retained as compatibility regression support rather than bound Settings controls. It does not import SwiftUI, AppKit, or concrete system frameworks. Swift Package Manager exposes it as a separate target; the generated single-app Xcode project compiles the same sources into the app target.
 
 ### DeskSetupSystem
 
-Concrete adapters for Core Graphics, Core Audio, CoreWLAN/Network/SystemConfiguration, common input preferences, hardware/condition discovery, authorized-location reads, and Keychain. Each setting adapter owns its snapshot-to-operation comparison and rollback data. Input preference keys are isolated and reported as experimental.
+Concrete adapters for Core Graphics, Core Audio, CoreWLAN/Network/SystemConfiguration, common input preferences, hardware/condition discovery, authorized-location reads, and Keychain. Each setting adapter owns its snapshot-to-operation comparison and rollback data. Core Graphics also supplies a typed ephemeral supported-mode catalog through read-only snapshots; it never enters profile JSON. Input preference keys are isolated and reported as experimental, and their writes require immediate adapter read-back agreement.
 
 ### DeskSetupSwitcherApp
 
-SwiftUI `MenuBarExtra`, compact header actions, expandable typed setting editors, Settings scene, observable application state, preview/confirmation sheets, app-lifetime profile editor ownership, one-shot permission UI, `SMAppService` login-item control, sanitized diagnostic browsing/clearing, import/export, About, localization, and accessibility metadata. The app binds pure presentation state to controls and coordinates core/system services; it does not implement display/audio/network/input mutations itself.
+SwiftUI `MenuBarExtra`, compact header actions, independently collapsible typed setting editors, inline field validation, Settings scene, observable application state, preview/confirmation/result sheets, app-lifetime profile editor ownership, one-shot permission UI, `SMAppService` login-item control, sanitized diagnostic browsing/clearing, import/export, About, localization, and accessibility metadata. The app binds pure presentation state to controls and coordinates core/system services; it does not implement display/audio/network/input mutations itself.
 
 ### Tests
 
@@ -34,10 +34,12 @@ flowchart LR
     Presentation --> CoreValues["Core profile / plan values"]
     UI --> Coordinator["App coordinator"]
     Coordinator --> Store["Profile store actor"]
+    Store --> Normalizer["Applicability normalizer"]
     Coordinator --> Diagnostics["Diagnostic log actor"]
     Coordinator --> Conditions["Condition evaluator / fact provider"]
     Coordinator --> Engine["Apply engine actor"]
     Engine --> Registry["Adapter registry"]
+    Engine --> Normalizer
     Registry --> Display["Display adapter"]
     Registry --> Audio["Audio adapter"]
     Registry --> Network["Network adapter"]
@@ -45,6 +47,8 @@ flowchart LR
     Store --> AppSupport["Application Support"]
     Diagnostics --> AppSupport
     Registry --> macOS["Public macOS APIs"]
+    Registry --> ReadBack["Fresh read-only snapshots"]
+    ReadBack --> Coordinator
 ```
 
 ## Profile draft flow
@@ -53,7 +57,17 @@ flowchart LR
 
 Save is asynchronous and marks the draft clean only after storage returns the persisted profile. `ApplicationModel` reloads the authoritative profile and merges only the current draft's editable fields, preventing an older draft from overwriting a newer last-application result or timestamp. A current-settings capture calls read-only snapshot services and replaces draft settings only; persistence still requires an explicit save. Menu capture rejects an unusable snapshot and atomically creates plus selects its profile before emitting transient success.
 
-The app layer owns compact header actions and expandable setting editors. Inclusion toggles change disclosure and inclusion state without erasing typed values or legacy conditions. Condition authoring is not bound into current Settings, while stored and imported conditions continue through persistence and readiness evaluation.
+The app layer owns compact header actions and setting editors whose disclosure sets are independent from profile inclusion flags. Collapsing never changes inclusion or erases typed values. Normalized snapshot-only fields are read-only; supported display modes arrive as ephemeral adapter snapshot context and are not persisted. Pure validation produces stable field identifiers and typed messages before save.
+
+Condition authoring is not bound into current Settings. Stored and imported conditions continue through persistence for round-trip compatibility, but the current manual readiness/preview/execution path deliberately treats them as dormant and non-blocking. The evaluator remains in Core for compatibility tests and any future explicitly designed condition surface; no automatic application exists.
+
+## Apply request and result flow
+
+The profile row asks `PrimaryApplyActionState` for one action. A complete executable plan selects normal Apply; a partial plan with executable items selects available-items/force Apply in the same slot. Locks, pending display confirmation, preparation, zero-operation, and unavailable states carry typed non-color reasons. Cached readiness may remain usable during a refresh, while per-profile preparation prevents duplicate requests.
+
+Before planning, `DirtyApplyProtectionDecision` compares the target with the app-lifetime editor session. Save/discard/cancel must resolve explicitly; save failure or cancel ends the request. The normalizer then removes unsupported applicability, and the existing fresh profile/snapshot execution-equivalence check protects the preview.
+
+After execution, a fresh read-only plan classifies executed operation references. If the same operation remains necessary, or if its capability/snapshot cannot be read safely because preparation is unavailable or fatal, the result changes from succeeded to not verified. Intentional available-items omissions and newly required operations remain separate. Rollback presentation matches operation UUIDs so same-key operations are not conflated and successful restoration cannot erase an initiating failure. The menu owns a compact count card and a value-free itemized detail view. A high-risk display result is finalized only after Keep/Revert resolves.
 
 ## Transaction state machine
 
@@ -65,16 +79,19 @@ stateDiagram-v2
     Planning --> Previewing: plan prepared
     Previewing --> Applying: user confirms
     Previewing --> Cancelled: user cancels
-    Applying --> Applied: low/moderate-risk success
+    Applying --> Verifying: low/moderate-risk result
     Applying --> AwaitingSafetyConfirmation: high-risk success
-    AwaitingSafetyConfirmation --> Applied: keep changes
+    AwaitingSafetyConfirmation --> Verifying: keep changes
     AwaitingSafetyConfirmation --> RollingBack: timeout / revert
     AwaitingSafetyConfirmation --> RollingBack: confirmation commit fails
     Applying --> RollingBack: fatal failure
     Applying --> Failed: nonfatal failures recorded
     RollingBack --> Restored: requested safety restore succeeds
     RollingBack --> Failed: fatal rollback or restore failure
+    Verifying --> Applied: read-back confirms
+    Verifying --> NotVerified: operation remains necessary
     Applied --> [*]
+    NotVerified --> [*]
     Restored --> [*]
     Failed --> [*]
     Rejected --> [*]
@@ -89,12 +106,12 @@ stateDiagram-v2
 - Profiles store stable value types, never ephemeral handles or sole runtime display IDs.
 - Persistence does not import system adapters.
 - UI does not decide readiness or rollback policy.
-- UI owns focus, sheets, localization, and accessibility delivery; pure presentation types own deterministic draft transitions, summaries, and action reasons. Condition-input utilities remain isolated regression support for persisted data, not a current Settings surface.
+- UI owns focus, disclosure sets, sheets, localization, and accessibility delivery; pure presentation types own deterministic draft transitions, action decisions, summaries, validation, and read-back result classification. Condition-input utilities remain isolated compatibility support for persisted data, not a current Settings surface or manual Apply gate.
 - An adapter never invokes another adapter directly; cross-group order is owned by the engine, while display-wide dependencies are represented as one atomic adapter operation.
 
 ## Failure model
 
-Errors and results carry stable group/key identity, typed status/fatality, safe user-facing messages, and redacted diagnostics. Expected capability limitations are values, not crashes. Profile storage errors are mapped to typed, sanitized UI messages before accessibility announcements and diagnostics. The engine captures both the initiating failure and every rollback result. Rendered English/Korean and assistive-technology behavior is still being audited.
+Errors and results carry stable operation UUID plus group/key identity, typed status/fatality, safe user-facing messages, and redacted diagnostics. Expected capability limitations are values, not crashes. Profile storage errors and field-validation issues are separated and mapped to typed, sanitized UI messages before accessibility announcements and diagnostics. The engine captures both the initiating failure and every rollback result; presentation reconciles each rollback only with its UUID-matched result and additionally distinguishes adapter success from available, matching read-back verification. The source/test-backed localization and accessibility-structure audit is complete; rendered English/Korean layout and assistive-technology behavior remain manually unverified.
 
 ## Security boundaries
 
@@ -107,7 +124,7 @@ Errors and results carry stable group/key identity, typed status/fatality, safe 
 
 ## Persistence recovery
 
-The store keeps a canonical document, a last-known-good backup, Foundation-managed atomic replacement files, and a quarantine directory. Recovery decisions are reported to the UI. Temporary-directory tests cover valid reload, failed candidate update, corrupt primary recovery, and corrupt primary-plus-backup reset. Sudden-power-loss durability and arbitrary filesystem fault injection are not claimed.
+The store keeps a canonical document, a last-known-good backup, Foundation-managed atomic replacement files, and a quarantine directory. Recovery decisions are reported to the UI. Every decoded, loaded, updated, or imported document passes the idempotent applicability normalizer before becoming authoritative, preserving snapshot values while excluding unsupported mutations. Temporary-directory tests cover valid reload, normalization, failed candidate update, corrupt primary recovery, and corrupt primary-plus-backup reset. Sudden-power-loss durability and arbitrary filesystem fault injection are not claimed.
 
 ## Display safety
 
@@ -117,7 +134,7 @@ The temporary/confirm/rollback/timer paths are mock verified. No real display co
 
 ## Stale-plan safety
 
-Preview and execution are separated by a second read-only preparation. The app reloads the profile, recaptures conditions/snapshots, and compares execution-relevant capabilities, readiness, issues, operations, omissions, payloads, and rollback payloads. Generated IDs/timestamps do not invalidate an otherwise identical plan; any meaningful state or backup change returns to preview. This prevents a stale preview from applying with obsolete rollback state.
+Dirty-draft resolution, preview, and execution are separate barriers. The app first refuses to plan silently from an older saved profile, then reloads the chosen persisted profile, applies the current normalization/dormant-condition policy, recaptures snapshots, and compares execution-relevant capabilities, readiness, issues, operations, omissions, payloads, and rollback payloads. Generated IDs/timestamps do not invalidate an otherwise identical plan; any meaningful state or backup change returns to preview. This prevents either an unsaved or system-stale value from applying with obsolete rollback state.
 
 ## Wi-Fi ambiguity safety
 
@@ -125,11 +142,13 @@ The network adapter treats a powered-on CoreWLAN interface with no readable SSID
 
 ## Current evidence boundary
 
-The current header/editor follow-up passes full local `make verify` with 215 default non-live tests (112 XCTest + 103 Swift Testing), including 56 presentation-specific cases, universal Debug/Release, Analyze, and mounted package/checksum verification. Local DMG SHA-256 is `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`. UI-hardening commit `5f0cabc`, [GitHub Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967), and artifact `8256718472` remain the latest remote evidence and predate the follow-up. No live flag or current-tree screenshot/assistive-technology/TCC action was used.
+The apply-reliability tree passed integrated non-live `make verify` on 2026-07-14: lint/localization policy; 290 default cases (124 XCTest with five opt-in skips plus 166 Swift Testing with one opt-in skip), zero failures; Swift Debug/Release; universal Xcode Debug/Release; Analyze; package/checksum; mounted metadata/resources/`x86_64 arm64`; and ad-hoc/no-Developer-ID signature classification. Separately, `git diff --check` passed. The verified DMG SHA-256 is `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`. The behavior-focused local commit and clean status are recorded by the final handoff; no push or new CI run was performed.
+
+The preceding header/editor follow-up passed full local `make verify` with 215 default non-live tests (112 XCTest + 103 Swift Testing), including 56 presentation-specific cases, universal Debug/Release, Analyze, and mounted package/checksum verification. Its local DMG SHA-256 is `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`. UI-hardening commit `5f0cabc`, [GitHub Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967), and artifact `8256718472` remain historical remote evidence and predate the current follow-up.
 
 The 2026-07-11 post-fix baseline passed full local `make verify` with 158 tests (83 XCTest + 75 Swift Testing), the universal package/checksum gate, and all five opt-in read-only discovery gates on an Apple M5 Mac running macOS 26.5.2. Its recorded local-DMG install launched background-only/menu-bar-only from `/Applications`; Korean popover/Settings and one accessibility label passed. It created one schema-v1 Ready profile from a read-only snapshot with all four groups, while the zero-operation plan kept Apply and Force Apply disabled. Default-on login registration plus opt-out/re-enable passed, with final cleanup opted out. The baseline local DMG SHA-256 is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
 
-Initial Actions run `29154880831` for `0d8f510` preserves the Swift 6.1 actor-isolation failure history. Repair [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) remains historical compatibility evidence, while UI-hardening run `29181900967` is the latest remote implementation evidence above; the local header/editor follow-up has no new CI evidence. Login approval/retry and actual reboot/login-at-boot, current-tree rendered localization/accessibility, import/export, TCC permission paths, quarantine/Gatekeeper, physical Intel, Keychain write, every live setting mutation, and release publication remain outside the verified boundary. Architecture diagrams describe call paths, not proof that each external effect works on every device.
+Initial Actions run `29154880831` for `0d8f510` preserves the Swift 6.1 actor-isolation failure history. Repair [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) remains historical compatibility evidence, while UI-hardening run `29181900967` is the latest remote implementation evidence above. Login approval/retry and actual reboot/login-at-boot, current-follow-up rendered localization/accessibility, import/export, TCC permission paths, quarantine/Gatekeeper, physical Intel, Keychain write, every live setting mutation/rollback, full VoiceOver, signing/notarization, and release publication remain outside the verified boundary. No UI automation was used. Architecture diagrams describe call paths, not proof that each external effect works on every device.
 
 ## Evolution
 

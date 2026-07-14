@@ -121,11 +121,6 @@ extension DisplayAdapterError: LocalizedError {
   }
 }
 
-func displayModesMatch(_ lhs: DisplayMode, _ rhs: DisplayMode) -> Bool {
-  lhs.width == rhs.width && lhs.height == rhs.height && lhs.pixelWidth == rhs.pixelWidth
-    && lhs.pixelHeight == rhs.pixelHeight && abs(lhs.refreshRate - rhs.refreshRate) <= 0.1
-}
-
 func displayPointFitsCoreGraphics(_ point: DisplayPoint) -> Bool {
   Int(Int32.min) <= point.x && point.x <= Int(Int32.max) && Int(Int32.min) <= point.y
     && point.y <= Int(Int32.max)

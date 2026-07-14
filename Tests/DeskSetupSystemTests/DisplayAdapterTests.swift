@@ -14,6 +14,8 @@ struct DisplayAdapterTests {
     var displays = makeDisplays()
     displays[1].bounds = DisplaySystemBounds(x: 0, y: 0, width: 2560, height: 1440)
     displays[1].mirrorSourceSessionID = displays[0].sessionID
+    displays[1].rotationDegrees = 90
+    displays[1].isActive = false
     let api = MockDisplaySystemAPI(displays: displays)
     let adapter = CoreGraphicsDisplayAdapter(systemAPI: api)
 
@@ -32,7 +34,14 @@ struct DisplayAdapterTests {
     #expect(settings.displays[0].origin.value == DisplayPoint(x: 0, y: 0))
     #expect(settings.displays[0].mode.value == displays[0].currentMode)
     #expect(settings.displays[1].mirroring.value == .mirrors(displays[0].identity))
+    #expect(settings.displays[1].rotationDegrees.value == 90)
+    #expect(!settings.displays[1].rotationDegrees.isIncluded)
+    #expect(settings.displays[1].isActive.value == false)
+    #expect(!settings.displays[1].isActive.isIncluded)
     #expect(snapshot.items.allSatisfy { $0.state == .storable })
+    #expect(snapshot.displayModeCatalog?.count == 2)
+    #expect(snapshot.displayModeCatalog?[1].identity == displays[1].identity)
+    #expect(snapshot.displayModeCatalog?[1].modes == displays[1].supportedModes)
   }
 
   @Test("an unchanged snapshot plans no operation")
@@ -157,7 +166,9 @@ struct DisplayAdapterTests {
       height: 600,
       refreshRate: 75
     )
+    settings.displays[externalIndex].rotationDegrees.isIncluded = true
     settings.displays[externalIndex].rotationDegrees.value = 90
+    settings.displays[externalIndex].isActive.isIncluded = true
     settings.displays[externalIndex].isActive.value = false
 
     let validation = await adapter.validate(.display(settings), against: snapshot)
@@ -223,6 +234,7 @@ struct DisplayAdapterTests {
     let adapter = CoreGraphicsDisplayAdapter(systemAPI: api)
     let snapshot = try await adapter.snapshot()
     var settings = try displaySettings(from: snapshot)
+    settings.displays[0].rotationDegrees.isIncluded = true
     settings.displays[0].rotationDegrees.value = 45
 
     let plan = try await adapter.plan(

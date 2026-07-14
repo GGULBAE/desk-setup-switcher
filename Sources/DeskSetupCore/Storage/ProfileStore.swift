@@ -32,6 +32,7 @@ public actor ProfileStore {
   public nonisolated let locations: ProfileStoreLocations
 
   private let codec: ProfileJSONCodec
+  private let normalizer: ProfileApplicabilityNormalizer
   private let now: @Sendable () -> Date
   private var document: ProfileDocument
   private var hasLoaded = false
@@ -45,10 +46,12 @@ public actor ProfileStore {
     directoryURL: URL = ProfileStore.defaultDirectoryURL,
     fileName: String = "profiles.json",
     codec: ProfileJSONCodec = .init(),
+    normalizer: ProfileApplicabilityNormalizer = .init(),
     now: @escaping @Sendable () -> Date = { Date() }
   ) {
     self.locations = ProfileStoreLocations(directoryURL: directoryURL, fileName: fileName)
     self.codec = codec
+    self.normalizer = normalizer
     self.now = now
     self.document = ProfileDocument(updatedAt: now())
   }
@@ -69,9 +72,11 @@ public actor ProfileStore {
 
     do {
       let decoded = try codec.decode(contentsOf: locations.primaryURL)
+      if decoded.requiresPersistence {
+        try persist(decoded.document)
+      }
       document = decoded.document
       if decoded.wasMigrated {
-        try persist(decoded.document)
         hasLoaded = true
         return ProfileLoadResult(
           document: decoded.document,
@@ -107,7 +112,7 @@ public actor ProfileStore {
       throw ProfileStorageError.profileAlreadyExists(profile.id)
     }
     let timestamp = now()
-    var created = profile
+    var created = normalizer.normalize(profile)
     created.createdAt = timestamp
     created.updatedAt = timestamp
 
@@ -128,7 +133,7 @@ public actor ProfileStore {
       throw ProfileStorageError.profileNotFound(profile.id)
     }
     let timestamp = now()
-    var updated = profile
+    var updated = normalizer.normalize(profile)
     updated.createdAt = document.profiles[index].createdAt
     updated.updatedAt = timestamp
 
@@ -153,7 +158,7 @@ public actor ProfileStore {
       throw ProfileStorageError.profileAlreadyExists(newID)
     }
     let timestamp = now()
-    var duplicate = document.profiles[index]
+    var duplicate = normalizer.normalize(document.profiles[index])
     duplicate.id = newID
     duplicate.name = name ?? "\(duplicate.name) Copy"
     duplicate.createdAt = timestamp
@@ -223,8 +228,9 @@ public actor ProfileStore {
   }
 
   private func replaceCurrent(with candidate: ProfileDocument) throws {
-    try persist(candidate)
-    document = candidate
+    let normalized = normalizer.normalize(candidate)
+    try persist(normalized)
+    document = normalized
   }
 
   private func persist(_ candidate: ProfileDocument) throws {
@@ -274,7 +280,7 @@ public actor ProfileStore {
       let canonical = try codec.encode(decoded.document)
       try canonical.write(to: locations.primaryURL, options: [.atomic])
       try setPrivateFilePermissions(locations.primaryURL)
-      if decoded.wasMigrated {
+      if decoded.requiresPersistence {
         try canonical.write(to: locations.backupURL, options: [.atomic])
         try setPrivateFilePermissions(locations.backupURL)
       }

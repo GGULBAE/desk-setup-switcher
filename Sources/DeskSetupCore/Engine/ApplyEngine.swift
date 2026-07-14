@@ -175,6 +175,7 @@ public actor ApplyEngine {
 
   private let registry: AdapterRegistry
   private let readinessEvaluator: ReadinessEvaluator
+  private let profileNormalizer: ProfileApplicabilityNormalizer
   private let now: @Sendable () -> Date
   private let maximumPendingSafetyRollbacks: Int
   private var isExecuting = false
@@ -183,11 +184,13 @@ public actor ApplyEngine {
   public init(
     registry: AdapterRegistry,
     readinessEvaluator: ReadinessEvaluator = .init(),
+    profileNormalizer: ProfileApplicabilityNormalizer = .init(),
     maximumPendingSafetyRollbacks: Int = 1,
     now: @escaping @Sendable () -> Date = { Date() }
   ) {
     self.registry = registry
     self.readinessEvaluator = readinessEvaluator
+    self.profileNormalizer = profileNormalizer
     self.maximumPendingSafetyRollbacks = min(
       max(1, maximumPendingSafetyRollbacks),
       Self.safetyRollbackHardLimit
@@ -200,6 +203,7 @@ public actor ApplyEngine {
     mode: ApplyMode,
     conditionsSatisfied: Bool = true
   ) async -> ApplyPreparation {
+    let profile = profileNormalizer.normalize(profile)
     let includedGroups = SettingGroup.safeApplicationSequence.filter {
       profile.settings.payload(for: $0) != nil
     }

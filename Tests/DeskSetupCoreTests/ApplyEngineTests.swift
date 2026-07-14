@@ -5,6 +5,40 @@ import Testing
 
 @Suite("Apply engine planning")
 struct ApplyEngineTests {
+  @Test("planning defensively excludes unsupported leaves without mutating the profile value")
+  func planningNormalizesUnsupportedLeaves() async throws {
+    let displayOperation = PlannedOperation(
+      group: .display,
+      key: "display.atomic-configuration",
+      summary: "Display"
+    )
+    let displayAdapter = MockSystemSettingsAdapter(
+      group: .display,
+      plan: AdapterPlan(group: .display, operations: [displayOperation])
+    )
+    let networkAdapter = MockSystemSettingsAdapter(group: .network)
+    let engine = ApplyEngine(
+      registry: try AdapterRegistry([displayAdapter, networkAdapter])
+    )
+    var profile = makeProfile(including: [.display])
+    profile.settings.display.value.displays[0].rotationDegrees = .init(value: 90)
+    profile.settings.network = .init(
+      isIncluded: true,
+      value: .init(dnsServers: .init(value: ["192.0.2.53"]))
+    )
+
+    let preparation = await engine.prepare(profile: profile, mode: .force)
+
+    #expect(preparation.includedGroups == [.display])
+    #expect(preparation.operations.map(\.key) == [displayOperation.key])
+    #expect(preparation.omissions.isEmpty)
+    #expect(await networkAdapter.recordedInvocations().isEmpty)
+    #expect(profile.settings.display.value.displays[0].rotationDegrees.isIncluded)
+    #expect(profile.settings.display.value.displays[0].rotationDegrees.value == 90)
+    #expect(profile.settings.network.value.dnsServers.isIncluded)
+    #expect(profile.settings.network.value.dnsServers.value == ["192.0.2.53"])
+  }
+
   @Test("a group toggle without included leaf settings is not applicable")
   func emptyIncludedGroupIsRejected() async {
     var settings = ProfileSettings()
@@ -17,6 +51,57 @@ struct ApplyEngineTests {
     #expect(preparation.includedGroups.isEmpty)
     #expect(preparation.rejectionReasons == [.noIncludedSettings])
     #expect(preparation.readiness.status == .unavailable)
+  }
+
+  @Test("planning cannot execute a mixed primary-display inclusion state")
+  func mixedPrimaryDisplayInclusionCannotExecute() async throws {
+    let adapter = MockSystemSettingsAdapter(group: .display)
+    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+    var profile = makeProfile(including: [.display])
+    var secondDisplay = testDisplayTarget()
+    profile.settings.display.value.displays[0].isPrimary = .init(
+      isIncluded: true,
+      value: false
+    )
+    secondDisplay.isPrimary = .init(isIncluded: false, value: true)
+    profile.settings.display.value.displays.append(secondDisplay)
+
+    let preparation = await engine.prepare(profile: profile, mode: .force)
+
+    #expect(preparation.includedGroups.isEmpty)
+    #expect(preparation.rejectionReasons == [.noIncludedSettings, .noOperations])
+    #expect(await adapter.recordedInvocations().isEmpty)
+  }
+
+  @Test("legacy conditions do not block the default manual apply policy")
+  func legacyConditionsAreDormantForManualApply() async throws {
+    let operation = PlannedOperation(
+      group: .audio,
+      key: "defaultOutput",
+      summary: "Synthetic output change"
+    )
+    let adapter = MockSystemSettingsAdapter(
+      group: .audio,
+      plan: AdapterPlan(group: .audio, operations: [operation])
+    )
+    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+    var profile = makeProfile(including: [.audio])
+    profile.conditions = ProfileConditionSet(
+      conditions: [ProfileCondition(kind: .wifiSSID("Synthetic Legacy Network"))]
+    )
+
+    let manualPreparation = await engine.prepare(profile: profile, mode: .normal)
+    let explicitlyConditionedPreparation = await engine.prepare(
+      profile: profile,
+      mode: .normal,
+      conditionsSatisfied: false
+    )
+
+    #expect(manualPreparation.canExecute)
+    #expect(manualPreparation.operations.map(\.key) == [operation.key])
+    #expect(
+      explicitlyConditionedPreparation.rejectionReasons.contains(.conditionsUnsatisfied)
+    )
   }
 
   @Test("normal mode rejects an unavailable included group")

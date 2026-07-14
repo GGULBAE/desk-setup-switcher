@@ -2,13 +2,13 @@
 
 ## Status
 
-Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. The current header/editor follow-up passes full local `make verify` with 215 default non-live tests (112 XCTest + 103 Swift Testing), including 56 presentation-specific cases, plus universal Analyze/package/checksum verification. Local DMG SHA-256 is `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`. UI-hardening commit `5f0cabc` remains the latest matching [GitHub Actions](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967) and unsigned-artifact baseline; it predates the local follow-up. The earlier repair baseline retains its 2026-07-11 five opt-in read-only hardware and fresh `/Applications` smoke evidence. This is not a public release or mutation proof: no live setting mutation, physical Intel run, live Keychain write, or quarantined Gatekeeper test exists. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. The apply-reliability follow-up described in [APPLY-RELIABILITY-UX-GOAL.md](APPLY-RELIABILITY-UX-GOAL.md) passed integrated non-live `make verify` on 2026-07-14 with 290 default cases (124 XCTest with five opt-in skips plus 166 Swift Testing cases with one opt-in skip), zero failures, lint, Swift and universal Xcode Debug/Release, Analyze, and mounted package/checksum verification. The current DMG SHA-256 is `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`; it is universal and ad-hoc signed without Developer ID. The preceding 215-test header/editor package, SHA-256 `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`, UI-hardening commit `5f0cabc`, and its matching [GitHub Actions run](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967) remain historical baselines. No new push or CI run was performed. This is not a public release or mutation proof: no live setting mutation, physical Intel run, live Keychain write, full VoiceOver/TCC audit, or quarantined Gatekeeper test exists. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
 ## Product promise
 
 Desk Setup Switcher is a free, open-source, local-first macOS menu-bar app that lets a person capture the current desk-related settings as a profile and deliberately apply a saved profile later. It never changes profiles automatically.
 
-The app covers displays, audio, network state, and the macOS-wide mouse and keyboard settings that can be accessed safely. A profile's conditions answer “can this profile be applied here?” They are readiness checks, not triggers.
+The app covers displays, audio, network state, and the macOS-wide mouse and keyboard settings that can be accessed safely. Legacy/imported conditions remain in the versioned format for round-trip compatibility, but the current manual workflow neither edits them nor lets them silently block readiness or Apply. They never act as triggers.
 
 ## Product principles
 
@@ -34,40 +34,45 @@ The fresh final-DMG install launched background-only/menu-bar-only. Default-on `
 
 ### Create and manage a profile
 
-A user can create, inspect, edit, duplicate, delete, reorder, enable, import, and export profiles. Settings keeps a distinct app-lifetime draft and saved profile: selection, replacement, and ordinary quit paths require save, discard, or cancel when the draft is dirty, and a failed save leaves the draft intact. Successful saves merge user-editable fields into the latest stored metadata. A current-settings snapshot pre-fills only values that were actually read and changes the reviewable draft, not the persistent profile, until the user saves. Enabling a setting group reveals its options immediately, and enabling an option reveals the corresponding value editor; turning either off preserves the typed value. Unsupported display and administrative-network fields carry explicit support notices. Conditions remain part of the versioned profile and readiness calculation, but Settings does not expose condition editing. A profile also includes a name, description, SF Symbol, and last-application summary; the containing document carries the schema version. The 2026-07-11 fresh-install smoke test created one schema-v1 Ready profile from a read-only snapshot with all four groups; the current UI flow has not received a new manual walkthrough.
+A user can create, inspect, edit, duplicate, delete, reorder, enable, import, and export profiles. Settings keeps a distinct app-lifetime draft and saved profile: selection, replacement, ordinary quit, and Apply paths require an explicit save/discard/cancel decision when the draft is dirty, and a failed save leaves the draft intact. Successful saves merge user-editable fields into the latest stored metadata. A current-settings snapshot pre-fills only values that were actually read and changes the reviewable draft, not the persistent profile, until the user saves.
+
+Setting inclusion and disclosure are independent: collapsing an included group or option does not exclude it or erase its target value. Common values use typed pickers, toggles, and semantic sliders; the display-mode picker consumes a typed runtime catalog from the read-only adapter snapshot and never stores that catalog in profile JSON. Field-specific validation blocks invalid saves and connects localized error text to the affected control. Display rotation/active state and administrative IPv4, DNS, and proxy values are retained only as read-only snapshot evidence. An idempotent normalizer excludes these leaves—and any group left without an applicable leaf—when capturing, loading, decoding, planning, or importing without deleting the stored values. Conditions remain round-trip-compatible profile data but are dormant for current manual readiness and Apply. The 2026-07-11 fresh-install smoke test predates this behavior and is not a current UI walkthrough.
 
 ### Apply a profile
 
-The app evaluates conditions and adapter capabilities, calculates a change plan, and skips no-op values.
+The app evaluates current adapter capabilities, calculates a change plan, and skips no-op values. Legacy conditions are not a hidden gate in this manual path.
 
-The top-right header exposes short Capture plus icon-only Settings and Quit actions. Each profile exposes Apply and direct Edit only; availability review, available-items application, the ellipsis, and manual refresh are not menu controls. Edit selects that profile, opens the Profiles tab through the public Settings action, and preserves the save/discard/cancel decision when another draft is dirty. Readiness refreshes automatically when the menu opens. A successful capture message appears for about three seconds only after an actual success, while unusable snapshots and storage failures use a separate error path. Disabled actions include a text-and-symbol reason. Profile summaries and previews lead with friendly included values; opaque identifiers remain available only under explicit technical disclosures.
+The top-right header exposes short Capture plus icon-only Settings and Quit actions. Each profile has one state-aware primary action in a stable location: `Apply…` for a complete normal plan, or `Apply Available…` for a partial plan with executable items. The latter still opens an explicit force/omission preview; it is not a second button or an ellipsis action. Edit remains direct, and readiness refreshes automatically without discarding a usable cached action. Per-profile preparation prevents duplicate taps. A dirty draft is resolved before planning, then the latest stored profile and read-only system state are prepared again so an older saved value cannot be applied silently.
 
-- Normal apply is available only when every enabled setting can be applied.
-- Force apply requires explicit confirmation, lists omissions first, and applies only supported/available values.
+Capture returns a value-free complete/partial/failure summary with saved, snapshot-only, unreadable, permission-required, and unsupported counts. A partial result remains visible in a compact banner; a capture with no applicable leaf does not create a profile. Wi-Fi permission failure is described without exposing an SSID or requesting permission automatically. Disabled Apply actions use a text-and-symbol reason. Profile summaries and previews lead with friendly included values; opaque identifiers remain behind explicit technical disclosures.
+
+- Normal apply is available only when every included applicable setting can be applied.
+- Available-items/force apply requires explicit confirmation, lists omissions separately, and applies only supported/available values.
 - Force confirmation is disabled if no change is possible.
 - Before execution, the app recaptures profile/condition/system state and refreshes the plan. If execution-relevant operations or rollback payloads changed, it requires another preview instead of using stale state.
-- Results are recorded per setting as succeeded, failed, skipped, unsupported, rolled back, or rollback failed.
+- Results are recorded per setting as succeeded, failed, skipped, unsupported, rolled back, rollback failed, or not verified.
+- After a non-display-safety execution, a new read-only preparation checks whether an executed operation is still required and whether the relevant capability/snapshot can be read safely. A still-needed operation or unavailable read-back is reported as not verified rather than finalized as applied; intentional force omissions stay distinct. High-risk display results are finalized after Keep/Revert.
 - A fatal failure rolls completed steps back in reverse order when rollback is supported.
 - Risky display changes are initially app-only, become session-scoped only after confirmation, and restore the prior arrangement on timeout/revert or confirmation failure.
 
-The fresh snapshot profile produced a zero-operation plan, so both Apply and Force Apply were disabled and no live setting changed.
+The historical fresh snapshot profile produced a zero-operation plan, so both Apply and Force Apply were disabled and no live setting changed. No current follow-up path has been exercised against live hardware.
 
 ## Readiness states
 
-- **Ready:** all enabled settings and required conditions are satisfiable.
-- **Partial:** at least one enabled setting is applicable and at least one is missing, unsupported, or blocked.
+- **Ready:** all included, applicable settings can be prepared and the plan has no blocking omission.
+- **Partial:** at least one enabled setting is applicable while another is missing, unsupported, blocked, intentionally omitted, or not verified.
 - **Unavailable:** no enabled setting can be applied.
 - **Applying:** a transaction is active.
-- **Applied:** the last transaction completed without a failed enabled item.
-- **Failed:** the last transaction had a failure; its rollback outcome remains visible.
+- **Applied:** the last transaction completed with every required result successful and read-back verified, without omission, unsupported work, or failure.
+- **Failed:** the last transaction had an apply or rollback failure; a successful rollback does not rewrite the initiating apply failure as success.
 
-State is communicated by text and symbol as well as color.
+State is communicated by text and symbol as well as color. Historical applied/failed outcomes are shown as results; a new readiness refresh is not permanently masked by those older operational states.
 
 ## Settings scope
 
 ### Displays
 
-Discover connected displays and stable identity attributes; snapshot primary display, topology, mirroring, mode, refresh rate, rotation, and active state where public Core Graphics APIs expose them. Validate saved modes before applying. Never persist a `CGDirectDisplayID` as the sole identity. High-risk changes require preflight backup and an app-only temporary commit; **Keep Changes** promotes the same configuration to session scope, while timeout/revert/failed confirmation restores the backup. This path is mock verified, not live-mutation verified.
+Discover connected displays and stable identity attributes; snapshot primary display, topology, mirroring, mode, refresh rate, rotation, and active state where public Core Graphics APIs expose them. A typed supported-mode catalog travels only with the current read-only snapshot so the editor can offer a safe picker and preserve a saved mode that is temporarily unavailable; the catalog is not profile data. Validate saved modes before applying. Never persist a `CGDirectDisplayID` as the sole identity. High-risk changes require preflight backup and an app-only temporary commit; **Keep Changes** promotes the same configuration to session scope, while timeout/revert/failed confirmation restores the backup. This path is mock verified, not live-mutation verified.
 
 ### Audio
 
@@ -85,19 +90,19 @@ Vendor application profiles, firmware, proprietary DPI/button mappings, Karabine
 
 ## Conditions
 
-Conditions include display, audio input/output, USB/hardware presence, SSID, Ethernet, IP/CIDR, and location when authorized. Existing and imported conditions remain preserved and evaluated, including all/any and inversion semantics, but the current Settings UI does not allow adding or editing them. Condition choice and input-validation utilities remain regression tested for stored-data compatibility. Conditions never initiate an apply operation.
+The schema can decode and round-trip display, audio input/output, USB/hardware presence, SSID, Ethernet, IP/CIDR, and authorized-location conditions, including all/any and inversion semantics. The current Settings UI does not add or edit them, and current manual readiness/preview/application treats existing or imported conditions as dormant compatibility data so an invisible rule cannot block the user. The pure evaluator and historical choice/input-validation utilities remain regression tested for stored-data compatibility and possible future explicitly designed use. Conditions never initiate an apply operation.
 
 ## Accessibility and localization
 
-The menu and settings window provide VoiceOver labels, keyboard shortcuts, non-color status cues, actionable error copy, and confirmation for destructive or risky actions. Current source/build includes save/apply announcements, text-and-symbol diagnostic severity, an Escape revert and default keep action for display safety, and a remaining-seconds accessibility value. English is the development language and Korean is shipped through localizable resources; lint checks catalog parity, duplicate keys, placeholders, and statically discoverable UI keys.
+The menu and settings window provide VoiceOver labels, keyboard shortcuts, non-color status cues, actionable error copy, and confirmation for destructive or risky actions. Current source includes distinct labels/values for inclusion versus target state, field identifiers and invalid-state descriptions, save/apply/result announcements, text-and-symbol status, an Escape revert and default keep action for display safety, and a remaining-seconds accessibility value. English is the development language and Korean is shipped through localizable resources; lint checks catalog parity, duplicate keys, placeholders, and statically discoverable UI keys.
 
-The 2026-07-11 baseline fresh-install popover and Settings rendered in Korean, and one accessibility label passed inspection. No current-tree screenshot walkthrough or full VoiceOver/keyboard/focus/contrast/text-size audit has run. Structural localization checks do not prove rendered layout, translation quality, or assistive-technology behavior; this section remains the acceptance target, not a completed claim.
+The 2026-07-11 baseline fresh-install popover and Settings rendered in Korean, and one accessibility label passed inspection. No current-follow-up screenshot walkthrough or full VoiceOver/keyboard/focus/contrast/text-size audit has run. Structural localization and deterministic accessibility metadata checks do not prove rendered layout, translation quality, or assistive-technology behavior; this section remains the acceptance target, not a completed claim.
 
 ## Distribution
 
 The minimum deployment target is macOS 14 Sonoma. Release builds target both Apple Silicon and Intel. The project produces a no-Developer-ID DMG with an ad-hoc-signed app, Applications link, versioned filename, and SHA-256 checksum. Developer ID signing and notarization are optional. See [DISTRIBUTION.md](DISTRIBUTION.md).
 
-The post-fix local DMG SHA-256 is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`; downloaded CI artifact ID `8249295840` verified CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. The DMGs are not byte-for-byte reproducible. Download quarantine/Gatekeeper, a tagged release, publication, and physical Intel remain unverified. The ad-hoc signature supplies integrity, not publisher identity or notarization.
+The current local DMG SHA-256 is `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`; its mounted universal `x86_64 arm64` app and ad-hoc/no-Developer-ID status passed verification. The preceding header/editor checksum `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b` and post-fix checksum `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f` remain historical. Downloaded CI artifact ID `8249295840` verified CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. The DMGs are not byte-for-byte reproducible. Download quarantine/Gatekeeper, a tagged release, publication, and physical Intel remain unverified. The ad-hoc signature supplies integrity, not publisher identity or notarization.
 
 ## Non-goals
 

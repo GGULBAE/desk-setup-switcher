@@ -118,6 +118,57 @@ final class ProfileStoreTests: XCTestCase {
     XCTAssertEqual(reloaded, before)
   }
 
+  func testLoadNormalizesExistingProfileAndPersistsCanonicalDocument() async throws {
+    let directory = try makeTemporaryDirectory()
+    let timestamp = Date(timeIntervalSince1970: 1_700_000_000)
+    let codec = ProfileJSONCodec()
+    let locations = ProfileStoreLocations(directoryURL: directory)
+    let document = unsupportedNetworkDocument(timestamp: timestamp)
+    let expected = ProfileApplicabilityNormalizer().normalize(document)
+    try codec.encode(document).write(to: locations.primaryURL, options: [.atomic])
+
+    let store = ProfileStore(directoryURL: directory, now: { timestamp })
+    let result = try await store.load()
+
+    XCTAssertEqual(result.status, .loaded)
+    XCTAssertEqual(result.document, expected)
+    XCTAssertEqual(try Data(contentsOf: locations.primaryURL), try codec.encode(expected))
+    XCTAssertEqual(try Data(contentsOf: locations.backupURL), try codec.encode(expected))
+
+    let reloaded = try await ProfileStore(directoryURL: directory).load()
+    XCTAssertEqual(reloaded.document, expected)
+    XCTAssertEqual(try Data(contentsOf: locations.primaryURL), try codec.encode(expected))
+  }
+
+  func testCreateAndReplaceAllNormalizeProfilesBeforePersistence() async throws {
+    let directory = try makeTemporaryDirectory()
+    let timestamp = Date(timeIntervalSince1970: 1_700_000_000)
+    let store = ProfileStore(directoryURL: directory, now: { timestamp })
+    _ = try await store.load()
+    let source = try XCTUnwrap(unsupportedNetworkDocument(timestamp: timestamp).profiles.first)
+
+    let created = try await store.createProfile(source)
+
+    XCTAssertFalse(created.settings.network.isIncluded)
+    XCTAssertEqual(created.settings.network.value.dnsServers.value, ["192.0.2.53"])
+    XCTAssertFalse(created.settings.network.value.dnsServers.isIncluded)
+
+    var replacement = unsupportedNetworkDocument(timestamp: timestamp)
+    replacement.profiles[0].id = UUID()
+    replacement.selectedProfileID = replacement.profiles[0].id
+    try await store.replaceAll(with: replacement)
+    let stored = await store.currentDocument()
+
+    XCTAssertFalse(try XCTUnwrap(stored.profiles.first).settings.network.isIncluded)
+    XCTAssertFalse(
+      try XCTUnwrap(stored.profiles.first).settings.network.value.dnsServers.isIncluded
+    )
+    XCTAssertEqual(
+      try XCTUnwrap(stored.profiles.first).settings.network.value.dnsServers.value,
+      ["192.0.2.53"]
+    )
+  }
+
   func testProfileDirectoryAndFilesUsePrivatePermissions() async throws {
     let directory = try makeTemporaryDirectory()
     let store = ProfileStore(directoryURL: directory)
@@ -139,5 +190,30 @@ final class ProfileStoreTests: XCTestCase {
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     addTeardownBlock { try? FileManager.default.removeItem(at: url) }
     return url
+  }
+
+  private func unsupportedNetworkDocument(timestamp: Date) -> ProfileDocument {
+    var settings = ProfileSettings()
+    settings.network = .init(
+      isIncluded: true,
+      value: .init(
+        ipv4: .init(value: .dhcp),
+        dnsServers: .init(value: ["192.0.2.53"]),
+        secureWebProxy: .init(
+          value: .init(enabled: true, host: "secure-proxy.invalid", port: 8443)
+        )
+      )
+    )
+    let profile = DeskProfile(
+      name: "Synthetic",
+      settings: settings,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    )
+    return ProfileDocument(
+      profiles: [profile],
+      selectedProfileID: profile.id,
+      updatedAt: timestamp
+    )
   }
 }

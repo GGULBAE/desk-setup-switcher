@@ -188,6 +188,46 @@ func appLocalizedRuntime(_ value: String) -> String {
   return value
 }
 
+/// Formats typed draft-validation messages without attempting to use a
+/// user-specific, already-interpolated value as a localization key.
+func appLocalizedDraftValidationMessage(_ message: DraftValidationMessage) -> String {
+  switch message {
+  case .outOfRange(let minimum, let maximum):
+    return appRuntimeLocalizedFormat(
+      "Enter a value from %@ through %@.",
+      FriendlyValueFormatter.decimal(minimum),
+      FriendlyValueFormatter.decimal(maximum)
+    )
+  case .tooLong(let maximum):
+    return appRuntimeLocalizedFormat(
+      "Enter %lld characters or fewer.",
+      maximum
+    )
+  case .required,
+    .cannotBeBlank,
+    .enterProfileName,
+    .selectAtLeastOneSetting,
+    .invalidDisplayDimension,
+    .chooseOnePrimaryDisplay,
+    .repairPrimaryDisplayInclusion,
+    .invalidWiFiNetworkName,
+    .invalidIPv4Address,
+    .invalidSubnetMask,
+    .invalidIPAddress,
+    .invalidRotation:
+    return appLocalizedRuntime(message.defaultMessage)
+  }
+}
+
+func appProfileDraftValidationError(_ profile: DeskProfile) -> String? {
+  guard !profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    return appLocalized("Enter a profile name.")
+  }
+  return ProfileDraftValidator().validate(profile).issues.first.map {
+    appLocalizedDraftValidationMessage($0.message)
+  }
+}
+
 func appOperationPreviewValue(
   _ value: String,
   operation: PlannedOperation,

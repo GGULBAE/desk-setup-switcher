@@ -54,22 +54,38 @@ public struct SnapshotItem: Codable, Hashable, Sendable, Identifiable {
   }
 }
 
+/// Read-only, session-scoped choices used by profile editors. These values are
+/// carried with a snapshot and are never copied into persisted profile JSON.
+public struct DisplayModeCatalogEntry: Codable, Hashable, Sendable {
+  public var identity: DisplayIdentity
+  public var modes: [DisplayMode]
+
+  public init(identity: DisplayIdentity, modes: [DisplayMode]) {
+    self.identity = identity
+    self.modes = modes
+  }
+}
+
 public struct AdapterSnapshot: Codable, Hashable, Sendable {
   public var group: SettingGroup
   public var capturedAt: Date
   public var payload: SettingsPayload?
   public var items: [SnapshotItem]
+  /// Optional for backward-compatible decoding of older serialized apply plans.
+  public var displayModeCatalog: [DisplayModeCatalogEntry]?
 
   public init(
     group: SettingGroup,
     capturedAt: Date,
     payload: SettingsPayload?,
-    items: [SnapshotItem]
+    items: [SnapshotItem],
+    displayModeCatalog: [DisplayModeCatalogEntry]? = nil
   ) {
     self.group = group
     self.capturedAt = capturedAt
     self.payload = payload
     self.items = items
+    self.displayModeCatalog = displayModeCatalog
   }
 }
 

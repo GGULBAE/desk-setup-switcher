@@ -165,7 +165,13 @@ struct NetworkAdapterTests {
     #expect(settings.wifiPower.value == true)
     #expect(settings.wifiSSID.isIncluded == false)
     #expect(settings.ipv4.value == .dhcp)
+    #expect(settings.ipv4.isIncluded == false)
     #expect(settings.dnsServers.value == ["192.0.2.53"])
+    #expect(settings.dnsServers.isIncluded == false)
+    #expect(settings.webProxy.value == .init(enabled: false, host: "", port: 0))
+    #expect(settings.webProxy.isIncluded == false)
+    #expect(settings.secureWebProxy.value == nil)
+    #expect(settings.secureWebProxy.isIncluded == false)
   }
 
   @Test("an identical full network payload plans no operation or omission")

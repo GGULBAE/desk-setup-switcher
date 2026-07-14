@@ -91,3 +91,67 @@ final class DisplayIdentityMatcherTests: XCTestCase {
     XCTAssertEqual(matcher.match(desired, among: [candidate]), .noMatch)
   }
 }
+
+final class DisplayModeMatcherTests: XCTestCase {
+  private let matcher = DisplayModeMatcher()
+
+  func testNominalRefreshRateDifferencesWithinToleranceMatch() {
+    let reported = mode(refreshRate: 59.94)
+    let persisted = mode(refreshRate: 60)
+
+    XCTAssertTrue(matcher.matches(reported, persisted))
+    XCTAssertEqual(matcher.match(persisted, among: [reported]), reported)
+  }
+
+  func testRefreshRateOutsideToleranceDoesNotMatch() {
+    XCTAssertFalse(
+      matcher.matches(mode(refreshRate: 59.89), mode(refreshRate: 60))
+    )
+  }
+
+  func testLogicalAndPixelDimensionsStillRequireExactMatches() {
+    let reference = mode(refreshRate: 60)
+
+    XCTAssertFalse(
+      matcher.matches(
+        reference,
+        DisplayMode(
+          width: 2_560,
+          height: 1_440,
+          pixelWidth: 5_119,
+          pixelHeight: 2_880,
+          refreshRate: 60
+        )
+      )
+    )
+  }
+
+  func testDeduplicationUsesToleranceAndPreservesFirstReportedMode() {
+    let first = mode(refreshRate: 59.94)
+    let nominalDuplicate = mode(refreshRate: 60)
+    let distinct = mode(refreshRate: 60.2)
+
+    XCTAssertEqual(
+      matcher.deduplicated([first, nominalDuplicate, distinct]),
+      [first, distinct]
+    )
+  }
+
+  func testScaledPixelDimensionsAreAvailableForDistinctPickerLabels() {
+    XCTAssertTrue(mode(refreshRate: 60).hasDistinctPixelDimensions)
+    XCTAssertFalse(
+      DisplayMode(width: 2_560, height: 1_440, refreshRate: 60)
+        .hasDistinctPixelDimensions
+    )
+  }
+
+  private func mode(refreshRate: Double) -> DisplayMode {
+    DisplayMode(
+      width: 2_560,
+      height: 1_440,
+      pixelWidth: 5_120,
+      pixelHeight: 2_880,
+      refreshRate: refreshRate
+    )
+  }
+}

@@ -91,19 +91,45 @@ struct InputPreferencesAdapterTests {
     #expect((await adapter.apply(operation)).status == .failed)
     #expect(api.value(for: .pointerSpeed) == .number(1))
   }
+
+  @Test("write is not successful when immediate read-back disagrees")
+  func readBackMismatchFails() async throws {
+    let api = MockInputPreferencesAPI(
+      values: [.pointerSpeed: .number(1)],
+      ignoredWriteKeys: [.pointerSpeed]
+    )
+    let adapter = InputPreferencesAdapter(api: api)
+    let snapshot = try await adapter.snapshot()
+    var desired = InputProfileSettings()
+    desired.pointerSpeed = .init(value: 2)
+    let plan = try await adapter.plan(.input(desired), from: snapshot, mode: .normal)
+    guard let operation = plan.operations.first else {
+      Issue.record("Expected an operation")
+      return
+    }
+
+    let result = await adapter.apply(operation)
+
+    #expect(result.status == .failed)
+    #expect(result.message.contains("read-back"))
+    #expect(api.value(for: .pointerSpeed) == .number(1))
+  }
 }
 
 private final class MockInputPreferencesAPI: InputPreferencesAPI, @unchecked Sendable {
   private let lock = NSLock()
   private var values: [InputPreferenceKey: InputPreferenceValue]
   private let failingKeys: Set<InputPreferenceKey>
+  private let ignoredWriteKeys: Set<InputPreferenceKey>
 
   init(
     values: [InputPreferenceKey: InputPreferenceValue] = [:],
-    failingKeys: Set<InputPreferenceKey> = []
+    failingKeys: Set<InputPreferenceKey> = [],
+    ignoredWriteKeys: Set<InputPreferenceKey> = []
   ) {
     self.values = values
     self.failingKeys = failingKeys
+    self.ignoredWriteKeys = ignoredWriteKeys
   }
 
   func value(for key: InputPreferenceKey) -> InputPreferenceValue? {
@@ -114,6 +140,9 @@ private final class MockInputPreferencesAPI: InputPreferencesAPI, @unchecked Sen
     try lock.withLock {
       if failingKeys.contains(key) {
         throw InputPreferencesAPIError.synchronizationFailed
+      }
+      if ignoredWriteKeys.contains(key) {
+        return
       }
       values[key] = value
     }

@@ -4,6 +4,34 @@ import Foundation
   import DeskSetupCore
 #endif
 
+/// Gives visually identical friendly names deterministic, non-sensitive
+/// ordinals while leaving unique names unchanged. Runtime identifiers remain
+/// selection values and are never exposed in the default label.
+public struct FriendlyNameDisambiguator: Equatable, Sendable {
+  public init() {}
+
+  public func labels<Identifier: Hashable>(
+    for candidates: [(id: Identifier, name: String)]
+  ) -> [Identifier: String] {
+    let counts = Dictionary(
+      grouping: candidates,
+      by: \.name
+    ).mapValues(\.count)
+    var ordinals: [String: Int] = [:]
+    var labels: [Identifier: String] = [:]
+    for candidate in candidates {
+      guard counts[candidate.name, default: 0] > 1 else {
+        labels[candidate.id] = candidate.name
+        continue
+      }
+      let ordinal = ordinals[candidate.name, default: 0] + 1
+      ordinals[candidate.name] = ordinal
+      labels[candidate.id] = "\(candidate.name) \(ordinal)"
+    }
+    return labels
+  }
+}
+
 /// A technical value that can be shown behind an explicit disclosure without
 /// making opaque device identifiers part of the default profile summary.
 public struct FriendlyTechnicalDetail: Equatable, Sendable {
@@ -126,6 +154,14 @@ public enum FriendlyValueFormatter {
   public static func percentage(_ value: Double) -> String {
     guard value.isFinite else { return "Value unavailable" }
     return "\(decimal(value * 100, maximumFractionDigits: 1))%"
+  }
+
+  /// Returns the exact target name used by Wi-Fi summaries. Trimming is only
+  /// used to classify a whitespace-only value as unavailable because leading
+  /// and trailing whitespace can be part of a valid SSID.
+  public static func wifiNetworkName(_ value: String?) -> String? {
+    guard let value else { return nil }
+    return value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : value
   }
 
   public static func decimal(
@@ -419,7 +455,10 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
         .init(
           kind: .wifiNetwork,
           label: "Wi-Fi network",
-          value: optionalStringValue(settings.wifiSSID.value)
+          value: .init(
+            primaryText: FriendlyValueFormatter.wifiNetworkName(settings.wifiSSID.value)
+              ?? "Value unavailable"
+          )
         ))
     }
     if settings.ipv4.isIncluded {
@@ -688,14 +727,6 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
     guard let proxy else { return .init(primaryText: "Value unavailable") }
     guard proxy.enabled else { return .init(primaryText: "Off") }
     return .init(primaryText: "\(proxy.host):\(proxy.port)")
-  }
-
-  private func optionalStringValue(_ value: String?) -> FriendlyDisplayValue {
-    guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty
-    else {
-      return .init(primaryText: "Value unavailable")
-    }
-    return .init(primaryText: value)
   }
 
   private func optionalValue<Value>(

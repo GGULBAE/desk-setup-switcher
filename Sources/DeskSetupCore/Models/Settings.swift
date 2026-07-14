@@ -84,6 +84,45 @@ public struct DisplayMode: Codable, Hashable, Sendable {
     self.pixelHeight = pixelHeight ?? height
     self.refreshRate = refreshRate
   }
+
+  public var hasDistinctPixelDimensions: Bool {
+    pixelWidth != width || pixelHeight != height
+  }
+}
+
+/// Compares persisted display modes with modes reported by the current display session.
+///
+/// Core Graphics can report the same nominal refresh rate with small floating-point
+/// differences (for example, 59.94 Hz and 60 Hz). Logical and pixel dimensions must
+/// still match exactly.
+public struct DisplayModeMatcher: Sendable {
+  public static let refreshRateTolerance = 0.1
+
+  public init() {}
+
+  public func matches(_ lhs: DisplayMode, _ rhs: DisplayMode) -> Bool {
+    lhs.width == rhs.width && lhs.height == rhs.height
+      && lhs.pixelWidth == rhs.pixelWidth && lhs.pixelHeight == rhs.pixelHeight
+      && abs(lhs.refreshRate - rhs.refreshRate) <= Self.refreshRateTolerance
+  }
+
+  /// Returns the session-reported mode that represents the desired persisted mode.
+  public func match<S: Sequence>(
+    _ desired: DisplayMode,
+    among candidates: S
+  ) -> DisplayMode? where S.Element == DisplayMode {
+    candidates.first { matches($0, desired) }
+  }
+
+  /// Removes equivalent modes while preserving the first session-reported value and order.
+  public func deduplicated<S: Sequence>(_ modes: S) -> [DisplayMode]
+  where S.Element == DisplayMode {
+    var unique: [DisplayMode] = []
+    for mode in modes where match(mode, among: unique) == nil {
+      unique.append(mode)
+    }
+    return unique
+  }
 }
 
 public enum DisplayMirroring: Codable, Hashable, Sendable {

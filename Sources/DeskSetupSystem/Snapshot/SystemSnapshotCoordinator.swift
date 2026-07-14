@@ -71,6 +71,10 @@ public struct SystemSnapshotResult: Equatable, Sendable {
 
   public var settings: ProfileSettings { profileSettings }
 
+  public var displayModeCatalog: [DisplayModeCatalogEntry] {
+    groups.flatMap { $0.snapshot?.displayModeCatalog ?? [] }
+  }
+
   public init(
     capturedAt: Date,
     groups: [SystemSnapshotGroupResult],
