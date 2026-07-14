@@ -39,7 +39,7 @@ The later inline-delete-confirmation correction is source/build verified but is 
 
 ## Current capture-permission click-through
 
-This check is intentionally user-driven. Do not use UI automation, AX actions, AppleScript, or an automated TCC reset. Start from the installed package with DMG SHA-256 `8760d68754f3bc1eebca37319bd0d2bfc29b6b3d90832532e0a64cd072506a9b`. Record only pass/fail and visible generic state text; do not record or screenshot an actual SSID, IP address, location, or device identifier.
+This check is intentionally user-driven. Do not use UI automation, AX actions, AppleScript, or an automated TCC reset. Start from the installed package with DMG SHA-256 `ed52b253159e6abc8fe35e606aed56cc269693a53b76986dae20a04ffb2bd4fc`. Record only pass/fail and visible generic state text; do not record or screenshot an actual SSID, IP address, location, or device identifier.
 
 1. Record the current Desk Setup Switcher Location permission so it can be restored afterward.
 2. If the app is already denied or restricted, select **Capture**. Confirm that the explanation offers **Open macOS System Settings**, **Capture Without Wi-Fi**, and **Cancel** without displaying a Wi-Fi name.

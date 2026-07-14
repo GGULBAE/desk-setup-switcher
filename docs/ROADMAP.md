@@ -25,7 +25,7 @@ Evidence: initial Actions run `29154880831` for `0d8f510` exposed the Swift 6.1 
 - USB/hardware, network, and authorized-recent-location readiness facts
 - Profile editing plus condition persistence/evaluation and permission-aware location support; condition editing UI was later retired while stored and imported values remain supported
 
-Evidence: mocks pass. All five opt-in read-only display, audio, network, input, and combined readiness-context tests pass on one Apple M5 Mac. A fresh install created one schema-v1 Ready profile from a read-only snapshot with all four groups. External display, Ethernet, explicit denied/granted permutations, and physical Intel remain absent.
+Evidence: mocks pass. All five opt-in read-only display, audio, network, input, and combined readiness-context tests pass on the current capture-permission source on one Apple M5 Mac. The display gate also verifies that an online session display sleeping with zero active Core Graphics displays is a nonfatal empty fact set, while active states retain count, identity, mode, and snapshot assertions. A historical fresh install created one schema-v1 Ready profile from a read-only snapshot with all four groups. External display, Ethernet, explicit denied/granted permutations, and physical Intel remain absent.
 
 ## M3 — Controlled application (mock verified; no live mutation evidence)
 
@@ -110,7 +110,7 @@ The actual MenuBarExtra Settings click/reopen path and same-window 980→680→9
 - Current header/editor follow-up `make verify` produced and verified a universal local DMG with SHA-256 `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`
 - UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967); unsigned artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`
 - The 2026-07-14 apply-reliability `make verify` produced and mounted its then-current universal package with SHA-256 `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`; this is historical package evidence
-- The capture-permission follow-up `make verify` produced and mounted the current `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`, verified `x86_64 arm64`, resources, checksum, and ad-hoc/no-Developer-ID signature status; SHA-256 is `8760d68754f3bc1eebca37319bd0d2bfc29b6b3d90832532e0a64cd072506a9b`. The preceding tray/editor SHA-256 `f3d24ae95709d0db9de13ba6032eb63a1d19a5be89af15aa68244da9019afbde` and layout-correction SHA-256 `ae940ce1cffb969f309b8ffa8f6ffcd0637fd0845ee21bf24fa59129ea530ef7` are historical
+- The capture-permission follow-up `make verify` produced and mounted the current `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`, verified `x86_64 arm64`, resources, checksum, and ad-hoc/no-Developer-ID signature status; SHA-256 is `ed52b253159e6abc8fe35e606aed56cc269693a53b76986dae20a04ffb2bd4fc`. The pre-live-test-adjustment capture SHA-256 `8760d68754f3bc1eebca37319bd0d2bfc29b6b3d90832532e0a64cd072506a9b`, preceding tray/editor SHA-256 `f3d24ae95709d0db9de13ba6032eb63a1d19a5be89af15aa68244da9019afbde`, and layout-correction SHA-256 `ae940ce1cffb969f309b8ffa8f6ffcd0637fd0845ee21bf24fa59129ea530ef7` are historical
 
 Remaining:
 

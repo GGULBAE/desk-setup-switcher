@@ -26,8 +26,6 @@ final class DisplayLiveSnapshotTests: XCTestCase {
       }
       return count
     }
-    XCTAssertGreaterThan(rawDisplayCount, 0)
-
     let systemAPI = CoreGraphicsDisplaySystemAPI()
     let systemDisplays = try await systemAPI.activeDisplays()
     XCTAssertEqual(systemDisplays.count, Int(rawDisplayCount))
@@ -40,14 +38,26 @@ final class DisplayLiveSnapshotTests: XCTestCase {
     guard case .display(let settings)? = snapshot.payload else {
       return XCTFail("Expected a display snapshot payload.")
     }
-    XCTAssertFalse(settings.displays.isEmpty)
     XCTAssertEqual(settings.displays.count, systemDisplays.count)
-    XCTAssertEqual(settings.displays.count, snapshot.items.count)
     XCTAssertTrue(
       settings.displays.allSatisfy {
         $0.identity.uuid != nil
           || ($0.identity.vendorID != nil && $0.identity.modelID != nil)
       }
     )
+
+    if rawDisplayCount == 0 {
+      // CGGetActiveDisplayList legitimately returns zero while an online
+      // session display is asleep. The adapter must preserve that as a typed,
+      // nonfatal unsupported snapshot item instead of inventing a display.
+      XCTAssertEqual(snapshot.items.count, 1)
+      XCTAssertEqual(snapshot.items.first?.key, "display.active")
+      XCTAssertEqual(snapshot.items.first?.state, .unsupported)
+      XCTAssertEqual(snapshot.displayModeCatalog?.count, 0)
+    } else {
+      XCTAssertFalse(settings.displays.isEmpty)
+      XCTAssertEqual(settings.displays.count, snapshot.items.count)
+      XCTAssertEqual(snapshot.displayModeCatalog?.count, settings.displays.count)
+    }
   }
 }

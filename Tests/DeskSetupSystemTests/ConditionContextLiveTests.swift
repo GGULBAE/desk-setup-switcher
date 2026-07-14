@@ -15,7 +15,9 @@ final class ConditionContextLiveTests: XCTestCase {
     let result = await ConditionContextProvider().discover()
 
     XCTAssertFalse(result.unavailableSources.contains(.displays))
-    XCTAssertFalse(result.context.displays.isEmpty)
+    // An online display can temporarily be absent from the active list while
+    // the session display sleeps. That is an available empty fact set, not a
+    // reader failure; the dedicated display live test covers both states.
     XCTAssertTrue(
       result.context.displays.allSatisfy {
         $0.uuid != nil || ($0.vendorID != nil && $0.modelID != nil)

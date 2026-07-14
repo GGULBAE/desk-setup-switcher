@@ -18,9 +18,9 @@
 | Area | Target | Current evidence |
 | --- | --- | --- |
 | macOS | 14 Sonoma or later | Deployment target is 14.0. The capture-permission tree passed full local `make verify` on 2026-07-14 with 300 default cases (129 XCTest plus 171 Swift Testing cases, six opt-in skips), zero failures, and no live flag. The 298-case tray/editor, 297-case layout-correction, 290-case apply-reliability, 215-test header/editor, and 158-test 2026-07-11 gates remain historical evidence |
-| Apple Silicon | arm64 | Default tests and opt-in live-read smoke tests passed on an Apple M5 Mac |
+| Apple Silicon | arm64 | Default tests and the current-source opt-in live-read smoke tests passed on an Apple M5 Mac; the display gate covers both active displays and the legitimate online-but-inactive sleep state |
 | Intel Mac | x86_64 | Current Swift/Xcode Debug/Release and packaged executable contain x86_64; physical Intel execution is pending |
-| Distribution | Direct no-Developer-ID DMG | Current `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`, SHA-256 `8760d68754f3bc1eebca37319bd0d2bfc29b6b3d90832532e0a64cd072506a9b`, passed checksum, mount, metadata/resources, `x86_64 arm64`, and ad-hoc/no-Developer-ID signature verification. The preceding tray/editor SHA-256 `f3d24ae95709d0db9de13ba6032eb63a1d19a5be89af15aa68244da9019afbde`, layout-correction SHA-256 `ae940ce1cffb969f309b8ffa8f6ffcd0637fd0845ee21bf24fa59129ea530ef7`, pre-layout-fix UI-audit SHA-256 `fa42df665ca453165dd041fe5112a8f1a6d2314bd31512ef9371b12289132122`, and downloaded CI artifact ID `8256718472`, SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`, remain historical; nothing is published and the Gatekeeper path remains pending |
+| Distribution | Direct no-Developer-ID DMG | Current `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`, SHA-256 `ed52b253159e6abc8fe35e606aed56cc269693a53b76986dae20a04ffb2bd4fc`, passed checksum, mount, metadata/resources, `x86_64 arm64`, and ad-hoc/no-Developer-ID signature verification. The pre-live-test-adjustment capture SHA-256 `8760d68754f3bc1eebca37319bd0d2bfc29b6b3d90832532e0a64cd072506a9b`, preceding tray/editor SHA-256 `f3d24ae95709d0db9de13ba6032eb63a1d19a5be89af15aa68244da9019afbde`, layout-correction SHA-256 `ae940ce1cffb969f309b8ffa8f6ffcd0637fd0845ee21bf24fa59129ea530ef7`, pre-layout-fix UI-audit SHA-256 `fa42df665ca453165dd041fe5112a8f1a6d2314bd31512ef9371b12289132122`, and downloaded CI artifact ID `8256718472`, SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`, remain historical; nothing is published and the Gatekeeper path remains pending |
 | CI | GitHub Actions | UI-hardening commit `5f0cabc` passed full `make verify` and unsigned-package upload in [run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967). Initial failure run `29154880831` and repair run `29155207923` remain historical Swift 6.1 compatibility evidence |
 | App Store | Not required | No sandbox/App Store claim |
 | Signing/notarization | Optional | App is ad-hoc signed for integrity only; no Developer ID identity or notarization exists |
@@ -90,7 +90,7 @@ No UI automation or system mutation was used. The DEBUG-only host used synthetic
 
 | Group | Capability | API/mechanism | Status and evidence |
 | --- | --- | --- | --- |
-| Display | Active display discovery and stable identity | Public Core Graphics/ColorSync | Mock verified and live-read verified on the built-in display of one Apple M5 Mac |
+| Display | Active display discovery and stable identity | Public Core Graphics/ColorSync | Mock verified and current-source live-read verified on one Apple M5 Mac. The gate preserves count/identity/mode checks when active and verifies a typed nonfatal empty snapshot when the online session display is asleep |
 | Display | Primary display and topology/origin | Core Graphics display configuration | Mock verified; live mutation not run |
 | Display | Mirroring | Core Graphics display configuration | Mock verified; live mutation not run |
 | Display | Logical/pixel mode and refresh rate | Core Graphics display modes | Mock verified; live mutation not run. Read-only snapshots now carry typed ephemeral supported-mode catalog entries for the editor picker; this catalog is runtime context and is not persisted in profile JSON |
@@ -125,7 +125,7 @@ No UI automation or system mutation was used. The DEBUG-only host used synthetic
 
 ## Historical read-only evidence recorded on 2026-07-11
 
-The final local `make verify` gate passed with 158 tests: 83 XCTest and 75 Swift Testing cases. Six opt-in cases skip by default: five read-only hardware tests and one Keychain-write test. With `DESK_SETUP_LIVE_READ_TESTS=1`, the display, audio, network, input, and combined condition-context tests passed on an Apple M5 Mac running macOS 26.5.2. These tests call only capability/snapshot/read paths. No personal device identifier, SSID, IP address, or location is recorded in the repository.
+The historical 2026-07-11 local `make verify` gate passed with 158 tests: 83 XCTest and 75 Swift Testing cases. Six opt-in cases skip by default: five read-only hardware tests and one Keychain-write test. On 2026-07-14 the current capture-permission source reran `DESK_SETUP_LIVE_READ_TESTS=1`; display, audio, network, input, and combined condition-context tests all passed on an Apple M5 Mac running macOS 26.5.2, including the online-but-inactive display sleep state. These tests call only capability/snapshot/read paths. No personal device identifier, SSID, IP address, or location is recorded in the repository.
 
 ## Historical local package evidence recorded on 2026-07-11
 
