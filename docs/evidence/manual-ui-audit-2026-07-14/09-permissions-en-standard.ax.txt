@@ -1,30 +1,216 @@
-role=AXWindow | title=Desk Setup Switcher UI Audit | focused=1 | actions=AXRaise
-  role=AXGroup | focused=0
-    role=AXTabGroup | focused=0
-      role=AXRadioButton | description=Profiles | value=0 | enabled=1 | focused=0 | actions=AXPress
-      role=AXRadioButton | description=Permissions | value=1 | enabled=1 | focused=0 | actions=AXPress
-      role=AXRadioButton | description=Diagnostics | value=0 | enabled=1 | focused=0 | actions=AXPress
-      role=AXRadioButton | description=About | value=0 | enabled=1 | focused=0 | actions=AXPress
-      role=AXGroup | focused=0
-        role=AXScrollArea | focused=0 | actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
-          role=AXHeading | description=Login | enabled=1
-          role=AXGroup | enabled=1
-            role=AXStaticText | value=Launch Desk Setup Switcher at login | enabled=1
-            role=AXCheckBox | value=1 | enabled=1 | focused=0 | actions=AXPress
-            role=AXStaticText | value=App setting | enabled=1
-            role=AXStaticText | value=On | enabled=1 | focused=0 | actions=AXShowMenu
-            role=AXStaticText | value=macOS registration | enabled=1
-            role=AXStaticText | value=Not enabled | enabled=1 | focused=0 | actions=AXShowMenu
-            role=AXStaticText | value=Login item status: Requested; approval is required in System Settings > General > Login Items. | enabled=1
-            role=AXButton | description=Refresh Status | enabled=1 | focused=0 | actions=AXPress
-            role=AXDisclosureTriangle | description=Why can these states differ? | value=0 | enabled=1
-          role=AXHeading | description=System permissions | enabled=1
-          role=AXGroup | enabled=1
-            role=AXStaticText | value=macOS can require Location Services to reveal a Wi-Fi network name and evaluate a location readiness condition. Desk Setup Switcher does not track location continuously. | enabled=1
-            role=AXStaticText | value=Location | enabled=1
-            role=AXStaticText | value=Denied | enabled=1 | focused=0 | actions=AXShowMenu
-            role=AXButton | description=Request Location Access | help=Shows the macOS permission prompt only after this explanation | enabled=1 | focused=0 | actions=AXPress
-  role=AXButton | enabled=1 | focused=0 | actions=AXPress
-  role=AXButton | help=this button also has an action to zoom the window | enabled=1 | focused=0 | actions=AXPress,AXZoomWindow,AXShowMenu
-    role=AXGroup | focused=0
-  role=AXButton | enabled=1 | focused=0 | actions=AXPress
+role=AXApplication title=Desk Setup Switcher description= value= help= enabled= actions=
+  role=AXWindow title=Desk Setup Switcher UI Audit description= value= help= enabled= actions=AXRaise
+    role=AXGroup title= description= value= help= enabled= actions=
+      role=AXTabGroup title= description= value= help= enabled= actions=
+        role=AXRadioButton title= description=Profiles value=0 help= enabled=1 actions=AXPress
+        role=AXRadioButton title= description=Permissions value=1 help= enabled=1 actions=AXPress
+        role=AXRadioButton title= description=Diagnostics value=0 help= enabled=1 actions=AXPress
+        role=AXRadioButton title= description=About value=0 help= enabled=1 actions=AXPress
+        role=AXGroup title= description= value= help= enabled= actions=
+          role=AXScrollArea title= description= value= help= enabled= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+            role=AXHeading title= description=Login value= help= enabled=1 actions=
+            role=AXGroup title= description= value= help= enabled=1 actions=
+              role=AXStaticText title= description= value=Launch Desk Setup Switcher at login help= enabled=1 actions=
+              role=AXCheckBox title= description= value=1 help= enabled=1 actions=AXPress
+              role=AXStaticText title= description= value=App setting help= enabled=1 actions=
+              role=AXStaticText title= description= value=On help= enabled=1 actions=AXShowMenu
+              role=AXStaticText title= description= value=macOS registration help= enabled=1 actions=
+              role=AXStaticText title= description= value=Not enabled help= enabled=1 actions=AXShowMenu
+              role=AXStaticText title= description= value=Login item status: Requested; approval is required in System Settings > General > Login Items. help= enabled=1 actions=
+              role=AXButton title= description=Refresh Status value= help= enabled=1 actions=AXPress
+              role=AXDisclosureTriangle title= description=Why can these states differ? value=0 help= enabled=1 actions=
+            role=AXHeading title= description=System permissions value= help= enabled=1 actions=
+            role=AXGroup title= description= value= help= enabled=1 actions=
+              role=AXStaticText title= description= value=macOS can require Location Services to reveal a Wi-Fi network name and evaluate a location readiness condition. Desk Setup Switcher does not track location continuously. help= enabled=1 actions=
+              role=AXStaticText title= description= value=Location help= enabled=1 actions=
+              role=AXStaticText title= description= value=Denied help= enabled=1 actions=AXShowMenu
+              role=AXButton title= description=Request Location Access value= help=Shows the macOS permission prompt only after this explanation enabled=1 actions=AXPress
+    role=AXButton title= description= value= help= enabled=1 actions=AXPress
+    role=AXButton title= description= value= help=this button also has an action to zoom the window enabled=1 actions=AXPress,AXZoomWindow,AXShowMenu
+      role=AXGroup title= description= value= help= enabled= actions=
+    role=AXButton title= description= value= help= enabled=1 actions=AXPress
+  role=AXMenuBar title= description= value= help= enabled=1 actions=AXCancel
+    role=AXMenuBarItem title=Apple description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=이 Mac에 관하여 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=시스템 정보 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=시스템 설정… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=App Store description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=최근 사용 항목 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=응용 프로그램 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=ChatGPT description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘ChatGPT’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Mail description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Mail’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=MapleStory description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘MapleStory’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Notion description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Notion’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Safari description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Safari’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Tabby description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Tabby’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Visual Studio Code description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Visual Studio Code’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=계산기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘계산기’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=리그 오브 레전드 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘리그 오브 레전드’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=시스템 설정 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘시스템 설정’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=문서 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=6. AI 리포트.png description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘6. AI 리포트.png’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Desk-Setup-Switcher-0.1.0-unsigned.dmg description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Desk-Setup-Switcher-0.1.0-unsigned.dmg’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=NKeepCleaner description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘NKeepCleaner’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=NKeepCleanerIOS description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘NKeepCleanerIOS’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=pasted-text.txt description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘pasted-text.txt’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=react-native-image-compression-kit description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘react-native-image-compression-kit’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=README.md description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘README.md’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=RESULTS.md description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘RESULTS.md’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=talktalkenglish.co.kr description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘talktalkenglish.co.kr’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=과학_G6-G7-6월_2026-07-04_cQNMVz4SqC95GoTW2skQ.mp4 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘과학_G6-G7-6월_2026-07-04_cQNMVz4SqC95GoTW2skQ.mp4’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=서버 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Macintosh HD description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=메뉴 지우기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=강제 종료... description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Desk Setup Switcher 강제 종료 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=잠자기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=재시동… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=재시동 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=시스템 종료… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=시스템 종료 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=잠금 화면 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=2LB Inc. 로그아웃… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=2LB Inc. 로그아웃 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+    role=AXMenuBarItem title=Desk Setup Switcher description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=About Desk Setup Switcher description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Settings… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Services description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=Activity Monitor description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Allocations & Leaks description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=File Activity description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=System Trace description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Time Profile Active Application description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Time Profile App Under Mouse description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Time Profile Entire System description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Toggle Instruments Recording description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Services Settings… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Hide Desk Setup Switcher description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Hide Others description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Show All description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Quit Desk Setup Switcher description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+    role=AXMenuBarItem title=Edit description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=Undo description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Redo description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Cut description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Copy description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Paste description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Delete description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Select All description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Writing Tools description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=Show Writing Tools description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Proofread description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Rewrite description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Make Friendly description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Make Professional description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Make Concise description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Summarize description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Create Key Points description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Make List description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Make Table description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Compose… description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=AutoFill description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=Contact… description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Passwords… description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Credit Card… description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Start Dictation… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Emoji & Symbols description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+    role=AXMenuBarItem title=View description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=Enter Full Screen description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+    role=AXMenuBarItem title=Window description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=Close description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Close All description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Minimize description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Minimize All description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Zoom description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Zoom All description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Fill description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Center description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Move & Resize description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=Halves description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Left description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Right description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Top description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Bottom description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Quarters description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Top Left description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Top Right description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Bottom Left description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Bottom Right description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Arrange description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Left & Right description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Left & Quarters description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Right & Left description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Right & Quarters description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Top & Bottom description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Top & Quarters description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Bottom & Top description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Bottom & Quarters description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Quarters description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Return to Previous Size description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Full Screen Tile description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=Left of Screen description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Right of Screen description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Remove Window from Set description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Bring All to Front description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Arrange in Front description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Desk Setup Switcher UI Audit description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+    role=AXMenuBarItem title=Help description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=Desk Setup Switcher Help description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick

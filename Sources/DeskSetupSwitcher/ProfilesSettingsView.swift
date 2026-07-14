@@ -1359,6 +1359,9 @@ private struct ProfileEditorForm: View {
           HStack(spacing: 8) {
             Label(localizedTitle, systemImage: systemImage)
               .font(.headline)
+              .lineLimit(2)
+              .multilineTextAlignment(.leading)
+              .layoutPriority(1)
             Spacer(minLength: 8)
             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
               .font(.caption.bold())
@@ -1368,18 +1371,18 @@ private struct ProfileEditorForm: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .layoutPriority(1)
         .accessibilityLabel(localizedTitle)
         .accessibilityValue(isExpanded ? Text("Expanded") : Text("Collapsed"))
         .accessibilityHint("Expands or collapses this settings category")
         .accessibilityInvalid(firstValidationIssue(in: group) != nil)
         .focused($focusedField, equals: .group(group))
 
-        Toggle("Include", isOn: isOn)
-          .toggleStyle(.switch)
-          .controlSize(.small)
-          .fixedSize()
-          .accessibilityLabel(appLocalized("Include \(localizedTitle)"))
-          .accessibilityValue(isOn.wrappedValue ? Text("Included") : Text("Excluded"))
+        compactIncludeToggle(
+          isOn: isOn,
+          accessibilityLabel: appLocalized("Include \(localizedTitle)")
+        )
       }
 
       if let issue = validation.issue(for: .group(group)) {
@@ -1433,6 +1436,9 @@ private struct ProfileEditorForm: View {
           HStack(spacing: 8) {
             Text(localizedTitle)
               .fontWeight(.medium)
+              .lineLimit(2)
+              .multilineTextAlignment(.leading)
+              .layoutPriority(1)
             Spacer(minLength: 8)
             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
               .font(.caption.bold())
@@ -1442,26 +1448,23 @@ private struct ProfileEditorForm: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .layoutPriority(1)
         .accessibilityLabel(localizedTitle)
         .accessibilityValue(isExpanded ? Text("Expanded") : Text("Collapsed"))
         .accessibilityHint("Expands or collapses this setting's target value")
         .accessibilityInvalid(!validationIssues(for: validationFields).isEmpty)
 
-        Toggle(
-          "Include",
+        compactIncludeToggle(
           isOn: Binding(
             get: { isOn.wrappedValue },
             set: { newValue in
               isOn.wrappedValue = newValue
               onIncludeChange?.perform(newValue)
             }
-          )
+          ),
+          accessibilityLabel: appLocalized("Include \(localizedTitle)")
         )
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .fixedSize()
-        .accessibilityLabel(appLocalized("Include \(localizedTitle)"))
-        .accessibilityValue(isOn.wrappedValue ? Text("Included") : Text("Excluded"))
       }
 
       if isExpanded {
@@ -1491,6 +1494,28 @@ private struct ProfileEditorForm: View {
       }
     }
     .padding(.vertical, 3)
+  }
+
+  private func compactIncludeToggle(
+    isOn: Binding<Bool>,
+    accessibilityLabel: String
+  ) -> some View {
+    HStack(spacing: 8) {
+      Text("Include")
+        .font(.subheadline)
+        .fixedSize()
+        .accessibilityHidden(true)
+      Toggle(isOn: isOn) {
+        EmptyView()
+      }
+      .labelsHidden()
+      .toggleStyle(.switch)
+      .controlSize(.small)
+      .fixedSize()
+      .accessibilityLabel(accessibilityLabel)
+      .accessibilityValue(isOn.wrappedValue ? Text("Included") : Text("Excluded"))
+    }
+    .fixedSize(horizontal: true, vertical: false)
   }
 
   @ViewBuilder
@@ -1803,8 +1828,9 @@ private struct ProfileEditorForm: View {
     guard uiAuditConfiguration.isEnabled else { return }
     switch uiAuditConfiguration.variant {
     case .editor:
-      groupDisclosure.expand(.display)
-      optionDisclosure.expand(.init(group: .display, key: "primary"))
+      groupDisclosure.expand(.audio)
+      optionDisclosure.expand(.init(group: .audio, key: "default-input-device"))
+      optionDisclosure.expand(.init(group: .audio, key: "default-output-device"))
     case .validation:
       if let firstValidationItem {
         revealAndFocus(firstValidationItem.fieldID)

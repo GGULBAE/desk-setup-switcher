@@ -1,37 +1,223 @@
-role=AXWindow | title=Desk Setup Switcher UI Audit | focused=1 | actions=AXRaise
-  role=AXGroup | focused=0
-    role=AXHeading | description=책상 설정 전환기 | enabled=1
-    role=AXButton | description=현재 설정 캡처 | help=Mac 설정을 변경하지 않고 현재 설정을 읽어 프로필을 만듭니다. | enabled=1 | focused=0 | actions=AXPress
-    role=AXButton | description=설정 | help=설정 | enabled=1 | focused=0 | actions=AXPress
-    role=AXButton | description=책상 설정 전환기 종료 | help=책상 설정 전환기 종료 | enabled=1 | focused=0 | actions=AXPress
-    role=AXScrollArea | focused=0 | actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
-      role=AXOpaqueProviderGroup | enabled=1 | actions=AXScrollToTop,AXScrollToBottom
-        role=AXGroup | enabled=1 | actions=AXScrollToVisible
-          role=AXStaticText | value=Focus Workspace — Display, Audio, Network & Input | enabled=1 | actions=AXScrollToVisible
-          role=AXStaticText | value=프로필 상태: 준비됨 | enabled=1 | actions=AXScrollToVisible
-          role=AXButton | description=적용… Focus Workspace — Display, Audio, Network & Input | help=이 프로필의 전체 변경사항을 미리 보고 적용합니다. | enabled=1 | focused=0 | actions=AXScrollToVisible,AXPress
-          role=AXButton | description=Focus Workspace — Display, Audio, Network & Input 수정 | help=프로필 수정 | enabled=1 | focused=0 | actions=AXScrollToVisible,AXPress
-        role=AXGroup | enabled=1 | actions=AXScrollToVisible
-          role=AXStaticText | value=Portable Desk — Available Settings Only | enabled=1 | actions=AXScrollToVisible
-          role=AXStaticText | value=프로필 상태: 일부 사용 가능 | enabled=1 | actions=AXScrollToVisible
-          role=AXButton | description=사용 가능한 항목 적용… Portable Desk — Available Settings Only | help=현재 사용 가능한 설정만 미리 보고 적용합니다. | enabled=1 | focused=0 | actions=AXScrollToVisible,AXPress
-          role=AXButton | description=Portable Desk — Available Settings Only 수정 | help=프로필 수정 | enabled=1 | focused=0 | actions=AXScrollToVisible,AXPress
-    role=AXGroup | enabled=1
-      role=AXStaticText | value=일부 캡처 | enabled=1
-      role=AXButton | description=캡처 결과 닫기 | help=캡처 결과 닫기 | enabled=1 | focused=0 | actions=AXPress
-      role=AXStaticText | value=적용 가능 1개 · 스냅샷 전용 1개 | enabled=1
-      role=AXStaticText | value=읽을 수 없음 0개 · 권한 필요 1개 · 미지원 1개 | enabled=1
-      role=AXStaticText | value=Wi-Fi 네트워크를 캡처하지 못했습니다. | enabled=1
-      role=AXButton | description=권한 확인 | enabled=1 | focused=0 | actions=AXPress
-    role=AXGroup | enabled=1
-      role=AXStaticText | value=일부 적용됨 | enabled=1
-      role=AXButton | description=적용 결과 닫기 | help=적용 결과 닫기 | enabled=1 | focused=0 | actions=AXPress
-      role=AXStaticText | value=Focus Workspace — Display, Audio, Network & Input | enabled=1
-      role=AXStaticText | value=성공 2개 · 실패 0개 · 건너뛰 0개 · 미지원 1개 | enabled=1
-      role=AXStaticText | value=확인되지 않음 1개 · 되돌리기 실패 0개 | enabled=1
-      role=AXStaticText | value=오전 7:13 | enabled=1
-      role=AXButton | description=세부 사항 | help=항목별 적용 결과와 다시 읽기 결과를 표시합니다 | enabled=1 | focused=0 | actions=AXPress
-  role=AXButton | enabled=1 | focused=0 | actions=AXPress
-  role=AXButton | help=이 버튼을 누르면 윈도우를 확대/축소합니다. | enabled=1 | focused=0 | actions=AXPress,AXZoomWindow,AXShowMenu
-    role=AXGroup | focused=0
-  role=AXButton | enabled=1 | focused=0 | actions=AXPress
+role=AXApplication title=Desk Setup Switcher description= value= help= enabled= actions=
+  role=AXWindow title=Desk Setup Switcher UI Audit description= value= help= enabled= actions=AXRaise
+    role=AXGroup title= description= value= help= enabled= actions=
+      role=AXHeading title= description=책상 설정 전환기 value= help= enabled=1 actions=
+      role=AXButton title= description=현재 설정 캡처 value= help=Mac 설정을 변경하지 않고 현재 설정을 읽어 프로필을 만듭니다. enabled=1 actions=AXPress
+      role=AXButton title= description=설정 value= help=설정 enabled=1 actions=AXPress
+      role=AXButton title= description=책상 설정 전환기 종료 value= help=책상 설정 전환기 종료 enabled=1 actions=AXPress
+      role=AXScrollArea title= description= value= help= enabled= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+        role=AXOpaqueProviderGroup title= description= value= help= enabled=1 actions=AXScrollToTop,AXScrollToBottom
+          role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+            role=AXStaticText title= description= value=Focus Workspace — Display, Audio, Network & Input help= enabled=1 actions=AXScrollToVisible
+            role=AXStaticText title= description= value=프로필 상태: 준비됨 help= enabled=1 actions=AXScrollToVisible
+            role=AXButton title= description=적용… Focus Workspace — Display, Audio, Network & Input value= help=이 프로필의 전체 변경사항을 미리 보고 적용합니다. enabled=1 actions=AXScrollToVisible,AXPress
+            role=AXButton title= description=Focus Workspace — Display, Audio, Network & Input 수정 value= help=프로필 수정 enabled=1 actions=AXScrollToVisible,AXPress
+          role=AXGroup title= description= value= help= enabled=1 actions=AXScrollToVisible
+            role=AXStaticText title= description= value=Portable Desk — Available Settings Only help= enabled=1 actions=AXScrollToVisible
+            role=AXStaticText title= description= value=프로필 상태: 일부 사용 가능 help= enabled=1 actions=AXScrollToVisible
+            role=AXButton title= description=사용 가능한 항목 적용… Portable Desk — Available Settings Only value= help=현재 사용 가능한 설정만 미리 보고 적용합니다. enabled=1 actions=AXScrollToVisible,AXPress
+            role=AXButton title= description=Portable Desk — Available Settings Only 수정 value= help=프로필 수정 enabled=1 actions=AXScrollToVisible,AXPress
+      role=AXGroup title= description= value= help= enabled=1 actions=
+        role=AXStaticText title= description= value=일부 캡처 help= enabled=1 actions=
+        role=AXButton title= description=캡처 결과 닫기 value= help=캡처 결과 닫기 enabled=1 actions=AXPress
+        role=AXStaticText title= description= value=적용 가능 1개 · 스냅샷 전용 1개 help= enabled=1 actions=
+        role=AXStaticText title= description= value=읽을 수 없음 0개 · 권한 필요 1개 · 미지원 1개 help= enabled=1 actions=
+        role=AXStaticText title= description= value=Wi-Fi 네트워크를 캡처하지 못했습니다. help= enabled=1 actions=
+        role=AXButton title= description=권한 확인 value= help= enabled=1 actions=AXPress
+      role=AXGroup title= description= value= help= enabled=1 actions=
+        role=AXStaticText title= description= value=일부 적용됨 help= enabled=1 actions=
+        role=AXButton title= description=적용 결과 닫기 value= help=적용 결과 닫기 enabled=1 actions=AXPress
+        role=AXStaticText title= description= value=Focus Workspace — Display, Audio, Network & Input help= enabled=1 actions=
+        role=AXStaticText title= description= value=성공 2개 · 실패 0개 · 건너뛰 0개 · 미지원 1개 help= enabled=1 actions=
+        role=AXStaticText title= description= value=확인되지 않음 1개 · 되돌리기 실패 0개 help= enabled=1 actions=
+        role=AXStaticText title= description= value=오전 7:13 help= enabled=1 actions=
+        role=AXButton title= description=세부 사항 value= help=항목별 적용 결과와 다시 읽기 결과를 표시합니다 enabled=1 actions=AXPress
+    role=AXButton title= description= value= help= enabled=1 actions=AXPress
+    role=AXButton title= description= value= help=이 버튼을 누르면 윈도우를 확대/축소합니다. enabled=1 actions=AXPress,AXZoomWindow,AXShowMenu
+      role=AXGroup title= description= value= help= enabled= actions=
+    role=AXButton title= description= value= help= enabled=1 actions=AXPress
+  role=AXMenuBar title= description= value= help= enabled=1 actions=AXCancel
+    role=AXMenuBarItem title=Apple description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=이 Mac에 관하여 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=시스템 정보 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=시스템 설정… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=App Store description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=최근 사용 항목 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=응용 프로그램 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=계산기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘계산기’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=리그 오브 레전드 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘리그 오브 레전드’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=시스템 설정 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘시스템 설정’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=ChatGPT description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘ChatGPT’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Mail description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Mail’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=MapleStory description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘MapleStory’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Notion description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Notion’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Safari description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Safari’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Tabby description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Tabby’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Visual Studio Code description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Visual Studio Code’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=문서 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=6. AI 리포트.png description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘6. AI 리포트.png’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=과학_G6-G7-6월_2026-07-04_cQNMVz4SqC95GoTW2skQ.mp4 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘과학_G6-G7-6월_2026-07-04_cQNMVz4SqC95GoTW2skQ.mp4’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Desk-Setup-Switcher-0.1.0-unsigned.dmg description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘Desk-Setup-Switcher-0.1.0-unsigned.dmg’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=NKeepCleaner description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘NKeepCleaner’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=NKeepCleanerIOS description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘NKeepCleanerIOS’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=pasted-text.txt description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘pasted-text.txt’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=react-native-image-compression-kit description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘react-native-image-compression-kit’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=README.md description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘README.md’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=RESULTS.md description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘RESULTS.md’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=talktalkenglish.co.kr description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Finder에서 ‘talktalkenglish.co.kr’ 보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=서버 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Macintosh HD description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=메뉴 지우기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=강제 종료... description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Desk Setup Switcher 강제 종료 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=잠자기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=재시동… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=재시동 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=시스템 종료… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=시스템 종료 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=잠금 화면 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=2LB Inc. 로그아웃… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=2LB Inc. 로그아웃 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+    role=AXMenuBarItem title=Desk Setup Switcher description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=Desk Setup Switcher에 관하여 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=설정… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=서비스 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=Activity Monitor description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Allocations & Leaks description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=File Activity description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=System Trace description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Time Profile Active Application description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Time Profile App Under Mouse description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Time Profile Entire System description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=Toggle Instruments Recording description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=서비스 설정… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Desk Setup Switcher 가리기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=기타 가리기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=모두 보기 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Desk Setup Switcher 종료 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+    role=AXMenuBarItem title=편집 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=실행 취소 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=실행 복귀 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=오려두기 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=복사 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=붙여넣기 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=삭제 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=전체 선택 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=글쓰기 도구 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=글쓰기 도구 표시 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=교정 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=재작성 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=친근하게 만들기 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=전문적으로 만들기 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=간결하게 만들기 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=요약 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=키 포인트 생성 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=목록으로 만들기 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=표로 만들기 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=작문… description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=자동 완성 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=연락처… description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=암호… description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=신용 카드… description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=받아쓰기 시작… description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=이모지 및 기호 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+    role=AXMenuBarItem title=보기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=전체 화면 시작 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+    role=AXMenuBarItem title=윈도우 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=닫기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=모두 닫기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=최소화 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=모두 최소화 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=확대/축소 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=모두 확대/축소 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=채우기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=중앙 정렬 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=이동 및 크기 조절 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=이분면 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=왼쪽 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=오른쪽 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=상단 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=하단 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=사분면 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=왼쪽 상단 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=오른쪽 상단 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=왼쪽 하단 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=오른쪽 하단 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=정렬 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=왼쪽과 오른쪽 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=왼쪽 및 사분면 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=오른쪽 및 왼쪽 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=오른쪽 및 사분면 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=상단 및 하단 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=상단 및 사분면 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=아래와 위 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=하단 및 사분면 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=사분면 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=이전 크기로 돌아가기 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=전체 화면 타일 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+          role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+            role=AXMenuItem title=화면 왼쪽 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+            role=AXMenuItem title=화면 오른쪽 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=세트에서 윈도우 제거 description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=모두 앞으로 가져오기 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=차례대로 정렬 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title= description= value= help= enabled=0 actions=AXCancel,AXPress,AXPick
+        role=AXMenuItem title=Desk Setup Switcher UI Audit description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+    role=AXMenuBarItem title=도움말 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
+      role=AXMenu title= description= value= help= enabled=1 actions=AXCancel
+        role=AXMenuItem title=Desk Setup Switcher 도움말 description= value= help= enabled=1 actions=AXCancel,AXPress,AXPick
