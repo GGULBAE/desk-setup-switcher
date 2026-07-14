@@ -368,23 +368,6 @@ private struct MenuContentView: View {
       Text("The open profile has changes that have not been saved.")
     }
     .confirmationDialog(
-      "Delete this profile?",
-      isPresented: Binding(
-        get: { profilePendingDeletion != nil },
-        set: { if !$0 { profilePendingDeletion = nil } }
-      ),
-      presenting: profilePendingDeletion
-    ) { profile in
-      Button(appLocalized("Delete \(profile.name)"), role: .destructive) {
-        deleteProfile(profile)
-      }
-      Button("Cancel", role: .cancel) {
-        profilePendingDeletion = nil
-      }
-    } message: { profile in
-      Text(profileDeletionMessage(profile))
-    }
-    .confirmationDialog(
       draftApplyDialogTitle,
       isPresented: Binding(
         get: { draftProtectedApply != nil },
@@ -1205,45 +1188,51 @@ private struct MenuContentView: View {
           .fixedSize(horizontal: false, vertical: true)
       }
 
-      HStack {
-        Button(appLocalizedRuntime(action.defaultLabel)) {
-          requestApply(profile, mode: action.mode)
-        }
-        .buttonStyle(.borderedProminent)
-        .disabled(!action.isEnabled)
-        .accessibilityLabel(
-          appLocalized("\(appLocalizedRuntime(action.defaultLabel)) \(profile.name)")
-        )
-        .help(
-          action.disabledReason.map { appLocalizedRuntime($0.defaultMessage) }
-            ?? (action.kind == .availableItems
-              ? appLocalized("Preview and apply only the currently available settings.")
-              : appLocalized("Preview and apply this complete profile.")))
+      if profilePendingDeletion?.id == profile.id {
+        inlineProfileDeletionConfirmation(profile)
+      } else {
+        HStack {
+          Button(appLocalizedRuntime(action.defaultLabel)) {
+            requestApply(profile, mode: action.mode)
+          }
+          .buttonStyle(.borderedProminent)
+          .disabled(!action.isEnabled)
+          .accessibilityLabel(
+            appLocalized("\(appLocalizedRuntime(action.defaultLabel)) \(profile.name)")
+          )
+          .help(
+            action.disabledReason.map { appLocalizedRuntime($0.defaultMessage) }
+              ?? (action.kind == .availableItems
+                ? appLocalized("Preview and apply only the currently available settings.")
+                : appLocalized("Preview and apply this complete profile.")))
 
-        Spacer()
+          Spacer()
 
-        Button {
-          editProfile(profile)
-        } label: {
-          Label("Edit Profile", systemImage: "pencil")
-        }
-        .disabled(model.isProfileMutationLocked || profileEditor.activity.isBusy)
-        .accessibilityLabel(appLocalized("Edit \(profile.name)"))
-        .help("Edit Profile")
+          Button {
+            editProfile(profile)
+          } label: {
+            Label("Edit Profile", systemImage: "pencil")
+          }
+          .disabled(model.isProfileMutationLocked || profileEditor.activity.isBusy)
+          .accessibilityLabel(appLocalized("Edit \(profile.name)"))
+          .help("Edit Profile")
 
-        Button(role: .destructive) {
-          profilePendingDeletion = profile
-        } label: {
-          Label("Delete Profile", systemImage: "trash")
-            .labelStyle(.iconOnly)
+          Button(role: .destructive) {
+            withAnimation(.easeInOut(duration: 0.16)) {
+              profilePendingDeletion = profile
+            }
+          } label: {
+            Label("Delete Profile", systemImage: "trash")
+              .labelStyle(.iconOnly)
+          }
+          .buttonStyle(.bordered)
+          .disabled(
+            model.isProfileMutationLocked || profileEditor.activity.isBusy
+              || profileEditor.session.pendingSelection != nil
+          )
+          .accessibilityLabel(appLocalized("Delete \(profile.name)"))
+          .help(appLocalized("Delete \(profile.name)"))
         }
-        .buttonStyle(.bordered)
-        .disabled(
-          model.isProfileMutationLocked || profileEditor.activity.isBusy
-            || profileEditor.session.pendingSelection != nil
-        )
-        .accessibilityLabel(appLocalized("Delete \(profile.name)"))
-        .help(appLocalized("Delete \(profile.name)"))
       }
     }
     .padding(10)
@@ -1260,6 +1249,40 @@ private struct MenuContentView: View {
     return appLocalized(
       "This removes \(profile.name) from local profile storage. This action cannot be undone."
     )
+  }
+
+  private func inlineProfileDeletionConfirmation(_ profile: DeskProfile) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Divider()
+
+      Label("Delete this profile?", systemImage: "trash")
+        .font(.caption.bold())
+        .foregroundStyle(.red)
+
+      Text(profileDeletionMessage(profile))
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+
+      HStack {
+        Button("Cancel", role: .cancel) {
+          withAnimation(.easeInOut(duration: 0.16)) {
+            profilePendingDeletion = nil
+          }
+        }
+        .keyboardShortcut(.cancelAction)
+
+        Spacer()
+
+        Button(appLocalized("Delete \(profile.name)"), role: .destructive) {
+          deleteProfile(profile)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.red)
+      }
+    }
+    .transition(.opacity.combined(with: .move(edge: .top)))
+    .accessibilityElement(children: .contain)
   }
 
   private func deleteProfile(_ profile: DeskProfile) {

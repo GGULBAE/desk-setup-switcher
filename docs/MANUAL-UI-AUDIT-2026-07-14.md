@@ -35,6 +35,8 @@ The profile workspace intentionally uses a fixed responsive breakpoint at 760 po
 
 The required same-window 980→680→980 interaction still needs an explicit user result. Until that is supplied, preservation of the selected profile, expanded group/option, unsaved value, and focus across the live resize remains **pending**, even though the view identity is preserved in source. The actual MenuBarExtra Settings gear open/close/reopen path also remains **pending** because no user result was received; no UI automation was substituted.
 
+The later inline-delete-confirmation correction is source/build verified but is not depicted in these 12 static captures. Its confirmation is deliberately part of the profile card rather than a system dialog, avoiding the observed MenuBarExtra dismissal; a user-driven click-through remains the appropriate final interaction check.
+
 ## Evidence boundary and pending checks
 
 The synthetic host is evidence for the contained SwiftUI content only. It does not prove the actual MenuBarExtra chrome, status-item anchor, or menu placement. The optional DEBUG-only synthetic MenuBarExtra path suppresses production dependencies, but its gear-button click and Settings reactivation require a user's direct click.
