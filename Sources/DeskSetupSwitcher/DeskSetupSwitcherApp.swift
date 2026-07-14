@@ -294,8 +294,8 @@ private struct DraftProtectedApplyPrompt: Identifiable, Equatable {
 
 private struct MenuContentView: View {
   @Environment(\.openSettings) private var openSettings
-  @Environment(\.uiAuditConfiguration) private var uiAuditConfiguration
   @EnvironmentObject private var model: ApplicationModel
+  @EnvironmentObject private var locationPermission: LocationPermissionController
   @EnvironmentObject private var profileEditor: ProfileEditorModel
   @Binding var selectedSettingsTab: SettingsTab
   @State private var isCaptureDraftPromptPresented = false
@@ -309,7 +309,8 @@ private struct MenuContentView: View {
   @State private var deferredApplyAfterPreviewDismissal: PendingApplyRequest?
   @State private var isApplyResultDetailsPresented = false
   @State private var profilePendingDeletion: DeskProfile?
-  @State private var captureDetailsExpanded = false
+  @State private var isCaptureLocationExplanationPresented = false
+  @State private var isCaptureLocationSettingsPresented = false
 
   var body: some View {
     Group {
@@ -361,11 +362,37 @@ private struct MenuContentView: View {
       .disabled(!openDraftIsValid)
       Button("Discard Changes and Capture", role: .destructive) {
         profileEditor.revertDraft()
-        Task { await performCapture() }
+        beginPermissionAwareCapture()
       }
       Button("Cancel", role: .cancel) {}
     } message: {
       Text("The open profile has changes that have not been saved.")
+    }
+    .alert("Allow Location Access?", isPresented: $isCaptureLocationExplanationPresented) {
+      Button("Capture Without Wi-Fi") {
+        Task { await performCapture() }
+      }
+      Button("Continue") {
+        Task { await requestLocationAccessAndCapture() }
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text(
+        "Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere."
+      )
+    }
+    .alert("Location Access Is Off", isPresented: $isCaptureLocationSettingsPresented) {
+      Button("Open macOS System Settings") {
+        locationPermission.openSystemSettings()
+      }
+      Button("Capture Without Wi-Fi") {
+        Task { await performCapture() }
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text(
+        "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi."
+      )
     }
     .confirmationDialog(
       draftApplyDialogTitle,
@@ -445,9 +472,6 @@ private struct MenuContentView: View {
       // Opening the menu is an explicit, read-only refresh point so hot-plugged
       // devices and network changes do not leave readiness permanently stale.
       model.refreshReadinessFacts()
-      if uiAuditConfiguration.isEnabled, uiAuditConfiguration.variant == .overview {
-        captureDetailsExpanded = true
-      }
     }
     .onDisappear {
       transientCaptureTask?.cancel()
@@ -562,10 +586,34 @@ private struct MenuContentView: View {
   private func requestCaptureCurrentSettings() {
     guard profileEditor.session.pendingSelection == nil else { return }
     guard profileEditor.isDirty else {
-      Task { await performCapture() }
+      beginPermissionAwareCapture()
       return
     }
     isCaptureDraftPromptPresented = true
+  }
+
+  private func beginPermissionAwareCapture() {
+    switch locationPermission.authorizationStatus {
+    case .notDetermined:
+      isCaptureLocationExplanationPresented = true
+    case .denied, .restricted:
+      isCaptureLocationSettingsPresented = true
+    case .authorizedAlways, .authorized:
+      Task { await performCapture() }
+    @unknown default:
+      Task { await performCapture() }
+    }
+  }
+
+  private func requestLocationAccessAndCapture() async {
+    locationPermission.requestAccess()
+    guard locationPermission.lastError == nil else { return }
+    for await status in locationPermission.$authorizationStatus.values {
+      guard !Task.isCancelled else { return }
+      guard status != .notDetermined else { continue }
+      await performCapture()
+      return
+    }
   }
 
   private func editProfile(_ profile: DeskProfile) {
@@ -859,7 +907,7 @@ private struct MenuContentView: View {
         )
         return
       }
-      await performCapture()
+      beginPermissionAwareCapture()
     case .rejected(let message):
       profileEditor.finishWithError(message)
       captureDraftSaveError = message
@@ -876,9 +924,11 @@ private struct MenuContentView: View {
       let message =
         summary.status == .complete
         ? appLocalized("Captured current settings without changing the Mac.")
-        : appLocalized(
-          "Captured \(summary.applicableCount) applicable settings with \(summary.excludedCount) snapshot-only and \(summary.omittedCount) unavailable items."
-        )
+        : summary.permissionRequiredCount > 0
+          ? appLocalized(
+            "Captured \(summary.applicableCount) applicable settings. Location access is needed to include the current Wi-Fi network."
+          )
+          : appLocalized("Captured \(summary.applicableCount) applicable settings.")
       if summary.status == .complete {
         transientCaptureMessage = message
       }
@@ -908,13 +958,15 @@ private struct MenuContentView: View {
   }
 
   private func captureResultBanner(_ summary: ProfileCaptureSummary) -> some View {
-    VStack(alignment: .leading, spacing: 7) {
+    let permissionItems = summary.items.filter { $0.disposition == .permissionRequired }
+
+    return VStack(alignment: .leading, spacing: 7) {
       HStack(alignment: .firstTextBaseline) {
         Label(
-          summary.status == .failure
-            ? appLocalized("Capture Failed") : appLocalized("Partial Capture"),
-          systemImage: summary.status == .failure
-            ? "xmark.octagon" : "exclamationmark.triangle"
+          summary.permissionRequiredCount > 0
+            ? appLocalized("Location Access Needed") : appLocalized("Capture Failed"),
+          systemImage: summary.permissionRequiredCount > 0
+            ? "location.slash" : "xmark.octagon"
         )
         .font(.caption.bold())
         Spacer()
@@ -929,45 +981,15 @@ private struct MenuContentView: View {
         .help("Dismiss Capture Result")
       }
       Text(
-        appLocalized(
-          "\(summary.applicableCount) applicable · \(summary.excludedCount) snapshot only"
-        )
+        appLocalized("\(summary.applicableCount) applicable settings saved.")
       )
       .font(.caption)
       .foregroundStyle(.secondary)
-      Text(
-        appLocalized(
-          "\(summary.unreadableCount) unreadable · \(summary.permissionRequiredCount) permission required · \(summary.unsupportedCount) unsupported"
-        )
-      )
-      .font(.caption2)
-      .foregroundStyle(.secondary)
-      DisclosureGroup(
-        "Why is this a partial capture?",
-        isExpanded: $captureDetailsExpanded
-      ) {
-        VStack(alignment: .leading, spacing: 9) {
-          Text(
-            "Usable settings were saved. The items below were kept as reference data or omitted without changing the Mac."
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
 
-          ForEach(captureIncompleteDispositions, id: \.self) { disposition in
-            let items = summary.items.filter { $0.disposition == disposition }
-            if !items.isEmpty {
-              captureDispositionRow(disposition, items: items)
-            }
-          }
-        }
-        .padding(.top, 4)
-      }
-      .font(.caption)
-      if summary.wifiNetworkWasNotCaptured {
-        Label("Wi-Fi network was not captured.", systemImage: "location.slash")
-          .font(.caption)
-        Button("Review System Settings") {
-          presentSystemSettings()
+      if !permissionItems.isEmpty {
+        capturePermissionRow(permissionItems)
+        Button(capturePermissionActionTitle) {
+          handleCapturePermissionAction()
         }
         .font(.caption)
       }
@@ -980,66 +1002,48 @@ private struct MenuContentView: View {
     .accessibilityElement(children: .contain)
   }
 
-  private var captureIncompleteDispositions: [CaptureItemDisposition] {
-    [.savedSnapshotOnly, .unreadable, .permissionRequired, .unsupported]
-  }
-
-  private func captureDispositionRow(
-    _ disposition: CaptureItemDisposition,
-    items: [CaptureSummaryItem]
-  ) -> some View {
+  private func capturePermissionRow(_ items: [CaptureSummaryItem]) -> some View {
     VStack(alignment: .leading, spacing: 2) {
       HStack(spacing: 5) {
-        Image(systemName: captureDispositionSymbol(disposition))
+        Image(systemName: "lock.trianglebadge.exclamationmark")
           .accessibilityHidden(true)
-        Text(captureDispositionTitle(disposition))
+        Text("Permission required")
           .fontWeight(.semibold)
         Text(appLocalized("\(items.count) items"))
           .foregroundStyle(.secondary)
       }
       Text(items.map(captureItemTitle).joined(separator: ", "))
         .fixedSize(horizontal: false, vertical: true)
-      Text(captureDispositionExplanation(disposition))
+      Text("macOS hid this value until the required permission is granted.")
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }
     .accessibilityElement(children: .combine)
   }
 
-  private func captureDispositionTitle(_ disposition: CaptureItemDisposition) -> String {
-    switch disposition {
-    case .savedApplicable: appLocalized("Applicable")
-    case .savedSnapshotOnly: appLocalized("Snapshot only")
-    case .unreadable: appLocalized("Unreadable")
-    case .permissionRequired: appLocalized("Permission required")
-    case .unsupported: appLocalized("Unsupported")
+  private var capturePermissionActionTitle: String {
+    switch locationPermission.authorizationStatus {
+    case .notDetermined:
+      appLocalized("Request Location Access")
+    case .denied, .restricted:
+      appLocalized("Open macOS System Settings")
+    case .authorizedAlways, .authorized:
+      appLocalized("Review System Settings")
+    @unknown default:
+      appLocalized("Review System Settings")
     }
   }
 
-  private func captureDispositionSymbol(_ disposition: CaptureItemDisposition) -> String {
-    switch disposition {
-    case .savedApplicable: "checkmark.circle"
-    case .savedSnapshotOnly: "camera"
-    case .unreadable: "eye.slash"
-    case .permissionRequired: "lock.trianglebadge.exclamationmark"
-    case .unsupported: "nosign"
-    }
-  }
-
-  private func captureDispositionExplanation(_ disposition: CaptureItemDisposition) -> String {
-    switch disposition {
-    case .savedApplicable:
-      appLocalized("This item was saved and can be applied.")
-    case .savedSnapshotOnly:
-      appLocalized(
-        "Saved for reference, but not applied because the current adapter cannot safely restore it."
-      )
-    case .unreadable:
-      appLocalized("macOS returned no compatible value, so this item was not added.")
-    case .permissionRequired:
-      appLocalized("macOS hid this value until the required permission is granted.")
-    case .unsupported:
-      appLocalized("The current adapter cannot safely capture or apply this item.")
+  private func handleCapturePermissionAction() {
+    switch locationPermission.authorizationStatus {
+    case .notDetermined:
+      isCaptureLocationExplanationPresented = true
+    case .denied, .restricted:
+      locationPermission.openSystemSettings()
+    case .authorizedAlways, .authorized:
+      presentSystemSettings()
+    @unknown default:
+      presentSystemSettings()
     }
   }
 
@@ -1063,8 +1067,6 @@ private struct MenuContentView: View {
       appLocalized("Web proxy")
     case "network.secureWebProxy", "secureWebProxy":
       appLocalized("Secure web proxy")
-    case "network.serviceOrder":
-      appLocalized("Network service order")
     case "wifi.ssid", "wifiSSID":
       appLocalized("Current Wi-Fi network")
     case "com.apple.mouse.scaling", "pointerSpeed":
@@ -1095,9 +1097,12 @@ private struct MenuContentView: View {
   }
 
   private func captureResultAnnouncement(_ summary: ProfileCaptureSummary) -> String {
-    appLocalized(
-      "\(summary.applicableCount) applicable, \(summary.excludedCount) snapshot only, \(summary.unreadableCount) unreadable, \(summary.permissionRequiredCount) permission required, and \(summary.unsupportedCount) unsupported."
-    )
+    if summary.permissionRequiredCount > 0 {
+      return appLocalized(
+        "\(summary.applicableCount) applicable settings saved; \(summary.permissionRequiredCount) permission required."
+      )
+    }
+    return appLocalized("\(summary.applicableCount) applicable settings saved.")
   }
 
   private func applyResultCard(_ summary: ApplyResultSummary) -> some View {

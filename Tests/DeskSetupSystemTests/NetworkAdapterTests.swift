@@ -153,10 +153,7 @@ struct NetworkAdapterTests {
     #expect(snapshot.items.contains(where: { $0.key == "network.ipv4Gateway" }))
     #expect(snapshot.items.contains(where: { $0.key == "network.ipv6Gateway" }))
     #expect(snapshot.items.contains(where: { $0.key == "network.dns" }))
-    #expect(
-      snapshot.items.first(where: { $0.key == "network.serviceOrder" })?.state
-        == .unsupported
-    )
+    #expect(!snapshot.items.contains(where: { $0.key == "network.serviceOrder" }))
 
     guard case .network(let settings) = snapshot.payload else {
       Issue.record("Expected network settings payload")
@@ -570,7 +567,6 @@ extension NetworkSystemSnapshot {
       ipv4Gateway: "192.0.2.1",
       ipv6Gateway: "2001:db8:1::1",
       dnsServers: ["192.0.2.53"],
-      serviceOrder: ["service-wifi", "service-ethernet"],
       services: [
         .init(
           serviceID: "service-wifi",

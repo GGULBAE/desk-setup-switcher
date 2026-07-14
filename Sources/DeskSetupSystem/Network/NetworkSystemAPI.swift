@@ -82,7 +82,6 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
       ipv4Gateway: configuration.ipv4Gateway,
       ipv6Gateway: configuration.ipv6Gateway,
       dnsServers: configuration.dnsServers,
-      serviceOrder: configuration.serviceOrder,
       services: configuration.services
     )
   }
@@ -269,7 +268,6 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
     var ipv4Gateway: String?
     var ipv6Gateway: String?
     var dnsServers: [String]
-    var serviceOrder: [String]
     var services: [NetworkServiceConfigurationSnapshot]
   }
 
@@ -297,14 +295,12 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
     let primaryInterface = ipv4PrimaryInterface ?? ipv6PrimaryInterface
     let primaryService = ipv4PrimaryService ?? ipv6PrimaryService
 
-    var serviceOrder: [String] = []
     var services: [NetworkServiceConfigurationSnapshot] = []
     if let preferences = SCPreferencesCreate(
       nil,
       "DeskSetupSwitcher.NetworkSnapshot" as CFString,
       nil
     ), let set = SCNetworkSetCopyCurrent(preferences) {
-      serviceOrder = SCNetworkSetGetServiceOrder(set) as? [String] ?? []
       let configuredServices = SCNetworkSetCopyServices(set) as? [SCNetworkService] ?? []
       services = configuredServices.compactMap(readService).sorted {
         $0.serviceID < $1.serviceID
@@ -317,7 +313,6 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
       ipv4Gateway: ipv4Gateway,
       ipv6Gateway: ipv6Gateway,
       dnsServers: dnsServers,
-      serviceOrder: serviceOrder,
       services: services
     )
   }

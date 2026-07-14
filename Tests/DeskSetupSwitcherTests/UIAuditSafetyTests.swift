@@ -111,6 +111,39 @@ import Testing
         controller.lastError
           == appLocalized("System access is disabled for this synthetic review."))
     }
+
+    @Test("explicit capture permission action calls the injected macOS request")
+    func explicitPermissionRequestUsesInjectedClosure() {
+      let recorder = PermissionRequestRecorder()
+      let controller = LocationPermissionController(
+        allowsSystemRequests: true,
+        syntheticAuthorizationStatus: .notDetermined,
+        requestWhenInUseAuthorization: recorder.requestAuthorization,
+        requestLocation: recorder.requestLocation,
+        openSystemSettingsApplication: recorder.openSystemSettings
+      )
+
+      controller.requestAccess()
+
+      #expect(recorder.invocations == ["authorization"])
+    }
+
+    @Test("denied capture permission opens only the injected System Settings action")
+    func deniedPermissionUsesInjectedSystemSettingsAction() {
+      let recorder = PermissionRequestRecorder()
+      let controller = LocationPermissionController(
+        allowsSystemRequests: true,
+        syntheticAuthorizationStatus: .denied,
+        requestWhenInUseAuthorization: recorder.requestAuthorization,
+        requestLocation: recorder.requestLocation,
+        openSystemSettingsApplication: recorder.openSystemSettings
+      )
+
+      controller.openSystemSettings()
+
+      #expect(recorder.invocations == ["settings"])
+      #expect(controller.lastError == nil)
+    }
   }
 
   private actor RecordingConditionReaders: ConditionDisplayReading, ConditionAudioReading,
@@ -195,6 +228,11 @@ import Testing
 
     func requestLocation() {
       invocations.append("location")
+    }
+
+    func openSystemSettings() -> Bool {
+      invocations.append("settings")
+      return true
     }
   }
 #endif

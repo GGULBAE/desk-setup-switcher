@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import CoreLocation
 import Foundation
@@ -18,6 +19,7 @@ final class LocationPermissionController: NSObject, ObservableObject, CLLocation
   private let allowsSystemRequests: Bool
   private let requestWhenInUseAuthorization: @MainActor () -> Void
   private let requestLocation: @MainActor () -> Void
+  private let openSystemSettingsApplication: @MainActor () -> Bool
   var onReadinessFactsChanged: (() -> Void)?
 
   init(
@@ -25,14 +27,24 @@ final class LocationPermissionController: NSObject, ObservableObject, CLLocation
     allowsSystemRequests: Bool = true,
     syntheticAuthorizationStatus: CLAuthorizationStatus? = nil,
     requestWhenInUseAuthorization: (@MainActor () -> Void)? = nil,
-    requestLocation: (@MainActor () -> Void)? = nil
+    requestLocation: (@MainActor () -> Void)? = nil,
+    openSystemSettingsApplication: (@MainActor () -> Bool)? = nil
   ) {
-    let activeManager = allowsSystemRequests ? (manager ?? CLLocationManager()) : nil
+    let activeManager =
+      allowsSystemRequests
+      ? (manager ?? (syntheticAuthorizationStatus == nil ? CLLocationManager() : nil))
+      : nil
     self.manager = activeManager
     self.allowsSystemRequests = allowsSystemRequests
     self.requestWhenInUseAuthorization =
       requestWhenInUseAuthorization ?? { activeManager?.requestWhenInUseAuthorization() }
     self.requestLocation = requestLocation ?? { activeManager?.requestLocation() }
+    self.openSystemSettingsApplication =
+      openSystemSettingsApplication ?? {
+        NSWorkspace.shared.open(
+          URL(fileURLWithPath: "/System/Applications/System Settings.app", isDirectory: true)
+        )
+      }
     authorizationStatus =
       syntheticAuthorizationStatus ?? activeManager?.authorizationStatus ?? .denied
     super.init()
@@ -76,6 +88,18 @@ final class LocationPermissionController: NSObject, ObservableObject, CLLocation
         "Enable Location Services for Desk Setup Switcher in System Settings.")
     @unknown default:
       lastError = appLocalized("The current location authorization state is unknown.")
+    }
+  }
+
+  func openSystemSettings() {
+    lastError = nil
+    guard allowsSystemRequests else {
+      lastError = appLocalized("System access is disabled for this synthetic review.")
+      return
+    }
+    guard openSystemSettingsApplication() else {
+      lastError = appLocalized("macOS System Settings could not be opened.")
+      return
     }
   }
 

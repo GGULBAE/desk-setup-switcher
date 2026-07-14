@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Profile capture summary builder")
 struct ProfileCaptureSummaryBuilderTests {
-  @Test("permission-hidden Wi-Fi and snapshot-only values create a sanitized partial result")
+  @Test("permission-hidden Wi-Fi is the only actionable incomplete capture evidence")
   func partialCaptureClassification() {
     let display = DisplayTargetSettings(
       identity: DisplayIdentity(isBuiltIn: true),
@@ -46,12 +46,14 @@ struct ProfileCaptureSummaryBuilderTests {
       )
     )
     #expect(summary.applicableCount == 5)
-    #expect(summary.excludedCount == 3)
+    #expect(summary.excludedCount == 0)
+    #expect(summary.unreadableCount == 0)
     #expect(summary.permissionRequiredCount == 1)
+    #expect(summary.unsupportedCount == 0)
     #expect(summary.wifiNetworkWasNotCaptured)
   }
 
-  @Test("snapshot-only values alone cannot create a profile")
+  @Test("snapshot-only values are omitted from the user-facing capture result")
   func snapshotOnlyCaptureIsUnusable() {
     let settings = ProfileSettings(
       network: .init(
@@ -66,12 +68,13 @@ struct ProfileCaptureSummaryBuilderTests {
     )
 
     #expect(summary.status == .failure)
-    #expect(summary.excludedCount == 1)
+    #expect(summary.items.isEmpty)
+    #expect(summary.excludedCount == 0)
     #expect(!summary.canCreateProfile)
   }
 
-  @Test("duplicate snapshot failure evidence is counted once")
-  func duplicateSnapshotFailureEvidenceIsDeduplicated() {
+  @Test("unreadable and unsupported evidence is omitted from the user-facing result")
+  func nonActionableEvidenceIsOmitted() {
     let duplicate = CaptureSnapshotEvidence(
       group: .display,
       key: "snapshot",
@@ -80,21 +83,22 @@ struct ProfileCaptureSummaryBuilderTests {
 
     let summary = ProfileCaptureSummaryBuilder().summary(
       settings: ProfileSettings(),
-      evidence: [duplicate, duplicate]
+      evidence: [
+        duplicate,
+        duplicate,
+        .init(group: .network, key: "network.serviceOrder", state: .unsupported),
+      ]
     )
 
     #expect(summary.status == .failure)
-    #expect(summary.unreadableCount == 1)
-    #expect(
-      summary.items.filter { $0.disposition == .unreadable }
-        == [.init(group: .display, key: "snapshot", disposition: .unreadable)]
-    )
+    #expect(summary.items.isEmpty)
+    #expect(summary.unreadableCount == 0)
     #expect(summary.savedCount == 0)
     #expect(summary.permissionRequiredCount == 0)
     #expect(summary.unsupportedCount == 0)
   }
 
-  @Test("incomplete device evidence keeps no runtime identifier")
+  @Test("ignored device evidence keeps no runtime identifier")
   func incompleteDeviceEvidenceIsSanitized() {
     let runtimeID = "6A1C2DD1-5FB0-4D83-A4FA-2FA127EDC978"
     let summary = ProfileCaptureSummaryBuilder().summary(
@@ -108,11 +112,7 @@ struct ProfileCaptureSummaryBuilderTests {
       ]
     )
 
-    #expect(
-      summary.items == [
-        .init(group: .display, key: "display.settings", disposition: .unreadable)
-      ]
-    )
+    #expect(summary.items.isEmpty)
     #expect(!summary.items.contains { $0.key.contains(runtimeID) })
   }
 }

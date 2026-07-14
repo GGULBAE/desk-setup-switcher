@@ -453,15 +453,6 @@ public struct NetworkAdapter: SystemSettingsAdapter {
         )
       )
     }
-    items.append(
-      SnapshotItem(
-        key: "network.serviceOrder",
-        label: "Network service order",
-        state: .unsupported,
-        detail:
-          "Readable service order detected; mutation is not supported without authorization and rollback."
-      )
-    )
     return items
   }
 

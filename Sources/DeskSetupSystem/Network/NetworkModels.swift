@@ -142,7 +142,6 @@ public struct NetworkSystemSnapshot: Codable, Hashable, Sendable {
   public var ipv4Gateway: String?
   public var ipv6Gateway: String?
   public var dnsServers: [String]
-  public var serviceOrder: [String]
   public var services: [NetworkServiceConfigurationSnapshot]
 
   public init(
@@ -153,7 +152,6 @@ public struct NetworkSystemSnapshot: Codable, Hashable, Sendable {
     ipv4Gateway: String? = nil,
     ipv6Gateway: String? = nil,
     dnsServers: [String] = [],
-    serviceOrder: [String] = [],
     services: [NetworkServiceConfigurationSnapshot] = []
   ) {
     self.wifi = wifi
@@ -163,7 +161,6 @@ public struct NetworkSystemSnapshot: Codable, Hashable, Sendable {
     self.ipv4Gateway = ipv4Gateway
     self.ipv6Gateway = ipv6Gateway
     self.dnsServers = dnsServers
-    self.serviceOrder = serviceOrder
     self.services = services
   }
 

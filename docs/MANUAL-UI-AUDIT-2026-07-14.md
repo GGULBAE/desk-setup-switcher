@@ -1,6 +1,6 @@
 # Manual UI Audit — 2026-07-14
 
-This report records the final-source synthetic render and read-only accessibility inspection for Desk Setup Switcher. The current follow-up adds per-profile menu deletion controls, an expanded value-free explanation of partial captures, a card-based profile editor with more usable width, and a simplified Profiles/System/About information architecture. Diagnostics remain available as an on-demand advanced sheet. It separates what the evidence proves from interactions and hardware behavior that remain pending.
+This report records a synthetic render and read-only accessibility inspection for Desk Setup Switcher at the source point captured below. That source added per-profile menu deletion controls, an expanded value-free explanation of partial captures, a card-based profile editor with more usable width, and a simplified Profiles/System/About information architecture. Later inline-delete and actionable capture-permission corrections are documented separately because they are not depicted in these images. Diagnostics remain available as an on-demand advanced sheet. The report separates what the evidence proves from interactions and hardware behavior that remain pending.
 
 ## Safety boundary
 
@@ -35,7 +35,7 @@ The profile workspace intentionally uses a fixed responsive breakpoint at 760 po
 
 The required same-window 980→680→980 interaction still needs an explicit user result. Until that is supplied, preservation of the selected profile, expanded group/option, unsaved value, and focus across the live resize remains **pending**, even though the view identity is preserved in source. The actual MenuBarExtra Settings gear open/close/reopen path also remains **pending** because no user result was received; no UI automation was substituted.
 
-The later inline-delete-confirmation correction is source/build verified but is not depicted in these 12 static captures. Its confirmation is deliberately part of the profile card rather than a system dialog, avoiding the observed MenuBarExtra dismissal, and its list viewport now reserves additional height while confirmation is open to avoid clipping either action. A user-driven click-through remains the appropriate final interaction check.
+The later inline-delete-confirmation correction is source/build verified but is not depicted in these 12 static captures. Its confirmation is deliberately part of the profile card rather than a system dialog, avoiding the observed MenuBarExtra dismissal, and its list viewport now reserves additional height while confirmation is open to avoid clipping either action. The later capture-permission correction is also absent: current source explains and requests undetermined Location access, routes denied access to macOS System Settings or an explicit Wi-Fi-free path, and omits snapshot-only/unreadable/unsupported noise from the result card. Injected tests cover these actions without live TCC mutation. User-driven delete and TCC click-throughs remain the appropriate final interaction checks.
 
 ## Evidence boundary and pending checks
 

@@ -17,8 +17,11 @@ public struct CaptureSnapshotEvidence: Hashable, Sendable {
   }
 }
 
-/// Deterministically classifies captured profile leaves without carrying any
-/// SSID, address, device identifier, or other captured value into UI state.
+/// Deterministically reports saved, applicable leaves and actionable permission
+/// gaps without carrying any SSID, address, device identifier, or other captured
+/// value into UI state. Snapshot-only, unreadable, and unsupported evidence is
+/// intentionally omitted from user-facing capture results because the user
+/// cannot act on it during capture.
 public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
   public init() {}
 
@@ -57,20 +60,6 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
         .display,
         "\(prefix).mode"
       )
-      items.append(
-        CaptureSummaryItem(
-          group: .display,
-          key: "\(prefix).rotation",
-          disposition: .savedSnapshotOnly
-        )
-      )
-      items.append(
-        CaptureSummaryItem(
-          group: .display,
-          key: "\(prefix).active",
-          disposition: .savedSnapshotOnly
-        )
-      )
     }
 
     let audio = settings.audio.value
@@ -95,26 +84,6 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     let network = settings.network.value
     applicable(settings.network.isIncluded && network.wifiPower.isIncluded, .network, "wifi.power")
     applicable(settings.network.isIncluded && network.wifiSSID.isIncluded, .network, "wifi.ssid")
-    snapshotOnly(network.ipv4.value != nil, .network, "network.ipv4", items: &items)
-    snapshotOnly(
-      !network.dnsServers.value.isEmpty,
-      .network,
-      "network.dns",
-      items: &items
-    )
-    snapshotOnly(
-      network.webProxy.value != nil,
-      .network,
-      "network.webProxy",
-      items: &items
-    )
-    snapshotOnly(
-      network.secureWebProxy.value != nil,
-      .network,
-      "network.secureWebProxy",
-      items: &items
-    )
-
     let input = settings.input.value
     applicable(
       settings.input.isIncluded && input.pointerSpeed.isIncluded,
@@ -146,13 +115,9 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     for item in evidence where seenEvidence.insert(item).inserted {
       let disposition: CaptureItemDisposition?
       switch item.state {
-      case .unreadable:
-        disposition = .unreadable
       case .permissionRequired:
         disposition = .permissionRequired
-      case .unsupported:
-        disposition = .unsupported
-      case .detected, .storable:
+      case .detected, .storable, .unreadable, .unsupported:
         disposition = nil
       }
       if let disposition {
@@ -188,15 +153,4 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     }
   }
 
-  private func snapshotOnly(
-    _ isPresent: Bool,
-    _ group: SettingGroup,
-    _ key: String,
-    items: inout [CaptureSummaryItem]
-  ) {
-    guard isPresent else { return }
-    items.append(
-      CaptureSummaryItem(group: group, key: key, disposition: .savedSnapshotOnly)
-    )
-  }
 }

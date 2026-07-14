@@ -1057,3 +1057,16 @@
 "Shows redacted local status, snapshot details, and recent events" = "Shows redacted local status, snapshot details, and recent events";
 "Advanced Diagnostics" = "Advanced Diagnostics";
 "Done" = "Done";
+
+/* Capture permission and actionable results */
+"Capture Without Wi-Fi" = "Capture Without Wi-Fi";
+"Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere." = "Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere.";
+"Location Access Is Off" = "Location Access Is Off";
+"Open macOS System Settings" = "Open macOS System Settings";
+"macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi." = "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi.";
+"macOS System Settings could not be opened." = "macOS System Settings could not be opened.";
+"Captured %lld applicable settings. Location access is needed to include the current Wi-Fi network." = "Captured %lld applicable settings. Location access is needed to include the current Wi-Fi network.";
+"Captured %lld applicable settings." = "Captured %lld applicable settings.";
+"Location Access Needed" = "Location Access Needed";
+"%lld applicable settings saved." = "%lld applicable settings saved.";
+"%lld applicable settings saved; %lld permission required." = "%lld applicable settings saved; %lld permission required.";
