@@ -148,6 +148,7 @@ final class ProfileValidationTests: XCTestCase {
             defaultInputUID: .init(value: nil),
             defaultOutputUID: .init(value: " \t"),
             systemOutputUID: .init(value: nil),
+            inputVolume: .init(value: -0.01),
             outputVolume: .init(value: 1.01),
             outputMuted: .init(value: nil)
           )
@@ -159,6 +160,7 @@ final class ProfileValidationTests: XCTestCase {
     assertInvalidValue(issues, pathSuffix: ".defaultInputUID", reason: .missingIncludedValue)
     assertInvalidValue(issues, pathSuffix: ".defaultOutputUID", reason: .blank)
     assertInvalidValue(issues, pathSuffix: ".systemOutputUID", reason: .missingIncludedValue)
+    assertInvalidValue(issues, pathSuffix: ".inputVolume", reason: .outOfRange)
     assertInvalidValue(issues, pathSuffix: ".outputVolume", reason: .outOfRange)
     assertInvalidValue(issues, pathSuffix: ".outputMuted", reason: .missingIncludedValue)
 
@@ -173,6 +175,22 @@ final class ProfileValidationTests: XCTestCase {
     let network = NetworkProfileSettings(
       wifiPower: .init(value: nil),
       wifiSSID: .init(value: " \n"),
+      serviceIPv4: [
+        .init(
+          identity: .init(
+            kind: .ethernet,
+            serviceName: "Synthetic Ethernet",
+            interfaceType: "Ethernet"
+          ),
+          configuration: .init(
+            value: .manual(
+              address: privateAddress,
+              subnetMask: "255.0.255.0",
+              router: "not-a-router"
+            )
+          )
+        )
+      ],
       ipv4: .init(
         value: .manual(
           address: privateAddress,
@@ -207,6 +225,21 @@ final class ProfileValidationTests: XCTestCase {
 
     assertInvalidValue(issues, pathSuffix: ".wifiPower", reason: .missingIncludedValue)
     assertInvalidValue(issues, pathSuffix: ".wifiSSID", reason: .blank)
+    assertInvalidValue(
+      issues,
+      pathSuffix: ".serviceIPv4[0].address",
+      reason: .malformedIPv4Address
+    )
+    assertInvalidValue(
+      issues,
+      pathSuffix: ".serviceIPv4[0].subnetMask",
+      reason: .malformedSubnetMask
+    )
+    assertInvalidValue(
+      issues,
+      pathSuffix: ".serviceIPv4[0].router",
+      reason: .malformedIPv4Address
+    )
     assertInvalidValue(issues, pathSuffix: ".ipv4.address", reason: .malformedIPv4Address)
     assertInvalidValue(issues, pathSuffix: ".ipv4.subnetMask", reason: .malformedSubnetMask)
     assertInvalidValue(issues, pathSuffix: ".ipv4.router", reason: .malformedIPv4Address)

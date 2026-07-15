@@ -27,14 +27,27 @@ public struct ProfileApplicabilityNormalizer: Sendable {
     normalizePrimaryDisplayApplicability(&normalized.display.value.displays)
 
     for index in normalized.display.value.displays.indices {
+      normalized.display.value.displays[index].origin.isIncluded = false
       normalized.display.value.displays[index].rotationDegrees.isIncluded = false
       normalized.display.value.displays[index].isActive.isIncluded = false
     }
 
+    normalized.audio.value.systemOutputUID.isIncluded = false
+    normalized.audio.value.outputMuted.isIncluded = false
+
+    for index in normalized.network.value.serviceIPv4.indices {
+      normalized.network.value.serviceIPv4[index].configuration.isIncluded = false
+    }
     normalized.network.value.ipv4.isIncluded = false
     normalized.network.value.dnsServers.isIncluded = false
     normalized.network.value.webProxy.isIncluded = false
     normalized.network.value.secureWebProxy.isIncluded = false
+
+    normalized.input.value.pointerSpeed.isIncluded = false
+    normalized.input.value.naturalScrolling.isIncluded = false
+    normalized.input.value.keyRepeatInterval.isIncluded = false
+    normalized.input.value.initialKeyRepeatDelay.isIncluded = false
+    normalized.input.value.useStandardFunctionKeys.isIncluded = false
 
     if !normalized.display.value.hasIncludedOption {
       normalized.display.isIncluded = false

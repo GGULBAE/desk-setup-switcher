@@ -206,6 +206,12 @@ public struct ProfileDocumentValidator: Sendable {
       issues: &issues
     )
     validateIncludedNumber(
+      settings.inputVolume,
+      range: 0...1,
+      at: "\(base).inputVolume",
+      issues: &issues
+    )
+    validateIncludedNumber(
       settings.outputVolume,
       range: 0...1,
       at: "\(base).outputVolume",
@@ -228,6 +234,42 @@ public struct ProfileDocumentValidator: Sendable {
     if semanticsEnabled {
       validateIncludedPresence(settings.wifiPower, at: "\(base).wifiPower", issues: &issues)
       validateIncludedString(settings.wifiSSID, at: "\(base).wifiSSID", issues: &issues)
+    }
+
+    for (index, service) in settings.serviceIPv4.enumerated() {
+      let serviceBase = "\(base).serviceIPv4[\(index)]"
+      checkLength(
+        service.identity.serviceName,
+        at: "\(serviceBase).identity.serviceName",
+        issues: &issues
+      )
+      checkLength(
+        service.identity.interfaceType,
+        at: "\(serviceBase).identity.interfaceType",
+        issues: &issues
+      )
+      guard let configuration = service.configuration.value else {
+        if semanticsEnabled, service.configuration.isIncluded {
+          invalid(serviceBase, .missingIncludedValue, issues: &issues)
+        }
+        continue
+      }
+      if case .manual(let address, let subnetMask, let router) = configuration {
+        checkLength(address, at: "\(serviceBase).address", issues: &issues)
+        checkLength(subnetMask, at: "\(serviceBase).subnetMask", issues: &issues)
+        checkLength(router, at: "\(serviceBase).router", issues: &issues)
+        if semanticsEnabled, service.configuration.isIncluded {
+          if !isIPv4Address(address) {
+            invalid("\(serviceBase).address", .malformedIPv4Address, issues: &issues)
+          }
+          if !isContiguousIPv4Mask(subnetMask) {
+            invalid("\(serviceBase).subnetMask", .malformedSubnetMask, issues: &issues)
+          }
+          if let router, !isIPv4Address(router) {
+            invalid("\(serviceBase).router", .malformedIPv4Address, issues: &issues)
+          }
+        }
+      }
     }
 
     if semanticsEnabled, settings.ipv4.isIncluded {

@@ -2,7 +2,7 @@
 
 ## Current status
 
-The version 0.1.0 no-Developer-ID packaging path passes locally. Tray Surface v2 passed `make verify` on 2026-07-15 with 326 default cases (130 XCTest + 196 Swift Testing), six opt-in skips, universal Debug/Release, Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. The current app contains `arm64` and `x86_64`; DMG SHA-256 is `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`. This package was not installed or launched.
+The version 0.1.0 no-Developer-ID packaging path passes locally. The current tray/settings refinement passed `make verify` on 2026-07-15 with 338 default cases (132 XCTest + 206 Swift Testing), six opt-in skips, universal Debug/Release, Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. The current app contains `arm64` and `x86_64`; DMG SHA-256 is `539c203607782302799d68acdda2f64666f0ace5897fa325a79e1dfdcfc98f78`. This package was not installed or launched.
 
 Initial Actions run `29154880831` for implementation commit `0d8f510` exposed the Swift 6.1 actor-isolation issue. Repair commit `4e45328` is pushed, and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) succeeded on 2026-07-11 under macOS 15/Xcode 16.4/Swift 6.1.2; full `make verify` and unsigned-package upload passed. No release has been published, and the downloaded/quarantined Gatekeeper path remains untested.
 

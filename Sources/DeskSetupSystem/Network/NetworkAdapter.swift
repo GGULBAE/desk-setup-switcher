@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 #if canImport(DeskSetupCore)
@@ -37,6 +38,13 @@ public struct NetworkAdapter: SystemSettingsAdapter {
       primaryService?.dnsServers.isEmpty == false
       ? primaryService?.dnsServers ?? []
       : system.dnsServers
+    let serviceIPv4 = system.services.compactMap { service -> NetworkServiceIPv4Settings? in
+      guard let identity = service.portableIdentity else { return nil }
+      return NetworkServiceIPv4Settings(
+        identity: identity,
+        configuration: .init(isIncluded: false, value: service.ipv4)
+      )
+    }
     let settings = NetworkProfileSettings(
       wifiPower: .init(
         isIncluded: system.wifi != nil,
@@ -46,6 +54,7 @@ public struct NetworkAdapter: SystemSettingsAdapter {
         isIncluded: system.wifi?.ssid != nil,
         value: system.wifi?.ssid
       ),
+      serviceIPv4: serviceIPv4,
       ipv4: .init(
         isIncluded: false,
         value: primaryService?.ipv4
@@ -68,7 +77,8 @@ public struct NetworkAdapter: SystemSettingsAdapter {
       group: .network,
       capturedAt: now(),
       payload: .network(settings),
-      items: snapshotItems(for: system)
+      items: snapshotItems(for: system),
+      savedWiFiNetworkNames: system.savedWiFiNetworkNames
     )
   }
 
@@ -116,6 +126,46 @@ public struct NetworkAdapter: SystemSettingsAdapter {
           message: "The saved Wi-Fi network name must contain 1 to 32 UTF-8 bytes."
         )
       )
+    }
+    for (index, target) in settings.serviceIPv4.enumerated()
+    where target.configuration.isIncluded {
+      let key = "network.serviceIPv4.\(index)"
+      guard let configuration = target.configuration.value else {
+        issues.append(
+          ValidationIssue(
+            group: .network,
+            key: key,
+            severity: .error,
+            isFatal: true,
+            message: "The saved service-specific IPv4 value is missing."
+          )
+        )
+        continue
+      }
+      if case .manual(let address, let subnetMask, let router) = configuration,
+        !isValidManualIPv4(address: address, subnetMask: subnetMask, router: router)
+      {
+        issues.append(
+          ValidationIssue(
+            group: .network,
+            key: key,
+            severity: .error,
+            isFatal: true,
+            message: "The manual IPv4 address, subnet mask, or router is invalid."
+          )
+        )
+      }
+      if settings.serviceIPv4.count(where: { $0.identity == target.identity }) > 1 {
+        issues.append(
+          ValidationIssue(
+            group: .network,
+            key: key,
+            severity: .warning,
+            isFatal: false,
+            message: "More than one network service matches this portable identity."
+          )
+        )
+      }
     }
     return issues
   }
@@ -253,6 +303,35 @@ public struct NetworkAdapter: SystemSettingsAdapter {
     }
     if let associationOperation {
       operations.append(associationOperation)
+    }
+
+    for (index, target) in desiredSettings.serviceIPv4.enumerated()
+    where target.configuration.isIncluded {
+      let key = "network.serviceIPv4.\(index)"
+      let desiredMatches = desiredSettings.serviceIPv4.count {
+        $0.identity == target.identity
+      }
+      let currentMatches = currentSettings.serviceIPv4.filter {
+        $0.identity == target.identity
+      }
+      guard desiredMatches == 1, currentMatches.count == 1 else {
+        omissions.append(
+          omission(
+            key: key,
+            status: .skipped,
+            reason:
+              "The network service identity is ambiguous, so its IPv4 configuration was not changed."
+          )
+        )
+        continue
+      }
+      appendUnsupportedChange(
+        key: key,
+        desired: target.configuration,
+        current: currentMatches[0].configuration,
+        reason: "DHCP and static IPv4 changes require an authorized, rollback-safe implementation.",
+        omissions: &omissions
+      )
     }
 
     appendUnsupportedChange(
@@ -421,6 +500,34 @@ public struct NetworkAdapter: SystemSettingsAdapter {
       }
     }
 
+    for kind in NetworkServiceKind.allCases {
+      let services = system.services.filter { $0.kind == kind }
+      if services.isEmpty {
+        items.append(
+          SnapshotItem(
+            key: "network.serviceIPv4.\(kind.rawValue)",
+            label: "\(kind.rawValue.capitalized) IPv4 configuration",
+            state: .unsupported,
+            detail: "No portable public service identity was available."
+          )
+        )
+      } else {
+        for (index, service) in services.enumerated() {
+          let isPortable = service.portableIdentity != nil
+          items.append(
+            SnapshotItem(
+              key: "network.serviceIPv4.\(kind.rawValue).\(index)",
+              label: "\(kind.rawValue.capitalized) IPv4 configuration",
+              state: isPortable ? .unsupported : .unreadable,
+              detail: isPortable
+                ? "Readable for this service; applying requires authorized rollback support."
+                : "The service lacks the public metadata required for portable matching."
+            )
+          )
+        }
+      }
+    }
+
     if let primaryInterfaceName = system.primaryInterfaceName {
       items.append(
         SnapshotItem(
@@ -568,6 +675,31 @@ public struct NetworkAdapter: SystemSettingsAdapter {
   private func isValidSSID(_ ssid: String) -> Bool {
     guard let data = ssid.data(using: .utf8) else { return false }
     return (1...32).contains(data.count)
+  }
+
+  private func isValidManualIPv4(
+    address: String,
+    subnetMask: String,
+    router: String?
+  ) -> Bool {
+    isIPv4Address(address)
+      && isContiguousIPv4Mask(subnetMask)
+      && (router == nil || isIPv4Address(router ?? ""))
+  }
+
+  private func isIPv4Address(_ value: String) -> Bool {
+    var address = in_addr()
+    return value.withCString { inet_pton(AF_INET, $0, &address) } == 1
+  }
+
+  private func isContiguousIPv4Mask(_ value: String) -> Bool {
+    var address = in_addr()
+    guard value.withCString({ inet_pton(AF_INET, $0, &address) }) == 1 else {
+      return false
+    }
+    let mask = UInt32(bigEndian: address.s_addr)
+    let inverted = ~mask
+    return inverted == 0 || (inverted & (inverted + 1)) == 0
   }
 
   private func rollbackPreflightOmissionReason(

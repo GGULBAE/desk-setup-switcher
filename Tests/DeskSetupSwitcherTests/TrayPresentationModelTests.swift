@@ -19,6 +19,10 @@ import Testing
         sessionGeneration: 1,
         viewport: CGSize(width: 368, height: 560)
       )
+      #expect(
+        presentation.scrollResetRequest
+          == TrayScrollResetRequest(sessionGeneration: 1, anchor: .top)
+      )
       await presentation.executeStayOpen(.requestDelete(first))
       #expect(presentation.deletion.pendingProfileID == first)
       #expect(presentation.focusTarget == .cancelDelete(first))
@@ -27,6 +31,10 @@ import Testing
       presentation.trayDidOpen(
         sessionGeneration: 2,
         viewport: CGSize(width: 368, height: 560)
+      )
+      #expect(
+        presentation.scrollResetRequest
+          == TrayScrollResetRequest(sessionGeneration: 2, anchor: .top)
       )
       #expect(presentation.deletion.pendingProfileID == first)
       #expect(presentation.focusTarget == .cancelDelete(first))
@@ -71,6 +79,23 @@ import Testing
       }
       #expect(presentation.capturePhase == .failure("Synthetic capture failure"))
       #expect(!presentation.hasCaptureTask)
+    }
+
+    @Test("twenty open generations each request a fresh top scroll")
+    func everyReopenRequestsTopScroll() {
+      let model = UIAuditFixtures.makeModel(configuration: .disabled)
+      let presentation = makePresentation(model: model)
+      let viewport = CGSize(width: 368, height: 560)
+
+      for generation in UInt64(1)...20 {
+        presentation.trayDidOpen(sessionGeneration: generation, viewport: viewport)
+        #expect(
+          presentation.scrollResetRequest
+            == TrayScrollResetRequest(sessionGeneration: generation, anchor: .top)
+        )
+        #expect(presentation.viewport == viewport)
+        presentation.trayDidClose(sessionGeneration: generation)
+      }
     }
 
     @Test("delete confirmation focuses cancel, then delete, then the next profile")

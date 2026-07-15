@@ -197,7 +197,8 @@ public struct CoreGraphicsDisplaySystemAPI: DisplaySystemAPI {
       rotationDegrees: Int(CGDisplayRotation(displayID).rounded()),
       isActive: CGDisplayIsActive(displayID) != 0,
       currentMode: CGDisplayCopyDisplayMode(displayID).map(makeDisplayMode),
-      supportedModes: allModes(for: displayID)
+      supportedModes: allModes(for: displayID),
+      currentColorSpaceName: CGDisplayCopyColorSpace(displayID).name as String?
     )
   }
 

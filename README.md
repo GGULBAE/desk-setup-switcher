@@ -1,6 +1,6 @@
 # Desk Setup Switcher
 
-> **Pre-release 0.1.0 implementation candidate:** Tray Surface Architecture v2 replaces production `MenuBarExtra(.window)` with one app-owned `NSStatusItem`, `NSPopover`, and `NSHostingController`. The open session has fixed geometry with one internal scroll region, while typed action routing keeps inline work open and closes only after a persistent destination is visible and key. The non-live `make verify` gate passes 326 default cases (130 XCTest and 196 Swift Testing cases, six opt-in skips), universal builds, Analyze, and mounted package verification. Twelve English/Korean offscreen PNG/metadata pairs cover the new SwiftUI content without claiming live popover chrome, VoiceOver, TCC, or hardware behavior.
+> **Pre-release 0.1.0 implementation candidate:** Tray Surface Architecture v2 now resets its AppKit viewport and SwiftUI scroll origin on every open, keeps Settings and workflow windows alive across red-close cycles, and derives the status-item symbol/name only from a fresh enabled-profile match. The profile editor is intentionally reduced to Display, Audio, and Network; unsupported color-mode and service-specific IPv4 writes remain visibly disabled instead of claiming unsafe support. The refinement passes 338 default non-live cases, universal builds, Analyze, and mounted-package verification.
 
 Desk Setup Switcher is a free and open-source macOS menu-bar app for manually saving and applying display, audio, network, mouse, and keyboard profiles. It is local-first: no account, server, cloud sync, telemetry, analytics, or automatic profile switching.
 
@@ -9,7 +9,9 @@ Desk Setup Switcher is a free and open-source macOS menu-bar app for manually sa
 - A native `LSUIElement` app whose tray is owned by `NSStatusItem` + `NSPopover` + `NSHostingController`, with persistent Settings/workflow windows, profile capture, editing, ordering, import/export, readiness, normal/force previews, itemized results, and a 15-second display confirmation flow.
 - App-lifetime profile drafts with save/discard/cancel protection across selection, replacement, and ordinary quit paths. `⌘S` saves a valid dirty draft, fixed save/revert controls remain outside the editor scroll area, and current-settings capture updates only the reviewable draft until the user saves.
 - The popover header provides compact Capture plus icon-only, accessibility-labelled Settings and Quit actions. Geometry is chosen once per open session for empty, single-profile, compact, or capped-overflow content and does not resize when banners, deletion confirmation, async results, or text size change. Each profile keeps one state-aware primary action, direct Edit, and inline destructive confirmation; overflow uses the single internal scroll view. `Apply…` and `Apply Available…` hand off to persistent workflows before the tray closes.
+- Every tray open restores a zero-origin hosting viewport and requests the single internal scroll view's top anchor. Settings, Profile Edit, permission, preview, confirmation, and result destinations survive red-close through app-owned controllers; the tray closes only after the destination is visible and key. The status item shows applying state or a fresh matching enabled profile's symbol and shortened name, with a neutral fallback when no match exists. Quit uses an `xmark` action with explicit English/Korean tooltip and accessibility text.
 - Settings uses an app-owned resizable macOS window with a 680×480 content minimum. The profile workspace switches at 760 points without replacing the editor identity, preserving the selected profile, unsaved draft, disclosure state, and keyboard focus while resizing.
+- Profile metadata places alias, icon, and enabled state in one adaptive row and no longer edits the description. The default editor exposes only Display output mode/primary display/per-display resolution and refresh/read-only Core Graphics color-space evidence, Audio default input/output and both volume controls, and Ethernet/Wi-Fi service IPv4 state plus macOS-reported saved Wi-Fi choices. Hidden description, conditions, Input, and legacy setting leaves still round-trip but are normalized out of new apply payloads.
 - Apply never silently uses an older saved profile when an editor draft is dirty. The save/discard/cancel decision identifies the draft and target profile, and preparation is repeated against the latest stored profile and read-only system state before execution.
 - Capture checks Location authorization before reading a Wi-Fi name. An undetermined state gets a privacy explanation followed by the macOS request; a denied/restricted state offers macOS System Settings or an explicit Wi-Fi-free capture. Permission, dirty-draft, preview, safety-confirmation, and result-detail work is app-lifetime state presented in persistent windows. The tray router waits for the destination to become visible and key before closing; failure or cancellation leaves the tray reachable with an error. User-facing results retain applicable settings and actionable permission gaps only.
 - Display rotation/active state and administrative IPv4, DNS, and proxy values are retained as snapshot-only values but normalized out of application for new, stored, and imported profiles. Legacy/imported conditions remain round-trip compatible but are dormant and non-blocking for current manual readiness and apply; condition editing and automatic switching are absent.
@@ -30,9 +32,12 @@ Evidence is intentionally split by confidence level:
 
 | Evidence | Current result |
 | --- | --- |
+| Current tray/settings refinement | `make verify` passed on 2026-07-15 with localization/policy lint, 338 default cases (132 XCTest + 206 Swift Testing, six opt-in skips), Swift Debug/Release, universal Xcode Debug/Release, Analyze, DMG/checksum, mounted metadata/resources/architectures, and ad-hoc signature classification. Focused coverage includes 20 tray reopen cycles, 10-cycle Settings/Profile Edit red-close recovery, input-volume rollback, and network identity ambiguity |
+| Current refinement UI evidence | [Tray and Settings refinement audit](docs/TRAY-SETTINGS-REFINEMENT-AUDIT-2026-07-15.md) records 12 refreshed tray PNG/AX pairs plus five profile-editor pairs for Display, Korean Audio, dark-mode Network, 680×480 minimum width, and accessibility large text. They prove detached content only; installed status-item/popover/window ordering, native localization context, keyboard traversal, VoiceOver, and hardware behavior remain manual |
+| Current refinement local package | `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg` verified `x86_64 arm64`, English/Korean resources, `/Applications` link, mounted layout, and ad-hoc/no-Developer-ID status. SHA-256: `539c203607782302799d68acdda2f64666f0ace5897fa325a79e1dfdcfc98f78`. It was not installed or launched |
 | Current Tray Surface v2 follow-up | `make verify` passed on 2026-07-15 with lint/localization policy, 326 default cases (130 XCTest + 196 Swift Testing, six opt-in skips), Swift Debug/Release, universal Xcode Debug/Release, Analyze, DMG/checksum, mounted metadata/resources/architectures, and ad-hoc signature classification. No live flag was set |
 | UI evidence | [Tray Surface v2 audit](docs/TRAY-SURFACE-AUDIT-2026-07-15.md) records 12 English/Korean detached-host PNGs and 12 read-only metadata files covering empty/1/3/10 profiles, deletion, permission, success/failure, result, dark, large-text, and high-contrast fixtures. It proves contained SwiftUI layout only; actual status-item click behavior, popover arrow/material/ghost-frame behavior, first-responder timing, VoiceOver, and TCC remain manual |
-| Current local universal package | `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg` verified `x86_64 arm64`, English/Korean resources, `/Applications` link, mounted layout, and ad-hoc/no-Developer-ID signature status. SHA-256: `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127` |
+| Tray Surface v2 baseline package | The preceding universal package verified `x86_64 arm64`, English/Korean resources, mounted layout, and ad-hoc/no-Developer-ID signature status at SHA-256 `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`; it is retained as historical evidence rather than the current artifact |
 | Current installed app | Tray Surface v2 was not installed or launched during this task. Earlier installed interactions exercised the superseded `MenuBarExtra` tree and remain historical evidence only for the Settings window and storage rollback they directly covered |
 | Historical pre-layout-fix UI-audit package | The preceding UI-audit DMG passed the same local gate with SHA-256 `fa42df665ca453165dd041fe5112a8f1a6d2314bd31512ef9371b12289132122`; its installed Korean Settings rendering exposed the Audio-row compression corrected in the current package |
 | Historical apply-reliability package | The preceding 290-case apply-reliability DMG passed the same local build/mount gate with SHA-256 `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`; it predates the UI-audit follow-up |
@@ -61,7 +66,7 @@ See the [support matrix](docs/SUPPORT-MATRIX.md) and [completion ledger](docs/CO
 - Menu-bar-only accessory app with an `SMAppService` login-item preference
 - Public macOS APIs for display, audio, and network operations
 - Experimental labels for common input preferences backed by undocumented global preference keys
-- Display rotation and activation mutation, administrative IPv4/DNS/proxy/service-order mutation, vendor configuration, UI scripting, and automatic switching are unsupported. Their readable values may be retained as snapshot-only evidence but are not application options
+- Display rotation/activation and color-mode mutation, administrative service-specific IPv4/DNS/proxy/service-order mutation, vendor configuration, UI scripting, and automatic switching are unsupported. Color mode and Ethernet/Wi-Fi IPv4 use typed capability UI with an explicit disabled reason; readable legacy values may be retained but are not falsely applied
 - No-Developer-ID DMG baseline: the app has a free ad-hoc integrity signature, but no trusted publisher identity and no notarization
 - MIT licensed
 
@@ -108,7 +113,7 @@ The current Tray Surface v2 DMG passed build, checksum, mount, resource, archite
 
 ## Next task
 
-The next task is **tray detailed UI refinement**: tune spacing, wrapping, focus rings, hover/disabled/destructive states, and bilingual accessibility behavior on the new fixed-viewport surface without changing its lifecycle or action-routing contracts.
+The next task is an explicitly authorized **installed interaction audit** of this refinement: status-item label changes, 20 visible tray reopen cycles, Settings/Profile Edit red-close recovery and frontmost ordering, keyboard/VoiceOver behavior, and bilingual native rendering. It must use a documented preflight and rollback boundary; hardware setting mutation remains a separate opt-in procedure.
 
 ## Project tracking
 
@@ -116,6 +121,7 @@ The next task is **tray detailed UI refinement**: tune spacing, wrapping, focus 
 - [Locally verified apply reliability and editor UX follow-up](docs/APPLY-RELIABILITY-UX-GOAL.md)
 - [Current-source manual UI audit](docs/MANUAL-UI-AUDIT-2026-07-14.md)
 - [Tray Surface v2 audit](docs/TRAY-SURFACE-AUDIT-2026-07-15.md)
+- [Tray and Settings refinement audit](docs/TRAY-SETTINGS-REFINEMENT-AUDIT-2026-07-15.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Completion criteria](docs/COMPLETION-CRITERIA.md)
 - [Support matrix](docs/SUPPORT-MATRIX.md)

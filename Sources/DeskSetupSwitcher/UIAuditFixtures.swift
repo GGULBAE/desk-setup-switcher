@@ -23,6 +23,9 @@ enum UIAuditVariant: String {
   case trayApplyResult = "tray-apply-result"
   case editor
   case editorPolish = "editor-polish"
+  case editorDisplay = "editor-display"
+  case editorAudio = "editor-audio"
+  case editorNetwork = "editor-network"
   case validation
   case permissions
   case diagnostics
@@ -32,7 +35,8 @@ enum UIAuditVariant: String {
     case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
       .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult:
       true
-    case .editor, .editorPolish, .validation, .permissions, .diagnostics:
+    case .editor, .editorPolish, .editorDisplay, .editorAudio, .editorNetwork,
+      .validation, .permissions, .diagnostics:
       false
     }
   }
@@ -185,7 +189,8 @@ extension View {
         }
       case .overview, .menuPolish, .trayDelete, .trayCapturePermission,
         .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
-        .editor, .editorPolish, .validation, .permissions, .diagnostics:
+        .editor, .editorPolish, .editorDisplay, .editorAudio, .editorNetwork,
+        .validation, .permissions, .diagnostics:
         profiles = [ready, partial, disabled]
       }
       let snapshot = syntheticSnapshot(settings: ready.settings)
@@ -225,7 +230,7 @@ extension View {
     private static func readyProfile() -> DeskProfile {
       DeskProfile(
         id: readyProfileID,
-        name: "Focus Workspace — Display, Audio, Network & Input",
+        name: "Focus Workspace — Display, Audio & Network",
         profileDescription:
           "A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata.",
         symbolName: "display.2",
@@ -307,7 +312,7 @@ extension View {
               id: builtInDisplayID,
               identity: builtInIdentity,
               isPrimary: .init(value: true),
-              origin: .init(value: .init(x: 0, y: 0)),
+              origin: .init(isIncluded: false, value: .init(x: 0, y: 0)),
               mirroring: .init(value: .extended),
               mode: .init(value: builtInMode),
               rotationDegrees: .init(isIncluded: false, value: 0),
@@ -317,8 +322,8 @@ extension View {
               id: externalDisplayID,
               identity: externalIdentity,
               isPrimary: .init(value: false),
-              origin: .init(value: .init(x: 1728, y: 0)),
-              mirroring: .init(isIncluded: false, value: .extended),
+              origin: .init(isIncluded: false, value: .init(x: 1728, y: 0)),
+              mirroring: .init(value: .extended),
               mode: .init(value: externalMode),
               rotationDegrees: .init(isIncluded: false, value: 0),
               isActive: .init(isIncluded: false, value: true)
@@ -329,15 +334,34 @@ extension View {
           value: .init(
             defaultInputUID: .init(value: "synthetic-input"),
             defaultOutputUID: .init(value: "synthetic-output"),
-            systemOutputUID: .init(value: "synthetic-output"),
+            systemOutputUID: .init(isIncluded: false, value: "synthetic-output"),
+            inputVolume: .init(value: 0.44),
             outputVolume: .init(value: 0.72),
-            outputMuted: .init(value: false)
+            outputMuted: .init(isIncluded: false, value: false)
           )
         ),
         network: .init(
           value: .init(
             wifiPower: .init(value: true),
             wifiSSID: .init(value: "Synthetic Studio"),
+            serviceIPv4: [
+              .init(
+                identity: .init(
+                  kind: .ethernet,
+                  serviceName: "Synthetic Ethernet",
+                  interfaceType: "Ethernet"
+                ),
+                configuration: .init(isIncluded: false, value: .dhcp)
+              ),
+              .init(
+                identity: .init(
+                  kind: .wifi,
+                  serviceName: "Synthetic Wi-Fi",
+                  interfaceType: "IEEE80211"
+                ),
+                configuration: .init(isIncluded: false, value: .dhcp)
+              ),
+            ],
             ipv4: .init(isIncluded: false, value: .dhcp),
             dnsServers: .init(isIncluded: false, value: ["192.0.2.53"]),
             webProxy: .init(isIncluded: false, value: nil),
@@ -373,7 +397,10 @@ extension View {
         capturedAt: capturedAt,
         payload: .display(displaySettings),
         items: [],
-        displayModeCatalog: displayCatalog
+        displayModeCatalog: displayCatalog,
+        displayColorEvidence: displaySettings.displays.map {
+          DisplayColorEvidenceEntry(identity: $0.identity, colorSpaceName: "Synthetic sRGB")
+        }
       )
       let audioItems = [
         SnapshotItem(
@@ -388,12 +415,31 @@ extension View {
           state: .detected,
           detail: "Output"
         ),
+        SnapshotItem(
+          key: "inputVolume",
+          label: "Input volume",
+          state: .storable,
+          detail: "Readable and writable"
+        ),
+        SnapshotItem(
+          key: "outputVolume",
+          label: "Output volume",
+          state: .storable,
+          detail: "Readable and writable"
+        ),
       ]
       let audioSnapshot = AdapterSnapshot(
         group: .audio,
         capturedAt: capturedAt,
         payload: .audio(audioSettings),
         items: audioItems
+      )
+      let networkSnapshot = AdapterSnapshot(
+        group: .network,
+        capturedAt: capturedAt,
+        payload: .network(settings.network.value),
+        items: [],
+        savedWiFiNetworkNames: ["Synthetic Saved Wi-Fi"]
       )
       return SystemSnapshotResult(
         capturedAt: capturedAt,
@@ -410,6 +456,13 @@ extension View {
             capability: .init(group: .audio, state: .supported, reason: ""),
             snapshot: audioSnapshot,
             items: audioItems,
+            failures: []
+          ),
+          SystemSnapshotGroupResult(
+            group: .network,
+            capability: .init(group: .network, state: .supported, reason: ""),
+            snapshot: networkSnapshot,
+            items: [],
             failures: []
           ),
         ],

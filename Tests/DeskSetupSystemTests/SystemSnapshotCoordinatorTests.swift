@@ -157,6 +157,39 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     XCTAssertFalse(result.settings.input.isIncluded)
   }
 
+  func testReadOnlyEditorCatalogsRemainSessionScoped() async throws {
+    let identity = DisplayIdentity(uuid: UUID())
+    let display = MockSystemSettingsAdapter(
+      group: .display,
+      snapshot: AdapterSnapshot(
+        group: .display,
+        capturedAt: Date(timeIntervalSince1970: 100),
+        payload: .display(.init()),
+        items: [],
+        displayColorEvidence: [
+          DisplayColorEvidenceEntry(identity: identity, colorSpaceName: "Synthetic sRGB")
+        ]
+      )
+    )
+    let network = MockSystemSettingsAdapter(
+      group: .network,
+      snapshot: AdapterSnapshot(
+        group: .network,
+        capturedAt: Date(timeIntervalSince1970: 100),
+        payload: .network(.init()),
+        items: [],
+        savedWiFiNetworkNames: ["Synthetic Saved Wi-Fi"]
+      )
+    )
+
+    let result = await SystemSnapshotCoordinator(adapters: [network, display]).capture()
+
+    XCTAssertEqual(result.displayColorEvidence.first?.identity, identity)
+    XCTAssertEqual(result.displayColorEvidence.first?.colorSpaceName, "Synthetic sRGB")
+    XCTAssertEqual(result.savedWiFiNetworkNames, ["Synthetic Saved Wi-Fi"])
+    XCTAssertTrue(result.profileSettings.network.value.wifiSSID.value == nil)
+  }
+
   func testCoordinatorNeverCallsMutationOrPlanningMethods() async {
     let adapter = makeAdapter(
       group: .input,

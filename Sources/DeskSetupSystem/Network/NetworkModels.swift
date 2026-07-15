@@ -108,7 +108,10 @@ public enum SavedWiFiAssociationUnavailableReason: Equatable, Sendable {
 
 public struct NetworkServiceConfigurationSnapshot: Codable, Hashable, Sendable {
   public var serviceID: String
+  public var serviceName: String?
   public var bsdName: String?
+  public var interfaceType: String?
+  public var kind: NetworkServiceKind?
   public var enabled: Bool
   public var ipv4: IPv4Configuration?
   public var dnsServers: [String]
@@ -117,7 +120,10 @@ public struct NetworkServiceConfigurationSnapshot: Codable, Hashable, Sendable {
 
   public init(
     serviceID: String,
+    serviceName: String? = nil,
     bsdName: String? = nil,
+    interfaceType: String? = nil,
+    kind: NetworkServiceKind? = nil,
     enabled: Bool,
     ipv4: IPv4Configuration? = nil,
     dnsServers: [String] = [],
@@ -125,12 +131,31 @@ public struct NetworkServiceConfigurationSnapshot: Codable, Hashable, Sendable {
     secureWebProxy: ProxyConfiguration? = nil
   ) {
     self.serviceID = serviceID
+    self.serviceName = serviceName
     self.bsdName = bsdName
+    self.interfaceType = interfaceType
+    self.kind = kind
     self.enabled = enabled
     self.ipv4 = ipv4
     self.dnsServers = dnsServers
     self.webProxy = webProxy
     self.secureWebProxy = secureWebProxy
+  }
+
+  public var portableIdentity: NetworkServiceIdentity? {
+    guard let kind,
+      let serviceName = serviceName?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !serviceName.isEmpty,
+      let interfaceType = interfaceType?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !interfaceType.isEmpty
+    else {
+      return nil
+    }
+    return NetworkServiceIdentity(
+      kind: kind,
+      serviceName: serviceName,
+      interfaceType: interfaceType
+    )
   }
 }
 
@@ -143,6 +168,7 @@ public struct NetworkSystemSnapshot: Codable, Hashable, Sendable {
   public var ipv6Gateway: String?
   public var dnsServers: [String]
   public var services: [NetworkServiceConfigurationSnapshot]
+  public var savedWiFiNetworkNames: [String]
 
   public init(
     wifi: WiFiInterfaceSnapshot? = nil,
@@ -152,7 +178,8 @@ public struct NetworkSystemSnapshot: Codable, Hashable, Sendable {
     ipv4Gateway: String? = nil,
     ipv6Gateway: String? = nil,
     dnsServers: [String] = [],
-    services: [NetworkServiceConfigurationSnapshot] = []
+    services: [NetworkServiceConfigurationSnapshot] = [],
+    savedWiFiNetworkNames: [String] = []
   ) {
     self.wifi = wifi
     self.interfaces = interfaces
@@ -162,6 +189,7 @@ public struct NetworkSystemSnapshot: Codable, Hashable, Sendable {
     self.ipv6Gateway = ipv6Gateway
     self.dnsServers = dnsServers
     self.services = services
+    self.savedWiFiNetworkNames = savedWiFiNetworkNames
   }
 
   public var primaryService: NetworkServiceConfigurationSnapshot? {

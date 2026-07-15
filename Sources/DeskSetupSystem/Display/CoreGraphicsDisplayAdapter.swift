@@ -109,6 +109,11 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
       items: items,
       displayModeCatalog: displays.map {
         DisplayModeCatalogEntry(identity: $0.identity, modes: $0.supportedModes)
+      },
+      displayColorEvidence: displays.compactMap { display in
+        display.currentColorSpaceName.map {
+          DisplayColorEvidenceEntry(identity: display.identity, colorSpaceName: $0)
+        }
       }
     )
   }

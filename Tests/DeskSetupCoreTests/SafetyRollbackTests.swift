@@ -7,7 +7,7 @@ import Testing
 struct SafetyRollbackTests {
   @Test("successful low-risk work returns no safety token")
   func lowRiskWorkHasNoToken() async throws {
-    let low = PlannedOperation(group: .input, key: "low", summary: "Low")
+    let low = PlannedOperation(group: .audio, key: "low", summary: "Low")
     let (engine, _) = try makeSafetyEngine(operations: [low])
 
     let result = await engine.apply(profile: safetyProfile(), mode: .normal)
@@ -67,7 +67,7 @@ struct SafetyRollbackTests {
 
   @Test("revert rolls back only completed high-risk operations in reverse order")
   func revertUsesReverseHighRiskOrder() async throws {
-    let low = PlannedOperation(group: .input, key: "low", summary: "Low")
+    let low = PlannedOperation(group: .audio, key: "low", summary: "Low")
     let firstHigh = highRiskOperation(key: "first-high")
     let secondHigh = highRiskOperation(key: "second-high")
     let (engine, adapter) = try makeSafetyEngine(
@@ -158,8 +158,8 @@ private func makeSafetyEngine(
   maximumPendingSafetyRollbacks: Int = 1
 ) throws -> (ApplyEngine, MockSystemSettingsAdapter) {
   let adapter = MockSystemSettingsAdapter(
-    group: .input,
-    plan: AdapterPlan(group: .input, operations: operations),
+    group: .audio,
+    plan: AdapterPlan(group: .audio, operations: operations),
     confirmResults: confirmResults,
     rollbackResults: rollbackResults
   )
@@ -172,7 +172,7 @@ private func makeSafetyEngine(
 
 private func highRiskOperation(key: String) -> PlannedOperation {
   PlannedOperation(
-    group: .input,
+    group: .audio,
     key: key,
     summary: key,
     risk: .high,
@@ -183,7 +183,7 @@ private func highRiskOperation(key: String) -> PlannedOperation {
 
 private func safetyProfile() -> DeskProfile {
   var settings = ProfileSettings()
-  settings.input.isIncluded = true
-  settings.input.value.pointerSpeed = .init(isIncluded: true, value: 1)
+  settings.audio.isIncluded = true
+  settings.audio.value.defaultOutputUID = .init(isIncluded: true, value: "test-output")
   return DeskProfile(name: "Safety profile", settings: settings)
 }

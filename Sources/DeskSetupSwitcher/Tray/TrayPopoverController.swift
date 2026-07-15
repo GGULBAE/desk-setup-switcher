@@ -1,10 +1,108 @@
 import AppKit
 import SwiftUI
 
+#if canImport(DeskSetupCore)
+  import DeskSetupCore
+#endif
+
+enum TrayStatusItemState: Equatable, Sendable {
+  case noMatch
+  case matching(DeskProfile)
+  case applying(DeskProfile)
+}
+
+struct TrayStatusItemSnapshot: Equatable, Sendable {
+  var profiles: [DeskProfile]
+  var selectedProfileID: UUID?
+  var visibleReadinessByProfile: [UUID: ProfileReadiness]
+  var operationCountByProfile: [UUID: Int]
+  var hasFreshReadiness: Bool
+}
+
+struct TrayStatusItemPresentation: Equatable, Sendable {
+  static let fallbackSymbolName = "square.stack.3d.up"
+
+  var state: TrayStatusItemState
+  var symbolName: String
+  var title: String
+  var toolTip: String
+  var accessibilityValue: String
+}
+
+struct TrayStatusItemPresentationBuilder: Sendable {
+  static let maximumDisplayedNameLength = 18
+
+  func presentation(for snapshot: TrayStatusItemSnapshot) -> TrayStatusItemPresentation {
+    if let applying = snapshot.profiles.first(where: {
+      $0.isEnabled && snapshot.visibleReadinessByProfile[$0.id] == .applying
+    }) {
+      let displayName = compactName(applying.name)
+      let status = appLocalized("Applying \(applying.name)…")
+      return TrayStatusItemPresentation(
+        state: .applying(applying),
+        symbolName: resolvedSymbolName(applying.symbolName),
+        title: appLocalized("\(displayName) · Applying…"),
+        toolTip: status,
+        accessibilityValue: status
+      )
+    }
+
+    let matchingProfiles: [DeskProfile]
+    if snapshot.hasFreshReadiness {
+      matchingProfiles = snapshot.profiles.filter { profile in
+        profile.isEnabled
+          && snapshot.visibleReadinessByProfile[profile.id] == .ready
+          && snapshot.operationCountByProfile[profile.id] == 0
+          && snapshot.operationCountByProfile[profile.id] != nil
+          && SettingGroup.allCases.contains { profile.settings.payload(for: $0) != nil }
+      }
+    } else {
+      matchingProfiles = []
+    }
+    let matching =
+      matchingProfiles.first(where: { $0.id == snapshot.selectedProfileID })
+      ?? matchingProfiles.first
+    if let matching {
+      let status = appLocalized("Current Mac matches \(matching.name).")
+      return TrayStatusItemPresentation(
+        state: .matching(matching),
+        symbolName: resolvedSymbolName(matching.symbolName),
+        title: compactName(matching.name),
+        toolTip: status,
+        accessibilityValue: status
+      )
+    }
+
+    let status = appLocalized("No current profile match")
+    return TrayStatusItemPresentation(
+      state: .noMatch,
+      symbolName: TrayStatusItemPresentation.fallbackSymbolName,
+      title: "",
+      toolTip: appLocalized("Desk Setup Switcher — no enabled profile is confirmed to match"),
+      accessibilityValue: status
+    )
+  }
+
+  private func compactName(_ value: String) -> String {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    let safe = trimmed.isEmpty ? appLocalized("Profile") : trimmed
+    guard safe.count > Self.maximumDisplayedNameLength else { return safe }
+    return String(safe.prefix(Self.maximumDisplayedNameLength - 1)) + "…"
+  }
+
+  private func resolvedSymbolName(_ value: String) -> String {
+    let resolved = appResolvedProfileSymbolName(value)
+    return resolved == "questionmark.square.dashed"
+      ? TrayStatusItemPresentation.fallbackSymbolName
+      : resolved
+  }
+}
+
 @MainActor
 protocol TrayStatusItemSurface: AnyObject {
   var anchorView: NSView? { get }
   func configure(target: AnyObject, action: Selector)
+  func update(_ presentation: TrayStatusItemPresentation)
 }
 
 @MainActor
@@ -66,13 +164,8 @@ private final class AppKitTrayStatusItemSurface: TrayStatusItemSurface {
   let statusItem: NSStatusItem
 
   init() {
-    statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     if let button = statusItem.button {
-      let image = NSImage(systemSymbolName: "switch.2", accessibilityDescription: nil)
-      image?.isTemplate = true
-      button.image = image
-      button.imagePosition = .imageOnly
-      button.toolTip = appLocalized("Desk Setup Switcher")
       button.setAccessibilityLabel(appLocalized("Desk Setup Switcher"))
       button.setAccessibilityHelp(
         appLocalized("Opens or closes the Desk Setup Switcher tray."))
@@ -87,6 +180,29 @@ private final class AppKitTrayStatusItemSurface: TrayStatusItemSurface {
     statusItem.button?.target = target
     statusItem.button?.action = action
     statusItem.button?.sendAction(on: [.leftMouseUp])
+  }
+
+  func update(_ presentation: TrayStatusItemPresentation) {
+    guard let button = statusItem.button else { return }
+    let requested = NSImage(
+      systemSymbolName: presentation.symbolName,
+      accessibilityDescription: nil
+    )
+    let fallback = NSImage(
+      systemSymbolName: TrayStatusItemPresentation.fallbackSymbolName,
+      accessibilityDescription: nil
+    )
+    let image = requested ?? fallback
+    image?.isTemplate = true
+    button.image = image
+    button.title = presentation.title
+    button.imagePosition = presentation.title.isEmpty ? .imageOnly : .imageLeading
+    button.toolTip = presentation.toolTip
+    button.setAccessibilityValue(presentation.accessibilityValue)
+    statusItem.length =
+      presentation.title.isEmpty
+      ? NSStatusItem.squareLength
+      : min(172, max(48, button.fittingSize.width + 8))
   }
 }
 
@@ -226,6 +342,7 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     popover = factory.makePopover()
     dismissalMonitor = factory.makeDismissalMonitor()
     hostingController = NSHostingController(rootView: AnyView(rootView))
+    hostingController.sizingOptions = []
     sessionGeometry = TrayOpenSessionGeometry(policy: geometry)
     super.init()
 
@@ -235,6 +352,10 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
       self?.finishClosingCurrentSession()
     }
     statusItem.configure(target: self, action: #selector(togglePopover(_:)))
+    statusItem.update(sessionState.statusItemPresentation)
+    sessionState.setStatusItemPresentationHandler { [weak self] presentation in
+      self?.statusItem.update(presentation)
+    }
   }
 
   var isTrayVisible: Bool {
@@ -247,6 +368,14 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
 
   var hostingViewBounds: CGRect {
     hostingController.view.bounds
+  }
+
+  var hostingViewFrame: CGRect {
+    hostingController.view.frame
+  }
+
+  var hostingViewSafeAreaInsets: NSEdgeInsets {
+    hostingController.view.safeAreaInsets
   }
 
   var contentViewBounds: CGRect {
@@ -280,14 +409,14 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     )
     activeSessionGeneration = generation
 
-    popover.contentSize = viewport
-    hostingController.view.frame = NSRect(origin: .zero, size: viewport)
-    hostingController.view.autoresizingMask = [.width, .height]
-    hostingController.view.needsLayout = true
-    hostingController.view.layoutSubtreeIfNeeded()
-
+    synchronizeViewport(viewport)
     sessionState.trayDidOpen(sessionGeneration: generation, viewport: viewport)
     popover.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .minY)
+    // NSPopover attaches the hosting view to its private content window during
+    // show. Reassert the explicit viewport after that attachment so an origin,
+    // fitting-size, or safe-area value retained by AppKit from the previous
+    // generation cannot shift the SwiftUI root on reopen.
+    synchronizeViewport(viewport)
     dismissalMonitor.start(
       anchorView: anchorView,
       contentWindow: { [weak popover] in popover?.contentWindow },
@@ -312,5 +441,19 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     activeSessionGeneration = nil
     sessionGeometry.close()
     sessionState.trayDidClose(sessionGeneration: generation)
+  }
+
+  private func synchronizeViewport(_ viewport: CGSize) {
+    if popover.contentSize != viewport {
+      popover.contentSize = viewport
+    }
+    let bounds = NSRect(origin: .zero, size: viewport)
+    hostingController.view.frame = bounds
+    hostingController.view.bounds = bounds
+    hostingController.view.autoresizingMask = [.width, .height]
+    hostingController.view.needsLayout = true
+    hostingController.view.layoutSubtreeIfNeeded()
+    popover.contentWindow?.contentView?.needsLayout = true
+    popover.contentWindow?.contentView?.layoutSubtreeIfNeeded()
   }
 }

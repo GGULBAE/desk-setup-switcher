@@ -82,8 +82,25 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
       ipv4Gateway: configuration.ipv4Gateway,
       ipv6Gateway: configuration.ipv6Gateway,
       dnsServers: configuration.dnsServers,
-      services: configuration.services
+      services: configuration.services,
+      savedWiFiNetworkNames: savedWiFiNetworkNames()
     )
+  }
+
+  private func savedWiFiNetworkNames() -> [String] {
+    guard
+      let profiles = CWWiFiClient.shared().interface()?.configuration()?.networkProfiles.array
+        as? [CWNetworkProfile]
+    else { return [] }
+    let names = profiles.compactMap { profile -> String? in
+      guard let ssidData = profile.ssidData,
+        let name = String(data: ssidData, encoding: .utf8),
+        let encoded = name.data(using: .utf8),
+        (1...32).contains(encoded.count)
+      else { return nil }
+      return name
+    }
+    return Array(Set(names)).sorted()
   }
 
   public func setWiFiPower(_ enabled: Bool) async throws {
@@ -336,7 +353,12 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
       return nil
     }
     let interface = SCNetworkServiceGetInterface(service)
+    let serviceName = SCNetworkServiceGetName(service) as String?
     let bsdName = interface.flatMap { SCNetworkInterfaceGetBSDName($0) as String? }
+    let interfaceType = interface.flatMap {
+      SCNetworkInterfaceGetInterfaceType($0) as String?
+    }
+    let kind = interface.flatMap(networkServiceKind)
 
     let ipv4 = protocolConfiguration(service, type: kSCNetworkProtocolTypeIPv4)
     let dns = protocolConfiguration(service, type: kSCNetworkProtocolTypeDNS)
@@ -344,7 +366,10 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
 
     return NetworkServiceConfigurationSnapshot(
       serviceID: serviceID,
+      serviceName: serviceName,
       bsdName: bsdName,
+      interfaceType: interfaceType,
+      kind: kind,
       enabled: SCNetworkServiceGetEnabled(service),
       ipv4: parseIPv4(ipv4),
       dnsServers: stringArray(dns, key: kSCPropNetDNSServerAddresses as String),
@@ -361,6 +386,21 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
         portKey: kSCPropNetProxiesHTTPSPort as String
       )
     )
+  }
+
+  private func networkServiceKind(
+    _ interface: SCNetworkInterface
+  ) -> NetworkServiceKind? {
+    guard let type = SCNetworkInterfaceGetInterfaceType(interface) else {
+      return nil
+    }
+    if CFEqual(type, kSCNetworkInterfaceTypeIEEE80211) {
+      return .wifi
+    }
+    if CFEqual(type, kSCNetworkInterfaceTypeEthernet) {
+      return .ethernet
+    }
+    return nil
   }
 
   private func protocolConfiguration(

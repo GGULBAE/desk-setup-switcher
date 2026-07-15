@@ -44,6 +44,15 @@ enum TrayFocusTarget: Hashable, Sendable {
   case emptyState
 }
 
+enum TrayScrollAnchor: Hashable, Sendable {
+  case top
+}
+
+struct TrayScrollResetRequest: Equatable, Sendable {
+  let sessionGeneration: UInt64
+  let anchor: TrayScrollAnchor
+}
+
 enum TrayCapturePhase: Equatable, Sendable {
   case idle
   case running
@@ -77,8 +86,29 @@ struct TrayApplyDraftPrompt: Identifiable, Equatable, Sendable {
 @MainActor
 protocol TraySessionStateUpdating: AnyObject {
   var geometryContext: TrayGeometryContext { get }
+  var statusItemPresentation: TrayStatusItemPresentation { get }
+  func setStatusItemPresentationHandler(
+    _ handler: @escaping @MainActor (TrayStatusItemPresentation) -> Void)
   func trayDidOpen(sessionGeneration: UInt64, viewport: CGSize)
   func trayDidClose(sessionGeneration: UInt64)
+}
+
+extension TraySessionStateUpdating {
+  var statusItemPresentation: TrayStatusItemPresentation {
+    TrayStatusItemPresentationBuilder().presentation(
+      for: TrayStatusItemSnapshot(
+        profiles: [],
+        selectedProfileID: nil,
+        visibleReadinessByProfile: [:],
+        operationCountByProfile: [:],
+        hasFreshReadiness: false
+      )
+    )
+  }
+
+  func setStatusItemPresentationHandler(
+    _ handler: @escaping @MainActor (TrayStatusItemPresentation) -> Void
+  ) {}
 }
 
 /// App-lifetime surface state. Profiles and domain results remain authoritative
@@ -95,6 +125,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   @Published private(set) var capturePhase: TrayCapturePhase = .idle
   @Published private(set) var handoffError: String?
   @Published private(set) var activeSessionGeneration: UInt64?
+  @Published private(set) var scrollResetRequest: TrayScrollResetRequest?
   @Published private(set) var viewport: CGSize = .zero
   @Published private(set) var isTrayVisible = false
   @Published private(set) var workflowDestination: TrayDestination?
@@ -112,6 +143,8 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   private var workflowTask: Task<Void, Never>?
   private var applyDraftRetryAfterError: TrayApplyDraftPrompt?
   private var surfaceDismissRequest: (@MainActor (UInt64) -> Void)?
+  private var statusItemPresentationHandler: (@MainActor (TrayStatusItemPresentation) -> Void)?
+  private var modelStatusObservation: AnyCancellable?
 
   init(
     model: ApplicationModel,
@@ -131,6 +164,11 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
         }
         return await model.createProfileFromCurrentSettings()
       }
+    modelStatusObservation = model.objectWillChange.sink { [weak self] in
+      DispatchQueue.main.async { [weak self] in
+        self?.publishStatusItemPresentation()
+      }
+    }
   }
 
   var geometryContext: TrayGeometryContext {
@@ -144,6 +182,21 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
 
   var hasCaptureTask: Bool {
     captureTask != nil
+  }
+
+  var statusItemPresentation: TrayStatusItemPresentation {
+    TrayStatusItemPresentationBuilder().presentation(
+      for: TrayStatusItemSnapshot(
+        profiles: model.profiles,
+        selectedProfileID: model.selectedProfileID,
+        visibleReadinessByProfile: Dictionary(
+          uniqueKeysWithValues: model.profiles.map { ($0.id, model.readiness(for: $0)) }
+        ),
+        operationCountByProfile: model.operationCountByProfile,
+        hasFreshReadiness:
+          model.readinessLastRefreshedAt != nil && !model.isReadinessRefreshInProgress
+      )
+    )
   }
 
   var captureAction: TrayAction {
@@ -198,6 +251,17 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     surfaceDismissRequest = request
   }
 
+  func setStatusItemPresentationHandler(
+    _ handler: @escaping @MainActor (TrayStatusItemPresentation) -> Void
+  ) {
+    statusItemPresentationHandler = handler
+    handler(statusItemPresentation)
+  }
+
+  private func publishStatusItemPresentation() {
+    statusItemPresentationHandler?(statusItemPresentation)
+  }
+
   #if DEBUG
     func configureForUIAudit(capturePhase: TrayCapturePhase) {
       self.capturePhase = capturePhase
@@ -206,6 +270,10 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
 
   func trayDidOpen(sessionGeneration: UInt64, viewport: CGSize) {
     activeSessionGeneration = sessionGeneration
+    scrollResetRequest = TrayScrollResetRequest(
+      sessionGeneration: sessionGeneration,
+      anchor: .top
+    )
     self.viewport = viewport
     isTrayVisible = true
     model.refreshReadinessFacts()

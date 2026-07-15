@@ -6,7 +6,25 @@ import SwiftUI
 #endif
 
 @MainActor
-final class RuntimeSettingsWindowController: NSWindowController {
+protocol RuntimeSettingsWindowPresenting: AnyObject {
+  func presentAndWaitUntilKey() async -> TrayDestinationPresentation
+}
+
+@MainActor
+func presentApplicationSettings(
+  navigation: SettingsNavigationModel,
+  presenter: any RuntimeSettingsWindowPresenting
+) async -> TrayDestinationPresentation {
+  navigation.selectedTab = .profiles
+  return await presenter.presentAndWaitUntilKey()
+}
+
+@MainActor
+final class RuntimeSettingsWindowController: NSWindowController,
+  RuntimeSettingsWindowPresenting, NSWindowDelegate
+{
+  private var presentationRequest: (id: UUID, task: Task<TrayDestinationPresentation, Never>)?
+
   init<Content: View>(rootView: Content) {
     let hostingController = NSHostingController(rootView: rootView)
     let window = NSWindow(
@@ -26,21 +44,50 @@ final class RuntimeSettingsWindowController: NSWindowController {
     window.setContentSize(CGSize(width: 900, height: 568))
     window.center()
     super.init(window: window)
+    window.delegate = self
   }
 
   func showSettings() {
+    prepareForPresentation()
+    NSApplication.shared.activate(ignoringOtherApps: true)
     showWindow(nil)
     window?.makeKeyAndOrderFront(nil)
-    NSApplication.shared.activate(ignoringOtherApps: true)
   }
 
   func presentAndWaitUntilKey() async -> TrayDestinationPresentation {
-    guard let window else {
-      return .failed(appLocalized("The Settings window is unavailable."))
+    if let presentationRequest {
+      return await presentationRequest.task.value
     }
-    let waiter = WindowPresentationAwaiter(window: window)
-    return await waiter.present {
-      self.showSettings()
+    let id = UUID()
+    let task = Task { @MainActor [weak self] in
+      guard let self, let window = self.window else {
+        return TrayDestinationPresentation.failed(
+          appLocalized("The Settings window is unavailable."))
+      }
+      let waiter = WindowPresentationAwaiter(window: window)
+      return await waiter.present {
+        self.showSettings()
+      }
+    }
+    presentationRequest = (id, task)
+    let result = await task.value
+    if presentationRequest?.id == id {
+      presentationRequest = nil
+    }
+    return result
+  }
+
+  func windowShouldClose(_ sender: NSWindow) -> Bool {
+    // Red-close hides this app-owned destination instead of invalidating the
+    // controller/root view graph. The same window and app-lifetime draft can
+    // therefore be made key again from the tray or Cmd+,.
+    sender.orderOut(nil)
+    return false
+  }
+
+  func prepareForPresentation() {
+    if window?.isMiniaturized == true {
+      window?.deminiaturize(nil)
     }
   }
 
@@ -57,13 +104,29 @@ final class WindowPresentationAwaiter {
   private weak var window: NSWindow?
   private var observers: [NSObjectProtocol] = []
   private var continuation: CheckedContinuation<TrayDestinationPresentation, Never>?
+  private var isFinished = false
+  private let stateProvider: @MainActor () -> (isVisible: Bool, isKey: Bool)
 
   init(window: NSWindow) {
     self.window = window
+    stateProvider = { [weak window] in
+      (window?.isVisible == true, window?.isKeyWindow == true)
+    }
   }
+
+  #if DEBUG
+    init(
+      window: NSWindow,
+      stateProvider: @escaping @MainActor () -> (isVisible: Bool, isKey: Bool)
+    ) {
+      self.window = window
+      self.stateProvider = stateProvider
+    }
+  #endif
 
   func present(_ action: @MainActor () -> Void) async -> TrayDestinationPresentation {
     await withCheckedContinuation { continuation in
+      isFinished = false
       self.continuation = continuation
       guard let window else {
         finish(.failed(appLocalized("The destination window is unavailable.")))
@@ -91,22 +154,25 @@ final class WindowPresentationAwaiter {
       ]
       action()
       completeFromWindowState()
-      if !window.isVisible {
+      if !stateProvider().isVisible {
         finish(.failed(appLocalized("The destination window could not be shown.")))
       }
     }
   }
 
   private func completeFromWindowState() {
-    guard let window else {
+    guard window != nil else {
       finish(.failed(appLocalized("The destination window is unavailable.")))
       return
     }
-    guard window.isVisible, window.isKeyWindow else { return }
+    let state = stateProvider()
+    guard state.isVisible, state.isKey else { return }
     finish(.presented(isVisible: true, isKeyOrActive: true))
   }
 
   private func finish(_ result: TrayDestinationPresentation) {
+    guard !isFinished else { return }
+    isFinished = true
     for observer in observers {
       NotificationCenter.default.removeObserver(observer)
     }

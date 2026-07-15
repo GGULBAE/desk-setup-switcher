@@ -173,6 +173,7 @@ public struct AudioProfileSettings: Codable, Hashable, Sendable {
   public var defaultInputUID: SettingOption<String?>
   public var defaultOutputUID: SettingOption<String?>
   public var systemOutputUID: SettingOption<String?>
+  public var inputVolume: SettingOption<Double?>
   public var outputVolume: SettingOption<Double?>
   public var outputMuted: SettingOption<Bool?>
 
@@ -180,20 +181,114 @@ public struct AudioProfileSettings: Codable, Hashable, Sendable {
     defaultInputUID: SettingOption<String?> = .init(isIncluded: false, value: nil),
     defaultOutputUID: SettingOption<String?> = .init(isIncluded: false, value: nil),
     systemOutputUID: SettingOption<String?> = .init(isIncluded: false, value: nil),
+    inputVolume: SettingOption<Double?> = .init(isIncluded: false, value: nil),
     outputVolume: SettingOption<Double?> = .init(isIncluded: false, value: nil),
     outputMuted: SettingOption<Bool?> = .init(isIncluded: false, value: nil)
   ) {
     self.defaultInputUID = defaultInputUID
     self.defaultOutputUID = defaultOutputUID
     self.systemOutputUID = systemOutputUID
+    self.inputVolume = inputVolume
     self.outputVolume = outputVolume
     self.outputMuted = outputMuted
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case defaultInputUID
+    case defaultOutputUID
+    case systemOutputUID
+    case inputVolume
+    case outputVolume
+    case outputMuted
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    defaultInputUID =
+      try container.decodeIfPresent(
+        SettingOption<String?>.self,
+        forKey: .defaultInputUID
+      ) ?? .init(isIncluded: false, value: nil)
+    defaultOutputUID =
+      try container.decodeIfPresent(
+        SettingOption<String?>.self,
+        forKey: .defaultOutputUID
+      ) ?? .init(isIncluded: false, value: nil)
+    systemOutputUID =
+      try container.decodeIfPresent(
+        SettingOption<String?>.self,
+        forKey: .systemOutputUID
+      ) ?? .init(isIncluded: false, value: nil)
+    inputVolume =
+      try container.decodeIfPresent(
+        SettingOption<Double?>.self,
+        forKey: .inputVolume
+      ) ?? .init(isIncluded: false, value: nil)
+    outputVolume =
+      try container.decodeIfPresent(
+        SettingOption<Double?>.self,
+        forKey: .outputVolume
+      ) ?? .init(isIncluded: false, value: nil)
+    outputMuted =
+      try container.decodeIfPresent(
+        SettingOption<Bool?>.self,
+        forKey: .outputMuted
+      ) ?? .init(isIncluded: false, value: nil)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(defaultInputUID, forKey: .defaultInputUID)
+    try container.encode(defaultOutputUID, forKey: .defaultOutputUID)
+    try container.encode(systemOutputUID, forKey: .systemOutputUID)
+    try container.encode(inputVolume, forKey: .inputVolume)
+    try container.encode(outputVolume, forKey: .outputVolume)
+    try container.encode(outputMuted, forKey: .outputMuted)
   }
 }
 
 public enum IPv4Configuration: Codable, Hashable, Sendable {
   case dhcp
   case manual(address: String, subnetMask: String, router: String?)
+}
+
+public enum NetworkServiceKind: String, Codable, CaseIterable, Hashable, Sendable {
+  case ethernet
+  case wifi
+}
+
+/// A portable service identity assembled from public SystemConfiguration metadata.
+/// Runtime service IDs and BSD names are deliberately not persisted as identity.
+public struct NetworkServiceIdentity: Codable, Hashable, Sendable {
+  public var kind: NetworkServiceKind
+  public var serviceName: String
+  public var interfaceType: String
+
+  public init(
+    kind: NetworkServiceKind,
+    serviceName: String,
+    interfaceType: String
+  ) {
+    self.kind = kind
+    self.serviceName = serviceName
+    self.interfaceType = interfaceType
+  }
+}
+
+public struct NetworkServiceIPv4Settings: Codable, Hashable, Sendable {
+  public var identity: NetworkServiceIdentity
+  public var configuration: SettingOption<IPv4Configuration?>
+
+  public init(
+    identity: NetworkServiceIdentity,
+    configuration: SettingOption<IPv4Configuration?> = .init(
+      isIncluded: false,
+      value: nil
+    )
+  ) {
+    self.identity = identity
+    self.configuration = configuration
+  }
 }
 
 public struct ProxyConfiguration: Codable, Hashable, Sendable {
@@ -211,6 +306,7 @@ public struct ProxyConfiguration: Codable, Hashable, Sendable {
 public struct NetworkProfileSettings: Codable, Hashable, Sendable {
   public var wifiPower: SettingOption<Bool?>
   public var wifiSSID: SettingOption<String?>
+  public var serviceIPv4: [NetworkServiceIPv4Settings]
   public var ipv4: SettingOption<IPv4Configuration?>
   public var dnsServers: SettingOption<[String]>
   public var webProxy: SettingOption<ProxyConfiguration?>
@@ -219,6 +315,7 @@ public struct NetworkProfileSettings: Codable, Hashable, Sendable {
   public init(
     wifiPower: SettingOption<Bool?> = .init(isIncluded: false, value: nil),
     wifiSSID: SettingOption<String?> = .init(isIncluded: false, value: nil),
+    serviceIPv4: [NetworkServiceIPv4Settings] = [],
     ipv4: SettingOption<IPv4Configuration?> = .init(isIncluded: false, value: nil),
     dnsServers: SettingOption<[String]> = .init(isIncluded: false, value: []),
     webProxy: SettingOption<ProxyConfiguration?> = .init(isIncluded: false, value: nil),
@@ -226,10 +323,71 @@ public struct NetworkProfileSettings: Codable, Hashable, Sendable {
   ) {
     self.wifiPower = wifiPower
     self.wifiSSID = wifiSSID
+    self.serviceIPv4 = serviceIPv4
     self.ipv4 = ipv4
     self.dnsServers = dnsServers
     self.webProxy = webProxy
     self.secureWebProxy = secureWebProxy
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case wifiPower
+    case wifiSSID
+    case serviceIPv4
+    case ipv4
+    case dnsServers
+    case webProxy
+    case secureWebProxy
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    wifiPower =
+      try container.decodeIfPresent(
+        SettingOption<Bool?>.self,
+        forKey: .wifiPower
+      ) ?? .init(isIncluded: false, value: nil)
+    wifiSSID =
+      try container.decodeIfPresent(
+        SettingOption<String?>.self,
+        forKey: .wifiSSID
+      ) ?? .init(isIncluded: false, value: nil)
+    serviceIPv4 =
+      try container.decodeIfPresent(
+        [NetworkServiceIPv4Settings].self,
+        forKey: .serviceIPv4
+      ) ?? []
+    ipv4 =
+      try container.decodeIfPresent(
+        SettingOption<IPv4Configuration?>.self,
+        forKey: .ipv4
+      ) ?? .init(isIncluded: false, value: nil)
+    dnsServers =
+      try container.decodeIfPresent(
+        SettingOption<[String]>.self,
+        forKey: .dnsServers
+      ) ?? .init(isIncluded: false, value: [])
+    webProxy =
+      try container.decodeIfPresent(
+        SettingOption<ProxyConfiguration?>.self,
+        forKey: .webProxy
+      ) ?? .init(isIncluded: false, value: nil)
+    secureWebProxy =
+      try container.decodeIfPresent(
+        SettingOption<ProxyConfiguration?>.self,
+        forKey: .secureWebProxy
+      ) ?? .init(isIncluded: false, value: nil)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(wifiPower, forKey: .wifiPower)
+    try container.encode(wifiSSID, forKey: .wifiSSID)
+    try container.encode(serviceIPv4, forKey: .serviceIPv4)
+    try container.encode(ipv4, forKey: .ipv4)
+    try container.encode(dnsServers, forKey: .dnsServers)
+    try container.encode(webProxy, forKey: .webProxy)
+    try container.encode(secureWebProxy, forKey: .secureWebProxy)
   }
 }
 
@@ -319,6 +477,7 @@ extension AudioProfileSettings {
     defaultInputUID.isIncluded
       || defaultOutputUID.isIncluded
       || systemOutputUID.isIncluded
+      || inputVolume.isIncluded
       || outputVolume.isIncluded
       || outputMuted.isIncluded
   }
@@ -328,6 +487,7 @@ extension NetworkProfileSettings {
   public var hasIncludedOption: Bool {
     wifiPower.isIncluded
       || wifiSSID.isIncluded
+      || serviceIPv4.contains(where: { $0.configuration.isIncluded })
       || ipv4.isIncluded
       || dnsServers.isIncluded
       || webProxy.isIncluded

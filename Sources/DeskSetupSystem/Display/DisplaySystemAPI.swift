@@ -36,6 +36,7 @@ public struct DisplaySystemDisplay: Hashable, Sendable {
   public var isActive: Bool
   public var currentMode: DisplayMode?
   public var supportedModes: [DisplayMode]
+  public var currentColorSpaceName: String?
 
   public init(
     sessionID: UInt32,
@@ -46,7 +47,8 @@ public struct DisplaySystemDisplay: Hashable, Sendable {
     rotationDegrees: Int,
     isActive: Bool,
     currentMode: DisplayMode?,
-    supportedModes: [DisplayMode]
+    supportedModes: [DisplayMode],
+    currentColorSpaceName: String? = nil
   ) {
     self.sessionID = sessionID
     self.identity = identity
@@ -57,6 +59,7 @@ public struct DisplaySystemDisplay: Hashable, Sendable {
     self.isActive = isActive
     self.currentMode = currentMode
     self.supportedModes = supportedModes
+    self.currentColorSpaceName = currentColorSpaceName
   }
 }
 

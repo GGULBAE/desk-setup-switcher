@@ -75,6 +75,14 @@ public struct SystemSnapshotResult: Equatable, Sendable {
     groups.flatMap { $0.snapshot?.displayModeCatalog ?? [] }
   }
 
+  public var displayColorEvidence: [DisplayColorEvidenceEntry] {
+    groups.flatMap { $0.snapshot?.displayColorEvidence ?? [] }
+  }
+
+  public var savedWiFiNetworkNames: [String] {
+    groups.flatMap { $0.snapshot?.savedWiFiNetworkNames ?? [] }
+  }
+
   public init(
     capturedAt: Date,
     groups: [SystemSnapshotGroupResult],

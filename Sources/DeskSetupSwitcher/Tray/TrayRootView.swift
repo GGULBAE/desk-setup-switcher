@@ -36,6 +36,9 @@ struct TrayRootView: View {
       ScrollViewReader { proxy in
         ScrollView {
           VStack(alignment: .leading, spacing: TrayGeometry.sectionGap) {
+            Color.clear
+              .frame(height: 0)
+              .id(TrayScrollAnchor.top)
             profileContent
             captureStatus
             captureSummary
@@ -46,6 +49,10 @@ struct TrayRootView: View {
           .padding(.bottom, 2)
         }
         .scrollIndicators(.automatic)
+        .onChange(of: presentation.scrollResetRequest) { _, request in
+          guard request?.anchor == .top else { return }
+          proxy.scrollTo(TrayScrollAnchor.top, anchor: .top)
+        }
         .onChange(of: presentation.focusTarget) { _, target in
           focusedControl = target
           if let target {
@@ -99,7 +106,7 @@ struct TrayRootView: View {
         help: model.isProfileMutationLocked
           ? "Quit becomes available after the current apply transaction is safely recorded."
           : TrayAccessibilityCopy.quitHelp,
-        systemImage: "power",
+        systemImage: "xmark",
         isDisabled: model.isProfileMutationLocked
       )
       .keyboardShortcut("q")

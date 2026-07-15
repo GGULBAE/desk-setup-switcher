@@ -41,6 +41,35 @@ final class MigrationTests: XCTestCase {
     XCTAssertEqual(decoded.document, document)
   }
 
+  func testMissingAdditiveAudioAndServiceIPv4KeysDecodeAsDormant() throws {
+    let encoder = JSONEncoder()
+    let decoder = JSONDecoder()
+
+    var audioObject = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encoder.encode(AudioProfileSettings()))
+        as? [String: Any]
+    )
+    audioObject.removeValue(forKey: "inputVolume")
+    let audio = try decoder.decode(
+      AudioProfileSettings.self,
+      from: JSONSerialization.data(withJSONObject: audioObject)
+    )
+
+    var networkObject = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encoder.encode(NetworkProfileSettings()))
+        as? [String: Any]
+    )
+    networkObject.removeValue(forKey: "serviceIPv4")
+    let network = try decoder.decode(
+      NetworkProfileSettings.self,
+      from: JSONSerialization.data(withJSONObject: networkObject)
+    )
+
+    XCTAssertNil(audio.inputVolume.value)
+    XCTAssertFalse(audio.inputVolume.isIncluded)
+    XCTAssertTrue(network.serviceIPv4.isEmpty)
+  }
+
   func testCurrentSchemaApplicabilityNormalizationPreservesValuesAndIsIdempotent() throws {
     let document = unsupportedSnapshotDocument()
     let codec = ProfileJSONCodec()

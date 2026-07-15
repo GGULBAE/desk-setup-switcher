@@ -512,7 +512,16 @@ struct SafetyConfirmationView: View {
 }
 
 @MainActor
-final class TrayWorkflowWindowController: NSWindowController {
+protocol TrayWorkflowWindowPresenting: AnyObject {
+  func presentAndWaitUntilKey() async -> TrayDestinationPresentation
+}
+
+@MainActor
+final class TrayWorkflowWindowController: NSWindowController,
+  TrayWorkflowWindowPresenting, NSWindowDelegate
+{
+  private var presentationRequest: (id: UUID, task: Task<TrayDestinationPresentation, Never>)?
+
   init<Content: View>(rootView: Content) {
     let hostingController = NSHostingController(rootView: rootView)
     let window = NSWindow(
@@ -528,22 +537,48 @@ final class TrayWorkflowWindowController: NSWindowController {
     window.contentMinSize = CGSize(width: 520, height: 360)
     window.center()
     super.init(window: window)
+    window.delegate = self
   }
 
   func presentAndWaitUntilKey() async -> TrayDestinationPresentation {
-    guard let window else {
-      return .failed(appLocalized("The workflow window is unavailable."))
+    if let presentationRequest {
+      return await presentationRequest.task.value
     }
-    let waiter = WindowPresentationAwaiter(window: window)
-    return await waiter.present {
-      self.showWindow(nil)
-      window.makeKeyAndOrderFront(nil)
-      NSApplication.shared.activate(ignoringOtherApps: true)
+    let id = UUID()
+    let task = Task { @MainActor [weak self] in
+      guard let self, let window = self.window else {
+        return TrayDestinationPresentation.failed(
+          appLocalized("The workflow window is unavailable."))
+      }
+      let waiter = WindowPresentationAwaiter(window: window)
+      return await waiter.present {
+        self.prepareForPresentation()
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        self.showWindow(nil)
+        window.makeKeyAndOrderFront(nil)
+      }
     }
+    presentationRequest = (id, task)
+    let result = await task.value
+    if presentationRequest?.id == id {
+      presentationRequest = nil
+    }
+    return result
   }
 
   func closeWorkflow() {
     window?.performClose(nil)
+  }
+
+  func windowShouldClose(_ sender: NSWindow) -> Bool {
+    sender.orderOut(nil)
+    return false
+  }
+
+  func prepareForPresentation() {
+    if window?.isMiniaturized == true {
+      window?.deminiaturize(nil)
+    }
   }
 
   @available(*, unavailable)
@@ -842,16 +877,16 @@ final class TrayDestinationCoordinator: TrayDestinationPresenting {
   private let model: ApplicationModel
   private let profileEditor: ProfileEditorModel
   private let settingsNavigation: SettingsNavigationModel
-  private weak var settingsController: RuntimeSettingsWindowController?
-  private weak var workflowController: TrayWorkflowWindowController?
+  private weak var settingsController: (any RuntimeSettingsWindowPresenting)?
+  private weak var workflowController: (any TrayWorkflowWindowPresenting)?
   private let presentation: TrayPresentationModel
 
   init(
     model: ApplicationModel,
     profileEditor: ProfileEditorModel,
     settingsNavigation: SettingsNavigationModel,
-    settingsController: RuntimeSettingsWindowController?,
-    workflowController: TrayWorkflowWindowController?,
+    settingsController: (any RuntimeSettingsWindowPresenting)?,
+    workflowController: (any TrayWorkflowWindowPresenting)?,
     presentation: TrayPresentationModel
   ) {
     self.model = model

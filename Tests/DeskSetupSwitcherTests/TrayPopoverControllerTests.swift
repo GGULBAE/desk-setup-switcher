@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Testing
 
+@testable import DeskSetupCore
 @testable import DeskSetupSwitcher
 
 @Suite("Owned tray popover surface")
@@ -20,14 +21,128 @@ struct TrayPopoverControllerTests {
     controller.show()
 
     #expect(factory.statusItemCreations == 1)
+    #expect(factory.statusItem.presentations.count == 1)
     #expect(factory.popoverCreations == 1)
     #expect(factory.monitorCreations == 1)
     #expect(controller.popoverBehavior == .applicationDefined)
     #expect(controller.contentSize == CGSize(width: 368, height: 560))
     #expect(controller.hostingViewBounds.size == controller.contentSize)
+    #expect(controller.hostingViewBounds.origin == .zero)
+    #expect(controller.hostingViewFrame == CGRect(origin: .zero, size: controller.contentSize))
+    #expect(controller.hostingViewSafeAreaInsets.top == 0)
+    #expect(controller.hostingViewSafeAreaInsets.left == 0)
+    #expect(controller.hostingViewSafeAreaInsets.bottom == 0)
+    #expect(controller.hostingViewSafeAreaInsets.right == 0)
     #expect(controller.contentViewBounds.size == controller.contentSize)
     #expect(state.openEvents == [.init(generation: 1, viewport: controller.contentSize)])
     #expect(factory.monitor.startCount == 1)
+  }
+
+  @Test("status presentation uses fresh match, applying state, and safe fallbacks")
+  func statusItemPresentationPolicy() {
+    let builder = TrayStatusItemPresentationBuilder()
+    let first = statusProfile(name: "Meeting", symbol: "video")
+    let selected = statusProfile(
+      name: "아주 긴 한국어 프로필 이름으로 메뉴 막대 폭을 확인",
+      symbol: "not.a.real.symbol"
+    )
+
+    let noFreshMatch = builder.presentation(
+      for: TrayStatusItemSnapshot(
+        profiles: [first],
+        selectedProfileID: first.id,
+        visibleReadinessByProfile: [first.id: .ready],
+        operationCountByProfile: [first.id: 0],
+        hasFreshReadiness: false
+      )
+    )
+    #expect(noFreshMatch.state == .noMatch)
+    #expect(noFreshMatch.symbolName == TrayStatusItemPresentation.fallbackSymbolName)
+
+    let freshMatch = builder.presentation(
+      for: TrayStatusItemSnapshot(
+        profiles: [first, selected],
+        selectedProfileID: selected.id,
+        visibleReadinessByProfile: [first.id: .ready, selected.id: .ready],
+        operationCountByProfile: [first.id: 0, selected.id: 0],
+        hasFreshReadiness: true
+      )
+    )
+    #expect(freshMatch.state == .matching(selected))
+    #expect(freshMatch.symbolName == TrayStatusItemPresentation.fallbackSymbolName)
+    #expect(freshMatch.title.count == TrayStatusItemPresentationBuilder.maximumDisplayedNameLength)
+    #expect(freshMatch.title.hasSuffix("…"))
+
+    let applying = builder.presentation(
+      for: TrayStatusItemSnapshot(
+        profiles: [first, selected],
+        selectedProfileID: selected.id,
+        visibleReadinessByProfile: [first.id: .applying, selected.id: .ready],
+        operationCountByProfile: [first.id: 1, selected.id: 0],
+        hasFreshReadiness: true
+      )
+    )
+    #expect(applying.state == .applying(first))
+    #expect(applying.symbolName == "video")
+    #expect(applying.title.contains("Applying") || applying.title.contains("적용 중"))
+
+    let failed = builder.presentation(
+      for: TrayStatusItemSnapshot(
+        profiles: [first],
+        selectedProfileID: first.id,
+        visibleReadinessByProfile: [first.id: .unavailable],
+        operationCountByProfile: [first.id: 0],
+        hasFreshReadiness: true
+      )
+    )
+    #expect(failed.state == .noMatch)
+    #expect(failed.symbolName == TrayStatusItemPresentation.fallbackSymbolName)
+
+    let deleted = builder.presentation(
+      for: TrayStatusItemSnapshot(
+        profiles: [],
+        selectedProfileID: first.id,
+        visibleReadinessByProfile: [first.id: .ready],
+        operationCountByProfile: [first.id: 0],
+        hasFreshReadiness: true
+      )
+    )
+    #expect(deleted.state == .noMatch)
+    #expect(deleted.title.isEmpty)
+  }
+
+  @Test("twenty reopen generations reset the hosting origin without duplicating ownership")
+  func twentyReopensResetViewportOrigin() {
+    let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 3))
+    let factory = SurfaceFactorySpy()
+    factory.popover.mutatesHostingOriginWhenShown = true
+    let controller = TrayPopoverController(
+      rootView: Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity),
+      sessionState: state,
+      factory: factory
+    )
+
+    for expectedGeneration in UInt64(1)...20 {
+      controller.show()
+      let viewport = controller.contentSize
+      #expect(controller.activeSessionGeneration == expectedGeneration)
+      #expect(controller.hostingViewBounds == CGRect(origin: .zero, size: viewport))
+      #expect(controller.hostingViewFrame == CGRect(origin: .zero, size: viewport))
+      #expect(controller.hostingViewSafeAreaInsets.top == 0)
+      #expect(controller.hostingViewSafeAreaInsets.left == 0)
+      #expect(controller.hostingViewSafeAreaInsets.bottom == 0)
+      #expect(controller.hostingViewSafeAreaInsets.right == 0)
+      #expect(controller.contentViewBounds == CGRect(origin: .zero, size: viewport))
+      controller.requestClose(sessionGeneration: expectedGeneration)
+    }
+
+    #expect(factory.statusItemCreations == 1)
+    #expect(factory.popoverCreations == 1)
+    #expect(factory.monitorCreations == 1)
+    #expect(factory.monitor.startCount == 20)
+    #expect(factory.monitor.stopCount == 20)
+    #expect(state.openEvents.map(\.generation) == Array(UInt64(1)...20))
+    #expect(state.closeGenerations == Array(UInt64(1)...20))
   }
 
   @Test("state updates never resize an open session")
@@ -168,11 +283,16 @@ private final class SurfaceFactorySpy: TraySurfaceFactory {
 private final class StatusItemSurfaceSpy: TrayStatusItemSurface {
   let anchor = NSView(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
   private(set) var configurationCount = 0
+  private(set) var presentations: [TrayStatusItemPresentation] = []
 
   var anchorView: NSView? { anchor }
 
   func configure(target: AnyObject, action: Selector) {
     configurationCount += 1
+  }
+
+  func update(_ presentation: TrayStatusItemPresentation) {
+    presentations.append(presentation)
   }
 }
 
@@ -187,6 +307,7 @@ private final class PopoverSurfaceSpy: TrayPopoverSurface {
   var contentWindow: NSWindow? { nil }
   private var didClose: (@MainActor () -> Void)?
   private(set) var contentSizeAssignments: [CGSize] = []
+  var mutatesHostingOriginWhenShown = false
 
   func setDidCloseHandler(_ handler: @escaping @MainActor () -> Void) {
     didClose = handler
@@ -198,6 +319,10 @@ private final class PopoverSurfaceSpy: TrayPopoverSurface {
     preferredEdge: NSRectEdge
   ) {
     isShown = true
+    if mutatesHostingOriginWhenShown, let view = contentViewController?.view {
+      view.bounds.origin = CGPoint(x: 19, y: 23)
+      view.frame.origin = CGPoint(x: 7, y: 11)
+    }
   }
 
   func performClose(_ sender: Any?) {
@@ -229,4 +354,14 @@ private final class DismissalMonitorSpy: TrayDismissalMonitoring {
   func triggerDismiss() {
     dismiss?()
   }
+}
+
+private func statusProfile(name: String, symbol: String) -> DeskProfile {
+  var profile = DeskProfile(name: name, symbolName: symbol)
+  profile.settings.audio.isIncluded = true
+  profile.settings.audio.value.defaultOutputUID = .init(
+    isIncluded: true,
+    value: "synthetic-output"
+  )
+  return profile
 }

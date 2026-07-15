@@ -42,6 +42,7 @@ struct DisplayAdapterTests {
     #expect(snapshot.displayModeCatalog?.count == 2)
     #expect(snapshot.displayModeCatalog?[1].identity == displays[1].identity)
     #expect(snapshot.displayModeCatalog?[1].modes == displays[1].supportedModes)
+    #expect(snapshot.displayColorEvidence?.map(\.colorSpaceName) == ["Synthetic sRGB", "P3"])
   }
 
   @Test("an unchanged snapshot plans no operation")
@@ -367,7 +368,8 @@ private func makeDisplays() -> [DisplaySystemDisplay] {
       rotationDegrees: 0,
       isActive: true,
       currentMode: builtInMode,
-      supportedModes: [builtInMode]
+      supportedModes: [builtInMode],
+      currentColorSpaceName: "Synthetic sRGB"
     ),
     DisplaySystemDisplay(
       sessionID: 202,
@@ -386,7 +388,8 @@ private func makeDisplays() -> [DisplaySystemDisplay] {
       supportedModes: [
         externalMode,
         DisplayMode(width: 1_920, height: 1_080, refreshRate: 59.94),
-      ]
+      ],
+      currentColorSpaceName: "P3"
     ),
   ]
 }

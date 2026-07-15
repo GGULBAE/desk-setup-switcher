@@ -72,6 +72,7 @@ public enum AudioDraftField: String, Equatable, Sendable {
   case defaultInputDevice
   case defaultOutputDevice
   case systemOutputDevice
+  case inputVolume
   case outputVolume
   case outputMute
 }
@@ -394,6 +395,13 @@ public struct ProfileDraftValidator: Equatable, Sendable {
     validateIncludedString(
       group.value.systemOutputUID,
       field: .audio(.systemOutputDevice),
+      group: .audio,
+      issues: &issues
+    )
+    validateIncludedNumber(
+      group.value.inputVolume,
+      range: 0...1,
+      field: .audio(.inputVolume),
       group: .audio,
       issues: &issues
     )

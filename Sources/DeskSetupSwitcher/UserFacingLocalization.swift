@@ -71,6 +71,26 @@ private func appLocalizedRuntime(_ value: String, bundle: Bundle) -> String {
     return exact
   }
 
+  if value.hasPrefix("Current Mac matches "), value.hasSuffix("."),
+    value.count > "Current Mac matches .".count
+  {
+    let name = String(
+      value.dropFirst("Current Mac matches ".count).dropLast()
+    )
+    return appRuntimeLocalizedFormat(
+      "Current Mac matches %@.",
+      bundle: bundle,
+      name
+    )
+  }
+  if value.hasSuffix(" · Applying…") {
+    return appRuntimeLocalizedFormat(
+      "%@ · Applying…",
+      bundle: bundle,
+      String(value.dropLast(" · Applying…".count))
+    )
+  }
+
   if value.hasPrefix("Inverted condition: ") {
     return appRuntimeLocalizedFormat(
       "Inverted condition: %@",

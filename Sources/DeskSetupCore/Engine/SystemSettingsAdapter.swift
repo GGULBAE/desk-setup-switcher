@@ -66,6 +66,19 @@ public struct DisplayModeCatalogEntry: Codable, Hashable, Sendable {
   }
 }
 
+/// Read-only Core Graphics color-space evidence for the current session.
+/// This is not a ColorSync profile, HDR mode, or pixel-encoding setting and is
+/// never persisted into a profile or accepted by an apply plan.
+public struct DisplayColorEvidenceEntry: Codable, Hashable, Sendable {
+  public var identity: DisplayIdentity
+  public var colorSpaceName: String
+
+  public init(identity: DisplayIdentity, colorSpaceName: String) {
+    self.identity = identity
+    self.colorSpaceName = colorSpaceName
+  }
+}
+
 public struct AdapterSnapshot: Codable, Hashable, Sendable {
   public var group: SettingGroup
   public var capturedAt: Date
@@ -73,19 +86,27 @@ public struct AdapterSnapshot: Codable, Hashable, Sendable {
   public var items: [SnapshotItem]
   /// Optional for backward-compatible decoding of older serialized apply plans.
   public var displayModeCatalog: [DisplayModeCatalogEntry]?
+  /// Optional session-only evidence; absent in older serialized plans.
+  public var displayColorEvidence: [DisplayColorEvidenceEntry]?
+  /// Optional read-only saved-network choices; contains no credential material.
+  public var savedWiFiNetworkNames: [String]?
 
   public init(
     group: SettingGroup,
     capturedAt: Date,
     payload: SettingsPayload?,
     items: [SnapshotItem],
-    displayModeCatalog: [DisplayModeCatalogEntry]? = nil
+    displayModeCatalog: [DisplayModeCatalogEntry]? = nil,
+    displayColorEvidence: [DisplayColorEvidenceEntry]? = nil,
+    savedWiFiNetworkNames: [String]? = nil
   ) {
     self.group = group
     self.capturedAt = capturedAt
     self.payload = payload
     self.items = items
     self.displayModeCatalog = displayModeCatalog
+    self.displayColorEvidence = displayColorEvidence
+    self.savedWiFiNetworkNames = savedWiFiNetworkNames
   }
 }
 

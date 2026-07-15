@@ -132,8 +132,18 @@ Remaining:
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
-## Current next task — tray detailed UI refinement
+## M4.4 — Tray reopen and profile-detail refinement (implemented locally)
 
-With the lifecycle and action contracts fixed, the next implementation task is a non-behavioral pass over the new tray: normalize card padding and heading rhythm, improve long bilingual wrapping, keep compact controls comfortably separated, and review hover/focus/disabled/destructive states without reintroducing dynamic outer sizing or transient sheets. Acceptance should include actual status-item/popover opening, keyboard-only focus order and visible focus rings, plus a VoiceOver speech/focus walkthrough. Import/export, the full permission matrix, login approval/retry/reboot, and Gatekeeper checks remain under their documented authorization boundaries. A push, new CI run, tag, or publication is a separate operator decision.
+- Reset zero-origin AppKit viewport geometry and top-scroll state for every tray generation; a deterministic 20-cycle regression preserves the fixed viewport and one-scroll architecture.
+- Keep Settings/Profile Edit and other workflow destinations app-lifetime persistent, frontmost-before-tray-close, exactly-once, and recoverable after repeated red-close cycles.
+- Replace Quit's power glyph with localized `xmark` semantics and derive a variable-length status-item symbol/name only from fresh enabled-profile matching or applying state.
+- Reduce the profile surface to alias/symbol/enabled plus Display, Audio, and Network while preserving and excluding hidden legacy data.
+- Add public Core Audio input-volume snapshot/apply/rollback coverage and portable Ethernet/Wi-Fi service IPv4 identity/read capability. Color-mode and IPv4 writes remain explicitly disabled where public rollback-safe support is unavailable.
+- Record synthetic Display/Audio/Network evidence and the [refinement audit](TRAY-SETTINGS-REFINEMENT-AUDIT-2026-07-15.md). No installed app, live mutation, TCC change, Keychain write, push, or publication is part of this milestone.
+- Integrated non-live `make verify` passes 338 cases (132 XCTest + 206 Swift Testing, six opt-in skips), all build/Analyze stages, and universal mounted-DMG verification. Current local SHA-256 is `539c203607782302799d68acdda2f64666f0ace5897fa325a79e1dfdcfc98f78`.
+
+## Current next task — authorized installed interaction audit
+
+Run user-driven checks for the actual status item, 20 visible reopen cycles, Settings/Profile Edit red-close recovery and frontmost ordering, native English/Korean rendering, keyboard focus, and VoiceOver. Use an explicit install/preflight boundary; do not infer display/audio/network mutation authority. Import/export, the full permission matrix, login approval/retry/reboot, Gatekeeper, physical Intel, and live mutation/rollback remain separately authorized work.
 
 Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

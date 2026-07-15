@@ -171,6 +171,49 @@ The five read-only display/audio/network/input/readiness cases were rerun on the
 
 ## Static and release verification
 
+The tray/settings refinement passes 338 default non-live cases (132 XCTest and 206 Swift Testing, with six explicit opt-in skips), lint/localization policy, Swift Debug/Release, universal Xcode Debug/Release, Xcode Analyze, package/checksum creation, and mounted DMG metadata/resource/architecture/signature verification. The current no-Developer-ID DMG SHA-256 is `539c203607782302799d68acdda2f64666f0ace5897fa325a79e1dfdcfc98f78`. No live flag was set; the package was not installed or launched.
+
 Canonical commands are `build`, `test`, `lint`, `analyze`, `package`, `verify-package`, `verify`, and `clean` through the checked-in Makefile. `lint` includes source-policy checks and English/Korean key-parity, duplicate-key, format-placeholder, and static-localization-key validation. `verify` runs format/lint, tests, Swift and universal Xcode Debug/Release builds, Xcode Analyze, DMG creation, checksum validation, mounted-DMG inspection, and signature classification. The local closure gate runs `git diff --check` separately. CI performs no live discovery or system mutation. Initial run `29154880831` for `0d8f510` exposed the Swift 6.1 actor-isolation issue, and repair [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) remains historical compatibility evidence. UI-hardening commit `5f0cabc` passed full `make verify` and unsigned-package upload in [run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967). Current push and CI results are recorded in the implementation handoff rather than predeclared here.
 
-Packaging builds with automatic signing disabled, then ad-hoc signs the staged app. The verifier requires `Signature=adhoc`, no identity authority, and a structurally valid signature. The current universal `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg` passed the mounted verification gate with SHA-256 `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127` and architectures `x86_64 arm64`; it was not installed or launched. Earlier local and installed-interaction checksums remain historical in the completion ledger; downloaded CI artifact ID `8256718472` verified the earlier UI-hardening package at SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. The DMGs are not byte-for-byte reproducible. These signatures provide code integrity only: the app has no Developer ID identity, no notarization, and no verified Gatekeeper trust path.
+Packaging builds with automatic signing disabled, then ad-hoc signs the staged app. The verifier requires `Signature=adhoc`, no identity authority, and a structurally valid signature. The current universal `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg` passed the mounted verification gate with SHA-256 `539c203607782302799d68acdda2f64666f0ace5897fa325a79e1dfdcfc98f78` and architectures `x86_64 arm64`; it was not installed or launched. Earlier local and installed-interaction checksums remain historical in the completion ledger; downloaded CI artifact ID `8256718472` verified the earlier UI-hardening package at SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. The DMGs are not byte-for-byte reproducible. These signatures provide code integrity only: the app has no Developer ID identity, no notarization, and no verified Gatekeeper trust path.
+
+## Tray reopen and simplified editor specification
+
+### Reopen invariants
+
+- One status item, popover, hosting controller, root SwiftUI tree, and scoped event-monitor pair exist per application lifetime.
+- Each open generation has a fixed `contentSize`; the hosting view frame and bounds origins are `(0, 0)` before and after show.
+- `trayDidOpen` publishes a new top-scroll request. The root owns one zero-height top anchor inside its only scroll view.
+- Reopening never reads prior content offset to calculate height and never adds a corrective padding or offset.
+- The deterministic AppKit regression corrupts the host origin deliberately and checks 20 open/close cycles.
+
+### Persistent destination invariants
+
+- Settings and workflow controllers conform to presentation protocols and are strongly held by the app coordinator.
+- A red-close event calls `orderOut` and returns `false` from `windowShouldClose`; controller, root model, and unsaved draft survive.
+- Concurrent requests coalesce by presentation generation. Cancellation and completion pass through one exactly-once awaiter.
+- Success means visible, key, and ordered front after application activation; only then may the action router close the tray.
+
+### Status-item state
+
+`TrayStatusItemState` is one of `noMatch`, `matching(profileID, symbolName, displayName)`, or `applying(profileID?, symbolName, displayName)`. A matching profile must be enabled, freshly ready, contain at least one included applicable payload, and have a known zero-operation plan. The selected profile wins ties. User names are trimmed and capped at 18 characters for the status item; full context remains in localized tooltip/accessibility text. Symbol lookup failure uses `square.stack.3d.up`.
+
+### Visible profile document projection
+
+| Area | Visible controls | Persisted but hidden/excluded controls |
+| --- | --- | --- |
+| Metadata | Alias, symbol, enabled in one adaptive row | Description and conditions |
+| Display | Extended/mirrored output, primary display, primary/secondary cue, per-display resolution and refresh, read-only Core Graphics color-space evidence | Raw runtime ID, x/y origin, rotation, active state |
+| Audio | Default input, default output, input volume, output volume | System output UID and output mute |
+| Network | Ethernet/Wi-Fi service, DHCP/manual snapshot, Wi-Fi power and saved target | Global IPv4, DNS, proxy, service order |
+| Input | Nothing in the default editor | All legacy input values |
+
+Hidden values remain meaningful document data. `ProfileApplicabilityNormalizer` excludes their options before readiness and planning, and repeated normalization is idempotent.
+
+### Input volume
+
+`inputVolume` is `SettingOption<Double?>`. Missing JSON decodes as `.excluded(nil)`. Included values must be finite in `0...1`. Snapshot calls the injected or public Core Audio input scalar getter for the default input UID and records unsupported or non-settable capability without failing default-device discovery. Planning requires a matched current device and writable input-volume element, stores the prior scalar as rollback, filters no-ops, and keeps missing or hot-plug failures typed and isolated.
+
+### Service IPv4 and color mode
+
+`NetworkServiceIPv4Settings` persists `NetworkServiceIdentity(kind, serviceName, interfaceType)` plus DHCP or manual configuration. The adapter reads SystemConfiguration service metadata and rejects an identity that matches zero or multiple current services. Manual address, mask, and router values are validated as untrusted input. Public CoreWLAN configuration contributes a sorted session-only list of saved SSID names; the editor uses a picker and never exposes a password field or copies the catalog into profile JSON. This release intentionally has no privileged helper or private API, so service IPv4 controls are disabled with the localized reason that authorized apply and rollback are unavailable; safe Wi-Fi power and saved-network association planning remains independent. Display color evidence is the current public Core Graphics color-space name only—not a ColorSync profile, HDR mode, or pixel encoding—and remains read-only because the app has no public rollback-safe mutation API.

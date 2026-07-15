@@ -51,7 +51,7 @@ swift test --filter TrayOffscreenEvidenceTests
 
 Non-live `make verify` passed on 2026-07-15 with 326 default cases: 130 XCTest cases and 196 Swift Testing cases, six opt-in skips, and zero failures. It also passed formatting/source policy, English/Korean catalog validation, Swift Debug/Release, universal Xcode Debug/Release, Xcode Analyze, DMG creation/checksum, mounted metadata/resources, `x86_64 arm64`, and ad-hoc/no-Developer-ID signature classification.
 
-Current DMG SHA-256: `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`.
+Tray Surface v2 baseline DMG SHA-256: `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`.
 
 The package was not installed, launched, pushed, or submitted to CI. Earlier installed interactions in [MANUAL-UI-AUDIT-2026-07-14.md](MANUAL-UI-AUDIT-2026-07-14.md) used `MenuBarExtra` and are not v2 interaction evidence.
 

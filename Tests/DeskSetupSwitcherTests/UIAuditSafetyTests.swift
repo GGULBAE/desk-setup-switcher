@@ -173,6 +173,10 @@ import Testing
       #expect(ProfileWorkspaceLayoutMode(width: 760) == .regular)
       #expect(ProfileWorkspaceLayoutMode(width: 980) == .regular)
       #expect(ProfileWorkspaceLayoutMode(width: 680) == .compact)
+      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio, .network])
+      #expect(!ProfileEditorSurfacePolicy.visibleGroups.contains(.input))
+      #expect(!ProfileEditorSurfacePolicy.showsDescription)
+      #expect(!ProfileEditorSurfacePolicy.showsConditions)
     }
 
     @Test("runtime settings window exposes stable resizable geometry")
@@ -187,6 +191,21 @@ import Testing
       #expect(!window.isReleasedWhenClosed)
     }
 
+    @Test("settings red-close preserves one controller and root for ten reopen cycles")
+    func runtimeSettingsWindowReopenLifecycle() throws {
+      let controller = RuntimeSettingsWindowController(rootView: Color.clear)
+      let window = try #require(controller.window)
+      let contentController = try #require(window.contentViewController)
+
+      for _ in 0..<10 {
+        #expect(controller.windowShouldClose(window) == false)
+        #expect(controller.window === window)
+        #expect(window.contentViewController === contentController)
+        #expect(!window.isReleasedWhenClosed)
+        controller.prepareForPresentation()
+      }
+    }
+
     @Test("workflow window is persistent and strongly retains its content window")
     func workflowWindowGeometry() throws {
       let controller = TrayWorkflowWindowController(rootView: Color.clear)
@@ -195,6 +214,64 @@ import Testing
       #expect(window.styleMask.contains(.resizable))
       #expect(window.contentMinSize == CGSize(width: 520, height: 360))
       #expect(!window.isReleasedWhenClosed)
+    }
+
+    @Test("workflow red-close preserves one controller and root for ten reopen cycles")
+    func workflowWindowReopenLifecycle() throws {
+      let controller = TrayWorkflowWindowController(rootView: Color.clear)
+      let window = try #require(controller.window)
+      let contentController = try #require(window.contentViewController)
+
+      for _ in 0..<10 {
+        #expect(controller.windowShouldClose(window) == false)
+        #expect(controller.window === window)
+        #expect(window.contentViewController === contentController)
+        #expect(!window.isReleasedWhenClosed)
+        controller.prepareForPresentation()
+      }
+    }
+
+    @Test("settings and profile destinations remain presentable across ten reopen cycles")
+    func destinationCoordinatorReopensSettingsAndEditor() async throws {
+      let fixture = UIAuditFixtures.fixture(.overview)
+      let model = UIAuditFixtures.makeModel(configuration: .disabled)
+      model.configureForUIAudit(fixture)
+      let profile = try #require(fixture.profiles.first)
+      let editor = ProfileEditorModel()
+      editor.initialize(profiles: fixture.profiles, preferredProfileID: profile.id)
+      let navigation = SettingsNavigationModel(selectedTab: .system)
+      let presenter = ReopenableSettingsPresenter()
+      let presentation = TrayPresentationModel(
+        model: model,
+        locationPermission: LocationPermissionController(
+          allowsSystemRequests: false,
+          syntheticAuthorizationStatus: .authorized
+        ),
+        profileEditor: editor
+      )
+      let coordinator = TrayDestinationCoordinator(
+        model: model,
+        profileEditor: editor,
+        settingsNavigation: navigation,
+        settingsController: presenter,
+        workflowController: nil,
+        presentation: presentation
+      )
+
+      for _ in 0..<10 {
+        #expect(
+          await coordinator.present(.settings) == .presented(isVisible: true, isKeyOrActive: true))
+      }
+      for _ in 0..<10 {
+        #expect(
+          await coordinator.present(.profileEditor(profile.id))
+            == .presented(isVisible: true, isKeyOrActive: true)
+        )
+      }
+
+      #expect(presenter.presentationCount == 20)
+      #expect(navigation.selectedTab == .profiles)
+      #expect(editor.selectedProfileID == profile.id)
     }
 
     @Test("closing a destination before it becomes key reports cancellation")
@@ -213,6 +290,52 @@ import Testing
 
       #expect(result == .cancelled)
       #expect(!window.isVisible)
+    }
+
+    @Test("already-key and visible non-key destination states complete exactly once")
+    func destinationStateTransitionsAreDeterministic() async {
+      let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+        styleMask: [.titled, .closable],
+        backing: .buffered,
+        defer: false
+      )
+      var state = (isVisible: true, isKey: true)
+      var actionCount = 0
+      var waiter = WindowPresentationAwaiter(window: window, stateProvider: { state })
+
+      let alreadyKey = await waiter.present { actionCount += 1 }
+
+      #expect(alreadyKey == .presented(isVisible: true, isKeyOrActive: true))
+      #expect(actionCount == 1)
+
+      state = (isVisible: true, isKey: false)
+      waiter = WindowPresentationAwaiter(window: window, stateProvider: { state })
+      var actionStarted = false
+      let pending = Task { @MainActor in
+        await waiter.present { actionStarted = true }
+      }
+      while !actionStarted { await Task.yield() }
+      state = (isVisible: true, isKey: true)
+      NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+      NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+
+      #expect(await pending.value == .presented(isVisible: true, isKeyOrActive: true))
+    }
+
+    @Test("application Settings command is independent of tray lifetime")
+    func commandSettingsUsesPersistentPresenter() async {
+      let navigation = SettingsNavigationModel(selectedTab: .system)
+      let presenter = ReopenableSettingsPresenter()
+
+      let result = await presentApplicationSettings(
+        navigation: navigation,
+        presenter: presenter
+      )
+
+      #expect(result == .presented(isVisible: true, isKeyOrActive: true))
+      #expect(navigation.selectedTab == .profiles)
+      #expect(presenter.presentationCount == 1)
     }
   }
 
@@ -244,6 +367,16 @@ import Testing
     func readAuthorizedLocation() async throws -> LocationRegion? {
       invocationCount += 1
       return nil
+    }
+  }
+
+  @MainActor
+  private final class ReopenableSettingsPresenter: RuntimeSettingsWindowPresenting {
+    private(set) var presentationCount = 0
+
+    func presentAndWaitUntilKey() async -> TrayDestinationPresentation {
+      presentationCount += 1
+      return .presented(isVisible: true, isKeyOrActive: true)
     }
   }
 

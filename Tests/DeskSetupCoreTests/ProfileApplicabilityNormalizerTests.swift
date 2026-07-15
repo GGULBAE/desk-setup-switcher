@@ -15,7 +15,7 @@ struct ProfileApplicabilityNormalizerTests {
       id: displayID,
       identity: DisplayIdentity(productName: "Synthetic Panel"),
       isPrimary: .init(value: true),
-      origin: .init(isIncluded: false, value: DisplayPoint(x: 40, y: 20)),
+      origin: .init(value: DisplayPoint(x: 40, y: 20)),
       mirroring: .init(isIncluded: false, value: .extended),
       mode: .init(
         isIncluded: false,
@@ -46,11 +46,33 @@ struct ProfileApplicabilityNormalizerTests {
       value: NetworkProfileSettings(
         wifiPower: .init(value: true),
         wifiSSID: .init(isIncluded: false, value: "Synthetic Wi-Fi"),
+        serviceIPv4: [
+          .init(
+            identity: .init(
+              kind: .ethernet,
+              serviceName: "Synthetic Ethernet",
+              interfaceType: "Ethernet"
+            ),
+            configuration: .init(value: ipv4)
+          )
+        ],
         ipv4: .init(value: ipv4),
         dnsServers: .init(value: ["192.0.2.53", "2001:db8::53"]),
         webProxy: .init(value: webProxy),
         secureWebProxy: .init(value: secureProxy)
       )
+    )
+    settings.audio = .init(
+      isIncluded: true,
+      value: .init(
+        defaultInputUID: .init(value: "synthetic-input"),
+        systemOutputUID: .init(value: "synthetic-system-output"),
+        outputMuted: .init(value: true)
+      )
+    )
+    settings.input = .init(
+      isIncluded: true,
+      value: .init(pointerSpeed: .init(value: 4.5))
     )
     let profile = DeskProfile(
       id: profileID,
@@ -70,11 +92,19 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(normalized.profileDescription == profile.profileDescription)
     #expect(normalized.conditions == conditions)
     #expect(normalizedDisplay.id == displayID)
+    #expect(normalizedDisplay.origin.value == DisplayPoint(x: 40, y: 20))
+    #expect(!normalizedDisplay.origin.isIncluded)
     #expect(normalizedDisplay.rotationDegrees.value == 270)
     #expect(!normalizedDisplay.rotationDegrees.isIncluded)
     #expect(normalizedDisplay.isActive.value == false)
     #expect(!normalizedDisplay.isActive.isIncluded)
     #expect(normalized.settings.display.isIncluded)
+    #expect(normalized.settings.audio.isIncluded)
+    #expect(normalized.settings.audio.value.defaultInputUID.isIncluded)
+    #expect(!normalized.settings.audio.value.systemOutputUID.isIncluded)
+    #expect(!normalized.settings.audio.value.outputMuted.isIncluded)
+    #expect(normalized.settings.network.value.serviceIPv4[0].configuration.value == ipv4)
+    #expect(!normalized.settings.network.value.serviceIPv4[0].configuration.isIncluded)
     #expect(normalized.settings.network.value.ipv4.value == ipv4)
     #expect(!normalized.settings.network.value.ipv4.isIncluded)
     #expect(normalized.settings.network.value.dnsServers.value == ["192.0.2.53", "2001:db8::53"])
@@ -84,6 +114,9 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(normalized.settings.network.value.secureWebProxy.value == secureProxy)
     #expect(!normalized.settings.network.value.secureWebProxy.isIncluded)
     #expect(normalized.settings.network.isIncluded)
+    #expect(!normalized.settings.input.isIncluded)
+    #expect(normalized.settings.input.value.pointerSpeed.value == 4.5)
+    #expect(!normalized.settings.input.value.pointerSpeed.isIncluded)
   }
 
   @Test("groups with no applicable leaves are disabled without deleting values")

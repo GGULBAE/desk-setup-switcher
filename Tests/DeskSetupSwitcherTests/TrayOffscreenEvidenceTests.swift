@@ -18,6 +18,15 @@ import Testing
       let increasedContrast: Bool
     }
 
+    struct SettingsFixture {
+      let name: String
+      let variant: UIAuditVariant
+      let languageCode: String
+      let colorScheme: ColorScheme
+      let displayMode: UIAuditDisplayMode
+      let size: CGSize
+    }
+
     @Test("all tray states render offscreen with readable accessibility structure")
     func rendersSyntheticMatrix() throws {
       let fixtures = [
@@ -96,11 +105,163 @@ import Testing
       }
     }
 
+    @Test("simplified profile sections render offscreen in English and Korean")
+    func rendersSimplifiedProfileSections() throws {
+      let allFixtures = [
+        SettingsFixture(
+          name: "13-display-en-light",
+          variant: .editorDisplay,
+          languageCode: "en",
+          colorScheme: .light,
+          displayMode: .standard,
+          size: CGSize(width: 980, height: 720)
+        ),
+        SettingsFixture(
+          name: "14-audio-ko-light",
+          variant: .editorAudio,
+          languageCode: "ko",
+          colorScheme: .light,
+          displayMode: .standard,
+          size: CGSize(width: 980, height: 720)
+        ),
+        SettingsFixture(
+          name: "15-network-en-dark",
+          variant: .editorNetwork,
+          languageCode: "en",
+          colorScheme: .dark,
+          displayMode: .standard,
+          size: CGSize(width: 980, height: 720)
+        ),
+        SettingsFixture(
+          name: "16-profile-ko-minimum",
+          variant: .editorDisplay,
+          languageCode: "ko",
+          colorScheme: .light,
+          displayMode: .minimum,
+          size: CGSize(width: 680, height: 480)
+        ),
+        SettingsFixture(
+          name: "17-audio-en-large-text",
+          variant: .editorAudio,
+          languageCode: "en",
+          colorScheme: .light,
+          displayMode: .largeText,
+          size: CGSize(width: 980, height: 720)
+        ),
+      ]
+      let selectedFixture = ProcessInfo.processInfo.environment[
+        "DESK_SETUP_REFINEMENT_EVIDENCE_FIXTURE"
+      ]
+      let fixtures =
+        selectedFixture.map { selected in
+          allFixtures.filter { $0.name == selected }
+        } ?? allFixtures
+      #expect(selectedFixture == nil || fixtures.count == 1)
+      let outputDirectory = refinementEvidenceOutputDirectory
+      if let outputDirectory {
+        try FileManager.default.createDirectory(
+          at: outputDirectory,
+          withIntermediateDirectories: true
+        )
+      }
+
+      for fixture in fixtures {
+        setenv("DESK_SETUP_UI_AUDIT_LANGUAGE", fixture.languageCode, 1)
+        let rendered = try renderSettings(fixture)
+        unsetenv("DESK_SETUP_UI_AUDIT_LANGUAGE")
+
+        #expect(rendered.png.count > 10_000)
+        #expect(rendered.accessibility.contains("synthetic-settings-host=true"))
+        #expect(!rendered.accessibility.contains("/Users/"))
+        #expect(!rendered.accessibility.localizedCaseInsensitiveContains("password"))
+        if let outputDirectory {
+          try rendered.png.write(
+            to: outputDirectory.appendingPathComponent("\(fixture.name).png"),
+            options: .atomic
+          )
+          try rendered.accessibility.write(
+            to: outputDirectory.appendingPathComponent("\(fixture.name).ax.txt"),
+            atomically: true,
+            encoding: .utf8
+          )
+        }
+      }
+    }
+
     private var evidenceOutputDirectory: URL? {
       guard ProcessInfo.processInfo.environment["DESK_SETUP_WRITE_TRAY_EVIDENCE"] == "1",
         let path = ProcessInfo.processInfo.environment["DESK_SETUP_TRAY_EVIDENCE_DIR"]
       else { return nil }
       return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    private var refinementEvidenceOutputDirectory: URL? {
+      guard ProcessInfo.processInfo.environment["DESK_SETUP_WRITE_REFINEMENT_EVIDENCE"] == "1",
+        let path = ProcessInfo.processInfo.environment["DESK_SETUP_REFINEMENT_EVIDENCE_DIR"]
+      else { return nil }
+      return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    private func renderSettings(
+      _ fixture: SettingsFixture
+    ) throws -> (png: Data, accessibility: String) {
+      let configuration = UIAuditConfiguration(
+        isEnabled: true,
+        variant: fixture.variant,
+        displayMode: fixture.displayMode,
+        showsStatusPopover: false
+      )
+      let model = UIAuditFixtures.makeModel(configuration: configuration)
+      let locationPermission = LocationPermissionController(
+        allowsSystemRequests: false,
+        syntheticAuthorizationStatus: .denied
+      )
+      let editor = ProfileEditorModel()
+      let size = fixture.size
+      let root = ProfilesSettingsView()
+        .environmentObject(model)
+        .environmentObject(locationPermission)
+        .environmentObject(editor)
+        .environment(\.locale, Locale(identifier: fixture.languageCode))
+        .uiAuditEnvironment(configuration)
+        .preferredColorScheme(fixture.colorScheme)
+        .frame(width: size.width, height: size.height)
+        .background(fixture.colorScheme == .dark ? Color.black : Color.white)
+
+      let host = NSHostingView(rootView: root)
+      host.frame = NSRect(origin: .zero, size: size)
+      host.appearance = NSAppearance(
+        named: fixture.colorScheme == .dark ? .darkAqua : .aqua
+      )
+      host.layoutSubtreeIfNeeded()
+      host.displayIfNeeded()
+      // Profile initialization and locale propagation publish once from
+      // onAppear. Drain that detached-host update before caching pixels.
+      RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.25))
+      host.needsLayout = true
+      host.needsDisplay = true
+      host.layoutSubtreeIfNeeded()
+      host.displayIfNeeded()
+
+      let representation = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+      host.cacheDisplay(in: host.bounds, to: representation)
+      let png = try #require(
+        representation.representation(using: .png, properties: [:])
+      )
+      var lines = [
+        "source=detached NSHostingView with synthetic profile and snapshot",
+        "synthetic-settings-host=true",
+        "fixture=\(fixture.name)",
+        "language=\(fixture.languageCode)",
+        "viewport=\(Int(size.width))x\(Int(size.height))",
+        "variant=\(fixture.variant.rawValue)",
+        "display-mode=\(fixture.displayMode.rawValue)",
+        "live-display-audio-network-mutations=false",
+        "detached-ax-limit=virtual SwiftUI children require an onscreen accessibility host",
+      ]
+      var visited: Set<ObjectIdentifier> = []
+      appendAccessibility(host, depth: 0, lines: &lines, visited: &visited)
+      return (png, lines.joined(separator: "\n") + "\n")
     }
 
     private func render(_ fixture: Fixture) throws -> (png: Data, accessibility: String) {

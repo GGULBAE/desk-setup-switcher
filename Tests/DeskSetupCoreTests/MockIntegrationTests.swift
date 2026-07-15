@@ -7,14 +7,14 @@ import Testing
 struct MockIntegrationTests {
   @Test("force mode applies available operations and records omissions")
   func forceModeAppliesPartialPlan() async throws {
-    let inputOperation = PlannedOperation(
-      group: .input,
-      key: "pointerSpeed",
-      summary: "Set pointer speed"
+    let audioOperation = PlannedOperation(
+      group: .audio,
+      key: "defaultOutput",
+      summary: "Set default output"
     )
-    let inputAdapter = MockSystemSettingsAdapter(
-      group: .input,
-      plan: AdapterPlan(group: .input, operations: [inputOperation])
+    let audioAdapter = MockSystemSettingsAdapter(
+      group: .audio,
+      plan: AdapterPlan(group: .audio, operations: [audioOperation])
     )
     let displayAdapter = MockSystemSettingsAdapter(
       group: .display,
@@ -25,11 +25,11 @@ struct MockIntegrationTests {
       )
     )
     let engine = ApplyEngine(
-      registry: try AdapterRegistry([inputAdapter, displayAdapter])
+      registry: try AdapterRegistry([audioAdapter, displayAdapter])
     )
 
     let result = await engine.apply(
-      profile: makeIntegrationProfile(including: [.input, .display]),
+      profile: makeIntegrationProfile(including: [.audio, .display]),
       mode: .force
     )
 
@@ -39,28 +39,28 @@ struct MockIntegrationTests {
     #expect(result.itemResults.map(\.status) == [.unsupported, .succeeded])
     #expect(await displayAdapter.recordedInvocations() == [.capability])
     #expect(
-      await inputAdapter.recordedInvocations() == [
+      await audioAdapter.recordedInvocations() == [
         .capability,
         .snapshot,
         .validate,
         .plan(.force),
-        .apply(inputOperation.id),
+        .apply(audioOperation.id),
       ])
   }
 
   @Test("fatal failure rolls back in reverse order and keeps rollback failures separate")
   func fatalFailureRollsBackInReverse() async throws {
-    let first = PlannedOperation(group: .input, key: "first", summary: "First")
-    let second = PlannedOperation(group: .input, key: "second", summary: "Second")
+    let first = PlannedOperation(group: .audio, key: "first", summary: "First")
+    let second = PlannedOperation(group: .audio, key: "second", summary: "Second")
     let fatal = PlannedOperation(
-      group: .input,
+      group: .audio,
       key: "fatal",
       summary: "Fatal",
       isFatalOnFailure: true
     )
     let adapter = MockSystemSettingsAdapter(
-      group: .input,
-      plan: AdapterPlan(group: .input, operations: [first, second, fatal]),
+      group: .audio,
+      plan: AdapterPlan(group: .audio, operations: [first, second, fatal]),
       applyResults: [
         fatal.id: OperationResult(
           operationID: fatal.id,
@@ -84,7 +84,7 @@ struct MockIntegrationTests {
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
 
     let result = await engine.apply(
-      profile: makeIntegrationProfile(including: [.input]),
+      profile: makeIntegrationProfile(including: [.audio]),
       mode: .normal
     )
 

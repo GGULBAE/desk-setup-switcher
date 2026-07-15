@@ -143,7 +143,7 @@ struct DeskSetupSwitcherApp: App {
     case .permissions, .diagnostics: initialSettingsTab = .system
     case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
       .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
-      .editor, .editorPolish, .validation:
+      .editor, .editorPolish, .editorDisplay, .editorAudio, .editorNetwork, .validation:
       initialSettingsTab = .profiles
     }
     let settingsNavigation = SettingsNavigationModel(selectedTab: initialSettingsTab)
@@ -302,8 +302,12 @@ struct DeskSetupSwitcherApp: App {
     .commands {
       CommandGroup(replacing: .appSettings) {
         Button("Settings…") {
-          settingsNavigation.selectedTab = .profiles
-          Task { await settingsWindowController.presentAndWaitUntilKey() }
+          Task {
+            await presentApplicationSettings(
+              navigation: settingsNavigation,
+              presenter: settingsWindowController
+            )
+          }
         }
         .keyboardShortcut(",")
       }
@@ -357,7 +361,7 @@ struct DeskSetupSwitcherApp: App {
       case .permissions, .diagnostics: initialTab = .system
       case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
         .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
-        .editor, .editorPolish, .validation:
+        .editor, .editorPolish, .editorDisplay, .editorAudio, .editorNetwork, .validation:
         initialTab = .profiles
       }
       _selectedSettingsTab = State(initialValue: initialTab)
@@ -373,7 +377,8 @@ struct DeskSetupSwitcherApp: App {
           router: trayActionRouter
         )
         .frame(width: TrayGeometry.width, height: trayPresentation.viewport.height)
-      case .editor, .editorPolish, .validation, .permissions, .diagnostics:
+      case .editor, .editorPolish, .editorDisplay, .editorAudio, .editorNetwork,
+        .validation, .permissions, .diagnostics:
         SettingsView(selectedTab: $selectedSettingsTab)
           .frame(minWidth: 680, minHeight: 480)
       }

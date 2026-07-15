@@ -75,5 +75,21 @@ final class UserFacingLocalizationTests: XCTestCase {
       appLocalizedRuntime("Current Mac matches this profile", languageCode: "ko"),
       "현재 Mac이 이 프로필과 일치함"
     )
+    XCTAssertEqual(
+      appLocalizedRuntime("Current Mac matches Meeting.", languageCode: "en"),
+      "Current Mac matches ‘Meeting’."
+    )
+    XCTAssertEqual(
+      appLocalizedRuntime("Current Mac matches Meeting.", languageCode: "ko"),
+      "현재 Mac이 ‘Meeting’ 프로필과 일치합니다."
+    )
+    XCTAssertEqual(
+      appLocalizedRuntime("Meeting · Applying…", languageCode: "en"),
+      "Meeting · Applying…"
+    )
+    XCTAssertEqual(
+      appLocalizedRuntime("Meeting · Applying…", languageCode: "ko"),
+      "Meeting · 적용 중…"
+    )
   }
 }

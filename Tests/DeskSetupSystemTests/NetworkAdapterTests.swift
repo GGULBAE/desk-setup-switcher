@@ -161,6 +161,10 @@ struct NetworkAdapterTests {
     }
     #expect(settings.wifiPower.value == true)
     #expect(settings.wifiSSID.isIncluded == false)
+    #expect(settings.serviceIPv4.count == 2)
+    #expect(Set(settings.serviceIPv4.map(\.identity.kind)) == [.ethernet, .wifi])
+    #expect(settings.serviceIPv4.allSatisfy { !$0.configuration.isIncluded })
+    #expect(snapshot.savedWiFiNetworkNames == ["Synthetic Saved Wi-Fi", "Synthetic Wi-Fi"])
     #expect(settings.ipv4.value == .dhcp)
     #expect(settings.ipv4.isIncluded == false)
     #expect(settings.dnsServers.value == ["192.0.2.53"])
@@ -169,6 +173,44 @@ struct NetworkAdapterTests {
     #expect(settings.webProxy.isIncluded == false)
     #expect(settings.secureWebProxy.value == nil)
     #expect(settings.secureWebProxy.isIncluded == false)
+  }
+
+  @Test("service-specific IPv4 ambiguity is nonfatal and preserves unrelated Wi-Fi work")
+  func serviceIPv4AmbiguityIsIsolated() async throws {
+    let api = MockNetworkSystemAPI(snapshot: .associatedFixture)
+    let adapter = NetworkAdapter(systemAPI: api)
+    let snapshot = try await adapter.snapshot()
+    guard case .network(let current) = snapshot.payload else {
+      Issue.record("Expected network settings payload")
+      return
+    }
+    let wifiTarget = try #require(
+      current.serviceIPv4.first(where: { $0.identity.kind == .wifi })
+    )
+    let desiredTarget = NetworkServiceIPv4Settings(
+      identity: wifiTarget.identity,
+      configuration: .init(
+        value: .manual(
+          address: "198.51.100.20",
+          subnetMask: "255.255.255.0",
+          router: "198.51.100.1"
+        )
+      )
+    )
+    let desired = NetworkProfileSettings(
+      wifiPower: .init(value: false),
+      serviceIPv4: [desiredTarget, desiredTarget]
+    )
+
+    let issues = await adapter.validate(.network(desired), against: snapshot)
+    let plan = try await adapter.plan(.network(desired), from: snapshot, mode: .force)
+
+    #expect(!issues.contains(where: { $0.isFatal }))
+    #expect(issues.contains { $0.severity == .warning })
+    #expect(plan.operations.map(\.key) == ["wifi.power"])
+    #expect(plan.omissions.count == 2)
+    #expect(plan.omissions.allSatisfy { $0.status == .skipped })
+    #expect(await api.recordedCalls().isEmpty)
   }
 
   @Test("an identical full network payload plans no operation or omission")
@@ -570,13 +612,26 @@ extension NetworkSystemSnapshot {
       services: [
         .init(
           serviceID: "service-wifi",
+          serviceName: "Synthetic Wi-Fi Service",
           bsdName: "en0",
+          interfaceType: "IEEE80211",
+          kind: .wifi,
           enabled: true,
           ipv4: .dhcp,
           dnsServers: ["192.0.2.53"],
           webProxy: .init(enabled: false, host: "", port: 0)
-        )
-      ]
+        ),
+        .init(
+          serviceID: "service-ethernet",
+          serviceName: "Synthetic Ethernet Service",
+          bsdName: "en7",
+          interfaceType: "Ethernet",
+          kind: .ethernet,
+          enabled: true,
+          ipv4: .dhcp
+        ),
+      ],
+      savedWiFiNetworkNames: ["Synthetic Saved Wi-Fi", "Synthetic Wi-Fi"]
     )
   }
 }

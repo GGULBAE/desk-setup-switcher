@@ -55,8 +55,21 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       items: &items
     )
 
+    var inputVolume = SettingOption<Double?>(isIncluded: false, value: nil)
     var outputVolume = SettingOption<Double?>(isIncluded: false, value: nil)
     var outputMuted = SettingOption<Bool?>(isIncluded: false, value: nil)
+    if let defaultInputUID {
+      inputVolume = readInputVolume(deviceUID: defaultInputUID, items: &items)
+    } else {
+      items.append(
+        SnapshotItem(
+          key: "inputVolume",
+          label: "Input volume",
+          state: .unreadable,
+          detail: "No default input device is available."
+        )
+      )
+    }
     if let defaultOutputUID {
       outputVolume = readVolume(deviceUID: defaultOutputUID, items: &items)
       outputMuted = readMute(deviceUID: defaultOutputUID, items: &items)
@@ -92,6 +105,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
         isIncluded: systemOutputUID != nil,
         value: systemOutputUID
       ),
+      inputVolume: inputVolume,
       outputVolume: outputVolume,
       outputMuted: outputMuted
     )
@@ -142,6 +156,44 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       devices: devices,
       issues: &issues
     )
+
+    let inputUID: String?
+    if settings.defaultInputUID.isIncluded {
+      inputUID = settings.defaultInputUID.value
+    } else {
+      inputUID = try? api.defaultDeviceUID(for: .input)
+    }
+    if settings.inputVolume.isIncluded {
+      if let value = settings.inputVolume.value {
+        if !value.isFinite || !(0.0...1.0).contains(value) {
+          issues.append(
+            fatalIssue(
+              key: "inputVolume",
+              message: "Input volume must be a scalar between 0 and 1."
+            )
+          )
+        }
+      } else {
+        issues.append(fatalIssue(key: "inputVolume", message: "No input volume was saved."))
+      }
+      if let inputUID,
+        devices.contains(where: { $0.uid == inputUID && $0.supportsInput })
+      {
+        appendControlIssue(
+          try? api.inputVolume(forDeviceUID: inputUID),
+          key: "inputVolume",
+          label: "input software volume",
+          issues: &issues
+        )
+      } else {
+        issues.append(
+          fatalIssue(
+            key: "inputVolume",
+            message: "The input device for volume is unavailable."
+          )
+        )
+      }
+    }
 
     let needsOutputControl = settings.outputVolume.isIncluded || settings.outputMuted.isIncluded
     let outputUID: String?
@@ -254,6 +306,20 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
     try planDefaultDevice(
       settings.systemOutputUID,
       role: .systemOutput,
+      devices: devices,
+      operations: &operations,
+      omissions: &omissions
+    )
+
+    let inputUID: String?
+    if settings.defaultInputUID.isIncluded {
+      inputUID = settings.defaultInputUID.value
+    } else {
+      inputUID = try? api.defaultDeviceUID(for: .input)
+    }
+    planInputVolume(
+      settings.inputVolume,
+      deviceUID: inputUID,
       devices: devices,
       operations: &operations,
       omissions: &omissions
@@ -452,6 +518,53 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
     return SettingOption(isIncluded: false, value: nil)
   }
 
+  private func readInputVolume(
+    deviceUID: String,
+    items: inout [SnapshotItem]
+  ) -> SettingOption<Double?> {
+    do {
+      switch try api.inputVolume(forDeviceUID: deviceUID) {
+      case .available(let value, let isSettable):
+        items.append(
+          SnapshotItem(
+            key: "inputVolume",
+            label: "Input volume",
+            state: .storable,
+            detail: isSettable ? "Readable and writable" : "Readable, but not writable"
+          )
+        )
+        return SettingOption(isIncluded: true, value: value)
+      case .unsupported:
+        items.append(
+          unsupportedControlItem(
+            key: "inputVolume",
+            label: "Input volume",
+            deviceRole: "input"
+          )
+        )
+      case .unreadable(let reason):
+        items.append(
+          SnapshotItem(
+            key: "inputVolume",
+            label: "Input volume",
+            state: .unreadable,
+            detail: reason
+          )
+        )
+      }
+    } catch {
+      items.append(
+        SnapshotItem(
+          key: "inputVolume",
+          label: "Input volume",
+          state: .unreadable,
+          detail: "Core Audio could not inspect input software volume."
+        )
+      )
+    }
+    return SettingOption(isIncluded: false, value: nil)
+  }
+
   private func readMute(
     deviceUID: String,
     items: inout [SnapshotItem]
@@ -493,12 +606,16 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
     return SettingOption(isIncluded: false, value: nil)
   }
 
-  private func unsupportedControlItem(key: String, label: String) -> SnapshotItem {
+  private func unsupportedControlItem(
+    key: String,
+    label: String,
+    deviceRole: String = "output"
+  ) -> SnapshotItem {
     SnapshotItem(
       key: key,
       label: label,
       state: .unsupported,
-      detail: "The default output device has no software \(label.lowercased()) control."
+      detail: "The default \(deviceRole) device has no software \(label.lowercased()) control."
     )
   }
 
@@ -701,6 +818,65 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
     }
   }
 
+  private func planInputVolume(
+    _ option: SettingOption<Double?>,
+    deviceUID: String?,
+    devices: [AudioDeviceDescriptor],
+    operations: inout [PlannedOperation],
+    omissions: inout [PlanOmission]
+  ) {
+    guard option.isIncluded else { return }
+    guard let desiredValue = option.value,
+      desiredValue.isFinite,
+      (0.0...1.0).contains(desiredValue),
+      let deviceUID,
+      devices.contains(where: { $0.uid == deviceUID && $0.supportsInput })
+    else {
+      omissions.append(
+        unsupportedOmission(
+          key: "inputVolume",
+          reason: "No valid input device and scalar volume are available."
+        )
+      )
+      return
+    }
+
+    do {
+      switch try api.inputVolume(forDeviceUID: deviceUID) {
+      case .available(let currentValue, true):
+        guard abs(currentValue - desiredValue) > 0.0001 else { return }
+        operations.append(
+          try makeOperation(
+            key: "inputVolume",
+            summary: "Change input volume",
+            desired: .setInputVolume(deviceUID: deviceUID, value: desiredValue),
+            rollback: .setInputVolume(deviceUID: deviceUID, value: currentValue),
+            preview: OperationPreview(
+              previousValue: previewVolume(currentValue),
+              desiredValue: previewVolume(desiredValue)
+            )
+          )
+        )
+      case .available(_, false), .unsupported:
+        omissions.append(
+          unsupportedOmission(
+            key: "inputVolume",
+            reason: "The input device does not provide writable software volume."
+          )
+        )
+      case .unreadable(let reason):
+        omissions.append(skippedOmission(key: "inputVolume", reason: reason))
+      }
+    } catch {
+      omissions.append(
+        skippedOmission(
+          key: "inputVolume",
+          reason: "Input software volume could not be inspected."
+        )
+      )
+    }
+  }
+
   private func planMute(
     _ option: SettingOption<Bool?>,
     deviceUID: String?,
@@ -796,6 +972,8 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       try api.setDefaultDeviceUID(uid, for: role)
     case .setOutputVolume(let deviceUID, let value):
       try api.setOutputVolume(value, forDeviceUID: deviceUID)
+    case .setInputVolume(let deviceUID, let value):
+      try api.setInputVolume(value, forDeviceUID: deviceUID)
     case .setOutputMute(let deviceUID, let value):
       try api.setOutputMute(value, forDeviceUID: deviceUID)
     }

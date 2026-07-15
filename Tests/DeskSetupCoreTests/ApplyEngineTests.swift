@@ -197,10 +197,10 @@ struct ApplyEngineTests {
   @Test("operations sort by risk and then safe group order")
   func deterministicOperationOrdering() async throws {
     let inputLow = PlannedOperation(group: .input, key: "input.low", summary: "Input low")
-    let inputModerate = PlannedOperation(
-      group: .input,
-      key: "input.moderate",
-      summary: "Input moderate",
+    let audioModerate = PlannedOperation(
+      group: .audio,
+      key: "audio.moderate",
+      summary: "Audio moderate",
       risk: .moderate
     )
     let audioLow = PlannedOperation(group: .audio, key: "audio.low", summary: "Audio low")
@@ -211,6 +211,10 @@ struct ApplyEngineTests {
       key: "display.high",
       summary: "Display high",
       risk: .high
+    )
+    let inputAdapter = MockSystemSettingsAdapter(
+      group: .input,
+      plan: AdapterPlan(group: .input, operations: [inputLow])
     )
 
     let adapters: [any SystemSettingsAdapter] = [
@@ -224,12 +228,9 @@ struct ApplyEngineTests {
       ),
       MockSystemSettingsAdapter(
         group: .audio,
-        plan: AdapterPlan(group: .audio, operations: [audioLow])
+        plan: AdapterPlan(group: .audio, operations: [audioModerate, audioLow])
       ),
-      MockSystemSettingsAdapter(
-        group: .input,
-        plan: AdapterPlan(group: .input, operations: [inputModerate, inputLow])
-      ),
+      inputAdapter,
     ]
     let engine = ApplyEngine(registry: try AdapterRegistry(adapters))
 
@@ -241,25 +242,25 @@ struct ApplyEngineTests {
     #expect(preparation.canExecute)
     #expect(
       preparation.operations.map(\.key) == [
-        "input.low",
         "audio.low",
         "network.low",
         "display.low",
-        "input.moderate",
+        "audio.moderate",
         "display.high",
       ])
+    #expect(await inputAdapter.recordedInvocations().isEmpty)
   }
 
   @Test("execution results decode when legacy data omits the safety token")
   func executionResultCodableCompatibility() async throws {
-    let operation = PlannedOperation(group: .input, key: "low", summary: "Low risk")
+    let operation = PlannedOperation(group: .audio, key: "low", summary: "Low risk")
     let adapter = MockSystemSettingsAdapter(
-      group: .input,
-      plan: AdapterPlan(group: .input, operations: [operation])
+      group: .audio,
+      plan: AdapterPlan(group: .audio, operations: [operation])
     )
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
     let result = await engine.apply(
-      profile: makeProfile(including: [.input]),
+      profile: makeProfile(including: [.audio]),
       mode: .normal
     )
     let encoded = try JSONEncoder().encode(result)
@@ -282,30 +283,30 @@ struct ApplyEngineTests {
   @Test("fresh execution plans ignore generated metadata but detect stale rollback state")
   func executionEquivalenceProtectsRollbackState() async throws {
     let operation = PlannedOperation(
-      group: .input,
-      key: "pointer",
-      summary: "Change pointer speed",
+      group: .audio,
+      key: "outputVolume",
+      summary: "Change output volume",
       risk: .moderate,
       payload: Data([1]),
       rollbackPayload: Data([0])
     )
     let adapter = MockSystemSettingsAdapter(
-      group: .input,
+      group: .audio,
       validationIssues: [
         ValidationIssue(
-          group: .input,
+          group: .audio,
           key: "notice",
           severity: .notice,
           isFatal: false,
-          message: "Experimental preference."
+          message: "Synthetic capability notice."
         )
       ],
       plan: AdapterPlan(
-        group: .input,
+        group: .audio,
         operations: [operation],
         omissions: [
           PlanOmission(
-            group: .input,
+            group: .audio,
             key: "optional",
             status: .skipped,
             reason: "Optional item is unavailable."
@@ -315,7 +316,7 @@ struct ApplyEngineTests {
     )
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
     let preview = await engine.prepare(
-      profile: makeProfile(including: [.input]),
+      profile: makeProfile(including: [.audio]),
       mode: .force
     )
     var refreshed = preview
@@ -334,27 +335,27 @@ struct ApplyEngineTests {
   @Test("a failed nonfatal partial write is restored before later operations continue")
   func failedNonfatalOperationSelfRollsBack() async throws {
     let first = PlannedOperation(
-      group: .input,
+      group: .audio,
       key: "first",
       summary: "First",
       rollbackPayload: Data([0])
     )
     let partialFailure = PlannedOperation(
-      group: .input,
+      group: .audio,
       key: "partial",
       summary: "Partial",
       isFatalOnFailure: false,
       rollbackPayload: Data([1])
     )
     let last = PlannedOperation(
-      group: .input,
+      group: .audio,
       key: "last",
       summary: "Last",
       rollbackPayload: Data([2])
     )
     let adapter = MockSystemSettingsAdapter(
-      group: .input,
-      plan: AdapterPlan(group: .input, operations: [first, partialFailure, last]),
+      group: .audio,
+      plan: AdapterPlan(group: .audio, operations: [first, partialFailure, last]),
       applyResults: [
         partialFailure.id: OperationResult(
           operationID: partialFailure.id,
@@ -366,7 +367,7 @@ struct ApplyEngineTests {
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
 
     let result = await engine.apply(
-      profile: makeProfile(including: [.input]),
+      profile: makeProfile(including: [.audio]),
       mode: .normal
     )
 

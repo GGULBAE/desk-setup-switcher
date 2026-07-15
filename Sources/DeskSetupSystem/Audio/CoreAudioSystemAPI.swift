@@ -51,10 +51,30 @@ public struct CoreAudioSystemAPI: AudioSystemAPI {
   }
 
   public func outputVolume(forDeviceUID uid: String) throws -> AudioControlState<Double> {
-    let deviceID = try outputDeviceID(for: uid)
+    try volume(
+      forDeviceUID: uid,
+      role: .output,
+      scope: kAudioObjectPropertyScopeOutput
+    )
+  }
+
+  public func inputVolume(forDeviceUID uid: String) throws -> AudioControlState<Double> {
+    try volume(
+      forDeviceUID: uid,
+      role: .input,
+      scope: kAudioObjectPropertyScopeInput
+    )
+  }
+
+  private func volume(
+    forDeviceUID uid: String,
+    role: AudioDefaultDeviceRole,
+    scope: AudioObjectPropertyScope
+  ) throws -> AudioControlState<Double> {
+    let deviceID = try scopedDeviceID(for: uid, role: role)
     var address = propertyAddress(
       selector: kAudioDevicePropertyVolumeScalar,
-      scope: kAudioObjectPropertyScopeOutput
+      scope: scope
     )
     guard AudioObjectHasProperty(deviceID, &address) else { return .unsupported }
 
@@ -126,13 +146,36 @@ public struct CoreAudioSystemAPI: AudioSystemAPI {
   }
 
   public func setOutputVolume(_ value: Double, forDeviceUID uid: String) throws {
+    try setVolume(
+      value,
+      forDeviceUID: uid,
+      role: .output,
+      scope: kAudioObjectPropertyScopeOutput
+    )
+  }
+
+  public func setInputVolume(_ value: Double, forDeviceUID uid: String) throws {
+    try setVolume(
+      value,
+      forDeviceUID: uid,
+      role: .input,
+      scope: kAudioObjectPropertyScopeInput
+    )
+  }
+
+  private func setVolume(
+    _ value: Double,
+    forDeviceUID uid: String,
+    role: AudioDefaultDeviceRole,
+    scope: AudioObjectPropertyScope
+  ) throws {
     guard value.isFinite, (0.0...1.0).contains(value) else {
       throw AudioSystemError.invalidVolume(value)
     }
-    let deviceID = try outputDeviceID(for: uid)
+    let deviceID = try scopedDeviceID(for: uid, role: role)
     var address = propertyAddress(
       selector: kAudioDevicePropertyVolumeScalar,
-      scope: kAudioObjectPropertyScopeOutput
+      scope: scope
     )
     guard AudioObjectHasProperty(deviceID, &address) else {
       throw AudioSystemError.unsupportedControl(uid: uid, key: "volume")
@@ -150,7 +193,7 @@ public struct CoreAudioSystemAPI: AudioSystemAPI {
       UInt32(MemoryLayout<Float32>.size),
       &scalar
     )
-    try requireNoError(status, operation: "set output volume")
+    try requireNoError(status, operation: "set \(role.displayName) volume")
   }
 
   public func setOutputMute(_ value: Bool, forDeviceUID uid: String) throws {
@@ -232,9 +275,17 @@ public struct CoreAudioSystemAPI: AudioSystemAPI {
   }
 
   private func outputDeviceID(for uid: String) throws -> AudioDeviceID {
+    try scopedDeviceID(for: uid, role: .output)
+  }
+
+  private func scopedDeviceID(
+    for uid: String,
+    role: AudioDefaultDeviceRole
+  ) throws -> AudioDeviceID {
     let descriptor = try descriptor(for: uid)
-    guard descriptor.supportsOutput else {
-      throw AudioSystemError.deviceHasWrongScope(uid: uid, role: .output)
+    let supportsScope = role == .input ? descriptor.supportsInput : descriptor.supportsOutput
+    guard supportsScope else {
+      throw AudioSystemError.deviceHasWrongScope(uid: uid, role: role)
     }
     return try deviceID(for: uid)
   }

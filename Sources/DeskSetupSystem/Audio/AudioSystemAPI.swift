@@ -88,7 +88,7 @@ extension AudioSystemError: LocalizedError {
     case .controlNotSettable(_, let key):
       "The audio device's \(key) control is read-only."
     case .invalidVolume(let value):
-      "The output volume \(value) is outside the supported scalar range."
+      "The audio volume \(value) is outside the supported scalar range."
     case .malformedProperty(let property):
       "Core Audio returned an invalid \(property) property."
     }
@@ -100,16 +100,29 @@ extension AudioSystemError: LocalizedError {
 public protocol AudioSystemAPI: Sendable {
   func devices() throws -> [AudioDeviceDescriptor]
   func defaultDeviceUID(for role: AudioDefaultDeviceRole) throws -> String?
+  func inputVolume(forDeviceUID uid: String) throws -> AudioControlState<Double>
   func outputVolume(forDeviceUID uid: String) throws -> AudioControlState<Double>
   func outputMute(forDeviceUID uid: String) throws -> AudioControlState<Bool>
 
   func setDefaultDeviceUID(_ uid: String, for role: AudioDefaultDeviceRole) throws
+  func setInputVolume(_ value: Double, forDeviceUID uid: String) throws
   func setOutputVolume(_ value: Double, forDeviceUID uid: String) throws
   func setOutputMute(_ value: Bool, forDeviceUID uid: String) throws
 }
 
 public enum AudioOperationCommand: Codable, Hashable, Sendable {
   case setDefaultDevice(role: AudioDefaultDeviceRole, uid: String)
+  case setInputVolume(deviceUID: String, value: Double)
   case setOutputVolume(deviceUID: String, value: Double)
   case setOutputMute(deviceUID: String, value: Bool)
+}
+
+extension AudioSystemAPI {
+  public func inputVolume(forDeviceUID uid: String) throws -> AudioControlState<Double> {
+    .unsupported
+  }
+
+  public func setInputVolume(_ value: Double, forDeviceUID uid: String) throws {
+    throw AudioSystemError.unsupportedControl(uid: uid, key: "input volume")
+  }
 }
