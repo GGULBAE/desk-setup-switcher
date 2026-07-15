@@ -356,18 +356,25 @@ struct MenuProfileDeletionState: Equatable, Sendable {
 }
 
 enum MenuProfileListLayout {
-  static let minimumHeight: CGFloat = 124
+  static let fallbackHeight: CGFloat = 124
   static let normalMaximumHeight: CGFloat = 360
   static let confirmationMaximumHeight: CGFloat = 420
-  static let estimatedRowHeight: CGFloat = 84
-  static let confirmationAllowance: CGFloat = 110
 
-  static func height(profileCount: Int, hasDeletionConfirmation: Bool) -> CGFloat {
-    let rowHeight = CGFloat(max(profileCount, 0)) * estimatedRowHeight
-    let requestedHeight = rowHeight + (hasDeletionConfirmation ? confirmationAllowance : 0)
+  static func height(contentHeight: CGFloat, hasDeletionConfirmation: Bool) -> CGFloat {
     let maximumHeight =
       hasDeletionConfirmation ? confirmationMaximumHeight : normalMaximumHeight
-    return min(max(requestedHeight, minimumHeight), maximumHeight)
+    guard contentHeight.isFinite, contentHeight > 0 else {
+      return fallbackHeight
+    }
+    return min(contentHeight, maximumHeight)
+  }
+}
+
+private struct MenuProfileListContentHeightKey: PreferenceKey {
+  static let defaultValue: CGFloat = 0
+
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = max(value, nextValue())
   }
 }
 
@@ -400,6 +407,7 @@ private struct MenuContentView: View {
   @State private var deferredApplyAfterPreviewDismissal: PendingApplyRequest?
   @State private var isApplyResultDetailsPresented = false
   @State private var profileDeletion = MenuProfileDeletionState()
+  @State private var profileListContentHeight: CGFloat = 0
   @State private var isCaptureLocationExplanationPresented = false
   @State private var isCaptureLocationSettingsPresented = false
   private let showSettingsWindow: @MainActor () -> Void
@@ -664,8 +672,20 @@ private struct MenuContentView: View {
             }
             .padding(.trailing, 2)
             .padding(.bottom, 2)
+            .background {
+              GeometryReader { geometry in
+                Color.clear.preference(
+                  key: MenuProfileListContentHeightKey.self,
+                  value: geometry.size.height
+                )
+              }
+            }
           }
           .frame(width: 340, height: profileListHeight)
+          .onPreferenceChange(MenuProfileListContentHeightKey.self) { contentHeight in
+            guard abs(profileListContentHeight - contentHeight) > 0.5 else { return }
+            profileListContentHeight = contentHeight
+          }
           .onChange(of: profileDeletion.pendingProfileID) {
             guard let profileID = profileDeletion.pendingProfileID else { return }
             Task { @MainActor in
@@ -702,6 +722,7 @@ private struct MenuContentView: View {
       }
     }
     .padding(14)
+    .fixedSize(horizontal: false, vertical: true)
   }
 
   private var enabledProfiles: [DeskProfile] {
@@ -1098,7 +1119,7 @@ private struct MenuContentView: View {
 
   private var profileListHeight: CGFloat {
     MenuProfileListLayout.height(
-      profileCount: enabledProfiles.count,
+      contentHeight: profileListContentHeight,
       hasDeletionConfirmation: profileDeletion.pendingProfileID != nil
     )
   }

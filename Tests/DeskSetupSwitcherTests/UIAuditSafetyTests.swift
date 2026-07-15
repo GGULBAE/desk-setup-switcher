@@ -189,34 +189,34 @@ import Testing
       #expect(state.pendingProfileID == nil)
     }
 
-    @Test("tray deletion layout reserves a complete confirmation region")
-    func trayDeletionLayoutHeight() {
-      let normalOne = MenuProfileListLayout.height(
-        profileCount: 1,
+    @Test("tray profile list follows measured content and caps scrolling")
+    func trayProfileListMeasuredHeight() {
+      let compact = MenuProfileListLayout.height(
+        contentHeight: 176,
         hasDeletionConfirmation: false
       )
-      let confirmingOne = MenuProfileListLayout.height(
-        profileCount: 1,
+      let expandedConfirmation = MenuProfileListLayout.height(
+        contentHeight: 286,
         hasDeletionConfirmation: true
       )
-      let normalThree = MenuProfileListLayout.height(
-        profileCount: 3,
+      let normalOverflow = MenuProfileListLayout.height(
+        contentHeight: 640,
         hasDeletionConfirmation: false
       )
-      let confirmingThree = MenuProfileListLayout.height(
-        profileCount: 3,
+      let confirmationOverflow = MenuProfileListLayout.height(
+        contentHeight: 640,
         hasDeletionConfirmation: true
       )
-      let confirmingMany = MenuProfileListLayout.height(
-        profileCount: 20,
+      let awaitingMeasurement = MenuProfileListLayout.height(
+        contentHeight: 0,
         hasDeletionConfirmation: true
       )
 
-      #expect(normalOne == MenuProfileListLayout.minimumHeight)
-      #expect(confirmingOne >= 190)
-      #expect(confirmingOne - normalOne >= 70)
-      #expect(confirmingThree > normalThree)
-      #expect(confirmingMany == MenuProfileListLayout.confirmationMaximumHeight)
+      #expect(compact == 176)
+      #expect(expandedConfirmation == 286)
+      #expect(normalOverflow == MenuProfileListLayout.normalMaximumHeight)
+      #expect(confirmationOverflow == MenuProfileListLayout.confirmationMaximumHeight)
+      #expect(awaitingMeasurement == MenuProfileListLayout.fallbackHeight)
     }
 
     @Test("settings layout changes only at the documented breakpoint")
