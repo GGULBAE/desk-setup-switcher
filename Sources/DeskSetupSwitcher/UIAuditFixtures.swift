@@ -13,11 +13,29 @@ import SwiftUI
 enum UIAuditVariant: String {
   case overview
   case menuPolish = "menu-polish"
+  case trayEmpty = "tray-empty"
+  case traySingle = "tray-single"
+  case trayOverflow = "tray-overflow"
+  case trayDelete = "tray-delete"
+  case trayCapturePermission = "tray-capture-permission"
+  case trayCaptureSuccess = "tray-capture-success"
+  case trayCaptureFailure = "tray-capture-failure"
+  case trayApplyResult = "tray-apply-result"
   case editor
   case editorPolish = "editor-polish"
   case validation
   case permissions
   case diagnostics
+
+  var isTraySurface: Bool {
+    switch self {
+    case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
+      .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult:
+      true
+    case .editor, .editorPolish, .validation, .permissions, .diagnostics:
+      false
+    }
+  }
 }
 
 enum UIAuditDisplayMode: String {
@@ -30,7 +48,7 @@ struct UIAuditConfiguration {
   let isEnabled: Bool
   let variant: UIAuditVariant
   let displayMode: UIAuditDisplayMode
-  let showsMenuBarExtra: Bool
+  let showsStatusPopover: Bool
 
   static var current: Self {
     #if DEBUG
@@ -44,7 +62,7 @@ struct UIAuditConfiguration {
           ?? .overview,
         displayMode: UIAuditDisplayMode(
           rawValue: environment["DESK_SETUP_UI_AUDIT_DISPLAY"] ?? "") ?? .standard,
-        showsMenuBarExtra: environment["DESK_SETUP_UI_AUDIT_MENUBAR"] == "1"
+        showsStatusPopover: environment["DESK_SETUP_UI_AUDIT_MENUBAR"] == "1"
       )
     #else
       return .disabled
@@ -55,7 +73,7 @@ struct UIAuditConfiguration {
     isEnabled: false,
     variant: .overview,
     displayMode: .standard,
-    showsMenuBarExtra: false
+    showsStatusPopover: false
   )
 }
 
@@ -150,23 +168,54 @@ extension View {
         ready.settings.network.value.wifiSSID.value = "  "
       }
 
-      let profiles = [ready, partial, disabled]
+      let profiles: [DeskProfile]
+      switch variant {
+      case .trayEmpty:
+        profiles = []
+      case .traySingle:
+        profiles = [ready]
+      case .trayOverflow:
+        profiles = (0..<10).map { index in
+          var profile = ready
+          profile.id = UUID(
+            uuidString: String(format: "10000000-0000-0000-0000-%012d", index + 10)
+          )!
+          profile.name = "Synthetic Workspace \(index + 1) — Long Profile Name"
+          return profile
+        }
+      case .overview, .menuPolish, .trayDelete, .trayCapturePermission,
+        .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
+        .editor, .editorPolish, .validation, .permissions, .diagnostics:
+        profiles = [ready, partial, disabled]
+      }
       let snapshot = syntheticSnapshot(settings: ready.settings)
       let captureSummary: ProfileCaptureSummary? =
-        variant == .overview || variant == .menuPolish ? partialCaptureSummary() : nil
+        variant == .overview || variant == .menuPolish || variant == .trayCapturePermission
+        ? partialCaptureSummary() : nil
       let applySummary: ApplyResultSummary? =
-        variant == .overview ? partialApplySummary(profile: ready) : nil
+        variant == .overview || variant == .trayApplyResult
+        ? partialApplySummary(profile: ready) : nil
+
+      let readiness = Dictionary(
+        uniqueKeysWithValues: profiles.map { profile in
+          if profile.id == partial.id { return (profile.id, ProfileReadiness.partial) }
+          if profile.id == disabled.id { return (profile.id, ProfileReadiness.unavailable) }
+          return (
+            profile.id,
+            variant == .validation ? ProfileReadiness.partial : ProfileReadiness.ready
+          )
+        }
+      )
+      let operations = Dictionary(
+        uniqueKeysWithValues: profiles.filter(\.isEnabled).map { ($0.id, 7) }
+      )
 
       return UIAuditFixtureState(
         profiles: profiles,
-        selectedProfileID: ready.id,
+        selectedProfileID: profiles.first?.id,
         snapshot: snapshot,
-        readinessByProfile: [
-          ready.id: variant == .validation ? .partial : .ready,
-          partial.id: .partial,
-          disabled.id: .unavailable,
-        ],
-        operationCountByProfile: [ready.id: 7],
+        readinessByProfile: readiness,
+        operationCountByProfile: operations,
         availableOperationCountByProfile: [partial.id: 3],
         captureSummary: captureSummary,
         applySummary: applySummary

@@ -20,7 +20,7 @@ Concrete adapters for Core Graphics, Core Audio, CoreWLAN/Network/SystemConfigur
 
 ### DeskSetupSwitcherApp
 
-SwiftUI `MenuBarExtra`, compact header actions, independently collapsible typed setting editors, inline field validation, an AppKit-owned resizable Settings window hosting SwiftUI content, observable application state, preview/confirmation/result sheets, app-lifetime profile editor ownership, one-shot permission UI, `SMAppService` login-item control, sanitized diagnostic browsing/clearing, import/export, About, localization, and accessibility metadata. The app binds pure presentation state to controls and coordinates core/system services; it does not implement display/audio/network/input mutations itself.
+An AppKit-owned `NSStatusItem` + `NSPopover` tray with a SwiftUI root hosted by `NSHostingController`, compact header actions, independently collapsible typed setting editors, inline field validation, persistent Settings/workflow windows, app-lifetime profile editor and tray-presentation ownership, `SMAppService` login-item control, sanitized diagnostic browsing/clearing, import/export, About, localization, and accessibility metadata. The app binds pure presentation state to controls and coordinates core/system services; it does not implement display/audio/network/input mutations itself.
 
 ### Tests
 
@@ -30,7 +30,7 @@ Core unit tests use deterministic clocks, file systems, IDs, and mock adapters. 
 
 ```mermaid
 flowchart LR
-    UI["Menu bar / Settings"] --> Presentation["Draft and presentation models"]
+    UI["Status item / popover / persistent windows"] --> Presentation["Draft and presentation models"]
     Presentation --> CoreValues["Core profile / plan values"]
     UI --> Coordinator["App coordinator"]
     Coordinator --> Store["Profile store actor"]
@@ -50,6 +50,14 @@ flowchart LR
     Registry --> ReadBack["Fresh read-only snapshots"]
     ReadBack --> Coordinator
 ```
+
+## Tray surface lifecycle
+
+`DeskSetupSwitcherApp` strongly owns one `TrayPopoverController`, `TrayPresentationModel`, Settings controller, and workflow controller for the process lifetime. `TrayPopoverController` creates one status item, one `.applicationDefined` popover, and one hosting controller. Opening computes a `TrayOpenSessionGeometry` from profile count and the active screen's visible frame; that point-sized viewport is immutable until close. Banners, inline deletion, task completion, locale, and Dynamic Type update only content inside the single scroll view. A new screen or scale factor affects the next open generation, not the current one.
+
+`TrayAction` is the only user-action vocabulary at the surface boundary. `TrayActionRouter` maps every action to exactly one disposition: keep the surface open, present a persistent destination and close only after it is visible and key, or terminate. It coalesces identical in-flight handoffs and checks the session generation before closing, so a late completion cannot close a reopened popover. Presentation failure or cancellation records a reachable error and does not close. App deactivation and scoped outside-mouse monitors provide explicit dismissal; Esc is handled by the SwiftUI root. No test injects input events or opens the live surface.
+
+Permission, capture, dirty-draft, preview, safety-confirmation, result, deletion, focus, and in-flight task state live above the SwiftUI root. `onDisappear` is therefore not a cancellation boundary. Persistent AppKit windows host workflows that must outlive the popover; Settings/window handoff awaits actual visibility and key state rather than an arbitrary delay. `.applicationDefined` is an AppKit behavior choice, not proof that every native dismissal path is correct on every supported macOS release, so installed interaction remains a separate evidence gate.
 
 ## Profile draft flow
 
@@ -142,13 +150,13 @@ The network adapter treats a powered-on CoreWLAN interface with no readable SSID
 
 ## Current evidence boundary
 
-The current measured-height tray/responsive tree passed integrated non-live `make verify` on 2026-07-15: lint/localization policy; 305 default cases (129 XCTest plus 176 Swift Testing cases, six opt-in skips), zero failures; Swift Debug/Release; universal Xcode Debug/Release; Analyze; package/checksum; mounted metadata/resources/`x86_64 arm64`; and ad-hoc/no-Developer-ID signature classification. Its separate five-case opt-in live-read gate passed on the preceding capture source, including the online-but-inactive display sleep state, without mutation. Separately, `git diff --check` passed. The verified DMG SHA-256 is `8bf4d547fae0df3cbe999db84e7be169b33d495b3993cf7c37f46ba37d6ea71d`; its executable is byte-for-byte identical to the installed app launched from `/Applications`. The 301-case stable permission-handoff gate remains historical evidence.
+Tray Surface v2 passed integrated non-live `make verify` on 2026-07-15: lint/localization policy; 326 default cases (130 XCTest plus 196 Swift Testing cases, six opt-in skips), zero failures; Swift Debug/Release; universal Xcode Debug/Release; Analyze; package/checksum; mounted metadata/resources/`x86_64 arm64`; and ad-hoc/no-Developer-ID signature classification. Separately, `git diff --check` passed. The verified DMG SHA-256 is `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`. The package was not installed or launched. Twelve detached-host PNG/metadata pairs prove the contained synthetic SwiftUI states only; they do not prove `NSStatusItem` interaction, actual popover chrome/anchor/material/ghost-frame behavior, native dismissal timing, first responder, VoiceOver, or TCC. Earlier `MenuBarExtra` installed interactions are historical and cannot close those v2 gaps.
 
 The preceding header/editor follow-up passed full local `make verify` with 215 default non-live tests (112 XCTest + 103 Swift Testing), including 56 presentation-specific cases, universal Debug/Release, Analyze, and mounted package/checksum verification. Its local DMG SHA-256 is `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`. UI-hardening commit `5f0cabc`, [GitHub Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967), and artifact `8256718472` remain historical remote evidence and predate the current follow-up.
 
 The 2026-07-11 post-fix baseline passed full local `make verify` with 158 tests (83 XCTest + 75 Swift Testing), the universal package/checksum gate, and all five opt-in read-only discovery gates on an Apple M5 Mac running macOS 26.5.2. Its recorded local-DMG install launched background-only/menu-bar-only from `/Applications`; Korean popover/Settings and one accessibility label passed. It created one schema-v1 Ready profile from a read-only snapshot with all four groups, while the zero-operation plan kept Apply and Force Apply disabled. Default-on login registration plus opt-out/re-enable passed, with final cleanup opted out. The baseline local DMG SHA-256 is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
 
-Initial Actions run `29154880831` for `0d8f510` preserves the Swift 6.1 actor-isolation failure history. Repair [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) remains historical compatibility evidence, while UI-hardening run `29181900967` is the latest remote implementation evidence above. Login approval/retry and actual reboot/login-at-boot, current-follow-up rendered localization/accessibility, import/export, TCC permission paths, quarantine/Gatekeeper, physical Intel, Keychain write, every live setting mutation/rollback, full VoiceOver, signing/notarization, and release publication remain outside the verified boundary. No UI automation was used. Architecture diagrams describe call paths, not proof that each external effect works on every device.
+Initial Actions run `29154880831` for `0d8f510` preserves the Swift 6.1 actor-isolation failure history. Repair [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) remains historical compatibility evidence, while UI-hardening run `29181900967` is the latest remote implementation evidence above. Actual v2 tray interaction, login approval/retry and reboot/login-at-boot, import/export, TCC permission paths, quarantine/Gatekeeper, physical Intel, Keychain write, every live setting mutation/rollback, full VoiceOver, signing/notarization, and release publication remain outside the verified boundary. No UI automation was used. Architecture diagrams describe call paths, not proof that each external effect works on every device.
 
 ## Evolution
 

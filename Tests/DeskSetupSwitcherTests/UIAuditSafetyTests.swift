@@ -146,28 +146,6 @@ import Testing
       #expect(controller.lastError == nil)
     }
 
-    @Test("tray permission actions establish a stable settings window before system UI")
-    func permissionActionUsesStableSettingsWindow() async {
-      var events: [String] = []
-      let coordinator = StablePermissionActionCoordinator(
-        presentSettings: {
-          events.append("app-settings")
-        },
-        waitForPresentation: {
-          events.append("presentation-settled")
-        }
-      )
-
-      let task = coordinator.perform {
-        events.append("system-permission-action")
-      }
-
-      #expect(events == ["app-settings"])
-      await task.value
-      #expect(
-        events == ["app-settings", "presentation-settled", "system-permission-action"])
-    }
-
     @Test("tray deletion request, cancel, and confirmation are deterministic")
     func trayDeletionStateTransitions() {
       let first = UUID()
@@ -189,36 +167,6 @@ import Testing
       #expect(state.pendingProfileID == nil)
     }
 
-    @Test("tray profile list follows measured content and caps scrolling")
-    func trayProfileListMeasuredHeight() {
-      let compact = MenuProfileListLayout.height(
-        contentHeight: 176,
-        hasDeletionConfirmation: false
-      )
-      let expandedConfirmation = MenuProfileListLayout.height(
-        contentHeight: 286,
-        hasDeletionConfirmation: true
-      )
-      let normalOverflow = MenuProfileListLayout.height(
-        contentHeight: 640,
-        hasDeletionConfirmation: false
-      )
-      let confirmationOverflow = MenuProfileListLayout.height(
-        contentHeight: 640,
-        hasDeletionConfirmation: true
-      )
-      let awaitingMeasurement = MenuProfileListLayout.height(
-        contentHeight: 0,
-        hasDeletionConfirmation: true
-      )
-
-      #expect(compact == 176)
-      #expect(expandedConfirmation == 286)
-      #expect(normalOverflow == MenuProfileListLayout.normalMaximumHeight)
-      #expect(confirmationOverflow == MenuProfileListLayout.confirmationMaximumHeight)
-      #expect(awaitingMeasurement == MenuProfileListLayout.fallbackHeight)
-    }
-
     @Test("settings layout changes only at the documented breakpoint")
     func responsiveSettingsBreakpoint() {
       #expect(ProfileWorkspaceLayoutMode(width: 759.9) == .compact)
@@ -237,6 +185,34 @@ import Testing
       #expect(window.contentView?.bounds.width == 900)
       #expect(window.contentView?.bounds.height == 568)
       #expect(!window.isReleasedWhenClosed)
+    }
+
+    @Test("workflow window is persistent and strongly retains its content window")
+    func workflowWindowGeometry() throws {
+      let controller = TrayWorkflowWindowController(rootView: Color.clear)
+      let window = try #require(controller.window)
+
+      #expect(window.styleMask.contains(.resizable))
+      #expect(window.contentMinSize == CGSize(width: 520, height: 360))
+      #expect(!window.isReleasedWhenClosed)
+    }
+
+    @Test("closing a destination before it becomes key reports cancellation")
+    func destinationCloseBeforeKey() async {
+      let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+        styleMask: [.titled, .closable],
+        backing: .buffered,
+        defer: false
+      )
+      let waiter = WindowPresentationAwaiter(window: window)
+
+      let result = await waiter.present {
+        NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
+      }
+
+      #expect(result == .cancelled)
+      #expect(!window.isVisible)
     }
   }
 

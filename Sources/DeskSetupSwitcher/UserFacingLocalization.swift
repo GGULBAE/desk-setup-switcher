@@ -9,10 +9,27 @@ import Foundation
 #endif
 
 private var appRuntimeLocalizationBundle: Bundle {
+  #if DEBUG
+    if let languageCode = ProcessInfo.processInfo.environment["DESK_SETUP_UI_AUDIT_LANGUAGE"] {
+      #if SWIFT_PACKAGE
+        if let path = Bundle.module.path(forResource: languageCode, ofType: "lproj"),
+          let bundle = Bundle(path: path)
+        {
+          return bundle
+        }
+      #else
+        if let path = Bundle.main.path(forResource: languageCode, ofType: "lproj"),
+          let bundle = Bundle(path: path)
+        {
+          return bundle
+        }
+      #endif
+    }
+  #endif
   #if SWIFT_PACKAGE
-    Bundle.module
+    return Bundle.module
   #else
-    Bundle.main
+    return Bundle.main
   #endif
 }
 

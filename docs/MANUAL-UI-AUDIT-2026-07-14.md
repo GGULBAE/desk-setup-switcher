@@ -1,5 +1,7 @@
 # Manual UI Audit — 2026-07-14
 
+> **Historical surface:** this audit covers the superseded SwiftUI `MenuBarExtra` implementation and the persistent Settings window. Tray Surface Architecture v2 uses `NSStatusItem` + `NSPopover`; none of the installed tray interactions below prove the v2 anchor, chrome, material, dismissal, or focus behavior. See [TRAY-SURFACE-AUDIT-2026-07-15.md](TRAY-SURFACE-AUDIT-2026-07-15.md) for current non-live evidence and remaining manual checks.
+
 This report records a synthetic render and read-only accessibility inspection for Desk Setup Switcher at the source point captured below. That source added per-profile menu deletion controls, an expanded value-free explanation of partial captures, a card-based profile editor with more usable width, and a simplified Profiles/System/About information architecture. Later inline-delete and actionable capture-permission corrections are documented separately because they are not depicted in these images. Diagnostics remain available as an on-demand advanced sheet. The report separates what the evidence proves from interactions and hardware behavior that remain pending.
 
 ## Safety boundary
@@ -65,7 +67,7 @@ This read-only capture check must not apply a profile or change display, audio, 
 
 ## Evidence boundary and pending checks
 
-The synthetic host is evidence for the contained SwiftUI content only. It does not prove the actual MenuBarExtra chrome, status-item anchor, or menu placement. The installed interactions separately prove the actual status item, Capture and Settings header actions, Settings reactivation, inline deletion controls, and responsive Settings state preservation; they do not broaden the remaining synthetic states into hardware evidence.
+The synthetic host is evidence for the historical contained SwiftUI content only. It does not prove the actual `MenuBarExtra` chrome, status-item anchor, or menu placement, and it says nothing about Tray Surface v2. The installed interactions separately prove the superseded status item, Capture and Settings header actions, Settings reactivation, inline deletion controls, and responsive Settings state preservation; only the persistent Settings and store-rollback observations remain directly relevant to current shared code.
 
 The following remain separate evidence and are not marked complete here:
 

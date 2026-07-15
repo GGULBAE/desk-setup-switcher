@@ -83,7 +83,7 @@ The active contract is [APPLY-RELIABILITY-UX-GOAL.md](APPLY-RELIABILITY-UX-GOAL.
 
 Historical evidence: integrated non-live `make verify` passed on 2026-07-14 with lint/localization policy, 290 default cases (124 XCTest with five opt-in skips plus 166 Swift Testing with one opt-in skip), zero failures, Swift Debug/Release, universal Xcode Debug/Release, Analyze, DMG/checksum, mounted resources/architectures, and ad-hoc signature classification. The verified universal DMG SHA-256 was `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`. No live setting mutation, hardware rollback, TCC action, full VoiceOver run, UI automation, Developer ID signing/notarization, release, push, or new CI run was performed for this follow-up.
 
-## M4.2 — Final-source synthetic UI audit (locally verified; interaction gaps recorded)
+## M4.2 — Historical `MenuBarExtra` synthetic UI audit (locally verified; superseded by M4.3)
 
 - DEBUG-only English/Korean audit fixtures cover menu overview, editor, validation, denied-permission presentation, diagnostics, minimum layout, and simulated large text
 - The audit model uses a temporary store and injected empty adapters while blocking capture, apply, profile persistence, readiness, login-item, diagnostic, and Core Location request paths
@@ -99,7 +99,19 @@ Evidence: the [manual UI audit](MANUAL-UI-AUDIT-2026-07-14.md) records 16 PNGs a
 
 Full keyboard-only traversal, VoiceOver, real macOS text-size, TCC, login approval/retry/reboot, Keychain, Gatekeeper, physical Intel, import/export, and mutation/rollback evidence remains pending.
 
-## M5 — Packaging and CI (current local package verified; historical CI green)
+## M4.3 — Tray Surface Architecture v2 (locally verified; installed interaction pending)
+
+- Production tray ownership is `NSStatusItem` + `.applicationDefined` `NSPopover` + `NSHostingController`; `MenuBarExtra(.window)` and measured SwiftUI height feedback are removed.
+- Geometry is computed once per open generation for 0/1/compact/overflow profile states, clamped to the active screen, and held stable while banners, deletion, text size, or async results change. One internal scroll view owns overflow.
+- `TrayAction` assigns every control exactly one `stayOpen`, persistent-destination handoff, or terminate disposition. The router coalesces identical in-flight actions, waits for visible/key destinations, leaves failure/cancel reachable, and rejects stale-generation close requests.
+- Deletion/focus intent, capture/permission tasks, dirty decisions, previews, safety confirmation, and results are app-lifetime state. Settings and workflow windows are strongly retained and do not depend on popover view lifetime.
+- English/Korean strings, icon accessibility labels/help, non-color state text, keyboard shortcuts, and deterministic deletion focus transitions are covered by source/tests.
+
+Evidence: non-live `make verify` passed 326 default cases (130 XCTest + 196 Swift Testing, six opt-in skips), Swift Debug/Release, universal Xcode Debug/Release, Analyze, and mounted DMG verification. SHA-256 is `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`. The [Tray Surface v2 audit](TRAY-SURFACE-AUDIT-2026-07-15.md) records 12 detached-host PNGs and 12 read-only metadata files. It proves contained SwiftUI layout, localization, simulated large text, one high-contrast appearance, and privacy review; the detached host cannot prove actual popover chrome, arrow, anchor, material, ghost-frame absence, native dismissal timing, first responder, or full VoiceOver tree. The v2 package was not installed or launched, and earlier `MenuBarExtra` installed evidence is not reused.
+
+Remaining: user-driven installed status-item/popover interaction, complete keyboard/VoiceOver and real accessibility-setting walkthroughs, TCC, login approval/retry/reboot, Gatekeeper, physical Intel, import/export, Keychain, and every hardware mutation/rollback procedure.
+
+## M5 — Packaging and CI (Tray Surface v2 local package verified; historical CI green)
 
 - The 2026-07-11 post-fix full `make verify` locally passed lint, 158 tests (83 XCTest + 75 Swift Testing), universal builds, Analyze, packaging, checksum, and mounted-image inspection
 - Versioned DMG contains universal app, `/Applications` link, resources, and a verified ad-hoc integrity signature
@@ -111,7 +123,8 @@ Full keyboard-only traversal, VoiceOver, real macOS text-size, TCC, login approv
 - UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967); unsigned artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`
 - The 2026-07-14 apply-reliability `make verify` produced and mounted its then-current universal package with SHA-256 `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`; this is historical package evidence
 - The stable permission-handoff follow-up `make verify` produced and mounted its then-current universal package, verified `x86_64 arm64`, resources, checksum, and ad-hoc/no-Developer-ID signature status; SHA-256 is `150d1e0bb620fba52c2ec2a6a78345b5b74f44ca10c9d5375178f6ab16ea370d`. The installed-interaction package SHA-256 `df674b37e2a2fe9a94d37435313265069e27f6130ae05ad02b8ae822ac00e8b6`, pre-stable-handoff capture SHA-256 `ed52b253159e6abc8fe35e606aed56cc269693a53b76986dae20a04ffb2bd4fc`, pre-live-test-adjustment capture SHA-256 `8760d68754f3bc1eebca37319bd0d2bfc29b6b3d90832532e0a64cd072506a9b`, preceding tray/editor SHA-256 `f3d24ae95709d0db9de13ba6032eb63a1d19a5be89af15aa68244da9019afbde`, and layout-correction SHA-256 `ae940ce1cffb969f309b8ffa8f6ffcd0637fd0845ee21bf24fa59129ea530ef7` are historical
-- The measured-height tray/responsive-settings follow-up `make verify` produced and mounted the current universal package with SHA-256 `8bf4d547fae0df3cbe999db84e7be169b33d495b3993cf7c37f46ba37d6ea71d`; its executable matches the installed app byte-for-byte. The pre-correction package SHA-256 `8422b042b793bf0845ac56e2dcbd9808075a0467226d79ee65408440736648d8`, stable permission-handoff, and earlier checksums above are historical.
+- The measured-height tray/responsive-settings follow-up `make verify` produced and mounted historical universal package SHA-256 `8bf4d547fae0df3cbe999db84e7be169b33d495b3993cf7c37f46ba37d6ea71d`; its executable matched the then-installed app byte-for-byte. The pre-correction package SHA-256 `8422b042b793bf0845ac56e2dcbd9808075a0467226d79ee65408440736648d8`, stable permission-handoff, and earlier checksums above are historical.
+- Tray Surface v2 supersedes that package. Its non-live gate produced and mounted universal SHA-256 `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`; installation, launch, push, and CI were not performed.
 
 Remaining:
 
@@ -119,8 +132,8 @@ Remaining:
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
-## Current next task — detailed UI rhythm and accessibility pass
+## Current next task — tray detailed UI refinement
 
-With tray deletion and responsive window behavior closed, the next implementation task is a non-behavioral visual pass over the profile editor: normalize card padding and heading rhythm, reduce unnecessary empty space at regular width, keep compact controls comfortably separated at 680 points, and review hover/focus/disabled/destructive states in both languages. Acceptance should include keyboard-only focus order and visible focus rings plus a VoiceOver speech/focus walkthrough. Import/export, the full permission matrix, login approval/retry/reboot, and Gatekeeper checks remain under their documented authorization boundaries. A push, new CI run, tag, or publication is a separate operator decision.
+With the lifecycle and action contracts fixed, the next implementation task is a non-behavioral pass over the new tray: normalize card padding and heading rhythm, improve long bilingual wrapping, keep compact controls comfortably separated, and review hover/focus/disabled/destructive states without reintroducing dynamic outer sizing or transient sheets. Acceptance should include actual status-item/popover opening, keyboard-only focus order and visible focus rings, plus a VoiceOver speech/focus walkthrough. Import/export, the full permission matrix, login approval/retry/reboot, and Gatekeeper checks remain under their documented authorization boundaries. A push, new CI run, tag, or publication is a separate operator decision.
 
 Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

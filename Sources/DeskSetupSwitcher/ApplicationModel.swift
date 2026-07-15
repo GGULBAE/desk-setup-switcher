@@ -17,9 +17,25 @@ import UniformTypeIdentifiers
 
 func appLocalized(_ value: String.LocalizationValue) -> String {
   #if SWIFT_PACKAGE
-    String(localized: value, bundle: .module)
+    #if DEBUG
+      if let languageCode = ProcessInfo.processInfo.environment["DESK_SETUP_UI_AUDIT_LANGUAGE"],
+        let path = Bundle.module.path(forResource: languageCode, ofType: "lproj"),
+        let bundle = Bundle(path: path)
+      {
+        return String(localized: value, bundle: bundle)
+      }
+    #endif
+    return String(localized: value, bundle: .module)
   #else
-    String(localized: value)
+    #if DEBUG
+      if let languageCode = ProcessInfo.processInfo.environment["DESK_SETUP_UI_AUDIT_LANGUAGE"],
+        let path = Bundle.main.path(forResource: languageCode, ofType: "lproj"),
+        let bundle = Bundle(path: path)
+      {
+        return String(localized: value, bundle: bundle)
+      }
+    #endif
+    return String(localized: value)
   #endif
 }
 

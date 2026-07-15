@@ -2,7 +2,7 @@
 
 ## Current status
 
-The version 0.1.0 no-Developer-ID packaging path passes locally. On 2026-07-11, post-fix full `make verify` completed lint/policy checks, 158 tests (83 XCTest + 75 Swift Testing), Swift and universal Xcode Debug/Release builds, Xcode Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. Six opt-in cases skipped by default. The resulting app contains `arm64` and `x86_64`; the post-fix DMG checksum is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`.
+The version 0.1.0 no-Developer-ID packaging path passes locally. Tray Surface v2 passed `make verify` on 2026-07-15 with 326 default cases (130 XCTest + 196 Swift Testing), six opt-in skips, universal Debug/Release, Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. The current app contains `arm64` and `x86_64`; DMG SHA-256 is `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`. This package was not installed or launched.
 
 Initial Actions run `29154880831` for implementation commit `0d8f510` exposed the Swift 6.1 actor-isolation issue. Repair commit `4e45328` is pushed, and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) succeeded on 2026-07-11 under macOS 15/Xcode 16.4/Swift 6.1.2; full `make verify` and unsigned-package upload passed. No release has been published, and the downloaded/quarantined Gatekeeper path remains untested.
 
@@ -51,7 +51,7 @@ The checksum detects accidental or malicious byte changes only when the checksum
 
 ## Manual evidence and remaining gaps
 
-The final locally built DMG was installed fresh to `/Applications` and launched background-only/menu-bar-only. The popover and Settings window rendered in Korean, and an accessibility label passed inspection. The app created one schema-v1 Ready profile from a read-only snapshot with all four setting groups; its zero-operation plan kept Apply and Force Apply disabled.
+A historical 2026-07-11 DMG was installed fresh to `/Applications` and launched background-only/menu-bar-only. Its then-current popover and Settings window rendered in Korean, and an accessibility label passed inspection. It created one schema-v1 Ready profile from a read-only snapshot with all four setting groups; its zero-operation plan kept Apply and Force Apply disabled. This does not prove Tray Surface v2 interaction.
 
 Default-on `SMAppService` registration succeeded and Background Task Management reported `[enabled, allowed, notified]`. UI opt-out moved it to disabled, and re-enable restored enabled status. Final cleanup opted out and left only disabled BTM history.
 

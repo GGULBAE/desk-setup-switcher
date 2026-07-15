@@ -1934,7 +1934,9 @@ private struct ProfileEditorForm: View {
       if let firstValidationItem {
         revealAndFocus(firstValidationItem.fieldID)
       }
-    case .overview, .menuPolish, .permissions, .diagnostics:
+    case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
+      .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
+      .permissions, .diagnostics:
       break
     }
   }

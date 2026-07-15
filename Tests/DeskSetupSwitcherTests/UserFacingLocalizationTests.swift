@@ -53,4 +53,27 @@ final class UserFacingLocalizationTests: XCTestCase {
       "Core Audio에서 기기 12개를 감지했습니다."
     )
   }
+
+  func testTraySurfaceCopyResolvesExactlyInEnglishAndKorean() {
+    XCTAssertEqual(appLocalizedRuntime("Settings…", languageCode: "en"), "Settings…")
+    XCTAssertEqual(appLocalizedRuntime("Settings…", languageCode: "ko"), "설정…")
+    XCTAssertEqual(
+      appLocalizedRuntime(
+        "Opens or closes the Desk Setup Switcher tray.",
+        languageCode: "en"
+      ),
+      "Opens or closes the Desk Setup Switcher tray."
+    )
+    XCTAssertEqual(
+      appLocalizedRuntime(
+        "Opens or closes the Desk Setup Switcher tray.",
+        languageCode: "ko"
+      ),
+      "책상 설정 전환기 트레이를 열거나 닫습니다."
+    )
+    XCTAssertEqual(
+      appLocalizedRuntime("Current Mac matches this profile", languageCode: "ko"),
+      "현재 Mac이 이 프로필과 일치함"
+    )
+  }
 }
