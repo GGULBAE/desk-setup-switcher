@@ -102,8 +102,9 @@ struct DeskSetupSwitcherApp: App {
   @StateObject private var model: ApplicationModel
   @StateObject private var locationPermission: LocationPermissionController
   @StateObject private var profileEditor: ProfileEditorModel
-  @State private var selectedSettingsTab: SettingsTab
+  @StateObject private var settingsNavigation: SettingsNavigationModel
   private let uiAuditConfiguration: UIAuditConfiguration
+  private let settingsWindowController: RuntimeSettingsWindowController?
   #if DEBUG
     private let auditWindowController: UIAuditWindowController?
   #endif
@@ -135,9 +136,23 @@ struct DeskSetupSwitcherApp: App {
     let initialSettingsTab: SettingsTab
     switch uiAuditConfiguration.variant {
     case .permissions, .diagnostics: initialSettingsTab = .system
-    case .overview, .editor, .validation: initialSettingsTab = .profiles
+    case .overview, .menuPolish, .editor, .editorPolish, .validation:
+      initialSettingsTab = .profiles
     }
-    _selectedSettingsTab = State(initialValue: initialSettingsTab)
+    let settingsNavigation = SettingsNavigationModel(selectedTab: initialSettingsTab)
+    _settingsNavigation = StateObject(wrappedValue: settingsNavigation)
+    if !uiAuditConfiguration.isEnabled || uiAuditConfiguration.showsMenuBarExtra {
+      let settingsRoot = RuntimeSettingsRoot(
+        navigation: settingsNavigation,
+        uiAuditConfiguration: uiAuditConfiguration
+      )
+      .environmentObject(model)
+      .environmentObject(locationPermission)
+      .environmentObject(profileEditor)
+      settingsWindowController = RuntimeSettingsWindowController(rootView: settingsRoot)
+    } else {
+      settingsWindowController = nil
+    }
     #if DEBUG
       if uiAuditConfiguration.isEnabled, !uiAuditConfiguration.showsMenuBarExtra {
         let auditRoot = UIAuditHostView(configuration: uiAuditConfiguration)
@@ -184,26 +199,55 @@ struct DeskSetupSwitcherApp: App {
       isInserted: .constant(
         !uiAuditConfiguration.isEnabled || uiAuditConfiguration.showsMenuBarExtra)
     ) {
-      MenuContentView(selectedSettingsTab: $selectedSettingsTab)
-        .environmentObject(model)
-        .environmentObject(locationPermission)
-        .environmentObject(profileEditor)
-        .uiAuditEnvironment(uiAuditConfiguration)
+      MenuContentView(
+        selectedSettingsTab: $settingsNavigation.selectedTab,
+        showSettingsWindow: { settingsWindowController?.showSettings() }
+      )
+      .environmentObject(model)
+      .environmentObject(locationPermission)
+      .environmentObject(profileEditor)
+      .uiAuditEnvironment(uiAuditConfiguration)
     } label: {
       Label("Desk Setup Switcher", systemImage: "switch.2")
         .labelStyle(.iconOnly)
         .accessibilityLabel("Desk Setup Switcher")
     }
     .menuBarExtraStyle(.window)
+  }
+}
 
-    Settings {
-      SettingsView(selectedTab: $selectedSettingsTab)
-        .environmentObject(model)
-        .environmentObject(locationPermission)
-        .environmentObject(profileEditor)
-        .uiAuditEnvironment(uiAuditConfiguration)
-        .frame(minWidth: 680, minHeight: 480)
-    }
+@MainActor
+final class RuntimeSettingsWindowController: NSWindowController {
+  init<Content: View>(rootView: Content) {
+    let hostingController = NSHostingController(rootView: rootView)
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 900, height: 568),
+      styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+      backing: .buffered,
+      defer: false
+    )
+    window.contentViewController = hostingController
+    window.title = appLocalized("Settings")
+    window.titleVisibility = .hidden
+    window.titlebarAppearsTransparent = true
+    window.isMovableByWindowBackground = true
+    window.isReleasedWhenClosed = false
+    window.tabbingMode = .disallowed
+    window.contentMinSize = CGSize(width: 680, height: 480)
+    window.setContentSize(CGSize(width: 900, height: 568))
+    window.center()
+    super.init(window: window)
+  }
+
+  func showSettings() {
+    showWindow(nil)
+    window?.makeKeyAndOrderFront(nil)
+    NSApplication.shared.activate(ignoringOtherApps: true)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
   }
 }
 
@@ -243,7 +287,8 @@ struct DeskSetupSwitcherApp: App {
       let initialTab: SettingsTab
       switch configuration.variant {
       case .permissions, .diagnostics: initialTab = .system
-      case .overview, .editor, .validation: initialTab = .profiles
+      case .overview, .menuPolish, .editor, .editorPolish, .validation:
+        initialTab = .profiles
       }
       _selectedSettingsTab = State(initialValue: initialTab)
     }
@@ -251,11 +296,16 @@ struct DeskSetupSwitcherApp: App {
     @ViewBuilder
     var body: some View {
       switch configuration.variant {
-      case .overview:
-        MenuContentView(selectedSettingsTab: $selectedSettingsTab)
-          .frame(width: overviewWidth)
-          .fixedSize(horizontal: false, vertical: true)
-      case .editor, .validation, .permissions, .diagnostics:
+      case .overview, .menuPolish:
+        MenuContentView(
+          selectedSettingsTab: $selectedSettingsTab,
+          initialDeletionProfileID: configuration.variant == .menuPolish
+            ? UIAuditFixtures.readyProfileID
+            : nil
+        )
+        .frame(width: overviewWidth)
+        .fixedSize(horizontal: false, vertical: true)
+      case .editor, .editorPolish, .validation, .permissions, .diagnostics:
         SettingsView(selectedTab: $selectedSettingsTab)
           .frame(minWidth: 680, minHeight: 480)
       }
@@ -279,6 +329,48 @@ struct DeskSetupSwitcherApp: App {
   }
 #endif
 
+struct MenuProfileDeletionState: Equatable, Sendable {
+  private(set) var pendingProfileID: UUID?
+
+  init(pendingProfileID: UUID? = nil) {
+    self.pendingProfileID = pendingProfileID
+  }
+
+  mutating func request(profileID: UUID) {
+    pendingProfileID = profileID
+  }
+
+  mutating func cancel() {
+    pendingProfileID = nil
+  }
+
+  mutating func confirm(profileID: UUID) -> Bool {
+    guard pendingProfileID == profileID else { return false }
+    pendingProfileID = nil
+    return true
+  }
+
+  func isPending(profileID: UUID) -> Bool {
+    pendingProfileID == profileID
+  }
+}
+
+enum MenuProfileListLayout {
+  static let minimumHeight: CGFloat = 124
+  static let normalMaximumHeight: CGFloat = 360
+  static let confirmationMaximumHeight: CGFloat = 420
+  static let estimatedRowHeight: CGFloat = 84
+  static let confirmationAllowance: CGFloat = 110
+
+  static func height(profileCount: Int, hasDeletionConfirmation: Bool) -> CGFloat {
+    let rowHeight = CGFloat(max(profileCount, 0)) * estimatedRowHeight
+    let requestedHeight = rowHeight + (hasDeletionConfirmation ? confirmationAllowance : 0)
+    let maximumHeight =
+      hasDeletionConfirmation ? confirmationMaximumHeight : normalMaximumHeight
+    return min(max(requestedHeight, minimumHeight), maximumHeight)
+  }
+}
+
 private enum DraftProtectedApplyKind: Equatable {
   case targetDraft
   case otherDraft(openProfileID: UUID, openProfileName: String)
@@ -293,7 +385,6 @@ private struct DraftProtectedApplyPrompt: Identifiable, Equatable {
 }
 
 private struct MenuContentView: View {
-  @Environment(\.openSettings) private var openSettings
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var locationPermission: LocationPermissionController
   @EnvironmentObject private var profileEditor: ProfileEditorModel
@@ -308,9 +399,22 @@ private struct MenuContentView: View {
   @State private var draftApplyRetryAfterError: DraftProtectedApplyPrompt?
   @State private var deferredApplyAfterPreviewDismissal: PendingApplyRequest?
   @State private var isApplyResultDetailsPresented = false
-  @State private var profilePendingDeletion: DeskProfile?
+  @State private var profileDeletion = MenuProfileDeletionState()
   @State private var isCaptureLocationExplanationPresented = false
   @State private var isCaptureLocationSettingsPresented = false
+  private let showSettingsWindow: @MainActor () -> Void
+
+  init(
+    selectedSettingsTab: Binding<SettingsTab>,
+    initialDeletionProfileID: UUID? = nil,
+    showSettingsWindow: @escaping @MainActor () -> Void = {}
+  ) {
+    _selectedSettingsTab = selectedSettingsTab
+    _profileDeletion = State(
+      initialValue: MenuProfileDeletionState(pendingProfileID: initialDeletionProfileID)
+    )
+    self.showSettingsWindow = showSettingsWindow
+  }
 
   var body: some View {
     Group {
@@ -550,22 +654,43 @@ private struct MenuContentView: View {
         }
         .frame(width: 340, height: 170)
       } else {
-        ScrollView {
-          LazyVStack(alignment: .leading, spacing: 8) {
-            ForEach(enabledProfiles) { profile in
-              profileRow(profile)
+        ScrollViewReader { proxy in
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: 8) {
+              ForEach(enabledProfiles) { profile in
+                profileRow(profile)
+                  .id(profile.id)
+              }
+            }
+            .padding(.trailing, 2)
+            .padding(.bottom, 2)
+          }
+          .frame(width: 340, height: profileListHeight)
+          .onChange(of: profileDeletion.pendingProfileID) {
+            guard let profileID = profileDeletion.pendingProfileID else { return }
+            Task { @MainActor in
+              await Task.yield()
+              withAnimation(.easeInOut(duration: 0.16)) {
+                proxy.scrollTo(profileID, anchor: .bottom)
+              }
             }
           }
-          .padding(.trailing, 2)
         }
-        .frame(width: 340, height: profileListHeight)
       }
 
       if let transientCaptureMessage {
         Label(transientCaptureMessage, systemImage: "checkmark.circle")
           .font(.caption)
           .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(10)
+          .background(
+            Color.green.opacity(0.10),
+            in: RoundedRectangle(cornerRadius: 9)
+          )
           .transition(.opacity)
+          .accessibilityElement(children: .combine)
       }
 
       if let summary = model.lastCaptureSummary, summary.status != .complete {
@@ -900,14 +1025,12 @@ private struct MenuContentView: View {
 
   private func presentSettings() {
     selectedSettingsTab = .profiles
-    openSettings()
-    NSApplication.shared.activate(ignoringOtherApps: true)
+    showSettingsWindow()
   }
 
   private func presentSystemSettings() {
     selectedSettingsTab = .system
-    openSettings()
-    NSApplication.shared.activate(ignoringOtherApps: true)
+    showSettingsWindow()
   }
 
   private func saveDraftThenCaptureCurrentSettings() async {
@@ -974,9 +1097,10 @@ private struct MenuContentView: View {
   }
 
   private var profileListHeight: CGFloat {
-    let baseHeight = min(max(CGFloat(enabledProfiles.count) * 132, 124), 360)
-    let deletionConfirmationAllowance: CGFloat = profilePendingDeletion == nil ? 0 : 72
-    return min(baseHeight + deletionConfirmationAllowance, 360)
+    MenuProfileListLayout.height(
+      profileCount: enabledProfiles.count,
+      hasDeletionConfirmation: profileDeletion.pendingProfileID != nil
+    )
   }
 
   private func captureResultBanner(_ summary: ProfileCaptureSummary) -> some View {
@@ -1014,9 +1138,12 @@ private struct MenuContentView: View {
           handleCapturePermissionAction()
         }
         .font(.caption)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
       }
     }
-    .padding(10)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(12)
     .background(
       (summary.status == .failure ? Color.red : Color.orange).opacity(0.12),
       in: RoundedRectangle(cornerRadius: 9)
@@ -1217,7 +1344,7 @@ private struct MenuContentView: View {
           .fixedSize(horizontal: false, vertical: true)
       }
 
-      if profilePendingDeletion?.id == profile.id {
+      if profileDeletion.isPending(profileID: profile.id) {
         inlineProfileDeletionConfirmation(profile)
       } else {
         HStack {
@@ -1248,7 +1375,7 @@ private struct MenuContentView: View {
 
           Button(role: .destructive) {
             withAnimation(.easeInOut(duration: 0.16)) {
-              profilePendingDeletion = profile
+              profileDeletion.request(profileID: profile.id)
             }
           } label: {
             Label("Delete Profile", systemImage: "trash")
@@ -1296,18 +1423,20 @@ private struct MenuContentView: View {
       HStack {
         Button("Cancel", role: .cancel) {
           withAnimation(.easeInOut(duration: 0.16)) {
-            profilePendingDeletion = nil
+            profileDeletion.cancel()
           }
         }
         .keyboardShortcut(.cancelAction)
 
         Spacer()
 
-        Button(appLocalized("Delete \(profile.name)"), role: .destructive) {
+        Button("Delete Profile", role: .destructive) {
           deleteProfile(profile)
         }
         .buttonStyle(.borderedProminent)
         .tint(.red)
+        .accessibilityLabel(appLocalized("Delete \(profile.name)"))
+        .help(appLocalized("Delete \(profile.name)"))
       }
     }
     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -1315,11 +1444,11 @@ private struct MenuContentView: View {
   }
 
   private func deleteProfile(_ profile: DeskProfile) {
+    guard profileDeletion.confirm(profileID: profile.id) else { return }
     if profileEditor.isDirty, profileEditor.selectedProfileID == profile.id {
       profileEditor.revertDraft()
     }
     model.deleteProfile(id: profile.id)
-    profilePendingDeletion = nil
   }
 
   private func primaryApplyActionState(
@@ -1869,6 +1998,33 @@ private enum SettingsTab: Hashable {
   case profiles
   case system
   case about
+}
+
+@MainActor
+private final class SettingsNavigationModel: ObservableObject {
+  @Published var selectedTab: SettingsTab
+
+  init(selectedTab: SettingsTab) {
+    self.selectedTab = selectedTab
+  }
+}
+
+private struct RuntimeSettingsRoot: View {
+  @ObservedObject var navigation: SettingsNavigationModel
+  let uiAuditConfiguration: UIAuditConfiguration
+
+  var body: some View {
+    SettingsView(selectedTab: $navigation.selectedTab)
+      .uiAuditEnvironment(uiAuditConfiguration)
+      .frame(
+        minWidth: 680,
+        idealWidth: 900,
+        maxWidth: .infinity,
+        minHeight: 480,
+        idealHeight: 568,
+        maxHeight: .infinity
+      )
+  }
 }
 
 private struct SettingsView: View {

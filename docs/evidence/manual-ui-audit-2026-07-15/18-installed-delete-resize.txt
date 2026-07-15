@@ -1,0 +1,36 @@
+Desk Setup Switcher installed deletion and responsive-settings audit
+Date: 2026-07-15
+Package: artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg
+DMG SHA-256: 8422b042b793bf0845ac56e2dcbd9808075a0467226d79ee65408440736648d8
+Installed architecture: Apple Silicon; packaged binary also contains x86_64
+
+Safety boundary
+- The user explicitly authorized scoped automatic UI interaction.
+- DESK_SETUP_LIVE_UI_TESTS=1 was set for each interactive process.
+- The complete three-file, three-profile local store was copied outside the repository before interaction.
+- No profile was applied. Capture, TCC, login-item, Keychain, import/export, and system-setting mutation paths were not invoked.
+
+Installed-package integrity
+- The existing /Applications bundle was stopped, removed, and replaced from the mounted DMG.
+- The mounted and installed executables matched byte-for-byte.
+- The installed executable exposed a settable Settings window size through Accessibility.
+
+Tray deletion
+- Esc: confirmation opened fully, Esc removed the confirmation, the tray remained available, and all three profiles remained.
+- Cancel: confirmation opened fully, Cancel removed the confirmation, the tray remained available, and all three profiles remained.
+- Confirm: confirmation opened fully, Delete removed exactly one profile, the tray remained available, and two profiles remained.
+- The store was restored before the responsive-settings check.
+
+Responsive Settings
+- Start: 980x720, one profile selected, Audio expanded, a valid unsaved draft present, name field focused, Save enabled.
+- Compact: 680x560, the same selected row, draft fingerprint, focus, and Save-enabled state remained. The expanded Audio control was below the compact viewport rather than removed from state.
+- Return: 980x720, the same selected row, draft fingerprint, focus, Save-enabled state, and expanded Audio disclosure returned unchanged.
+- A temporary compact screenshot was inspected for clipping and was not retained because it contained local profile names.
+
+Rollback
+- The app was stopped without saving the draft.
+- The complete local store was restored byte-for-byte from the preflight copy.
+- Final state matched the preflight three files and three profiles.
+- The temporary backup and interaction artifacts were removed after final package/install verification.
+
+Result: PASS

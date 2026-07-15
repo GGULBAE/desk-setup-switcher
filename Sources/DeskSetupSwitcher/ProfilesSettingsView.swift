@@ -10,7 +10,21 @@ import SwiftUI
   import DeskSetupSystem
 #endif
 
+enum ProfileWorkspaceLayoutMode: Equatable, Sendable {
+  case compact
+  case regular
+
+  static let compactBreakpoint: CGFloat = 760
+
+  init(width: CGFloat) {
+    self = width < Self.compactBreakpoint ? .compact : .regular
+  }
+
+  var isCompact: Bool { self == .compact }
+}
+
 struct ProfilesSettingsView: View {
+  @Environment(\.uiAuditConfiguration) private var uiAuditConfiguration
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var profileEditor: ProfileEditorModel
   @State private var profilePendingDeletion: DeskProfile?
@@ -26,19 +40,20 @@ struct ProfilesSettingsView: View {
 
       Divider()
 
-      HStack {
-        Text(model.storageStatus)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .accessibilityLabel(
-            appLocalized("Profile storage status: \(model.storageStatus)"))
-        Spacer()
-        Button("Import…") { requestDeferredAction(.importProfiles) }
-          .disabled(model.isProfileMutationLocked)
-          .accessibilityHint("Selects and validates a local profile JSON file")
-        Button("Export…") { model.exportProfiles() }
-          .disabled(model.profiles.isEmpty || model.isProfileMutationLocked)
-          .accessibilityHint("Exports all profiles to a new local JSON file")
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 10) {
+          storageStatusLabel
+          Spacer(minLength: 12)
+          importExportButtons
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+          storageStatusLabel
+          HStack(spacing: 8) {
+            Spacer()
+            importExportButtons
+          }
+        }
       }
 
       if model.isProfileMutationLocked {
@@ -58,6 +73,13 @@ struct ProfilesSettingsView: View {
       if profileEditor.session.pendingSelection != nil {
         isUnsavedPromptPresented = true
       }
+      #if DEBUG
+        if uiAuditConfiguration.isEnabled,
+          uiAuditConfiguration.variant == .editorPolish
+        {
+          profileEditor.finishWithMessage(appLocalized("Profile saved."))
+        }
+      #endif
     }
     .onChange(of: model.profiles) {
       synchronizeEditor()
@@ -149,7 +171,8 @@ struct ProfilesSettingsView: View {
 
   private var profileWorkspace: some View {
     GeometryReader { geometry in
-      let usesCompactLayout = geometry.size.width < 760
+      let layoutMode = ProfileWorkspaceLayoutMode(width: geometry.size.width)
+      let usesCompactLayout = layoutMode.isCompact
 
       // The fixed breakpoint intentionally replaces the draggable HSplitView.
       // AnyLayout keeps the sidebar/editor identity stable while the window is resized.
@@ -202,6 +225,7 @@ struct ProfilesSettingsView: View {
               "\(profile.name), \(profile.isEnabled ? appLocalized("enabled") : appLocalized("disabled"))"
             )
           )
+          .accessibilityIdentifier("profile-row")
         }
       }
       .overlay {
@@ -311,6 +335,26 @@ struct ProfilesSettingsView: View {
   private var selectedProfile: DeskProfile? {
     guard let selection = profileEditor.selectedProfileID else { return nil }
     return model.profiles.first { $0.id == selection }
+  }
+
+  private var storageStatusLabel: some View {
+    Label(model.storageStatus, systemImage: "externaldrive")
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
+      .accessibilityLabel(
+        appLocalized("Profile storage status: \(model.storageStatus)"))
+  }
+
+  private var importExportButtons: some View {
+    HStack(spacing: 8) {
+      Button("Import…") { requestDeferredAction(.importProfiles) }
+        .disabled(model.isProfileMutationLocked)
+        .accessibilityHint("Selects and validates a local profile JSON file")
+      Button("Export…") { model.exportProfiles() }
+        .disabled(model.profiles.isEmpty || model.isProfileMutationLocked)
+        .accessibilityHint("Exports all profiles to a new local JSON file")
+    }
   }
 
   private func canMove(by offset: Int) -> Bool {
@@ -739,6 +783,7 @@ private struct ProfileEditorForm: View {
       VStack(alignment: .leading, spacing: 12) {
         TextField("Name", text: $profile.name)
           .accessibilityLabel("Profile name")
+          .accessibilityIdentifier("profile-name-field")
           .focused($focusedField, equals: .profileName)
           .accessibilityHint(validationAccessibilityHint(for: .profileName))
           .accessibilityInvalid(validation.issue(for: .profileName) != nil)
@@ -1417,6 +1462,7 @@ private struct ProfileEditorForm: View {
           .accessibilityLabel(localizedTitle)
           .accessibilityValue(isExpanded ? Text("Expanded") : Text("Collapsed"))
           .accessibilityHint("Expands or collapses this settings category")
+          .accessibilityIdentifier("profile-group-\(group.rawValue)")
           .accessibilityInvalid(firstValidationIssue(in: group) != nil)
           .focused($focusedField, equals: .group(group))
 
@@ -1880,7 +1926,7 @@ private struct ProfileEditorForm: View {
   private func configureSyntheticAuditDisclosure() {
     guard uiAuditConfiguration.isEnabled else { return }
     switch uiAuditConfiguration.variant {
-    case .editor:
+    case .editor, .editorPolish:
       groupDisclosure.expand(.audio)
       optionDisclosure.expand(.init(group: .audio, key: "default-input-device"))
       optionDisclosure.expand(.init(group: .audio, key: "default-output-device"))
@@ -1888,7 +1934,7 @@ private struct ProfileEditorForm: View {
       if let firstValidationItem {
         revealAndFocus(firstValidationItem.fieldID)
       }
-    case .overview, .permissions, .diagnostics:
+    case .overview, .menuPolish, .permissions, .diagnostics:
       break
     }
   }

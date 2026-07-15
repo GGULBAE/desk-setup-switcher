@@ -1,0 +1,55 @@
+WINDOW_ID=168
+role=AXApplication title=Desk Setup Switcher
+  role=AXWindow title=Desk Setup Switcher UI Audit description= identifier= value= help= enabled= focused=0 selected= actions=AXRaise
+    role=AXGroup title= description= identifier= value= help= enabled= focused=0 selected= actions=
+      role=AXTabGroup title= description= identifier= value= help= enabled= focused=0 selected= actions=
+        role=AXRadioButton title= description=프로필 identifier=rectangle.stack value=1 help= enabled=1 focused=0 selected= actions=AXPress
+        role=AXRadioButton title= description=시스템 identifier=gearshape.2 value=0 help= enabled=1 focused=0 selected= actions=AXPress
+        role=AXRadioButton title= description=앱 정보 identifier=info.circle value=0 help= enabled=1 focused=0 selected= actions=AXPress
+        role=AXGroup title= description= identifier= value= help= enabled= focused=0 selected= actions=
+          role=AXGroup title= description= identifier= value= help= enabled=1 focused=0 selected= actions=
+            role=AXScrollArea title= description= identifier= value= help= enabled= focused=0 selected= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+              role=AXOutline title= description= identifier= value= help= enabled=1 focused=1 selected= actions=AXShowMenu
+                role=AXRow title= description= identifier= value= help= enabled= focused= selected=1 actions=AXShowDefaultUI,AXShowAlternateUI
+                  role=AXCell title= description= identifier= value= help= enabled=1 focused=1 selected=1 actions=
+                    role=AXUnknown title= description=Focus Workspace — Display, Audio, Network & Input, 활성화됨 identifier=profile-row value= help= enabled=1 focused= selected= actions=
+                role=AXRow title= description= identifier= value= help= enabled= focused= selected=0 actions=AXShowDefaultUI,AXShowAlternateUI
+                  role=AXCell title= description= identifier= value= help= enabled=1 focused=1 selected=0 actions=
+                    role=AXUnknown title= description=Portable Desk — Available Settings Only, 활성화됨 identifier=profile-row value= help= enabled=1 focused= selected= actions=
+                role=AXRow title= description= identifier= value= help= enabled= focused= selected=0 actions=AXShowDefaultUI,AXShowAlternateUI
+                  role=AXCell title= description= identifier= value= help= enabled=1 focused=1 selected=0 actions=
+                    role=AXUnknown title= description=Archived Synthetic Profile, 비활성화됨 identifier=profile-row value= help= enabled=1 focused= selected= actions=
+                role=AXColumn title= description= identifier=ListColumn value= help= enabled= focused= selected=0 actions=
+            role=AXButton title= description=프로필 만들기 identifier=plus value= help=프로필 만들기 enabled=1 focused=0 selected= actions=AXPress
+            role=AXButton title= description=선택한 프로필 복제 identifier=plus.square.on.square value= help=선택한 프로필 복제 enabled=1 focused=0 selected= actions=AXPress
+            role=AXButton title= description=선택한 프로필 삭제 identifier=trash value= help=선택한 프로필 삭제 enabled=1 focused=0 selected= actions=AXPress
+            role=AXButton title= description=선택한 프로필을 위로 이동 identifier=chevron.up value= help=선택한 프로필을 위로 이동 enabled=0 focused= selected= actions=AXPress
+            role=AXButton title= description=선택한 프로필을 아래로 이동 identifier=chevron.down value= help=선택한 프로필을 아래로 이동 enabled=1 focused=0 selected= actions=AXPress
+            role=AXScrollArea title= description= identifier= value= help= enabled= focused=0 selected= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+              role=AXOpaqueProviderGroup title= description= identifier= value= help= enabled=1 focused=0 selected= actions=AXScrollToTop,AXScrollToBottom
+                role=AXGroup title= description= identifier= value= help= enabled=1 focused=0 selected= actions=AXScrollToVisible
+                  role=AXHeading title= description=프로필 identifier= value= help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXTextField title= description=프로필 이름 identifier=profile-name-field value=Focus Workspace — Display, Audio, Network & Input help= enabled=1 focused=0 selected= actions=AXShowMenu,AXConfirm,AXScrollToVisible
+                  role=AXTextField title= description=프로필 설명 identifier= value=A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata. help= enabled=1 focused=0 selected= actions=AXShowMenu,AXConfirm,AXScrollToVisible
+                  role=AXStaticText title= description= identifier= value=아이콘 help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXPopUpButton title= description=프로필 아이콘 identifier= value=디스플레이 help= enabled=1 focused=0 selected= actions=AXPress,AXScrollToVisible
+                  role=AXCheckBox title= description=활성화됨 identifier= value=1 help= enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+                role=AXHeading title= description=설정 identifier= value= help= enabled=1 focused= selected= actions=AXScrollToVisible
+                role=AXStaticText title= description= identifier= value=이 프로필이 적용할 항목은 ‘포함’으로 선택하세요. 저장된 값을 확인하거나 편집하려면 카테고리를 펼치세요. help= enabled=1 focused= selected= actions=AXScrollToVisible
+              role=AXScrollBar title= description= identifier= value=0 help= enabled=1 focused=0 selected= actions=
+                role=AXValueIndicator title= description= identifier= value=0 help= enabled= focused= selected= actions=
+                role=AXButton title= description= identifier= value= help= enabled= focused= selected= actions=AXPress
+                role=AXButton title= description= identifier= value= help= enabled= focused= selected= actions=AXPress
+                role=AXButton title= description= identifier= value= help= enabled= focused= selected= actions=AXPress
+                role=AXButton title= description= identifier= value= help= enabled= focused= selected= actions=AXPress
+            role=AXStaticText title= description= identifier= value=프로필 편집기 상태: 프로필을 저장했습니다. help= enabled=1 focused= selected= actions=
+            role=AXButton title= description=현재 설정으로 초안 업데이트 identifier= value= help=현재 Mac을 읽어 이 저장되지 않은 초안만 업데이트합니다 enabled=1 focused=0 selected= actions=AXPress
+            role=AXButton title= description=변경사항 되돌리기 identifier= value= help= enabled=0 focused= selected= actions=AXPress
+            role=AXButton title= description=프로필 저장 identifier= value= help= enabled=0 focused= selected= actions=AXPress
+            role=AXStaticText title= description= identifier= value=프로필 저장소 상태: 합성 UI 검토 모드입니다. 아무것도 저장하거나 적용하지 않습니다. help= enabled=1 focused= selected= actions=
+            role=AXButton title= description=가져오기… identifier= value= help=로컬 프로필 JSON 파일을 선택하고 유효성을 검사합니다 enabled=1 focused=0 selected= actions=AXPress
+            role=AXButton title= description=내보내기… identifier= value= help=모든 프로필을 새 로컬 JSON 파일로 내보냅니다 enabled=1 focused=0 selected= actions=AXPress
+    role=AXButton title= description= identifier= value= help= enabled=1 focused=0 selected= actions=AXPress
+    role=AXButton title= description= identifier= value= help=이 버튼을 누르면 윈도우를 확대/축소합니다. enabled=1 focused=0 selected= actions=AXPress,AXZoomWindow,AXShowMenu
+      role=AXGroup title= description= identifier= value= help= enabled= focused=0 selected= actions=
+    role=AXButton title= description= identifier= value= help= enabled=1 focused=0 selected= actions=AXPress

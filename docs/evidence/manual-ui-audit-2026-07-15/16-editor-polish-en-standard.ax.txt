@@ -1,0 +1,85 @@
+WINDOW_ID=159
+role=AXApplication title=Desk Setup Switcher
+  role=AXWindow title=Desk Setup Switcher UI Audit description= identifier= value= help= enabled= focused=0 selected= actions=AXRaise
+    role=AXGroup title= description= identifier= value= help= enabled= focused=0 selected= actions=
+      role=AXTabGroup title= description= identifier= value= help= enabled= focused=0 selected= actions=
+        role=AXRadioButton title= description=Profiles identifier=rectangle.stack value=1 help= enabled=1 focused=0 selected= actions=AXPress
+        role=AXRadioButton title= description=System identifier=gearshape.2 value=0 help= enabled=1 focused=0 selected= actions=AXPress
+        role=AXRadioButton title= description=About identifier=info.circle value=0 help= enabled=1 focused=0 selected= actions=AXPress
+        role=AXGroup title= description= identifier= value= help= enabled= focused=0 selected= actions=
+          role=AXGroup title= description= identifier= value= help= enabled=1 focused=0 selected= actions=
+            role=AXScrollArea title= description= identifier= value= help= enabled= focused=0 selected= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+              role=AXOutline title= description= identifier= value= help= enabled=1 focused=1 selected= actions=AXShowMenu
+                role=AXRow title= description= identifier= value= help= enabled= focused= selected=1 actions=AXShowDefaultUI,AXShowAlternateUI
+                  role=AXCell title= description= identifier= value= help= enabled=1 focused=1 selected=1 actions=
+                    role=AXUnknown title= description=Focus Workspace — Display, Audio, Network & Input, enabled identifier=profile-row value= help= enabled=1 focused= selected= actions=
+                role=AXRow title= description= identifier= value= help= enabled= focused= selected=0 actions=AXShowDefaultUI,AXShowAlternateUI
+                  role=AXCell title= description= identifier= value= help= enabled=1 focused=1 selected=0 actions=
+                    role=AXUnknown title= description=Portable Desk — Available Settings Only, enabled identifier=profile-row value= help= enabled=1 focused= selected= actions=
+                role=AXRow title= description= identifier= value= help= enabled= focused= selected=0 actions=AXShowDefaultUI,AXShowAlternateUI
+                  role=AXCell title= description= identifier= value= help= enabled=1 focused=1 selected=0 actions=
+                    role=AXUnknown title= description=Archived Synthetic Profile, disabled identifier=profile-row value= help= enabled=1 focused= selected= actions=
+                role=AXColumn title= description= identifier=ListColumn value= help= enabled= focused= selected=0 actions=
+            role=AXButton title= description=Create profile identifier=plus value= help=Create profile enabled=1 focused=0 selected= actions=AXPress
+            role=AXButton title= description=Duplicate selected profile identifier=plus.square.on.square value= help=Duplicate selected profile enabled=1 focused=0 selected= actions=AXPress
+            role=AXButton title= description=Delete selected profile identifier=trash value= help=Delete selected profile enabled=1 focused=0 selected= actions=AXPress
+            role=AXButton title= description=Move selected profile up identifier=chevron.up value= help=Move selected profile up enabled=0 focused= selected= actions=AXPress
+            role=AXButton title= description=Move selected profile down identifier=chevron.down value= help=Move selected profile down enabled=1 focused=0 selected= actions=AXPress
+            role=AXScrollArea title= description= identifier= value= help= enabled= focused=0 selected= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+              role=AXOpaqueProviderGroup title= description= identifier= value= help= enabled=1 focused=0 selected= actions=AXScrollToTop,AXScrollToBottom
+                role=AXGroup title= description= identifier= value= help= enabled=1 focused=0 selected= actions=AXScrollToVisible
+                  role=AXHeading title= description=Profile identifier= value= help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXTextField title= description=Profile name identifier=profile-name-field value=Focus Workspace — Display, Audio, Network & Input help= enabled=1 focused=0 selected= actions=AXShowMenu,AXConfirm,AXScrollToVisible
+                  role=AXTextField title= description=Profile description identifier= value=A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata. help= enabled=1 focused=0 selected= actions=AXShowMenu,AXConfirm,AXScrollToVisible
+                  role=AXStaticText title= description= identifier= value=Icon help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXPopUpButton title= description=Profile icon identifier= value=Displays help= enabled=1 focused=0 selected= actions=AXPress,AXScrollToVisible
+                  role=AXCheckBox title= description=Enabled identifier= value=1 help= enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+                role=AXHeading title= description=Settings identifier= value= help= enabled=1 focused= selected= actions=AXScrollToVisible
+                role=AXStaticText title= description= identifier= value=Use Include to choose what this profile applies. Expand a category to review or edit its saved values. help= enabled=1 focused= selected= actions=AXScrollToVisible
+                role=AXGroup title= description= identifier= value= help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXButton title= description=Displays identifier=profile-group-display value=Collapsed help=Expands or collapses this settings category enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Displays identifier= value=1 help= enabled=1 focused= selected= actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= identifier= value=Included · Built-in Retina Display · 1728 × 1117 at 60 Hz and 7 more help= enabled=1 focused= selected= actions=AXScrollToVisible
+                role=AXGroup title= description= identifier= value= help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXButton title= description=Audio identifier=profile-group-audio value=Expanded help=Expands or collapses this settings category enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Audio identifier= value=1 help= enabled=1 focused= selected= actions=AXScrollToVisible,AXPress
+                  role=AXButton title= description=Default input device identifier= value=Expanded help=Expands or collapses this setting's target value enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Default input device identifier= value=1 help= enabled=1 focused= selected= actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= identifier= value=Device help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXPopUpButton title= description= identifier= value=Synthetic Microphone help= enabled=1 focused=0 selected= actions=AXPress,AXScrollToVisible
+                  role=AXDisclosureTriangle title= description=Advanced identifier= value=0 help= enabled=1 focused= selected= actions=AXScrollToVisible,AXPress
+                  role=AXButton title= description=Default output device identifier= value=Expanded help=Expands or collapses this setting's target value enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Default output device identifier= value=1 help= enabled=1 focused= selected= actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= identifier= value=Device help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXPopUpButton title= description= identifier= value=Synthetic Speakers help= enabled=1 focused=0 selected= actions=AXPress,AXScrollToVisible
+                  role=AXDisclosureTriangle title= description=Advanced identifier= value=0 help= enabled=1 focused= selected= actions=AXScrollToVisible,AXPress
+                  role=AXButton title= description=System output device identifier= value=Collapsed help=Expands or collapses this setting's target value enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include System output device identifier= value=1 help= enabled=1 focused= selected= actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= identifier= value=Included · Synthetic Speakers help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXButton title= description=Output volume identifier= value=Collapsed help=Expands or collapses this setting's target value enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Output volume identifier= value=1 help= enabled=1 focused= selected= actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= identifier= value=Included · 72% help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXButton title= description=Output mute identifier= value=Collapsed help=Expands or collapses this setting's target value enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Output mute identifier= value=1 help= enabled=1 focused= selected= actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= identifier= value=Included · Off help= enabled=1 focused= selected= actions=AXScrollToVisible
+                role=AXGroup title= description= identifier= value= help= enabled=1 focused= selected= actions=AXScrollToVisible
+                  role=AXButton title= description=Network identifier=profile-group-network value=Collapsed help=Expands or collapses this settings category enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+                  role=AXCheckBox title= description=Include Network identifier= value=1 help= enabled=1 focused= selected= actions=AXScrollToVisible,AXPress
+                  role=AXStaticText title= description= identifier= value=Included · On · Synthetic Studio help= enabled=1 focused= selected= actions=AXScrollToVisible
+              role=AXScrollBar title= description= identifier= value=0 help= enabled=1 focused=0 selected= actions=
+                role=AXValueIndicator title= description= identifier= value=0 help= enabled= focused= selected= actions=
+                role=AXButton title= description= identifier= value= help= enabled= focused= selected= actions=AXPress
+                role=AXButton title= description= identifier= value= help= enabled= focused= selected= actions=AXPress
+                role=AXButton title= description= identifier= value= help= enabled= focused= selected= actions=AXPress
+                role=AXButton title= description= identifier= value= help= enabled= focused= selected= actions=AXPress
+            role=AXStaticText title= description= identifier= value=Profile editor status: Profile saved. help= enabled=1 focused= selected= actions=
+            role=AXButton title= description=Update Draft from Current Settings identifier= value= help=Reads the current Mac and updates only this unsaved draft enabled=1 focused=0 selected= actions=AXPress
+            role=AXButton title= description=Revert Changes identifier= value= help= enabled=0 focused= selected= actions=AXPress
+            role=AXButton title= description=Save Profile identifier= value= help= enabled=0 focused= selected= actions=AXPress
+            role=AXStaticText title= description= identifier= value=Profile storage status: Synthetic UI audit mode. Nothing is saved or applied. help= enabled=1 focused= selected= actions=
+            role=AXButton title= description=Import… identifier= value= help=Selects and validates a local profile JSON file enabled=1 focused=0 selected= actions=AXPress
+            role=AXButton title= description=Export… identifier= value= help=Exports all profiles to a new local JSON file enabled=1 focused=0 selected= actions=AXPress
+    role=AXButton title= description= identifier= value= help= enabled=1 focused=0 selected= actions=AXPress
+    role=AXButton title= description= identifier= value= help=this button also has an action to zoom the window enabled=1 focused=0 selected= actions=AXPress,AXZoomWindow,AXShowMenu
+      role=AXGroup title= description= identifier= value= help= enabled= focused=0 selected= actions=
+    role=AXButton title= description= identifier= value= help= enabled=1 focused=0 selected= actions=AXPress

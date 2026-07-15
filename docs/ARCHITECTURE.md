@@ -20,7 +20,7 @@ Concrete adapters for Core Graphics, Core Audio, CoreWLAN/Network/SystemConfigur
 
 ### DeskSetupSwitcherApp
 
-SwiftUI `MenuBarExtra`, compact header actions, independently collapsible typed setting editors, inline field validation, Settings scene, observable application state, preview/confirmation/result sheets, app-lifetime profile editor ownership, one-shot permission UI, `SMAppService` login-item control, sanitized diagnostic browsing/clearing, import/export, About, localization, and accessibility metadata. The app binds pure presentation state to controls and coordinates core/system services; it does not implement display/audio/network/input mutations itself.
+SwiftUI `MenuBarExtra`, compact header actions, independently collapsible typed setting editors, inline field validation, an AppKit-owned resizable Settings window hosting SwiftUI content, observable application state, preview/confirmation/result sheets, app-lifetime profile editor ownership, one-shot permission UI, `SMAppService` login-item control, sanitized diagnostic browsing/clearing, import/export, About, localization, and accessibility metadata. The app binds pure presentation state to controls and coordinates core/system services; it does not implement display/audio/network/input mutations itself.
 
 ### Tests
 

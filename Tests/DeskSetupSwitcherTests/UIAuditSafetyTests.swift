@@ -1,5 +1,6 @@
 import Foundation
 import ServiceManagement
+import SwiftUI
 import Testing
 
 @testable import DeskSetupCore
@@ -165,6 +166,77 @@ import Testing
       await task.value
       #expect(
         events == ["app-settings", "presentation-settled", "system-permission-action"])
+    }
+
+    @Test("tray deletion request, cancel, and confirmation are deterministic")
+    func trayDeletionStateTransitions() {
+      let first = UUID()
+      let second = UUID()
+      var state = MenuProfileDeletionState()
+
+      state.request(profileID: first)
+      #expect(state.isPending(profileID: first))
+      let wrongConfirmation = state.confirm(profileID: second)
+      #expect(!wrongConfirmation)
+      #expect(state.pendingProfileID == first)
+
+      state.cancel()
+      #expect(state.pendingProfileID == nil)
+
+      state.request(profileID: first)
+      let matchingConfirmation = state.confirm(profileID: first)
+      #expect(matchingConfirmation)
+      #expect(state.pendingProfileID == nil)
+    }
+
+    @Test("tray deletion layout reserves a complete confirmation region")
+    func trayDeletionLayoutHeight() {
+      let normalOne = MenuProfileListLayout.height(
+        profileCount: 1,
+        hasDeletionConfirmation: false
+      )
+      let confirmingOne = MenuProfileListLayout.height(
+        profileCount: 1,
+        hasDeletionConfirmation: true
+      )
+      let normalThree = MenuProfileListLayout.height(
+        profileCount: 3,
+        hasDeletionConfirmation: false
+      )
+      let confirmingThree = MenuProfileListLayout.height(
+        profileCount: 3,
+        hasDeletionConfirmation: true
+      )
+      let confirmingMany = MenuProfileListLayout.height(
+        profileCount: 20,
+        hasDeletionConfirmation: true
+      )
+
+      #expect(normalOne == MenuProfileListLayout.minimumHeight)
+      #expect(confirmingOne >= 190)
+      #expect(confirmingOne - normalOne >= 70)
+      #expect(confirmingThree > normalThree)
+      #expect(confirmingMany == MenuProfileListLayout.confirmationMaximumHeight)
+    }
+
+    @Test("settings layout changes only at the documented breakpoint")
+    func responsiveSettingsBreakpoint() {
+      #expect(ProfileWorkspaceLayoutMode(width: 759.9) == .compact)
+      #expect(ProfileWorkspaceLayoutMode(width: 760) == .regular)
+      #expect(ProfileWorkspaceLayoutMode(width: 980) == .regular)
+      #expect(ProfileWorkspaceLayoutMode(width: 680) == .compact)
+    }
+
+    @Test("runtime settings window exposes stable resizable geometry")
+    func runtimeSettingsWindowGeometry() throws {
+      let controller = RuntimeSettingsWindowController(rootView: Color.clear)
+      let window = try #require(controller.window)
+
+      #expect(window.styleMask.contains(.resizable))
+      #expect(window.contentMinSize == CGSize(width: 680, height: 480))
+      #expect(window.contentView?.bounds.width == 900)
+      #expect(window.contentView?.bounds.height == 568)
+      #expect(!window.isReleasedWhenClosed)
     }
   }
 

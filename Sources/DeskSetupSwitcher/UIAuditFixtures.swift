@@ -12,7 +12,9 @@ import SwiftUI
 
 enum UIAuditVariant: String {
   case overview
+  case menuPolish = "menu-polish"
   case editor
+  case editorPolish = "editor-polish"
   case validation
   case permissions
   case diagnostics
@@ -108,7 +110,7 @@ extension View {
 
   @MainActor
   enum UIAuditFixtures {
-    private static let readyProfileID = UUID(
+    static let readyProfileID = UUID(
       uuidString: "10000000-0000-0000-0000-000000000001")!
     private static let partialProfileID = UUID(
       uuidString: "10000000-0000-0000-0000-000000000002")!
@@ -151,7 +153,7 @@ extension View {
       let profiles = [ready, partial, disabled]
       let snapshot = syntheticSnapshot(settings: ready.settings)
       let captureSummary: ProfileCaptureSummary? =
-        variant == .overview ? partialCaptureSummary() : nil
+        variant == .overview || variant == .menuPolish ? partialCaptureSummary() : nil
       let applySummary: ApplyResultSummary? =
         variant == .overview ? partialApplySummary(profile: ready) : nil
 

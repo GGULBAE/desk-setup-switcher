@@ -1,0 +1,34 @@
+WINDOW_ID=141
+role=AXApplication title=Desk Setup Switcher
+  role=AXWindow title=Desk Setup Switcher UI Audit description= identifier= value= help= enabled= focused=1 selected= actions=AXRaise
+    role=AXGroup title= description= identifier= value= help= enabled= focused=0 selected= actions=
+      role=AXHeading title= description=Desk Setup Switcher identifier= value= help= enabled=1 focused= selected= actions=
+      role=AXButton title= description=Capture Current Settings identifier= value= help=Reads current settings without changing the Mac and creates a profile. enabled=1 focused=0 selected= actions=AXPress
+      role=AXButton title= description=Settings identifier=gearshape value= help=Settings enabled=1 focused=0 selected= actions=AXPress
+      role=AXButton title= description=Quit Desk Setup Switcher identifier=power value= help=Quit Desk Setup Switcher enabled=1 focused=0 selected= actions=AXPress
+      role=AXScrollArea title= description= identifier= value= help= enabled= focused=0 selected= actions=AXScrollLeftByPage,AXScrollRightByPage,AXScrollUpByPage,AXScrollDownByPage
+        role=AXOpaqueProviderGroup title= description= identifier= value= help= enabled=1 focused= selected= actions=AXScrollToTop,AXScrollToBottom
+          role=AXGroup title= description= identifier= value= help= enabled=1 focused= selected= actions=AXScrollToVisible
+            role=AXStaticText title= description= identifier= value=Focus Workspace — Display, Audio, Network & Input help= enabled=1 focused= selected= actions=AXScrollToVisible
+            role=AXStaticText title= description= identifier= value=Profile status: Ready help= enabled=1 focused= selected= actions=AXScrollToVisible
+            role=AXGroup title= description= identifier= value= help= enabled=1 focused= selected= actions=AXScrollToVisible
+              role=AXStaticText title= description= identifier= value=Delete this profile? help= enabled=1 focused= selected= actions=AXScrollToVisible
+              role=AXStaticText title= description= identifier= value=This removes Focus Workspace — Display, Audio, Network & Input from local profile storage. This action cannot be undone. help= enabled=1 focused= selected= actions=AXScrollToVisible
+              role=AXButton title= description=Cancel identifier= value= help= enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+              role=AXButton title= description=Delete Focus Workspace — Display, Audio, Network & Input identifier= value= help=Delete Focus Workspace — Display, Audio, Network & Input enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+          role=AXGroup title= description= identifier= value= help= enabled=1 focused= selected= actions=AXScrollToVisible
+            role=AXStaticText title= description= identifier= value=Portable Desk — Available Settings Only help= enabled=1 focused= selected= actions=AXScrollToVisible
+            role=AXStaticText title= description= identifier= value=Profile status: Partial help= enabled=1 focused= selected= actions=AXScrollToVisible
+            role=AXButton title= description=Apply Available… Portable Desk — Available Settings Only identifier= value= help=Preview and apply only the currently available settings. enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+            role=AXButton title= description=Edit Portable Desk — Available Settings Only identifier= value= help=Edit Profile enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+            role=AXButton title= description=Delete Portable Desk — Available Settings Only identifier=trash value= help=Delete Portable Desk — Available Settings Only enabled=1 focused=0 selected= actions=AXScrollToVisible,AXPress
+      role=AXGroup title= description= identifier= value= help= enabled=1 focused= selected= actions=
+        role=AXStaticText title= description= identifier= value=Location Access Needed help= enabled=1 focused= selected= actions=
+        role=AXButton title= description=Dismiss Capture Result identifier=xmark value= help=Dismiss Capture Result enabled=1 focused=0 selected= actions=AXPress
+        role=AXStaticText title= description= identifier= value=12 applicable settings saved. help= enabled=1 focused= selected= actions=
+        role=AXStaticText title= description= identifier= value=Permission required, 1 items, Current Wi-Fi network, macOS hid this value until the required permission is granted. help= enabled=1 focused= selected= actions=
+        role=AXButton title= description=Open macOS System Settings identifier= value= help= enabled=1 focused=0 selected= actions=AXPress
+    role=AXButton title= description= identifier= value= help= enabled=1 focused=0 selected= actions=AXPress
+    role=AXButton title= description= identifier= value= help=this button also has an action to zoom the window enabled=1 focused=0 selected= actions=AXPress,AXZoomWindow,AXShowMenu
+      role=AXGroup title= description= identifier= value= help= enabled= focused=0 selected= actions=
+    role=AXButton title= description= identifier= value= help= enabled=1 focused=0 selected= actions=AXPress
