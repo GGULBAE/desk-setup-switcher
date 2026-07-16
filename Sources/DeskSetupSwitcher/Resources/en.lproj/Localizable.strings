@@ -48,6 +48,12 @@
 "Close" = "Close";
 "Apply Available Settings" = "Apply Available Settings";
 "Apply Profile" = "Apply Profile";
+"This is a review. No setting changes until you press Apply Profile below." = "This is a review. No setting changes until you press Apply Profile below.";
+"The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press Apply Profile again." = "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press Apply Profile again.";
+"Executes the reviewed operations and then shows itemized results." = "Executes the reviewed operations and then shows itemized results.";
+"The apply preview is no longer current. Reopen it and try again." = "The apply preview is no longer current. Reopen it and try again.";
+"Another profile or protected-change operation is still in progress." = "Another profile or protected-change operation is still in progress.";
+"The read-only apply plan was refreshed before any setting was changed." = "The read-only apply plan was refreshed before any setting was changed.";
 "The profile has no included settings." = "The profile has no included settings.";
 "One or more readiness conditions are not satisfied." = "One or more readiness conditions are not satisfied.";
 "Normal apply requires every included item to be available." = "Normal apply requires every included item to be available.";
@@ -867,8 +873,12 @@
 /* Apply reliability and editor usability */
 "Apply…" = "Apply…";
 "Apply Available…" = "Apply Available…";
+"Review…" = "Review…";
+"Review Available…" = "Review Available…";
 "menu.action.apply" = "Apply…";
 "menu.action.applyAvailable" = "Apply Available…";
+"menu.action.review" = "Review…";
+"menu.action.reviewAvailable" = "Review Available…";
 "Preparing this profile…" = "Preparing this profile…";
 "menu.apply.disabled.preparing" = "Preparing this profile…";
 "menu.apply.disabled.readinessRefreshing" = "Checking whether this profile can be applied…";

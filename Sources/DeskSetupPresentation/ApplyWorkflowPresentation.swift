@@ -22,15 +22,15 @@ public enum PrimaryApplyActionKind: String, Equatable, Sendable {
 
   public var localizationKey: String {
     switch self {
-    case .normal: "menu.action.apply"
-    case .availableItems: "menu.action.applyAvailable"
+    case .normal: "menu.action.review"
+    case .availableItems: "menu.action.reviewAvailable"
     }
   }
 
   public var defaultLabel: String {
     switch self {
-    case .normal: "Apply…"
-    case .availableItems: "Apply Available…"
+    case .normal: "Review…"
+    case .availableItems: "Review Available…"
     }
   }
 }

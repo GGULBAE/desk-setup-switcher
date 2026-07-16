@@ -228,6 +228,55 @@ import Testing
       }
     }
 
+    @Test("empty content remains centered with an asymmetric native safe area")
+    func emptyContentIgnoresAsymmetricNativeSafeArea() throws {
+      let configuration = UIAuditConfiguration(
+        isEnabled: true,
+        variant: .trayEmpty,
+        displayMode: .standard,
+        showsStatusPopover: false
+      )
+      let model = UIAuditFixtures.makeModel(configuration: configuration)
+      let permission = LocationPermissionController(
+        allowsSystemRequests: false,
+        syntheticAuthorizationStatus: .denied
+      )
+      let editor = ProfileEditorModel()
+      let presentation = TrayPresentationModel(
+        model: model,
+        locationPermission: permission,
+        profileEditor: editor
+      )
+      let router = TrayActionRouter(
+        executor: presentation,
+        destinationPresenter: OffscreenDestinationPresenter(),
+        terminateApplication: {}
+      )
+      let viewport = CGSize(width: TrayGeometry.width, height: TrayGeometry.compactHeight)
+      presentation.trayDidOpen(sessionGeneration: 1, viewport: viewport)
+      presentation.trayContentDidAttach(sessionGeneration: 1)
+      let root = TrayRootView(presentation: presentation, router: router)
+        .environmentObject(model)
+        .environmentObject(permission)
+        .environmentObject(editor)
+        .frame(width: viewport.width, height: viewport.height)
+        .background(Color.white)
+      let host = AsymmetricSafeAreaHostingView(
+        rootView: root,
+        injectedSafeAreaInsets: NSEdgeInsets(top: 0, left: 24, bottom: 0, right: 0)
+      )
+      host.frame = NSRect(origin: .zero, size: viewport)
+      host.layoutSubtreeIfNeeded()
+      host.displayIfNeeded()
+
+      let representation = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+      host.cacheDisplay(in: host.bounds, to: representation)
+      let inkCenter = try #require(horizontalEmptyStateInkCenter(in: representation))
+      let viewportCenter = CGFloat(representation.pixelsWide) / 2
+
+      #expect(abs(inkCenter - viewportCenter) <= 4)
+    }
+
     private var evidenceOutputDirectory: URL? {
       guard ProcessInfo.processInfo.environment["DESK_SETUP_WRITE_TRAY_EVIDENCE"] == "1",
         let path = ProcessInfo.processInfo.environment["DESK_SETUP_TRAY_EVIDENCE_DIR"]
@@ -459,6 +508,57 @@ import Testing
       for child in children {
         appendAccessibility(child as AnyObject, depth: depth + 1, lines: &lines, visited: &visited)
       }
+    }
+
+    private func horizontalEmptyStateInkCenter(
+      in representation: NSBitmapImageRep
+    ) -> CGFloat? {
+      let lowerY = Int(CGFloat(representation.pixelsHigh) * 0.10)
+      let upperY = Int(CGFloat(representation.pixelsHigh) * 0.50)
+      var minimumX = representation.pixelsWide
+      var maximumX = -1
+      for y in lowerY..<upperY {
+        for x in 0..<representation.pixelsWide {
+          guard
+            let color = representation.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+            color.alphaComponent > 0.5
+          else { continue }
+          let brightness =
+            0.2126 * color.redComponent
+            + 0.7152 * color.greenComponent
+            + 0.0722 * color.blueComponent
+          if brightness < 0.82 {
+            minimumX = min(minimumX, x)
+            maximumX = max(maximumX, x)
+          }
+        }
+      }
+      guard maximumX >= minimumX else { return nil }
+      return CGFloat(minimumX + maximumX) / 2
+    }
+  }
+
+  @MainActor
+  private final class AsymmetricSafeAreaHostingView<Content: View>: NSHostingView<Content> {
+    private let injectedSafeAreaInsets: NSEdgeInsets
+
+    init(rootView: Content, injectedSafeAreaInsets: NSEdgeInsets) {
+      self.injectedSafeAreaInsets = injectedSafeAreaInsets
+      super.init(rootView: rootView)
+    }
+
+    @available(*, unavailable)
+    required init(rootView: Content) {
+      fatalError("Use init(rootView:injectedSafeAreaInsets:)")
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+      fatalError("init(coder:) is unavailable")
+    }
+
+    override var safeAreaInsets: NSEdgeInsets {
+      injectedSafeAreaInsets
     }
   }
 

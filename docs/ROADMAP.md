@@ -158,8 +158,19 @@ Remaining:
 
 No live display/audio/network mutation, install, push, tag, signing/notarization, or publication is part of M4.5.
 
-## Current next task — installed and hardware verification audit
+## M4.6 — installed empty-state and apply-handoff follow-up
 
-Run user-driven checks for the actual status item, 20 visible reopen cycles, application/Space switching with Settings/Profile Edit held open, red-close recovery and frontmost ordering, native English/Korean rendering, keyboard focus, and VoiceOver. After a separate explicit mutation approval and preflight snapshot, execute the support-matrix ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 procedures and independently verify rollback. Import/export, the full permission matrix, login approval/retry/reboot, Gatekeeper, and physical Intel remain separately authorized work.
+- Ignore the actual `NSPopover` container's asymmetric horizontal safe area at the SwiftUI root and keep one symmetric 16-point content inset. Replace the tall native unavailable-content view with a compact explicit empty state.
+- Rename the tray's state-aware action to Review/Review Available, explain that the preview has not changed settings, and keep Apply Profile as the only mutation confirmation.
+- Return a changed execution preflight to a visibly marked refreshed review without invoking adapters; expose rejected confirmation guards instead of silently returning.
+- Add an asymmetric-safe-area raster regression, stable/changed execution-preflight adapter tests, and an opt-in adjacent read-only live-preparation check.
+- Integrated non-live `make verify` passes 370 default cases (134 XCTest with five skips + 236 Swift Testing with two disabled opt-in cases), all build/Analyze stages, and universal mounted-DMG verification. SHA-256 is `e2927513543903b794bea08628064b29c12604e18706bef169c20b3e89760bcd`.
+- The verified package replaced `/Applications/Desk Setup Switcher.app` and passed identity, version, `x86_64 arm64`, and signature checks. It was not launched after replacement, and no live setting mutation ran.
+
+Evidence: [installed empty/apply follow-up](INSTALLED-EMPTY-APPLY-FOLLOWUP-2026-07-16.md).
+
+## Current next task — reinstalled smoke check, then hardware audit
+
+Launch the reinstalled app and first run user-driven checks for the empty tray alignment, repeated opens, Review→Apply Profile wording, and visible result/error states. Continue with application/Space switching, red-close recovery, native English/Korean rendering, keyboard focus, and VoiceOver. Only after a separate explicit mutation approval and preflight snapshot, execute the support-matrix ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 procedures and independently verify rollback. Import/export, the full permission matrix, login approval/retry/reboot, Gatekeeper, and physical Intel remain separately authorized work.
 
 Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

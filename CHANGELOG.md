@@ -6,6 +6,7 @@ All notable changes will be documented here. The project follows Keep a Changelo
 
 ### Added
 
+- An injected-native-safe-area raster regression for the empty tray, deterministic confirmation-to-adapter coverage, and an opt-in read-only adjacent-plan check that never mutates host settings.
 - One nine-kind `VisibleSettingRegistry` contract requiring capture, edit, validation, planning, apply, verification, and rollback for every rendered setting, plus a real-adapter synthetic end-to-end invariant.
 - Public ColorSync ICC profile enumeration and mapping with portable registered-ID/ICC-SHA-256 persistence, exact read-back, and previous-mapping rollback after display topology.
 - Authorized Ethernet/Wi‑Fi service DHCP/manual IPv4 application through public SystemConfiguration, including exact serialized rollback data, dynamic-store completion/timeout, and generalized protected-change confirmation.
@@ -33,6 +34,8 @@ All notable changes will be documented here. The project follows Keep a Changelo
 
 ### Changed
 
+- The tray root now ignores `NSPopover`'s asymmetric horizontal safe area and owns the only 16-point content inset. The empty state uses a compact explicit stack instead of a tall native unavailable-content container.
+- Profile-row actions are labelled Review/Review Available because they open a preview. The preview explicitly says when no setting has changed, the separate Apply Profile button owns mutation, changed execution preflight returns to a refreshed review without mutation, and rejected confirmations show a visible reason.
 - Tray first attachment now has explicit before-show/show-return/content-window/first-layout/key/final-sync stages, fixed 260/300/316/560-point height tiers, symmetric root padding, stale-generation rejection, and no arbitrary delay.
 - Profile activation and group/option disclosure were removed from the product surface. Legacy false activation migrates to active applicability; Display, Audio, and Network are flat and always expanded, with unsupported controls absent rather than disabled.
 - Hidden description, conditions, Input, display origin/rotation/active, audio system-output/mute, Wi‑Fi power/SSID, global IPv4, DNS, and proxy values remain round-trip compatible but are normalized dormant for new apply payloads.
@@ -59,6 +62,7 @@ All notable changes will be documented here. The project follows Keep a Changelo
 
 ### Status
 
+- The installed-layout/apply follow-up passed integrated non-live `make verify` on 2026-07-16 with 370 default cases: 134 XCTest cases with five skips and 236 Swift Testing cases with two disabled opt-in cases. Universal Debug/Release, Analyze, DMG/checksum, mounted resources/architectures, and ad-hoc/no-Developer-ID verification passed. DMG SHA-256 is `e2927513543903b794bea08628064b29c12604e18706bef169c20b3e89760bcd`. It replaced the `/Applications` bundle and passed identity/version/architecture/signature checks, but it was not launched after replacement and no live setting mutation ran.
 - The tray/settings end-to-end contract passed integrated non-live `make verify` on 2026-07-16 with 366 default cases (134 XCTest and 232 Swift Testing cases), five opt-in skips, and zero failures. Swift Debug/Release, universal Xcode Debug/Release, Analyze, DMG/checksum, mounted resources/architectures, and ad-hoc/no-Developer-ID signature classification passed. The universal DMG SHA-256 is `76bc6d9f1187ea30f68be16ee81ee4a334d877a4e26c2497f35a9ffc781678b3`. It was not installed or launched; installed tray/window behavior and hardware mutation/rollback remain manual.
 - Tray Surface v2 passed integrated non-live `make verify` on 2026-07-15 with 326 default cases (130 XCTest and 196 Swift Testing cases), six opt-in skips, and zero failures. Swift Debug/Release, universal Xcode Debug/Release, Analyze, DMG/checksum, mounted resources/architectures, and ad-hoc/no-Developer-ID signature classification passed. The universal DMG SHA-256 is `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`. It was not installed or launched; actual popover chrome/anchor/dismissal, VoiceOver, TCC, physical Intel, and hardware mutation remain pending.
 - The historical measured-height tray/responsive-settings follow-up passed integrated non-live `make verify` on 2026-07-15 with 305 default cases, six opt-in skips, and zero failures. Its universal DMG SHA-256 was `8bf4d547fae0df3cbe999db84e7be169b33d495b3993cf7c37f46ba37d6ea71d`; it and the pre-correction package SHA-256 `8422b042b793bf0845ac56e2dcbd9808075a0467226d79ee65408440736648d8` are superseded historical evidence.

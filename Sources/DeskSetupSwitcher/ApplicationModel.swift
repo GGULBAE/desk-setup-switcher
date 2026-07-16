@@ -118,10 +118,48 @@ func appApplicationStatusTitle(
     ? appLocalized("Awaiting protected-change confirmation") : appReadinessTitle(status)
 }
 
+enum ApplyPreviewReviewReason: Equatable, Sendable {
+  case initial
+  case refreshedSystemState
+}
+
 struct PendingApplyRequest: Identifiable, Sendable {
   let id = UUID()
   let profile: DeskProfile
   let preparation: ApplyPreparation
+  let reviewReason: ApplyPreviewReviewReason
+
+  init(
+    profile: DeskProfile,
+    preparation: ApplyPreparation,
+    reviewReason: ApplyPreviewReviewReason = .initial
+  ) {
+    self.profile = profile
+    self.preparation = preparation
+    self.reviewReason = reviewReason
+  }
+}
+
+enum PendingApplyStartFailure: Equatable, Sendable {
+  case syntheticMode
+  case noPendingRequest
+  case transactionLocked
+
+  var defaultMessage: String {
+    switch self {
+    case .syntheticMode:
+      "System access is disabled for this synthetic review."
+    case .noPendingRequest:
+      "The apply preview is no longer current. Reopen it and try again."
+    case .transactionLocked:
+      "Another profile or protected-change operation is still in progress."
+    }
+  }
+}
+
+enum PendingApplyStartResult: Equatable, Sendable {
+  case started
+  case rejected(PendingApplyStartFailure)
 }
 
 struct PendingImportRequest: Identifiable, Sendable {
@@ -791,11 +829,11 @@ final class ApplicationModel: ObservableObject {
     pendingApply = nil
   }
 
-  func executePendingApply() {
-    guard !suppressesLiveSystemAccess else { return }
-    guard let request = pendingApply, !isProfileMutationLocked else {
-      return
-    }
+  @discardableResult
+  func executePendingApply() -> PendingApplyStartResult {
+    guard !suppressesLiveSystemAccess else { return .rejected(.syntheticMode) }
+    guard let request = pendingApply else { return .rejected(.noPendingRequest) }
+    guard !isProfileMutationLocked else { return .rejected(.transactionLocked) }
     pendingApply = nil
     lastApplySummary = nil
     lastApplyVerification = nil
@@ -846,7 +884,8 @@ final class ApplicationModel: ObservableObject {
         operationalStatusByProfile[request.profile.id] = nil
         pendingApply = PendingApplyRequest(
           profile: currentProfile,
-          preparation: currentPreparation
+          preparation: currentPreparation,
+          reviewReason: .refreshedSystemState
         )
         readinessByProfile[currentProfile.id] = currentPreparation.readiness.status
         let isAvailable =
@@ -864,6 +903,13 @@ final class ApplicationModel: ObservableObject {
         }
         lastMessage = appLocalized(
           "The system or profile changed. Review the refreshed plan before applying.")
+        recordDiagnostic(
+          severity: .info,
+          component: "apply",
+          code: "plan-refreshed-before-execution",
+          message: appLocalized(
+            "The read-only apply plan was refreshed before any setting was changed.")
+        )
         return
       }
 
@@ -958,6 +1004,7 @@ final class ApplicationModel: ObservableObject {
           )
       )
     }
+    return .started
   }
 
   func deferTerminationUntilApplyCompletes() {

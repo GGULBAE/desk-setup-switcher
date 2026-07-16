@@ -48,6 +48,23 @@ struct ApplyPreviewView: View {
         .background(.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
       }
 
+      switch request.reviewReason {
+      case .initial:
+        Label(
+          "This is a review. No setting changes until you press Apply Profile below.",
+          systemImage: "info.circle"
+        )
+        .padding(10)
+        .background(.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+      case .refreshedSystemState:
+        Label(
+          "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press Apply Profile again.",
+          systemImage: "arrow.clockwise.circle"
+        )
+        .padding(10)
+        .background(.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+      }
+
       if request.preparation.operations.contains(where: { $0.risk == .high }) {
         Label(
           "High-risk display and network changes remain temporary and will be restored if the safety window closes, the app exits, or you do not confirm within 15 seconds.",
@@ -146,6 +163,8 @@ struct ApplyPreviewView: View {
         .keyboardShortcut(.defaultAction)
         .buttonStyle(.borderedProminent)
         .disabled(!request.preparation.canExecute || model.isProfileMutationLocked)
+        .accessibilityHint(
+          appLocalized("Executes the reviewed operations and then shows itemized results."))
       }
     }
     .padding(20)

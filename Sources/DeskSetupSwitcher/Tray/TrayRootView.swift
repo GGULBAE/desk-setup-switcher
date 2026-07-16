@@ -43,10 +43,11 @@ struct TrayRootView: View {
             applySummary
             handoffError
           }
-          .frame(maxWidth: .infinity, alignment: .leading)
+          .frame(maxWidth: .infinity, alignment: .topLeading)
           .padding(.bottom, 2)
         }
         .scrollIndicators(.automatic)
+        .contentMargins(.vertical, 0, for: .scrollContent)
         .onChange(of: presentation.scrollResetRequest) { _, request in
           guard request?.anchor == .top else { return }
           proxy.scrollTo(TrayScrollAnchor.top, anchor: .top)
@@ -63,6 +64,7 @@ struct TrayRootView: View {
     }
     .padding(TrayGeometry.outerPadding)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .ignoresSafeArea(.container, edges: .horizontal)
     .onExitCommand {
       presentation.requestEscape()
     }
@@ -115,13 +117,24 @@ struct TrayRootView: View {
   @ViewBuilder
   private var profileContent: some View {
     if model.profiles.isEmpty {
-      ContentUnavailableView(
-        appLocalized("No Profiles"),
-        systemImage: "rectangle.stack.badge.plus",
-        description: Text(
-          appLocalized("Capture the current Mac to create your first editable profile."))
-      )
-      .frame(maxWidth: .infinity, minHeight: 170)
+      VStack(spacing: 8) {
+        Image(systemName: "rectangle.stack.badge.plus")
+          .font(.system(size: 30, weight: .medium))
+          .foregroundStyle(.secondary)
+          .accessibilityHidden(true)
+        Text(appLocalized("No Profiles"))
+          .font(.headline)
+        Text(appLocalized("Capture the current Mac to create your first editable profile."))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: 260)
+      }
+      .frame(maxWidth: .infinity, alignment: .top)
+      .padding(.top, 14)
+      .padding(.bottom, 8)
+      .accessibilityElement(children: .combine)
       .id(TrayFocusTarget.emptyState)
     } else {
       TrayProfileListView(

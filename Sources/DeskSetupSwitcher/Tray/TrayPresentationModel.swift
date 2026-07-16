@@ -379,7 +379,9 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
       requestApply(request.profile, mode: request.preparation.mode)
       return
     }
-    model.executePendingApply()
+    if case .rejected(let reason) = model.executePendingApply() {
+      applyDraftError = appLocalizedRuntime(reason.defaultMessage)
+    }
   }
 
   func cancelApplyWorkflow() {

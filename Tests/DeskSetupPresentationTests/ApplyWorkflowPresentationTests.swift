@@ -18,7 +18,8 @@ struct ApplyWorkflowPresentationTests {
     #expect(state.kind == .normal)
     #expect(state.mode == .normal)
     #expect(state.isEnabled)
-    #expect(state.defaultLabel == "Apply…")
+    #expect(state.defaultLabel == "Review…")
+    #expect(state.localizationKey == "menu.action.review")
   }
 
   @Test("partial operations select available-items in the same primary slot")
@@ -33,7 +34,8 @@ struct ApplyWorkflowPresentationTests {
     #expect(state.kind == .availableItems)
     #expect(state.mode == .force)
     #expect(state.isEnabled)
-    #expect(state.defaultLabel == "Apply Available…")
+    #expect(state.defaultLabel == "Review Available…")
+    #expect(state.localizationKey == "menu.action.reviewAvailable")
   }
 
   @Test("zero operations distinguish an already matching Mac from no available work")
