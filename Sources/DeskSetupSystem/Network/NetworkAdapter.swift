@@ -343,8 +343,14 @@ public struct NetworkAdapter: SystemSettingsAdapter {
         continue
       }
       guard !currentMatches.isEmpty else {
-        // The service editor is absent in this runtime; preserve the saved
-        // target without turning a hidden field into a partial profile.
+        omissions.append(
+          omission(
+            key: key,
+            status: .skipped,
+            reason:
+              "The saved network service is not available in the current system configuration."
+          )
+        )
         continue
       }
       guard currentMatches.count == 1 else {
@@ -368,14 +374,20 @@ public struct NetworkAdapter: SystemSettingsAdapter {
         )
         continue
       }
+      guard desiredConfiguration != currentMatches[0].configuration.value else { continue }
       let rollbackMatches = (snapshot.networkIPv4RollbackCatalog ?? []).filter {
         $0.identity == target.identity
       }
       guard rollbackMatches.count == 1, let rollback = rollbackMatches.first else {
-        // Without exact rollback evidence this service row is hidden.
+        omissions.append(
+          omission(
+            key: key,
+            status: .skipped,
+            reason: "Exact rollback data for the saved network service is unavailable."
+          )
+        )
         continue
       }
-      guard desiredConfiguration != currentMatches[0].configuration.value else { continue }
       operations.append(
         try operation(
           key: key,

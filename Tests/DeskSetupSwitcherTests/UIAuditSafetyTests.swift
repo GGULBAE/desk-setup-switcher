@@ -207,6 +207,184 @@ import Testing
       #expect(handoff.presentationChanged(isPresented: false) == .none)
     }
 
+    @Test("apply result count presentation hides zero outcomes without losing safety states")
+    func applyResultCountPresentationFiltersOnlyZeros() throws {
+      var summary = try #require(UIAuditFixtures.fixture(.trayApplyResult).applySummary)
+      summary.succeededCount = 3
+      summary.failedCount = 0
+      summary.skippedCount = 2
+      summary.unsupportedCount = 0
+      summary.notVerifiedCount = 1
+      summary.rolledBackCount = 0
+      summary.rollbackFailedCount = 1
+
+      #expect(
+        ApplyResultCountPresentation.nonzeroItems(for: summary) == [
+          ApplyResultCountItem(kind: .succeeded, count: 3),
+          ApplyResultCountItem(kind: .skipped, count: 2),
+          ApplyResultCountItem(kind: .notVerified, count: 1),
+          ApplyResultCountItem(kind: .rollbackFailed, count: 1),
+        ])
+
+      summary.failedCount = 1
+      summary.unsupportedCount = 1
+      summary.rolledBackCount = 1
+      #expect(
+        ApplyResultCountPresentation.nonzeroItems(for: summary).map(\.kind)
+          == ApplyResultCountKind.allCases
+      )
+    }
+
+    @Test("audio volume capability follows the device the profile will target")
+    func audioVolumeCapabilityUsesTargetDevice() {
+      let catalog = [
+        AudioVolumeControlCatalogEntry(
+          role: .output,
+          deviceUID: "writable-output",
+          currentValue: 0.42,
+          canApply: true
+        ),
+        AudioVolumeControlCatalogEntry(
+          role: .output,
+          deviceUID: "read-only-output",
+          currentValue: 0.8,
+          canApply: false
+        ),
+      ]
+
+      #expect(
+        ProfileEditorAudioVolumeCapabilityResolver.resolve(
+          role: .output,
+          selectedDevice: SettingOption(isIncluded: false, value: nil),
+          currentDeviceUID: "writable-output",
+          catalog: catalog
+        ) == ProfileEditorAudioVolumeCapability(isWritable: true, suggestedValue: 0.42)
+      )
+      #expect(
+        ProfileEditorAudioVolumeCapabilityResolver.resolve(
+          role: .output,
+          selectedDevice: SettingOption(isIncluded: true, value: "read-only-output"),
+          currentDeviceUID: "writable-output",
+          catalog: catalog
+        ) == ProfileEditorAudioVolumeCapability(isWritable: false, suggestedValue: 0.8)
+      )
+    }
+
+    @Test("only included unavailable settings receive an editor repair control")
+    func unavailableIncludedSettingsRemainRepairable() {
+      let savedColorProfile = ColorSyncProfileTarget(
+        registeredProfileID: "saved-profile",
+        fileSHA256: String(repeating: "a", count: 64),
+        displayName: "Saved synthetic ICC"
+      )
+      let otherColorProfile = ColorSyncProfileTarget(
+        registeredProfileID: "other-profile",
+        fileSHA256: String(repeating: "b", count: 64),
+        displayName: "Other synthetic ICC"
+      )
+
+      #expect(
+        ProfileEditorUnavailableIncludedSettingPolicy.isSelectedColorProfileAvailable(
+          savedColorProfile,
+          in: [savedColorProfile, otherColorProfile]
+        )
+      )
+      #expect(
+        !ProfileEditorUnavailableIncludedSettingPolicy.isSelectedColorProfileAvailable(
+          savedColorProfile,
+          in: [otherColorProfile]
+        )
+      )
+      #expect(
+        ProfileEditorUnavailableIncludedSettingPolicy.isSelectedColorProfileAvailable(
+          nil,
+          in: [otherColorProfile]
+        )
+      )
+      #expect(
+        !ProfileEditorUnavailableIncludedSettingPolicy.isSelectedColorProfileAvailable(
+          nil,
+          in: []
+        )
+      )
+
+      #expect(
+        ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
+          isIncluded: true,
+          isRuntimeAvailable: false,
+          hasRuntimeEvidence: true
+        )
+      )
+      #expect(
+        !ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
+          isIncluded: false,
+          isRuntimeAvailable: false,
+          hasRuntimeEvidence: true
+        )
+      )
+      #expect(
+        !ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
+          isIncluded: true,
+          isRuntimeAvailable: true,
+          hasRuntimeEvidence: true
+        )
+      )
+      #expect(
+        !ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
+          isIncluded: true,
+          isRuntimeAvailable: false,
+          hasRuntimeEvidence: false
+        )
+      )
+
+      let available = NetworkServiceIdentity(
+        kind: .ethernet,
+        serviceName: "Available synthetic service",
+        interfaceType: "Ethernet"
+      )
+      let unavailable = NetworkServiceIdentity(
+        kind: .ethernet,
+        serviceName: "Unavailable synthetic service",
+        interfaceType: "Ethernet"
+      )
+      let excluded = NetworkServiceIdentity(
+        kind: .ethernet,
+        serviceName: "Excluded synthetic service",
+        interfaceType: "Ethernet"
+      )
+      let otherKind = NetworkServiceIdentity(
+        kind: .wifi,
+        serviceName: "Unavailable synthetic Wi-Fi",
+        interfaceType: "IEEE80211"
+      )
+      let targets = [
+        NetworkServiceIPv4Settings(
+          identity: available,
+          configuration: .init(value: .dhcp)
+        ),
+        NetworkServiceIPv4Settings(
+          identity: unavailable,
+          configuration: .init(value: .dhcp)
+        ),
+        NetworkServiceIPv4Settings(
+          identity: excluded,
+          configuration: .init(isIncluded: false, value: .dhcp)
+        ),
+        NetworkServiceIPv4Settings(
+          identity: otherKind,
+          configuration: .init(value: .dhcp)
+        ),
+      ]
+
+      #expect(
+        ProfileEditorUnavailableIncludedSettingPolicy.unavailableNetworkServiceIndices(
+          in: targets,
+          kind: .ethernet,
+          availableIdentities: [available]
+        ) == [1]
+      )
+    }
+
     @Test("settings catalog stays stable within a presentation and refreshes on reopen")
     func settingsCatalogSessionLifetime() {
       let first = UIAuditFixtures.fixture(.editorDisplay).snapshot

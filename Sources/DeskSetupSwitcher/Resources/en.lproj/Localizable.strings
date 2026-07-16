@@ -41,6 +41,7 @@
 "High risk" = "High risk";
 "Review" = "Review";
 "Low risk" = "Low risk";
+"Change risk" = "Change risk";
 "Skipped or unsupported" = "Skipped or unsupported";
 "Validation" = "Validation";
 "Cannot apply" = "Cannot apply";
@@ -682,7 +683,6 @@
 "Discard Changes" = "Discard Changes";
 "This profile has changes that have not been saved." = "This profile has changes that have not been saved.";
 "Revert Changes" = "Revert Changes";
-"All changes are saved." = "All changes are saved.";
 "Unsaved changes" = "Unsaved changes";
 "Saving profile…" = "Saving profile…";
 "Reading current settings…" = "Reading current settings…";
@@ -740,7 +740,6 @@
 "Device UID" = "Device UID";
 "Volume percent" = "Volume percent";
 "%" = "%";
-"Enter a value from 0 to 100 percent." = "Enter a value from 0 to 100 percent.";
 "Output mute value" = "Output mute value";
 "Wi-Fi power value" = "Wi-Fi power value";
 "Network name" = "Network name";
@@ -782,9 +781,7 @@
 "Current %@" = "Current %@";
 "After apply %@" = "After apply %@";
 "%lld seconds remaining" = "%lld seconds remaining";
-"App setting" = "App setting";
 "macOS registration" = "macOS registration";
-"The app setting matches the macOS registration state." = "The app setting matches the macOS registration state.";
 "Why can these states differ?" = "Why can these states differ?";
 "macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration." = "macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration.";
 "Debug" = "Debug";
@@ -945,8 +942,13 @@
 "Dismiss Apply Result" = "Dismiss Apply Result";
 "Details" = "Details";
 "Shows itemized apply and read-back results" = "Shows itemized apply and read-back results";
-"%lld succeeded · %lld failed · %lld skipped · %lld unsupported" = "%lld succeeded · %lld failed · %lld skipped · %lld unsupported";
-"%lld not verified · %lld rollback failed" = "%lld not verified · %lld rollback failed";
+"%lld succeeded" = "%lld succeeded";
+"%lld failed" = "%lld failed";
+"%lld skipped" = "%lld skipped";
+"%lld unsupported" = "%lld unsupported";
+"%lld not verified" = "%lld not verified";
+"%lld rolled back" = "%lld rolled back";
+"%lld rollback failed" = "%lld rollback failed";
 "%@ for %@. %lld succeeded, %lld failed, %lld not verified." = "%@ for %@. %lld succeeded, %lld failed, %lld not verified.";
 "Apply Results" = "Apply Results";
 "Rollback Results" = "Rollback Results";
@@ -988,7 +990,6 @@
 "0" = "0";
 "100" = "100";
 "Choose a display" = "Choose a display";
-"Select the display that should anchor the desktop." = "Select the display that should anchor the desktop.";
 "Saved mode" = "Saved mode";
 "Supported mode" = "Supported mode";
 "Display mode" = "Display mode";
@@ -1114,9 +1115,9 @@
 "Input volume" = "Input volume";
 
 /* Tray/settings vertical-slice refinement */
-"Use each setting's Include switch to choose what this profile applies. Supported values are ready to edit below." = "Use each setting's Include switch to choose what this profile applies. Supported values are ready to edit below.";
 "Display output mode" = "Display output mode";
 "Choose an extended desktop or mirror secondary displays" = "Choose an extended desktop or mirror secondary displays";
+"Color profile" = "Color profile";
 "ColorSync ICC profile" = "ColorSync ICC profile";
 "Choose a color profile" = "Choose a color profile";
 "Display color profile" = "Display color profile";
@@ -1130,6 +1131,9 @@
 "Enter the IPv4 address for this service" = "Enter the IPv4 address for this service";
 "Enter a contiguous IPv4 subnet mask" = "Enter a contiguous IPv4 subnet mask";
 "Enter the optional IPv4 router address" = "Enter the optional IPv4 router address";
+"This included volume setting is unavailable for the selected device. Turn off Include to apply other available settings normally." = "This included volume setting is unavailable for the selected device. Turn off Include to apply other available settings normally.";
+"This included ColorSync profile setting is unavailable for the saved display. Turn off Include to apply other available settings normally." = "This included ColorSync profile setting is unavailable for the saved display. Turn off Include to apply other available settings normally.";
+"The included IPv4 setting for %@ is unavailable in the current network configuration. Turn off Include to apply other available settings normally." = "The included IPv4 setting for %@ is unavailable in the current network configuration. Turn off Include to apply other available settings normally.";
 "High-risk display and network changes remain temporary and will be restored if the safety window closes, the app exits, or you do not confirm within 15 seconds." = "High-risk display and network changes remain temporary and will be restored if the safety window closes, the app exits, or you do not confirm within 15 seconds.";
 "Protected change confirmation" = "Protected change confirmation";
 "Awaiting protected-change confirmation" = "Awaiting protected-change confirmation";

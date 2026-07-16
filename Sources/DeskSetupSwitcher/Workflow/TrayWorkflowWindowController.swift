@@ -8,6 +8,77 @@ import SwiftUI
   import DeskSetupPresentation
 #endif
 
+enum ApplyResultCountKind: String, CaseIterable, Hashable, Sendable {
+  case succeeded
+  case failed
+  case skipped
+  case unsupported
+  case notVerified
+  case rolledBack
+  case rollbackFailed
+
+  var title: String {
+    switch self {
+    case .succeeded: appLocalized("Succeeded")
+    case .failed: appLocalized("Failed")
+    case .skipped: appLocalized("Skipped")
+    case .unsupported: appLocalized("Unsupported")
+    case .notVerified: appLocalized("Not Verified")
+    case .rolledBack: appLocalized("Rolled back")
+    case .rollbackFailed: appLocalized("Rollback failed")
+    }
+  }
+
+  func compactText(count: Int) -> String {
+    switch self {
+    case .succeeded: appLocalized("\(count) succeeded")
+    case .failed: appLocalized("\(count) failed")
+    case .skipped: appLocalized("\(count) skipped")
+    case .unsupported: appLocalized("\(count) unsupported")
+    case .notVerified: appLocalized("\(count) not verified")
+    case .rolledBack: appLocalized("\(count) rolled back")
+    case .rollbackFailed: appLocalized("\(count) rollback failed")
+    }
+  }
+}
+
+struct ApplyResultCountItem: Equatable, Identifiable, Sendable {
+  let kind: ApplyResultCountKind
+  let count: Int
+
+  var id: ApplyResultCountKind { kind }
+}
+
+enum ApplyResultCountPresentation {
+  static func nonzeroItems(for summary: ApplyResultSummary) -> [ApplyResultCountItem] {
+    let counts: [ApplyResultCountKind: Int] = [
+      .succeeded: summary.succeededCount,
+      .failed: summary.failedCount,
+      .skipped: summary.skippedCount,
+      .unsupported: summary.unsupportedCount,
+      .notVerified: summary.notVerifiedCount,
+      .rolledBack: summary.rolledBackCount,
+      .rollbackFailed: summary.rollbackFailedCount,
+    ]
+    return ApplyResultCountKind.allCases.compactMap { kind in
+      guard let count = counts[kind], count > 0 else { return nil }
+      return ApplyResultCountItem(kind: kind, count: count)
+    }
+  }
+
+  static func compactText(for items: [ApplyResultCountItem]) -> String {
+    items
+      .map { $0.kind.compactText(count: $0.count) }
+      .joined(separator: " · ")
+  }
+
+  static func accessibilityText(for items: [ApplyResultCountItem]) -> String {
+    items
+      .map { $0.kind.compactText(count: $0.count) }
+      .joined(separator: ", ")
+  }
+}
+
 struct ApplyPreviewView: View {
   @EnvironmentObject private var model: ApplicationModel
   let request: PendingApplyRequest
@@ -62,14 +133,12 @@ struct ApplyPreviewView: View {
                       .frame(width: 70, alignment: .leading)
                     Text(appLocalizedRuntime(operation.summary))
                     Spacer()
-                    Text(
-                      operation.risk == .high
-                        ? appLocalized("High risk")
-                        : operation.risk == .moderate
-                          ? appLocalized("Review") : appLocalized("Low risk")
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    if operation.risk != .low {
+                      Text(riskTitle(operation.risk))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    }
                   }
                   if let preview = presentationBuilder.operationPreview(for: operation) {
                     operationPreview(preview, operation: operation)
@@ -78,6 +147,11 @@ struct ApplyPreviewView: View {
                 }
                 .padding(.vertical, 3)
                 .accessibilityElement(children: .combine)
+                .accessibilityCustomContent(
+                  Text(verbatim: appLocalized("Change risk")),
+                  Text(verbatim: riskTitle(operation.risk)),
+                  importance: operation.risk == .high ? .high : .default
+                )
               }
             }
           }
@@ -252,6 +326,14 @@ struct ApplyPreviewView: View {
     ProfilePresentationBuilder()
   }
 
+  private func riskTitle(_ risk: OperationRisk) -> String {
+    switch risk {
+    case .low: appLocalized("Low risk")
+    case .moderate: appLocalized("Review")
+    case .high: appLocalized("High risk")
+    }
+  }
+
   private func previewSection<Content: View>(
     _ title: String,
     systemImage: String,
@@ -319,16 +401,15 @@ struct ApplyResultDetailsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
 
-      Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 5) {
-        resultCount("Succeeded", summary.succeededCount)
-        resultCount("Failed", summary.failedCount)
-        resultCount("Skipped", summary.skippedCount)
-        resultCount("Unsupported", summary.unsupportedCount)
-        resultCount("Not verified", summary.notVerifiedCount)
-        resultCount("Rolled back", summary.rolledBackCount)
-        resultCount("Rollback failed", summary.rollbackFailedCount)
+      let countItems = ApplyResultCountPresentation.nonzeroItems(for: summary)
+      if !countItems.isEmpty {
+        Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 5) {
+          ForEach(countItems) { item in
+            resultCount(item.kind.title, item.count)
+          }
+        }
+        .font(.caption)
       }
-      .font(.caption)
 
       Divider()
       ScrollView {
@@ -378,7 +459,7 @@ struct ApplyResultDetailsView: View {
   }
 
   @ViewBuilder
-  private func resultCount(_ title: LocalizedStringKey, _ count: Int) -> some View {
+  private func resultCount(_ title: String, _ count: Int) -> some View {
     GridRow {
       Text(title)
       Text(count, format: .number)

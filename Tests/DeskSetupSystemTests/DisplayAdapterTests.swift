@@ -192,6 +192,93 @@ struct DisplayAdapterTests {
     )
   }
 
+  @Test("a rotation-only request produces one unsupported omission")
+  func rotationOnlyRequestIsOmitted() async throws {
+    let adapter = CoreGraphicsDisplayAdapter(
+      systemAPI: MockDisplaySystemAPI(displays: makeDisplays())
+    )
+    let snapshot = try await adapter.snapshot()
+    let settings = try displaySettings(from: snapshot)
+    var target = try #require(settings.displays.first)
+    target.isPrimary.isIncluded = false
+    target.origin.isIncluded = false
+    target.mirroring.isIncluded = false
+    target.mode.isIncluded = false
+    target.colorProfile.isIncluded = false
+    target.rotationDegrees = .init(value: 90)
+    target.isActive.isIncluded = false
+    let key = "display.\(target.id.uuidString).rotation"
+
+    let plan = try await adapter.plan(
+      .display(.init(displays: [target])),
+      from: snapshot,
+      mode: .normal
+    )
+
+    #expect(plan.operations.isEmpty)
+    #expect(plan.omissions.map(\.key) == [key])
+    #expect(plan.omissions.first?.status == .unsupported)
+  }
+
+  @Test("a rotation-only request does not require unrelated topology rollback")
+  func rotationOnlyRequestSkipsTopologyRollback() async throws {
+    var displays = makeDisplays()
+    displays[1].currentMode = nil
+    let adapter = CoreGraphicsDisplayAdapter(
+      systemAPI: MockDisplaySystemAPI(displays: displays)
+    )
+    let snapshot = try await adapter.snapshot()
+    let settings = try displaySettings(from: snapshot)
+    var target = try #require(settings.displays.first)
+    target.isPrimary.isIncluded = false
+    target.origin.isIncluded = false
+    target.mirroring.isIncluded = false
+    target.mode.isIncluded = false
+    target.colorProfile.isIncluded = false
+    target.rotationDegrees = .init(value: 90)
+    target.isActive.isIncluded = false
+    let key = "display.\(target.id.uuidString).rotation"
+
+    let plan = try await adapter.plan(
+      .display(.init(displays: [target])),
+      from: snapshot,
+      mode: .normal
+    )
+
+    #expect(plan.operations.isEmpty)
+    #expect(plan.omissions.map(\.key) == [key])
+    #expect(plan.omissions.first?.status == .unsupported)
+    #expect(!plan.omissions.contains { $0.key == "display.rollback" })
+  }
+
+  @Test("an active-only request produces one unsupported omission")
+  func activeOnlyRequestIsOmitted() async throws {
+    let adapter = CoreGraphicsDisplayAdapter(
+      systemAPI: MockDisplaySystemAPI(displays: makeDisplays())
+    )
+    let snapshot = try await adapter.snapshot()
+    let settings = try displaySettings(from: snapshot)
+    var target = try #require(settings.displays.first)
+    target.isPrimary.isIncluded = false
+    target.origin.isIncluded = false
+    target.mirroring.isIncluded = false
+    target.mode.isIncluded = false
+    target.colorProfile.isIncluded = false
+    target.rotationDegrees.isIncluded = false
+    target.isActive = .init(value: false)
+    let key = "display.\(target.id.uuidString).active"
+
+    let plan = try await adapter.plan(
+      .display(.init(displays: [target])),
+      from: snapshot,
+      mode: .normal
+    )
+
+    #expect(plan.operations.isEmpty)
+    #expect(plan.omissions.map(\.key) == [key])
+    #expect(plan.omissions.first?.status == .unsupported)
+  }
+
   @Test("selecting a new primary translates the complete topology")
   func primarySelectionTranslatesTopology() async throws {
     let api = MockDisplaySystemAPI(displays: makeDisplays())
@@ -250,6 +337,38 @@ struct DisplayAdapterTests {
       plan.omissions[0].reason
         == "Display rotation must be one of 0, 90, 180, or 270 degrees."
     )
+  }
+
+  @Test("mixed topology and unsupported leaves report a missing identity once")
+  func mixedMissingIdentityIsOmittedOnce() async throws {
+    let displays = makeDisplays()
+    let adapter = CoreGraphicsDisplayAdapter(
+      systemAPI: MockDisplaySystemAPI(displays: displays)
+    )
+    let snapshot = try await adapter.snapshot()
+    let missingIdentity = DisplayIdentity(
+      uuid: UUID(),
+      vendorID: 9_999,
+      modelID: 8_888,
+      serialNumber: 7_777,
+      productName: "Missing Test Panel"
+    )
+    var target = makeTarget(
+      identity: missingIdentity,
+      mode: try #require(displays[0].currentMode)
+    )
+    target.rotationDegrees = .init(value: 90)
+    let identityKey = "display.\(target.id.uuidString).identity"
+
+    let plan = try await adapter.plan(
+      .display(.init(displays: [target])),
+      from: snapshot,
+      mode: .normal
+    )
+
+    #expect(plan.operations.isEmpty)
+    #expect(plan.issues.map(\.key) == [identityKey])
+    #expect(plan.omissions.map(\.key) == [identityKey])
   }
 
   @Test("ambiguous fallback identity is never selected")
@@ -402,6 +521,126 @@ struct DisplayAdapterTests {
     await api.setIgnoreColorWrites(false)
     await api.replaceDisplays(Array(displays.dropFirst()))
     #expect(await adapter.apply(operation).status == .failed)
+  }
+
+  @Test("an included ColorSync target without rollback support is explicitly omitted")
+  func unavailableColorProfileControlIsOmitted() async throws {
+    let original = colorProfile("original", hash: "1", name: "Original ICC")
+    let target = colorProfile("target", hash: "2", name: "Target ICC")
+    var displays = makeDisplays()
+    displays[0].availableColorProfiles = [original, target]
+    displays[0].currentColorProfile = original
+    displays[0].currentColorProfileMapping = nil
+    displays[0].canSetColorProfile = false
+    let adapter = CoreGraphicsDisplayAdapter(systemAPI: MockDisplaySystemAPI(displays: displays))
+    let snapshot = try await adapter.snapshot()
+    var settings = try displaySettings(from: snapshot)
+    settings.displays[0].colorProfile = .init(value: target)
+
+    let validation = await adapter.validate(.display(settings), against: snapshot)
+    let plan = try await adapter.plan(.display(settings), from: snapshot, mode: .normal)
+    let key = "display.colorProfile.\(settings.displays[0].id.uuidString)"
+
+    #expect(validation.contains { $0.key == key })
+    #expect(!plan.operations.contains { $0.key == key })
+    #expect(plan.omissions.contains { $0.key == key && $0.status == .unsupported })
+  }
+
+  @Test("an already-satisfied ColorSync target needs no writable control or rollback")
+  func alreadySatisfiedColorProfileNeedsNoControl() async throws {
+    let current = colorProfile("current", hash: "1", name: "Current ICC")
+    var displays = makeDisplays()
+    displays[0].availableColorProfiles = [current]
+    displays[0].currentColorProfile = current
+    displays[0].currentColorProfileMapping = nil
+    displays[0].canSetColorProfile = false
+    let adapter = CoreGraphicsDisplayAdapter(systemAPI: MockDisplaySystemAPI(displays: displays))
+    let snapshot = try await adapter.snapshot()
+    var settings = try displaySettings(from: snapshot)
+    settings.displays[0].colorProfile = .init(value: current)
+
+    let validation = await adapter.validate(.display(settings), against: snapshot)
+    let plan = try await adapter.plan(.display(settings), from: snapshot, mode: .normal)
+    let key = "display.colorProfile.\(settings.displays[0].id.uuidString)"
+
+    #expect(!validation.contains { $0.key == key })
+    #expect(!plan.operations.contains { $0.key == key })
+    #expect(!plan.omissions.contains { $0.key == key })
+  }
+
+  @Test("a missing color-only target produces one ColorSync omission")
+  func missingColorOnlyTargetProducesOneOmission() async throws {
+    let targetID = UUID()
+    let targetProfile = colorProfile("target", hash: "2", name: "Target ICC")
+    let target = DisplayTargetSettings(
+      id: targetID,
+      identity: DisplayIdentity(
+        uuid: UUID(),
+        vendorID: 9_999,
+        modelID: 8_888,
+        serialNumber: 7_777,
+        productName: "Missing Test Panel"
+      ),
+      isPrimary: .init(isIncluded: false, value: false),
+      origin: .init(isIncluded: false, value: DisplayPoint(x: 0, y: 0)),
+      mirroring: .init(isIncluded: false, value: .extended),
+      mode: .init(
+        isIncluded: false,
+        value: DisplayMode(width: 1_920, height: 1_080, refreshRate: 60)
+      ),
+      colorProfile: .init(value: targetProfile),
+      rotationDegrees: .init(isIncluded: false, value: 0),
+      isActive: .init(isIncluded: false, value: true)
+    )
+    let adapter = CoreGraphicsDisplayAdapter(
+      systemAPI: MockDisplaySystemAPI(displays: makeDisplays())
+    )
+    let snapshot = try await adapter.snapshot()
+    let settings = DisplayProfileSettings(displays: [target])
+    let colorKey = "display.colorProfile.\(targetID.uuidString)"
+    let identityKey = "display.\(targetID.uuidString).identity"
+
+    let validation = await adapter.validate(.display(settings), against: snapshot)
+    let plan = try await adapter.plan(.display(settings), from: snapshot, mode: .normal)
+
+    #expect(validation.map(\.key) == [colorKey])
+    #expect(plan.issues.map(\.key) == [colorKey])
+    #expect(plan.omissions.map(\.key) == [colorKey])
+    #expect(plan.omissions.first?.status == .skipped)
+    #expect(!plan.omissions.contains { $0.key == identityKey })
+  }
+
+  @Test("color-only planning does not require unrelated topology rollback")
+  func colorOnlyPlanningSkipsTopologyRollback() async throws {
+    let original = colorProfile("original", hash: "1", name: "Original ICC")
+    let target = colorProfile("target", hash: "2", name: "Target ICC")
+    var displays = makeDisplays()
+    displays[0].availableColorProfiles = [original, target]
+    displays[0].currentColorProfile = original
+    displays[0].currentColorProfileMapping = .init(
+      entries: [.init(key: "default", value: .scope("original"))]
+    )
+    displays[0].canSetColorProfile = true
+    displays[1].currentMode = nil
+    let adapter = CoreGraphicsDisplayAdapter(systemAPI: MockDisplaySystemAPI(displays: displays))
+    let snapshot = try await adapter.snapshot()
+    var settings = try displaySettings(from: snapshot)
+    for index in settings.displays.indices {
+      settings.displays[index].isPrimary.isIncluded = false
+      settings.displays[index].origin.isIncluded = false
+      settings.displays[index].mirroring.isIncluded = false
+      settings.displays[index].mode.isIncluded = false
+      settings.displays[index].colorProfile.isIncluded = false
+    }
+    settings.displays[0].colorProfile = .init(value: target)
+
+    let validation = await adapter.validate(.display(settings), against: snapshot)
+    let plan = try await adapter.plan(.display(settings), from: snapshot, mode: .normal)
+
+    #expect(!validation.contains { $0.key == "display.rollback" })
+    #expect(!plan.omissions.contains { $0.key == "display.rollback" })
+    #expect(plan.operations.count == 1)
+    #expect(plan.operations[0].key.hasPrefix("display.colorProfile."))
   }
 
   @Test("display topology applies before color and rollback reverses that order")

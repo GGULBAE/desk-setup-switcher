@@ -49,8 +49,37 @@ struct ApplyEngineTests {
     let preparation = await engine.prepare(profile: profile, mode: .normal)
 
     #expect(preparation.includedGroups.isEmpty)
-    #expect(preparation.rejectionReasons == [.noIncludedSettings])
+    #expect(preparation.rejectionReasons == [.noIncludedSettings, .noOperations])
     #expect(preparation.readiness.status == .unavailable)
+  }
+
+  @Test("normal mode rejects a zero-operation plan without producing an applied result")
+  func normalRejectsZeroOperations() async throws {
+    let adapter = MockSystemSettingsAdapter(
+      group: .audio,
+      plan: AdapterPlan(group: .audio)
+    )
+    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+
+    let preparation = await engine.prepare(
+      profile: makeProfile(including: [.audio]),
+      mode: .normal
+    )
+    let result = await engine.execute(preparation)
+
+    #expect(!preparation.canExecute)
+    #expect(preparation.rejectionReasons == [.noOperations])
+    #expect(preparation.operations.isEmpty)
+    #expect(!result.didExecute)
+    #expect(result.status == .failed)
+    #expect(result.itemResults.isEmpty)
+    #expect(
+      await adapter.recordedInvocations() == [
+        .capability,
+        .snapshot,
+        .validate,
+        .plan(.normal),
+      ])
   }
 
   @Test("planning cannot execute a mixed primary-display inclusion state")
@@ -187,6 +216,41 @@ struct ApplyEngineTests {
         .validate,
         .plan(.normal),
       ])
+  }
+
+  @Test("semantically identical validation and planning issues are presented once")
+  func duplicateIssuesAreCollapsed() async throws {
+    let issue = ValidationIssue(
+      group: .audio,
+      key: "outputVolume",
+      severity: .warning,
+      isFatal: false,
+      message: "The selected output control is read-only."
+    )
+    let adapter = MockSystemSettingsAdapter(
+      group: .audio,
+      validationIssues: [issue],
+      plan: AdapterPlan(
+        group: .audio,
+        issues: [
+          ValidationIssue(
+            group: issue.group,
+            key: issue.key,
+            severity: issue.severity,
+            isFatal: issue.isFatal,
+            message: issue.message
+          )
+        ]
+      )
+    )
+    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+
+    let preparation = await engine.prepare(
+      profile: makeProfile(including: [.audio]),
+      mode: .normal
+    )
+
+    #expect(preparation.validationIssues == [issue])
   }
 
   @Test("force mode rejects a zero-operation plan")

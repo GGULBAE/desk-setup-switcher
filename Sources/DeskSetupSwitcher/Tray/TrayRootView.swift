@@ -239,6 +239,7 @@ struct TrayRootView: View {
   @ViewBuilder
   private var applySummary: some View {
     if let summary = model.lastApplySummary {
+      let countItems = ApplyResultCountPresentation.nonzeroItems(for: summary)
       VStack(alignment: .leading, spacing: 7) {
         HStack(alignment: .firstTextBaseline) {
           Label(
@@ -261,13 +262,14 @@ struct TrayRootView: View {
         Text(summary.profileName)
           .font(.caption)
           .lineLimit(2)
-        Text(
-          appLocalized(
-            "\(summary.succeededCount) succeeded · \(summary.failedCount) failed · \(summary.skippedCount) skipped · \(summary.unsupportedCount) unsupported"
-          )
-        )
-        .font(.caption2)
-        .foregroundStyle(.secondary)
+        if !countItems.isEmpty {
+          Text(ApplyResultCountPresentation.compactText(for: countItems))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel(
+              ApplyResultCountPresentation.accessibilityText(for: countItems)
+            )
+        }
         HStack {
           Text(summary.appliedAt.formatted(date: .omitted, time: .shortened))
             .font(.caption2)

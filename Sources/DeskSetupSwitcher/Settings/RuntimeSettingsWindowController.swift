@@ -337,10 +337,6 @@ private struct SystemSettingsView: View {
         )
 
         LabeledContent(
-          "App setting",
-          value: model.launchAtLoginDesired ? appLocalized("On") : appLocalized("Off")
-        )
-        LabeledContent(
           "macOS registration",
           value: model.loginItemEnabled ? appLocalized("Enabled") : appLocalized("Not enabled")
         )
@@ -350,12 +346,6 @@ private struct SystemSettingsView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .accessibilityLabel(appLocalized("Login item status: \(model.loginItemStatus)"))
-        } else {
-          Label(
-            "The app setting matches the macOS registration state.", systemImage: "checkmark.circle"
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
         }
 
         HStack {

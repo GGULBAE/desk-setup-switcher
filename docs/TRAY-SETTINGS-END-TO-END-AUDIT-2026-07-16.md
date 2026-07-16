@@ -18,7 +18,7 @@ Mock/offscreen evidence proves code paths and contained layout only. It does not
 
 - Profile activation is no longer a product concept. Legacy `isEnabled == false` remains decodable, normalizes to true, is ignored by dirty comparison, does not filter tray/settings, and cannot reject apply.
 - Display, Audio, and Network are flat and always expanded. Each visible leaf owns Include; there is no group or option disclosure state.
-- The visible surface omits unsupported, read-only, future, or ambiguous controls. It does not render a disabled promise.
+- The visible editor omits unsupported, read-only, future, or ambiguous controls as new choices. A saved included Audio, ColorSync, or service-IPv4 value that later lacks usable runtime evidence remains as a warning with an Include-off repair control, and planning also represents the unfulfilled change with a sanitized typed omission.
 - Description, conditions, Input, display origin/rotation/active state, audio system-output/mute, Wi‑Fi power/SSID, global IPv4, DNS, and proxies remain round-trip compatible but normalize dormant.
 - Capture summaries, profile summaries, validation, and apply results include only the current visible contract.
 
@@ -38,7 +38,9 @@ Mock/offscreen evidence proves code paths and contained layout only. It does not
 | Audio | Output volume | Settable output-volume catalog for resolved default output UID | Scalar apply/read-back tolerance, prior scalar rollback |
 | Network | Service DHCP/manual IPv4 | Exactly one portable service identity plus exact serialized IPv4 rollback dictionary | Authorized set/commit/apply, dynamic-store completion, exact read-back, exact dictionary rollback |
 
-The end-to-end invariant test builds actual display, audio, and network adapters over synthetic APIs and asserts that every projected field validates, produces a real operation with rollback evidence, applies successfully, verifies through a fresh read, and restores the original state. Unsupported audio controls, unresolvable ColorSync rows, missing network rollback evidence, and ambiguous network identities project no control.
+The end-to-end invariant test builds actual display, audio, and network adapters over synthetic APIs and asserts that every projected field validates, produces a real operation with rollback evidence, applies successfully, verifies through a fresh read, and restores the original state. Unsupported audio controls, unresolvable ColorSync rows, missing network rollback evidence, and ambiguous network identities project no editor control. If a persisted included value still requests a change through one of those unavailable paths, validation and planning emit a sanitized typed omission; a value already satisfied by the snapshot remains an omission-free no-op and does not require a writable control or rollback payload.
+
+Readiness derives from included groups, viable operations, typed omissions, capabilities, and fatal issues. An omission makes its affected group unavailable: readiness is Partial when another applicable group or operation remains and Unavailable when none remains. Normal preparation rejects omissions as unavailable items; force may execute remaining operations, but both normal and force reject a zero-operation plan. A hidden runtime control therefore cannot make an unfulfilled saved change appear Ready or executable.
 
 ## Public API boundary
 
@@ -46,7 +48,7 @@ Display topology uses public Core Graphics configuration APIs and app-only tempo
 
 Service IPv4 uses Authorization Services and public SystemConfiguration. The live adapter opens preferences with [`SCPreferencesCreateWithAuthorization`](https://developer.apple.com/documentation/systemconfiguration/scpreferencescreatewithauthorization%28_%3A_%3A_%3A_%3A%29), re-resolves one service/protocol, checks lock/set/commit/apply/unlock, waits for `SCDynamicStore` completion, and then performs exact DHCP/manual read-back. Deterministic tests cover an early notification and zero-timeout path without sleeping, plus authorization denial and each preferences/read-back failure. No real authorization request was made.
 
-Core Audio switching is UID-based. A default-device operation sorts before volume, so volume resolves against the target device. Percent UI values convert exactly to/from normalized scalar values. Non-settable or missing device controls remain absent and do not degrade unrelated readiness.
+Core Audio switching is UID-based. A default-device operation sorts before volume, so volume resolves against the target device. Percent UI values convert exactly to/from normalized scalar values. Non-settable or missing device controls remain absent as new choices; an included changed target retains an Include-off warning and produces an explicit typed issue/omission that degrades only its affected readiness group, while an already-satisfied target remains a clean no-op.
 
 ## Protected high-risk ordering
 
@@ -76,6 +78,8 @@ The existing 12 Tray Surface v2 evidence pairs continue to cover empty, one, thr
 With every live and UI-audit environment flag unset, integrated `make verify` passed localization/source-policy lint; 366 default cases (134 XCTest and 232 Swift Testing cases, five opt-in skips); Swift Debug/Release; universal Xcode Debug/Release; Xcode Analyze; DMG/checksum creation; and mounted metadata, English/Korean resources, `x86_64 arm64`, and ad-hoc/no-Developer-ID signature verification. `git diff --check` passed separately.
 
 The verified no-Developer-ID DMG SHA-256 is `76bc6d9f1187ea30f68be16ee81ee4a334d877a4e26c2497f35a9ffc781678b3`. The artifact contains `arm64` and `x86_64`, English/Korean resources, an `/Applications` link, and an ad-hoc integrity signature only. It was not installed or launched.
+
+Remaining implementation hardening is separate from the historical verification totals above: custom `ProfileStore` file names still need single-leaf/reserved-name validation to prevent traversal or collision with `profiles.backup.json`, and profile directory/file access still needs explicit no-follow symlink enforcement.
 
 Remaining manual evidence:
 

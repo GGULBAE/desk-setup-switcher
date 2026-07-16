@@ -190,8 +190,24 @@ Evidence: [installed empty/apply follow-up](INSTALLED-EMPTY-APPLY-FOLLOWUP-2026-
 
 No live display/audio/network mutation, UI automation, TCC action, Keychain write, push, tag, notarization, or publication is part of M4.8.
 
-## Current next task — reinstalled smoke check, then hardware audit
+## M4.9 — settings lifecycle and UI declutter refactor
 
-Launch the reinstalled app and first run user-driven checks for the empty tray alignment, repeated opens, Review→Apply Profile wording, and visible result/error states. Continue with application/Space switching, red-close recovery, native English/Korean rendering, keyboard focus, and VoiceOver. Only after a separate explicit mutation approval and preflight snapshot, execute the support-matrix ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 procedures and independently verify rollback. Import/export, the full permission matrix, login approval/retry/reboot, Gatekeeper, and physical Intel remain separately authorized work.
+- Remove routine and duplicated copy from Settings, login status, previews, and result counts while retaining every error, omission, not-verified, rollback, permission, progress, and accessibility state.
+- Delete the unused app-layer condition editor and obsolete private helpers while keeping condition schema/import/storage/evaluator compatibility in Core.
+- Prove editor load/edit/save/fresh-reload/apply/read-back as one deterministic injected lifecycle with no live adapter.
+- Reject zero-operation plans in every mode and collapse semantically duplicate adapter issues before presentation.
+- Make Audio capability target-device scoped and turn changed-but-unavailable Audio, ColorSync, and service-IPv4 values into explicit omissions. Preserve already-satisfied values as omission-free no-ops and keep color-only planning independent from unused topology rollback.
+- Keep previously included unavailable targets repairable with a warning and Include-off control without exposing never-included unsupported controls.
+- Stage profile bytes and private permissions before atomic replacement; cover pre-commit failure and backup recovery ordering with temporary-directory tests.
+- Record the source/test/evidence boundary in [SETTINGS-LIFECYCLE-REFACTOR-2026-07-16.md](SETTINGS-LIFECYCLE-REFACTOR-2026-07-16.md).
+- Integrated non-live `make verify` passes 401 default cases (144 XCTest with five opt-in skips + 257 Swift Testing with two default-disabled opt-in cases), all build/Analyze stages, and universal mounted-DMG verification. SHA-256 is `f3aa610026179161208dec2cb2ef6185768843becd8e0e56bccc9f8abab37f2b`; the package was not installed or launched.
+
+No installed-app launch, live hardware mutation, TCC action, Keychain write, UI automation, push, tag, notarization, or publication is part of M4.9.
+
+## Current next task — profile-store path boundary hardening
+
+Constrain the public `ProfileStore` file name to one non-reserved leaf, reject collision with `profiles.backup.json`, and add explicit no-follow checks for the managed directory plus primary, backup, staging, and quarantine paths. Prove traversal, reserved-name collision, file/directory symlink redirection, destination preservation, and staging cleanup with deterministic temporary-directory tests, then pass the full non-live gate. Do not change the profile schema, migration semantics, UI, import/export workflow, or any live system setting in this task.
+
+The installed smoke check and hardware audit remain later manual work. Launch/reinstall, native English/Korean rendering, keyboard/VoiceOver, TCC, login approval/retry/reboot, Gatekeeper, and physical Intel require their own evidence. Any ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 mutation still requires separate explicit approval, a preflight snapshot, and independently verified rollback.
 
 Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

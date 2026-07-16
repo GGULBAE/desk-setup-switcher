@@ -1,4 +1,141 @@
+import Darwin
 import Foundation
+
+struct PrivateAtomicFileWriter: Sendable {
+  typealias CreatePrivateStagingFile = @Sendable (Data, URL) throws -> Void
+  typealias AtomicReplace = @Sendable (URL, URL) throws -> Void
+
+  private let createPrivateStagingFile: CreatePrivateStagingFile
+  private let atomicReplace: AtomicReplace
+
+  init(
+    createPrivateStagingFile: @escaping CreatePrivateStagingFile = { data, url in
+      try PrivateAtomicFileWriter.writePrivateStagingFile(data, to: url)
+    },
+    atomicReplace: @escaping AtomicReplace = { source, destination in
+      try PrivateAtomicFileWriter.replaceAtomically(source, with: destination)
+    }
+  ) {
+    self.createPrivateStagingFile = createPrivateStagingFile
+    self.atomicReplace = atomicReplace
+  }
+
+  /// Prepares a private staging file completely before one atomic rename commits it.
+  /// No fallible permission change occurs after the destination has been replaced.
+  func write(_ data: Data, to destination: URL) throws {
+    let stagingURL = destination.deletingLastPathComponent().appendingPathComponent(
+      ".\(destination.lastPathComponent).\(UUID().uuidString).tmp",
+      isDirectory: false
+    )
+    defer { try? FileManager.default.removeItem(at: stagingURL) }
+
+    try createPrivateStagingFile(data, stagingURL)
+    try atomicReplace(stagingURL, destination)
+  }
+
+  private static func writePrivateStagingFile(_ data: Data, to url: URL) throws {
+    let descriptor = url.path.withCString { path in
+      Darwin.open(
+        path,
+        O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC,
+        mode_t(0o600)
+      )
+    }
+    guard descriptor >= 0 else {
+      throw posixError(errno)
+    }
+
+    var isOpen = true
+    defer {
+      if isOpen {
+        _ = Darwin.close(descriptor)
+      }
+    }
+
+    guard Darwin.fchmod(descriptor, mode_t(0o600)) == 0 else {
+      throw posixError(errno)
+    }
+
+    try data.withUnsafeBytes { bytes in
+      guard !bytes.isEmpty else { return }
+      guard let baseAddress = bytes.baseAddress else {
+        throw posixError(EIO)
+      }
+
+      var offset = 0
+      while offset < bytes.count {
+        let written = Darwin.write(
+          descriptor,
+          baseAddress.advanced(by: offset),
+          bytes.count - offset
+        )
+        if written < 0 {
+          let code = errno
+          if code == EINTR {
+            continue
+          }
+          throw posixError(code)
+        }
+        guard written > 0 else {
+          throw posixError(EIO)
+        }
+        offset += written
+      }
+    }
+
+    let closeResult = Darwin.close(descriptor)
+    let closeError = errno
+    isOpen = false
+    guard closeResult == 0 else {
+      throw posixError(closeError)
+    }
+  }
+
+  private static func replaceAtomically(_ sourceURL: URL, with destinationURL: URL) throws {
+    let result = sourceURL.path.withCString { source in
+      destinationURL.path.withCString { target in
+        Darwin.rename(source, target)
+      }
+    }
+    let renameError = errno
+    guard result == 0 else {
+      throw posixError(renameError)
+    }
+  }
+
+  private static func posixError(_ code: Int32) -> POSIXError {
+    POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
+  }
+}
+
+struct ProfileStoreFileOperations: Sendable {
+  typealias PrivateFileWriter = @Sendable (Data, URL) throws -> Void
+  typealias SetPrivatePermissions = @Sendable (URL) throws -> Void
+  typealias MoveItem = @Sendable (URL, URL) throws -> Void
+
+  let privateFileWriter: PrivateFileWriter
+  let setPrivatePermissions: SetPrivatePermissions
+  let moveItem: MoveItem
+
+  init(
+    privateFileWriter: @escaping PrivateFileWriter = { data, url in
+      try PrivateAtomicFileWriter().write(data, to: url)
+    },
+    setPrivatePermissions: @escaping SetPrivatePermissions = { url in
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o600],
+        ofItemAtPath: url.path
+      )
+    },
+    moveItem: @escaping MoveItem = { source, destination in
+      try FileManager.default.moveItem(at: source, to: destination)
+    }
+  ) {
+    self.privateFileWriter = privateFileWriter
+    self.setPrivatePermissions = setPrivatePermissions
+    self.moveItem = moveItem
+  }
+}
 
 public struct ProfileStoreLocations: Equatable, Sendable {
   public let directoryURL: URL
@@ -33,6 +170,7 @@ public actor ProfileStore {
 
   private let codec: ProfileJSONCodec
   private let normalizer: ProfileApplicabilityNormalizer
+  private let fileOperations: ProfileStoreFileOperations
   private let now: @Sendable () -> Date
   private var document: ProfileDocument
   private var hasLoaded = false
@@ -52,6 +190,23 @@ public actor ProfileStore {
     self.locations = ProfileStoreLocations(directoryURL: directoryURL, fileName: fileName)
     self.codec = codec
     self.normalizer = normalizer
+    self.fileOperations = ProfileStoreFileOperations()
+    self.now = now
+    self.document = ProfileDocument(updatedAt: now())
+  }
+
+  init(
+    directoryURL: URL,
+    fileName: String = "profiles.json",
+    codec: ProfileJSONCodec = .init(),
+    normalizer: ProfileApplicabilityNormalizer = .init(),
+    now: @escaping @Sendable () -> Date = { Date() },
+    fileOperations: ProfileStoreFileOperations
+  ) {
+    self.locations = ProfileStoreLocations(directoryURL: directoryURL, fileName: fileName)
+    self.codec = codec
+    self.normalizer = normalizer
+    self.fileOperations = fileOperations
     self.now = now
     self.document = ProfileDocument(updatedAt: now())
   }
@@ -74,20 +229,20 @@ public actor ProfileStore {
       let decoded = try codec.decode(contentsOf: locations.primaryURL)
       if decoded.requiresPersistence {
         try persist(decoded.document)
+      } else {
+        try setPrivateFilePermissions(locations.primaryURL)
+        if FileManager.default.fileExists(atPath: locations.backupURL.path) {
+          try setPrivateFilePermissions(locations.backupURL)
+        }
       }
       document = decoded.document
+      hasLoaded = true
       if decoded.wasMigrated {
-        hasLoaded = true
         return ProfileLoadResult(
           document: decoded.document,
           status: .migrated(fromVersion: decoded.originalSchemaVersion)
         )
       }
-      try setPrivateFilePermissions(locations.primaryURL)
-      if FileManager.default.fileExists(atPath: locations.backupURL.path) {
-        try setPrivateFilePermissions(locations.backupURL)
-      }
-      hasLoaded = true
       return ProfileLoadResult(document: decoded.document, status: .loaded)
     } catch let error as ProfileValidationError {
       return try recoverAfterCorruption(cause: error)
@@ -242,8 +397,7 @@ public actor ProfileStore {
       do {
         let previous = try codec.decode(contentsOf: locations.primaryURL).document
         let previousData = try codec.encode(previous)
-        try previousData.write(to: locations.backupURL, options: [.atomic])
-        try setPrivateFilePermissions(locations.backupURL)
+        try writePrivateFileAtomically(previousData, to: locations.backupURL)
         hasUsableBackup = true
       } catch let error as ProfileValidationError {
         _ = try quarantine(locations.primaryURL)
@@ -255,11 +409,9 @@ public actor ProfileStore {
 
     do {
       if !hasUsableBackup {
-        try data.write(to: locations.backupURL, options: [.atomic])
-        try setPrivateFilePermissions(locations.backupURL)
+        try writePrivateFileAtomically(data, to: locations.backupURL)
       }
-      try data.write(to: locations.primaryURL, options: [.atomic])
-      try setPrivateFilePermissions(locations.primaryURL)
+      try writePrivateFileAtomically(data, to: locations.primaryURL)
     } catch {
       throw ProfileStorageError.io(String(describing: error))
     }
@@ -278,12 +430,8 @@ public actor ProfileStore {
     do {
       let decoded = try codec.decode(contentsOf: locations.backupURL)
       let canonical = try codec.encode(decoded.document)
-      try canonical.write(to: locations.primaryURL, options: [.atomic])
-      try setPrivateFilePermissions(locations.primaryURL)
-      if decoded.requiresPersistence {
-        try canonical.write(to: locations.backupURL, options: [.atomic])
-        try setPrivateFilePermissions(locations.backupURL)
-      }
+      try writePrivateFileAtomically(canonical, to: locations.backupURL)
+      try writePrivateFileAtomically(canonical, to: locations.primaryURL)
       document = decoded.document
       hasLoaded = true
       return ProfileLoadResult(
@@ -297,6 +445,10 @@ public actor ProfileStore {
     } catch let error as ProfileStorageError where error.canQuarantine {
       let quarantinedBackup = try quarantine(locations.backupURL)
       return try resetAfterCorruption(quarantinedURLs: quarantinedURLs + [quarantinedBackup])
+    } catch let error as ProfileStorageError {
+      throw error
+    } catch {
+      throw ProfileStorageError.io(String(describing: error))
     }
   }
 
@@ -319,13 +471,9 @@ public actor ProfileStore {
     let name =
       "\(url.deletingPathExtension().lastPathComponent)-corrupt-\(timestamp)-\(UUID().uuidString).json"
     let destination = locations.quarantineDirectoryURL.appendingPathComponent(name)
-    do {
-      try FileManager.default.moveItem(at: url, to: destination)
-      try setPrivateFilePermissions(destination)
-      return destination
-    } catch {
-      throw ProfileStorageError.io(String(describing: error))
-    }
+    try setPrivateFilePermissions(url)
+    try moveItem(url, to: destination)
+    return destination
   }
 
   private func createDirectoryIfNeeded(_ url: URL) throws {
@@ -345,10 +493,27 @@ public actor ProfileStore {
   }
 
   private func setPrivateFilePermissions(_ url: URL) throws {
-    try FileManager.default.setAttributes(
-      [.posixPermissions: 0o600],
-      ofItemAtPath: url.path
-    )
+    do {
+      try fileOperations.setPrivatePermissions(url)
+    } catch {
+      throw ProfileStorageError.io(String(describing: error))
+    }
+  }
+
+  private func writePrivateFileAtomically(_ data: Data, to url: URL) throws {
+    do {
+      try fileOperations.privateFileWriter(data, url)
+    } catch {
+      throw ProfileStorageError.io(String(describing: error))
+    }
+  }
+
+  private func moveItem(_ source: URL, to destination: URL) throws {
+    do {
+      try fileOperations.moveItem(source, destination)
+    } catch {
+      throw ProfileStorageError.io(String(describing: error))
+    }
   }
 
   private func ensureLoaded() throws {

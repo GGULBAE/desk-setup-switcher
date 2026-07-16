@@ -38,6 +38,20 @@ final class AudioAdapterTests: XCTestCase {
     XCTAssertTrue(settings.inputVolume.isIncluded)
     XCTAssertTrue(settings.outputVolume.isIncluded)
     XCTAssertTrue(settings.outputMuted.isIncluded)
+    let volumeCatalog = try XCTUnwrap(snapshot.audioVolumeControlCatalog)
+    XCTAssertEqual(volumeCatalog.count, 4)
+    XCTAssertTrue(
+      volumeCatalog.contains {
+        $0.role == .input && $0.deviceUID == "input-B" && $0.currentValue == 0.55
+          && $0.canApply
+      }
+    )
+    XCTAssertTrue(
+      volumeCatalog.contains {
+        $0.role == .output && $0.deviceUID == "output-B" && $0.currentValue == 0.4
+          && $0.canApply
+      }
+    )
 
     let capability = await adapter.capability()
     XCTAssertEqual(capability.state, .supported)
@@ -109,7 +123,7 @@ final class AudioAdapterTests: XCTestCase {
     XCTAssertEqual(api.mute(for: "output-B")?.value, false)
   }
 
-  func testUnsupportedVolumeAndMuteStayDormantWithoutReadinessNoise() async throws {
+  func testUnsupportedIncludedControlsProduceExplicitFailuresAndOmissions() async throws {
     let api = makeAPI()
     api.setInputVolumeState(.unsupported, for: "input-A")
     api.setVolumeState(.unsupported, for: "output-A")
@@ -125,10 +139,11 @@ final class AudioAdapterTests: XCTestCase {
     let issues = await adapter.validate(.audio(desired), against: snapshot)
     let plan = try await adapter.plan(.audio(desired), from: snapshot, mode: .force)
 
+    XCTAssertEqual(Set(issues.map(\.key)), ["inputVolume", "outputVolume", "outputMute"])
     XCTAssertFalse(issues.contains(where: \.isFatal))
     XCTAssertTrue(plan.operations.isEmpty)
-    XCTAssertTrue(issues.isEmpty)
-    XCTAssertTrue(plan.omissions.isEmpty)
+    XCTAssertEqual(Set(plan.omissions.map(\.key)), ["inputVolume", "outputVolume", "outputMute"])
+    XCTAssertTrue(plan.omissions.allSatisfy { $0.status == .unsupported })
   }
 
   func testNoOpsAreNotPlannedOrReportedUnavailable() async throws {
@@ -144,8 +159,32 @@ final class AudioAdapterTests: XCTestCase {
       outputMuted: .init(isIncluded: true, value: false)
     )
 
+    let issues = await adapter.validate(.audio(desired), against: snapshot)
     let plan = try await adapter.plan(.audio(desired), from: snapshot, mode: .normal)
 
+    XCTAssertTrue(issues.isEmpty)
+    XCTAssertTrue(plan.operations.isEmpty)
+    XCTAssertTrue(plan.omissions.isEmpty)
+    XCTAssertTrue(api.mutations().isEmpty)
+  }
+
+  func testAlreadySatisfiedReadOnlyControlsDoNotProduceOperationsOrOmissions() async throws {
+    let api = makeAPI()
+    api.setInputVolumeState(.available(value: 0.35, isSettable: false), for: "input-A")
+    api.setVolumeState(.available(value: 0.25, isSettable: false), for: "output-A")
+    api.setMuteState(.available(value: false, isSettable: false), for: "output-A")
+    let adapter = makeAdapter(api: api)
+    let snapshot = try await adapter.snapshot()
+    let desired = AudioProfileSettings(
+      inputVolume: .init(value: 0.35),
+      outputVolume: .init(value: 0.25),
+      outputMuted: .init(value: false)
+    )
+
+    let issues = await adapter.validate(.audio(desired), against: snapshot)
+    let plan = try await adapter.plan(.audio(desired), from: snapshot, mode: .normal)
+
+    XCTAssertTrue(issues.isEmpty)
     XCTAssertTrue(plan.operations.isEmpty)
     XCTAssertTrue(plan.omissions.isEmpty)
     XCTAssertTrue(api.mutations().isEmpty)
@@ -219,6 +258,25 @@ final class AudioAdapterTests: XCTestCase {
         .setOutputVolume(deviceUID: "output-B", value: 0.8),
       ]
     )
+  }
+
+  func testDeviceSwitchCannotSilentlyDropReadOnlyTargetVolume() async throws {
+    let api = makeAPI()
+    api.setVolumeState(.available(value: 0.4, isSettable: false), for: "output-B")
+    let adapter = makeAdapter(api: api)
+    let snapshot = try await adapter.snapshot()
+    let desired = AudioProfileSettings(
+      defaultOutputUID: .init(value: "output-B"),
+      outputVolume: .init(value: 0.8)
+    )
+
+    let issues = await adapter.validate(.audio(desired), against: snapshot)
+    let plan = try await adapter.plan(.audio(desired), from: snapshot, mode: .normal)
+
+    XCTAssertTrue(issues.contains { $0.key == "outputVolume" && !$0.isFatal })
+    XCTAssertEqual(plan.operations.map(\.key), ["defaultOutput"])
+    XCTAssertEqual(plan.omissions.map(\.key), ["outputVolume"])
+    XCTAssertEqual(plan.omissions.first?.status, .unsupported)
   }
 
   func testReadBackMismatchAndHotPlugFailClosed() async throws {

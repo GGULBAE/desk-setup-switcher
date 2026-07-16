@@ -384,6 +384,7 @@ public actor ApplyEngine {
       issues: &issues,
       omissions: &omissions
     )
+    issues = semanticallyDistinctValidationIssues(issues)
     operations = deterministicallyOrdered(operations)
 
     let readiness = readinessEvaluator.evaluate(
@@ -400,6 +401,9 @@ public actor ApplyEngine {
     if includedGroups.isEmpty {
       appendUnique(.noIncludedSettings, to: &rejectionReasons)
     }
+    if operations.isEmpty {
+      appendUnique(.noOperations, to: &rejectionReasons)
+    }
 
     switch mode {
     case .normal:
@@ -413,9 +417,7 @@ public actor ApplyEngine {
         appendUnique(.fatalValidationIssues, to: &rejectionReasons)
       }
     case .force:
-      if operations.isEmpty {
-        appendUnique(.noOperations, to: &rejectionReasons)
-      }
+      break
     }
 
     return ApplyPreparation(
@@ -804,6 +806,23 @@ public actor ApplyEngine {
       }
       return lhs.offset < rhs.offset
     }.map(\.element)
+  }
+
+  private func semanticallyDistinctValidationIssues(
+    _ issues: [ValidationIssue]
+  ) -> [ValidationIssue] {
+    var result: [ValidationIssue] = []
+    for issue in issues
+    where !result.contains(where: {
+      $0.group == issue.group
+        && $0.key == issue.key
+        && $0.severity == issue.severity
+        && $0.isFatal == issue.isFatal
+        && $0.message == issue.message
+    }) {
+      result.append(issue)
+    }
+    return result
   }
 
   private func appendUnique<T: Equatable>(_ value: T, to values: inout [T]) {

@@ -464,14 +464,26 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
         )
         continue
       case .missing:
-        // The row is absent when its display is not resolvable in this runtime.
+        recordColorIssue(
+          key: key,
+          message: "The saved display for this ColorSync ICC profile is not currently active.",
+          isFatal: false,
+          in: &analysis
+        )
         continue
       }
 
+      guard display.currentColorProfile != desiredProfile else { continue }
       guard display.canSetColorProfile,
         let rollbackMapping = display.currentColorProfileMapping
       else {
-        // Unsupported ColorSync controls are hidden, not disabled or omitted.
+        recordColorIssue(
+          key: key,
+          message: "This display has no rollback-safe ColorSync ICC profile control.",
+          isFatal: false,
+          status: .unsupported,
+          in: &analysis
+        )
         continue
       }
       let matches = display.availableColorProfiles.filter { $0 == desiredProfile }
@@ -486,7 +498,7 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
         )
         continue
       }
-      guard display.currentColorProfile != desiredProfile, createOperations else { continue }
+      guard createOperations else { continue }
 
       let payload = DisplayColorProfileOperation(
         display: display.identity,
@@ -521,6 +533,7 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
     key: String,
     message: String,
     isFatal: Bool,
+    status: ApplicationItemStatus = .skipped,
     in analysis: inout DisplayColorAnalysis
   ) {
     analysis.issues.append(makeIssue(key: key, message: message, isFatal: isFatal))
@@ -528,7 +541,7 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
       PlanOmission(
         group: .display,
         key: key,
-        status: .skipped,
+        status: status,
         reason: message
       )
     )
@@ -576,6 +589,39 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
     current displays: [DisplaySystemDisplay]
   ) -> DisplayAnalysis {
     var analysis = DisplayAnalysis()
+    let topologyTargets = desired.displays.filter(hasIncludedTopologyLeaf)
+    let analyzedTargets = desired.displays.filter {
+      hasIncludedTopologyLeaf($0) || hasIncludedUnsupportedLeaf($0)
+    }
+    guard !analyzedTargets.isEmpty else { return analysis }
+
+    var resolvedTargets: [(target: DisplayTargetSettings, display: DisplaySystemDisplay)] = []
+    for target in analyzedTargets {
+      let key = "display.\(target.id.uuidString).identity"
+      switch resolve(target.identity, among: displays) {
+      case .matched(let display):
+        resolvedTargets.append((target, display))
+      case .ambiguous:
+        record(
+          key: key,
+          message: "The saved display identity matches more than one active display.",
+          isFatal: false,
+          status: .skipped,
+          in: &analysis
+        )
+      case .missing:
+        record(
+          key: key,
+          message: "The saved display is not currently active.",
+          isFatal: false,
+          status: .skipped,
+          in: &analysis
+        )
+      }
+    }
+    analyzeUnsupportedLeaves(resolvedTargets, in: &analysis)
+    guard !topologyTargets.isEmpty else { return analysis }
+
     let rollbackConfiguration: DisplayAtomicConfiguration
     do {
       rollbackConfiguration = try completeConfiguration(from: displays)
@@ -599,39 +645,20 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
     var usedSessionIDs = Set<UInt32>()
     var blocksEntirePlan = false
 
-    for target in desired.displays {
+    for (target, display) in resolvedTargets where hasIncludedTopologyLeaf(target) {
       let key = "display.\(target.id.uuidString).identity"
-      switch resolve(target.identity, among: displays) {
-      case .matched(let display):
-        guard usedSessionIDs.insert(display.sessionID).inserted else {
-          record(
-            key: key,
-            message: "More than one saved target resolves to the same active display.",
-            isFatal: true,
-            status: .skipped,
-            in: &analysis
-          )
-          blocksEntirePlan = true
-          continue
-        }
-        matchedTargets.append((target, display))
-      case .ambiguous:
+      guard usedSessionIDs.insert(display.sessionID).inserted else {
         record(
           key: key,
-          message: "The saved display identity matches more than one active display.",
-          isFatal: false,
+          message: "More than one saved target resolves to the same active display.",
+          isFatal: true,
           status: .skipped,
           in: &analysis
         )
-      case .missing:
-        record(
-          key: key,
-          message: "The saved display is not currently active.",
-          isFatal: false,
-          status: .skipped,
-          in: &analysis
-        )
+        blocksEntirePlan = true
+        continue
       }
+      matchedTargets.append((target, display))
     }
 
     let requestedPrimaryDisplays = matchedTargets.filter {
@@ -751,33 +778,6 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
         }
       }
 
-      if target.rotationDegrees.isIncluded,
-        target.rotationDegrees.value != display.rotationDegrees
-      {
-        let permittedRotations = Set([0, 90, 180, 270])
-        let message =
-          permittedRotations.contains(target.rotationDegrees.value)
-          ? "Public Core Graphics does not expose display rotation mutation."
-          : "Display rotation must be one of 0, 90, 180, or 270 degrees."
-        record(
-          key: "\(keyPrefix).rotation",
-          message: message,
-          isFatal: false,
-          status: .unsupported,
-          in: &analysis
-        )
-      }
-
-      if target.isActive.isIncluded, target.isActive.value != display.isActive {
-        record(
-          key: "\(keyPrefix).active",
-          message: "Public Core Graphics does not expose safe active-state mutation.",
-          isFatal: false,
-          status: .unsupported,
-          in: &analysis
-        )
-      }
-
       if target.isPrimary.isIncluded && !target.isPrimary.value && display.isMain
         && requestedPrimarySessionID == nil
       {
@@ -836,6 +836,52 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
       analysis.finalConfiguration = DisplayAtomicConfiguration(targets: finalTargets)
     }
     return analysis
+  }
+
+  private func analyzeUnsupportedLeaves(
+    _ resolvedTargets: [(target: DisplayTargetSettings, display: DisplaySystemDisplay)],
+    in analysis: inout DisplayAnalysis
+  ) {
+    for (target, display) in resolvedTargets {
+      let keyPrefix = "display.\(target.id.uuidString)"
+      if target.rotationDegrees.isIncluded,
+        target.rotationDegrees.value != display.rotationDegrees
+      {
+        let permittedRotations = Set([0, 90, 180, 270])
+        let message =
+          permittedRotations.contains(target.rotationDegrees.value)
+          ? "Public Core Graphics does not expose display rotation mutation."
+          : "Display rotation must be one of 0, 90, 180, or 270 degrees."
+        record(
+          key: "\(keyPrefix).rotation",
+          message: message,
+          isFatal: false,
+          status: .unsupported,
+          in: &analysis
+        )
+      }
+
+      if target.isActive.isIncluded, target.isActive.value != display.isActive {
+        record(
+          key: "\(keyPrefix).active",
+          message: "Public Core Graphics does not expose safe active-state mutation.",
+          isFatal: false,
+          status: .unsupported,
+          in: &analysis
+        )
+      }
+    }
+  }
+
+  private func hasIncludedTopologyLeaf(_ target: DisplayTargetSettings) -> Bool {
+    target.isPrimary.isIncluded
+      || target.origin.isIncluded
+      || target.mirroring.isIncluded
+      || target.mode.isIncluded
+  }
+
+  private func hasIncludedUnsupportedLeaf(_ target: DisplayTargetSettings) -> Bool {
+    target.rotationDegrees.isIncluded || target.isActive.isIncluded
   }
 
   private func completeConfiguration(

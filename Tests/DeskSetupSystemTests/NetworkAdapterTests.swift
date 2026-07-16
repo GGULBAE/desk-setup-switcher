@@ -552,6 +552,73 @@ struct NetworkAdapterTests {
     )
   }
 
+  @Test("included service IPv4 targets cannot disappear without an omission")
+  func unavailableServiceIPv4TargetsAreOmitted() async throws {
+    let api = MockNetworkSystemAPI(snapshot: .associatedFixture)
+    let adapter = NetworkAdapter(systemAPI: api)
+    var snapshot = try await adapter.snapshot()
+    guard case .network(let current) = snapshot.payload else {
+      Issue.record("Expected network settings payload")
+      return
+    }
+    let availableTarget = try #require(current.serviceIPv4.first)
+    let missingTarget = NetworkServiceIPv4Settings(
+      identity: NetworkServiceIdentity(
+        kind: .ethernet,
+        serviceName: "Missing synthetic service",
+        interfaceType: "Ethernet"
+      ),
+      configuration: .init(value: .dhcp)
+    )
+
+    let missingPlan = try await adapter.plan(
+      .network(.init(serviceIPv4: [missingTarget])),
+      from: snapshot,
+      mode: .normal
+    )
+    snapshot.networkIPv4RollbackCatalog = []
+    var changedAvailableTarget = availableTarget
+    changedAvailableTarget.configuration = .init(
+      value: .manual(
+        address: "198.51.100.40",
+        subnetMask: "255.255.255.0",
+        router: "198.51.100.1"
+      )
+    )
+    let noRollbackPlan = try await adapter.plan(
+      .network(.init(serviceIPv4: [changedAvailableTarget])),
+      from: snapshot,
+      mode: .normal
+    )
+
+    #expect(missingPlan.operations.isEmpty)
+    #expect(missingPlan.omissions.map(\.key) == ["network.serviceIPv4.0"])
+    #expect(noRollbackPlan.operations.isEmpty)
+    #expect(noRollbackPlan.omissions.map(\.key) == ["network.serviceIPv4.0"])
+  }
+
+  @Test("an already-satisfied service IPv4 target needs no rollback evidence")
+  func alreadySatisfiedServiceIPv4NeedsNoRollback() async throws {
+    let api = MockNetworkSystemAPI(snapshot: .associatedFixture)
+    let adapter = NetworkAdapter(systemAPI: api)
+    var snapshot = try await adapter.snapshot()
+    guard case .network(let current) = snapshot.payload else {
+      Issue.record("Expected network settings payload")
+      return
+    }
+    let target = try #require(current.serviceIPv4.first)
+    snapshot.networkIPv4RollbackCatalog = []
+
+    let plan = try await adapter.plan(
+      .network(.init(serviceIPv4: [target])),
+      from: snapshot,
+      mode: .normal
+    )
+
+    #expect(plan.operations.isEmpty)
+    #expect(plan.omissions.isEmpty)
+  }
+
   @Test("authorized service failures and read-back mismatches fail closed")
   func serviceIPv4FailuresAreSanitized() async throws {
     let failures: [NetworkSystemAPIError] = [

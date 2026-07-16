@@ -2,7 +2,7 @@
 
 ## Status
 
-Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. The current UI-stability follow-up on Tray Surface Architecture v2 passed integrated non-live `make verify` on 2026-07-16 with 375 default cases (134 XCTest plus 241 Swift Testing), zero failures, lint, Swift and universal Xcode Debug/Release, Analyze, and mounted package/checksum verification. The current DMG SHA-256 is `516b968718aeb3c1c247e1a2deca7a28d45820d119f31ea992d4b475071f3638`; it is universal and ad-hoc signed without Developer ID and replaced the `/Applications` bundle, but it was not launched afterward. This is not a public release or mutation proof: actual corrected click-through, native single-frame flicker, live setting mutation, physical Intel, live Keychain write, full VoiceOver/TCC audit, and quarantined Gatekeeper remain unverified. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. The current settings-lifecycle and UI-declutter refactor passed integrated non-live `make verify` on 2026-07-16 with 401 default cases (144 XCTest plus 257 Swift Testing), zero failures, lint, Swift and universal Xcode Debug/Release, Analyze, and mounted package/checksum verification. The current DMG SHA-256 is `f3aa610026179161208dec2cb2ef6185768843becd8e0e56bccc9f8abab37f2b`; it is universal and ad-hoc signed without Developer ID and was not installed or launched. This is not a public release or mutation proof: actual corrected click-through, live setting mutation, physical Intel, live Keychain write, full VoiceOver/TCC audit, and quarantined Gatekeeper remain unverified. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
 ## Product promise
 
@@ -34,9 +34,9 @@ The fresh final-DMG install launched background-only/menu-bar-only. Default-on `
 
 ### Create and manage a profile
 
-A user can create, inspect, edit, duplicate, delete, reorder, enable, import, and export profiles. Settings keeps a distinct app-lifetime draft and saved profile: selection, replacement, ordinary quit, and Apply paths require an explicit save/discard/cancel decision when the draft is dirty, and a failed save leaves the draft intact. Successful saves merge user-editable fields into the latest stored metadata. A current-settings snapshot pre-fills only values that were actually read and changes the reviewable draft, not the persistent profile, until the user saves.
+A user can create, inspect, edit, duplicate, delete, reorder, import, and export profiles. Settings keeps a distinct app-lifetime draft and saved profile: selection, replacement, ordinary quit, and Apply paths require an explicit save/discard/cancel decision when the draft is dirty, and a failed save leaves the draft intact. Successful saves merge user-editable fields into the latest stored metadata. Current settings are captured from the tray as a separate reviewable profile; they never replace an open editor draft.
 
-Setting inclusion and disclosure are independent: collapsing an included group or option does not exclude it or erase its target value. Common values use typed pickers, toggles, and semantic sliders; the display-mode picker consumes a typed runtime catalog from the read-only adapter snapshot and never stores that catalog in profile JSON. Field-specific validation blocks invalid saves and connects localized error text to the affected control. Display rotation/active state and administrative IPv4, DNS, and proxy values are retained only as read-only snapshot evidence. An idempotent normalizer excludes these leaves—and any group left without an applicable leaf—when capturing, loading, decoding, planning, or importing without deleting the stored values. Conditions remain round-trip-compatible profile data but are dormant for current manual readiness and Apply. The 2026-07-11 fresh-install smoke test predates this behavior and is not a current UI walkthrough.
+Display, Audio, and Network groups are flat and always expanded. Every visible leaf has an independent Include switch that preserves its target value when excluded. Common values use typed pickers, toggles, and semantic sliders; runtime catalogs from read-only adapter snapshots are never stored in profile JSON. Audio volume capability follows the input/output device the profile will target. Unsupported runtime choices remain absent, but a persisted included Audio, ColorSync, or service-IPv4 target that later becomes unavailable remains visible as a non-color warning with an Include-off repair control. Field-specific validation blocks invalid saves and connects localized error text to the affected control. Display rotation/active state and administrative IPv4, DNS, and proxy values are retained only as read-only snapshot evidence. An idempotent normalizer excludes these leaves—and any group left without an applicable leaf—when capturing, loading, decoding, planning, or importing without deleting the stored values. Conditions remain round-trip-compatible profile data but are dormant for current manual readiness and Apply. The 2026-07-11 fresh-install smoke test predates this behavior and is not a current UI walkthrough.
 
 ### Apply a profile
 
@@ -60,8 +60,8 @@ The historical fresh snapshot profile produced a zero-operation plan, so both Ap
 ## Readiness states
 
 - **Ready:** all included, applicable settings can be prepared and the plan has no blocking omission.
-- **Partial:** at least one enabled setting is applicable while another is missing, unsupported, blocked, intentionally omitted, or not verified.
-- **Unavailable:** no enabled setting can be applied.
+- **Partial:** at least one included setting is applicable while another is missing, unsupported, blocked, intentionally omitted, or not verified.
+- **Unavailable:** no included setting can be applied.
 - **Applying:** a transaction is active.
 - **Applied:** the last transaction completed with every required result successful and read-back verified, without omission, unsupported work, or failure.
 - **Failed:** the last transaction had an apply or rollback failure; a successful rollback does not rewrite the initiating apply failure as success.
@@ -76,7 +76,7 @@ Discover connected displays and stable identity attributes; snapshot primary dis
 
 ### Audio
 
-Discover Core Audio input/output devices by UID; snapshot and apply default input, default output, system output, volume, and mute when supported. A device without software volume or mute reports unsupported for that property instead of causing profile failure.
+Discover Core Audio input/output devices by UID; snapshot and apply default input, default output, system output, volume, and mute when supported. The read-only capability catalog is device-scoped so a profile that switches devices evaluates the eventual target's volume control. An included change with no writable control is an explicit omission rather than a silent success; an already-matching value remains a no-op.
 
 ### Network
 
@@ -102,7 +102,7 @@ The 2026-07-14/15 synthetic audit records eight English and eight Korean PNGs pl
 
 The minimum deployment target is macOS 14 Sonoma. Release builds target both Apple Silicon and Intel. The project produces a no-Developer-ID DMG with an ad-hoc-signed app, Applications link, versioned filename, and SHA-256 checksum. Developer ID signing and notarization are optional. See [DISTRIBUTION.md](DISTRIBUTION.md).
 
-The current local DMG SHA-256 is `516b968718aeb3c1c247e1a2deca7a28d45820d119f31ea992d4b475071f3638`; its mounted universal `x86_64 arm64` app and ad-hoc/no-Developer-ID status passed verification. It replaced the `/Applications` bundle but was not launched afterward. Earlier local and installed-interaction checksums remain historical in the completion ledger. Historical UI-hardening artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. The DMGs are not byte-for-byte reproducible. Download quarantine/Gatekeeper, a tagged release, publication, and physical Intel remain unverified. The ad-hoc signature supplies integrity, not publisher identity or notarization.
+The current local DMG SHA-256 is `f3aa610026179161208dec2cb2ef6185768843becd8e0e56bccc9f8abab37f2b`; its mounted universal `x86_64 arm64` app and ad-hoc/no-Developer-ID status passed verification. It was not installed or launched. Earlier local and installed-interaction checksums remain historical in the completion ledger. Historical UI-hardening artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. The DMGs are not byte-for-byte reproducible. Download quarantine/Gatekeeper, a tagged release, publication, and physical Intel remain unverified. The ad-hoc signature supplies integrity, not publisher identity or notarization.
 
 ## Non-goals
 

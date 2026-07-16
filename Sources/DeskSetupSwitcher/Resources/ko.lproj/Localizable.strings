@@ -41,6 +41,7 @@
 "High risk" = "고위험";
 "Review" = "확인 필요";
 "Low risk" = "저위험";
+"Change risk" = "변경 위험도";
 "Skipped or unsupported" = "건너뛰거나 지원되지 않는 항목";
 "Validation" = "유효성 검사";
 "Cannot apply" = "적용할 수 없음";
@@ -682,7 +683,6 @@
 "Discard Changes" = "변경사항 버리기";
 "This profile has changes that have not been saved." = "이 프로필에 저장하지 않은 변경사항이 있습니다.";
 "Revert Changes" = "변경사항 되돌리기";
-"All changes are saved." = "모든 변경사항이 저장되었습니다.";
 "Unsaved changes" = "저장하지 않은 변경사항";
 "Saving profile…" = "프로필 저장 중…";
 "Reading current settings…" = "현재 설정 읽는 중…";
@@ -740,7 +740,6 @@
 "Device UID" = "기기 UID";
 "Volume percent" = "음량(%)";
 "%" = "%";
-"Enter a value from 0 to 100 percent." = "0%에서 100% 사이의 값을 입력하세요.";
 "Output mute value" = "출력 음소거 값";
 "Wi-Fi power value" = "Wi-Fi 전원 값";
 "Network name" = "네트워크 이름";
@@ -782,9 +781,7 @@
 "Current %@" = "현재 %@";
 "After apply %@" = "적용 후 %@";
 "%lld seconds remaining" = "%lld초 남음";
-"App setting" = "앱 설정";
 "macOS registration" = "macOS 등록 상태";
-"The app setting matches the macOS registration state." = "앱 설정과 macOS 등록 상태가 일치합니다.";
 "Why can these states differ?" = "두 상태가 다른 이유";
 "macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration." = "macOS는 올바른 위치에 설치되고 코드 서명된 앱의 로그인 항목만 등록합니다. 앱 설정만으로 실제 등록이 보장되지는 않습니다.";
 "Debug" = "디버그";
@@ -945,8 +942,13 @@
 "Dismiss Apply Result" = "적용 결과 닫기";
 "Details" = "세부 사항";
 "Shows itemized apply and read-back results" = "항목별 적용 결과와 다시 읽기 결과를 표시합니다";
-"%lld succeeded · %lld failed · %lld skipped · %lld unsupported" = "성공 %lld개 · 실패 %lld개 · 건너뛰 %lld개 · 미지원 %lld개";
-"%lld not verified · %lld rollback failed" = "확인되지 않음 %lld개 · 되돌리기 실패 %lld개";
+"%lld succeeded" = "성공 %lld개";
+"%lld failed" = "실패 %lld개";
+"%lld skipped" = "건너뜀 %lld개";
+"%lld unsupported" = "미지원 %lld개";
+"%lld not verified" = "확인되지 않음 %lld개";
+"%lld rolled back" = "되돌림 %lld개";
+"%lld rollback failed" = "되돌리기 실패 %lld개";
 "%@ for %@. %lld succeeded, %lld failed, %lld not verified." = "%@ — %@. 성공 %lld개, 실패 %lld개, 확인되지 않음 %lld개.";
 "Apply Results" = "적용 결과";
 "Rollback Results" = "되돌리기 결과";
@@ -988,7 +990,6 @@
 "0" = "0";
 "100" = "100";
 "Choose a display" = "디스플레이 선택";
-"Select the display that should anchor the desktop." = "데스크탑의 기준이 될 디스플레이를 선택하세요.";
 "Saved mode" = "저장된 모드";
 "Supported mode" = "지원 모드";
 "Display mode" = "디스플레이 모드";
@@ -1114,9 +1115,9 @@
 "Input volume" = "입력 음량";
 
 /* 트레이/설정 수직 슬라이스 개선 */
-"Use each setting's Include switch to choose what this profile applies. Supported values are ready to edit below." = "각 설정의 포함 스위치로 이 프로필이 적용할 항목을 선택하세요. 지원되는 값은 아래에서 바로 편집할 수 있습니다.";
 "Display output mode" = "디스플레이 출력 방식";
 "Choose an extended desktop or mirror secondary displays" = "확장 데스크탑 또는 보조 디스플레이 미러링 선택";
+"Color profile" = "색상 프로필";
 "ColorSync ICC profile" = "ColorSync ICC 프로필";
 "Choose a color profile" = "색상 프로필 선택";
 "Display color profile" = "디스플레이 색상 프로필";
@@ -1130,6 +1131,9 @@
 "Enter the IPv4 address for this service" = "이 서비스의 IPv4 주소를 입력하세요";
 "Enter a contiguous IPv4 subnet mask" = "연속된 IPv4 서브넷 마스크를 입력하세요";
 "Enter the optional IPv4 router address" = "선택 사항인 IPv4 라우터 주소를 입력하세요";
+"This included volume setting is unavailable for the selected device. Turn off Include to apply other available settings normally." = "선택한 장치에서 이 포함된 음량 설정을 사용할 수 없습니다. 다른 사용 가능한 설정을 정상 적용하려면 포함을 끄세요.";
+"This included ColorSync profile setting is unavailable for the saved display. Turn off Include to apply other available settings normally." = "저장된 디스플레이에서 이 포함된 ColorSync 프로필 설정을 사용할 수 없습니다. 다른 사용 가능한 설정을 정상 적용하려면 포함을 끄세요.";
+"The included IPv4 setting for %@ is unavailable in the current network configuration. Turn off Include to apply other available settings normally." = "현재 네트워크 구성에서 %@의 포함된 IPv4 설정을 사용할 수 없습니다. 다른 사용 가능한 설정을 정상 적용하려면 포함을 끄세요.";
 "High-risk display and network changes remain temporary and will be restored if the safety window closes, the app exits, or you do not confirm within 15 seconds." = "고위험 디스플레이 및 네트워크 변경은 임시 상태로 유지되며, 안전 창을 닫거나 앱을 종료하거나 15초 안에 확인하지 않으면 복원됩니다.";
 "Protected change confirmation" = "보호된 변경 확인";
 "Awaiting protected-change confirmation" = "보호된 변경 확인 대기 중";

@@ -122,20 +122,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
           supportsOutput: $0.supportsOutput
         )
       },
-      audioVolumeControlCatalog: [
-        AudioVolumeControlCatalogEntry(
-          role: .input,
-          deviceUID: defaultInputUID,
-          currentValue: inputVolume.value,
-          canApply: inputVolume.isIncluded
-        ),
-        AudioVolumeControlCatalogEntry(
-          role: .output,
-          deviceUID: defaultOutputUID,
-          currentValue: outputVolume.value,
-          canApply: outputVolume.isIncluded
-        ),
-      ]
+      audioVolumeControlCatalog: volumeControlCatalog(for: devices)
     )
   }
 
@@ -203,6 +190,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       {
         appendControlIssue(
           try? api.inputVolume(forDeviceUID: inputUID),
+          desiredValue: settings.inputVolume.value,
           key: "inputVolume",
           label: "input software volume",
           issues: &issues
@@ -271,6 +259,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       if settings.outputVolume.isIncluded {
         appendControlIssue(
           try? api.outputVolume(forDeviceUID: outputUID),
+          desiredValue: settings.outputVolume.value,
           key: "outputVolume",
           label: "software volume",
           issues: &issues
@@ -279,6 +268,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       if settings.outputMuted.isIncluded {
         appendControlIssue(
           try? api.outputMute(forDeviceUID: outputUID),
+          desiredValue: settings.outputMuted.value,
           key: "outputMute",
           label: "software mute",
           issues: &issues
@@ -641,6 +631,37 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
     )
   }
 
+  private func volumeControlCatalog(
+    for devices: [AudioDeviceDescriptor]
+  ) -> [AudioVolumeControlCatalogEntry] {
+    devices.flatMap { device in
+      var entries: [AudioVolumeControlCatalogEntry] = []
+      if device.supportsInput {
+        let state = try? api.inputVolume(forDeviceUID: device.uid)
+        entries.append(
+          AudioVolumeControlCatalogEntry(
+            role: .input,
+            deviceUID: device.uid,
+            currentValue: state?.value,
+            canApply: state?.isSettable == true
+          )
+        )
+      }
+      if device.supportsOutput {
+        let state = try? api.outputVolume(forDeviceUID: device.uid)
+        entries.append(
+          AudioVolumeControlCatalogEntry(
+            role: .output,
+            deviceUID: device.uid,
+            currentValue: state?.value,
+            canApply: state?.isSettable == true
+          )
+        )
+      }
+      return entries
+    }
+  }
+
   private func validateDefaultOption(
     _ option: SettingOption<String?>,
     role: AudioDefaultDeviceRole,
@@ -673,16 +694,27 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
 
   private func appendControlIssue<Value>(
     _ state: AudioControlState<Value>?,
+    desiredValue: Value?,
     key: String,
     label: String,
     issues: inout [ValidationIssue]
   ) where Value: Hashable & Sendable {
-    // A non-writable control is not an editor field in this runtime. Preserve
-    // its saved value, but do not turn a hidden control into readiness noise.
-    _ = state
-    _ = key
-    _ = label
-    _ = issues
+    let message: String?
+    switch state {
+    case .available(_, true):
+      message = nil
+    case .available(let currentValue, false):
+      message =
+        currentValue == desiredValue
+        ? nil : "The selected device's \(label) control is read-only."
+    case .unsupported:
+      message = "The selected device has no \(label) control."
+    case .unreadable, nil:
+      message = "The selected device's \(label) control could not be read."
+    }
+    if let message {
+      issues.append(unavailableIssue(key: key, message: message))
+    }
   }
 
   private func planDefaultDevice(
@@ -785,13 +817,36 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
             )
           )
         )
-      case .available(_, false), .unsupported:
-        break
+      case .available(let currentValue, false):
+        guard abs(currentValue - desiredValue) > 0.0001 else { return }
+        omissions.append(
+          unsupportedOmission(
+            key: "outputVolume",
+            reason: "The selected output device has no writable software volume control."
+          )
+        )
+      case .unsupported:
+        omissions.append(
+          unsupportedOmission(
+            key: "outputVolume",
+            reason: "The selected output device has no writable software volume control."
+          )
+        )
       case .unreadable:
-        break
+        omissions.append(
+          skippedOmission(
+            key: "outputVolume",
+            reason: "The selected output device's software volume could not be read safely."
+          )
+        )
       }
     } catch {
-      return
+      omissions.append(
+        skippedOmission(
+          key: "outputVolume",
+          reason: "The selected output device's software volume could not be read safely."
+        )
+      )
     }
   }
 
@@ -834,13 +889,36 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
             )
           )
         )
-      case .available(_, false), .unsupported:
-        break
+      case .available(let currentValue, false):
+        guard abs(currentValue - desiredValue) > 0.0001 else { return }
+        omissions.append(
+          unsupportedOmission(
+            key: "inputVolume",
+            reason: "The selected input device has no writable software volume control."
+          )
+        )
+      case .unsupported:
+        omissions.append(
+          unsupportedOmission(
+            key: "inputVolume",
+            reason: "The selected input device has no writable software volume control."
+          )
+        )
       case .unreadable:
-        break
+        omissions.append(
+          skippedOmission(
+            key: "inputVolume",
+            reason: "The selected input device's software volume could not be read safely."
+          )
+        )
       }
     } catch {
-      return
+      omissions.append(
+        skippedOmission(
+          key: "inputVolume",
+          reason: "The selected input device's software volume could not be read safely."
+        )
+      )
     }
   }
 
@@ -883,13 +961,36 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
             )
           )
         )
-      case .available(_, false), .unsupported:
-        break
+      case .available(let currentValue, false):
+        guard currentValue != desiredValue else { return }
+        omissions.append(
+          unsupportedOmission(
+            key: "outputMute",
+            reason: "The selected output device has no writable software mute control."
+          )
+        )
+      case .unsupported:
+        omissions.append(
+          unsupportedOmission(
+            key: "outputMute",
+            reason: "The selected output device has no writable software mute control."
+          )
+        )
       case .unreadable:
-        break
+        omissions.append(
+          skippedOmission(
+            key: "outputMute",
+            reason: "The selected output device's software mute state could not be read safely."
+          )
+        )
       }
     } catch {
-      return
+      omissions.append(
+        skippedOmission(
+          key: "outputMute",
+          reason: "The selected output device's software mute state could not be read safely."
+        )
+      )
     }
   }
 
@@ -983,6 +1084,16 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       key: key,
       severity: .error,
       isFatal: true,
+      message: message
+    )
+  }
+
+  private func unavailableIssue(key: String, message: String) -> ValidationIssue {
+    ValidationIssue(
+      group: group,
+      key: key,
+      severity: .warning,
+      isFatal: false,
       message: message
     )
   }

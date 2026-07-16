@@ -497,17 +497,6 @@ public struct ProfileDraftValidator: Equatable, Sendable {
     )
   }
 
-  private func validateIncludedPresence<Value>(
-    _ option: SettingOption<Value?>,
-    field: DraftFieldIdentifier,
-    group: SettingGroup,
-    issues: inout [DraftValidationIssue]
-  ) where Value: Codable & Hashable & Sendable {
-    if option.isIncluded, option.value == nil {
-      append(.required, field: field, group: group, to: &issues)
-    }
-  }
-
   private func validateNumber(
     _ value: Double,
     range: ClosedRange<Double>,
@@ -599,17 +588,6 @@ public struct ProfileDraftValidator: Equatable, Sendable {
     guard !trimmed.isEmpty, !trimmed.utf8.contains(0) else { return false }
     var address = in_addr()
     return trimmed.withCString { inet_pton(AF_INET, $0, &address) == 1 }
-  }
-
-  private func isIPAddress(_ value: String) -> Bool {
-    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty, !trimmed.utf8.contains(0) else { return false }
-    var ipv4 = in_addr()
-    if trimmed.withCString({ inet_pton(AF_INET, $0, &ipv4) }) == 1 {
-      return true
-    }
-    var ipv6 = in6_addr()
-    return trimmed.withCString { inet_pton(AF_INET6, $0, &ipv6) == 1 }
   }
 
   private func isContiguousIPv4Mask(_ value: String) -> Bool {

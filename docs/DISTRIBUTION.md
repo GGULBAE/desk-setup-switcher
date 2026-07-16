@@ -2,7 +2,7 @@
 
 ## Current status
 
-The version 0.1.0 no-Developer-ID packaging path passes locally. The current UI-stability follow-up passed `make verify` on 2026-07-16 with 375 default cases (134 XCTest + 241 Swift Testing), universal Debug/Release, Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. The current app contains `arm64` and `x86_64`; DMG SHA-256 is `516b968718aeb3c1c247e1a2deca7a28d45820d119f31ea992d4b475071f3638`. This package replaced `/Applications/Desk Setup Switcher.app`; bundle identity, version, architectures, signature, and mounted-source executable equality passed read-only checks, and the app was not launched afterward.
+The version 0.1.0 no-Developer-ID packaging path passes locally. The current settings-lifecycle/UI-declutter refactor passed `make verify` on 2026-07-16 with 401 default cases (144 XCTest + 257 Swift Testing), universal Debug/Release, Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. The current app contains `arm64` and `x86_64`; DMG SHA-256 is `f3aa610026179161208dec2cb2ef6185768843becd8e0e56bccc9f8abab37f2b`. This package was not installed or launched.
 
 Initial Actions run `29154880831` for implementation commit `0d8f510` exposed the Swift 6.1 actor-isolation issue. Repair commit `4e45328` is pushed, and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) succeeded on 2026-07-11 under macOS 15/Xcode 16.4/Swift 6.1.2; full `make verify` and unsigned-package upload passed. No release has been published, and the downloaded/quarantined Gatekeeper path remains untested.
 
