@@ -18,6 +18,106 @@ public protocol NetworkSystemAPI: Sendable {
   func setWiFiPower(_ enabled: Bool) async throws
   func associateToSavedWiFi(ssid: String) async throws
   func disassociateWiFi() async throws
+  func setIPv4Configuration(
+    _ configuration: IPv4Configuration,
+    for service: NetworkServiceIdentity
+  ) async throws
+  func restoreIPv4Configuration(
+    _ configurationData: Data,
+    expected: IPv4Configuration?,
+    for service: NetworkServiceIdentity
+  ) async throws
+}
+
+final class DynamicStoreChangeMonitor: @unchecked Sendable {
+  private let lock = NSLock()
+  private let queue = DispatchQueue(
+    label: "DeskSetupSwitcher.NetworkIPv4.DynamicStore"
+  )
+  private var store: SCDynamicStore?
+  private var continuation: CheckedContinuation<Bool, Never>?
+  private var didChange = false
+  private var didFinish = false
+
+  init() {}
+
+  static func make(keys: [String]) -> DynamicStoreChangeMonitor? {
+    let monitor = DynamicStoreChangeMonitor()
+    var context = SCDynamicStoreContext(
+      version: 0,
+      info: Unmanaged.passUnretained(monitor).toOpaque(),
+      retain: nil,
+      release: nil,
+      copyDescription: nil
+    )
+    guard
+      let store = SCDynamicStoreCreate(
+        nil,
+        "DeskSetupSwitcher.NetworkIPv4.ChangeMonitor" as CFString,
+        { _, _, info in
+          guard let info else { return }
+          Unmanaged<DynamicStoreChangeMonitor>.fromOpaque(info)
+            .takeUnretainedValue()
+            .signalChange()
+        },
+        &context
+      ),
+      SCDynamicStoreSetNotificationKeys(
+        store,
+        keys as CFArray,
+        nil
+      ), SCDynamicStoreSetDispatchQueue(store, monitor.queue)
+    else {
+      return nil
+    }
+    monitor.store = store
+    return monitor
+  }
+
+  deinit {
+    if let store {
+      _ = SCDynamicStoreSetDispatchQueue(store, nil)
+    }
+  }
+
+  func waitForChange(timeout: TimeInterval) async -> Bool {
+    await withCheckedContinuation { continuation in
+      lock.lock()
+      if didChange {
+        didFinish = true
+        lock.unlock()
+        continuation.resume(returning: true)
+        return
+      }
+      self.continuation = continuation
+      lock.unlock()
+
+      queue.asyncAfter(deadline: .now() + max(0, timeout)) { [weak self] in
+        self?.finish(false)
+      }
+    }
+  }
+
+  func signalChange() {
+    lock.lock()
+    didChange = true
+    lock.unlock()
+    finish(true)
+  }
+
+  private func finish(_ result: Bool) {
+    let continuation: CheckedContinuation<Bool, Never>?
+    lock.lock()
+    if didFinish {
+      lock.unlock()
+      return
+    }
+    didFinish = true
+    continuation = self.continuation
+    self.continuation = nil
+    lock.unlock()
+    continuation?.resume(returning: result)
+  }
 }
 
 extension NetworkSystemAPI {
@@ -25,6 +125,21 @@ extension NetworkSystemAPI {
   /// unavailable, so a saved-network switch cannot be planned accidentally.
   public func preflightSavedWiFiAssociation(ssid: String) async -> SavedWiFiAssociationPreflight {
     .unavailable(.preflightUnavailable)
+  }
+
+  public func setIPv4Configuration(
+    _ configuration: IPv4Configuration,
+    for service: NetworkServiceIdentity
+  ) async throws {
+    throw NetworkSystemAPIError.authorizationUnavailable
+  }
+
+  public func restoreIPv4Configuration(
+    _ configurationData: Data,
+    expected: IPv4Configuration?,
+    for service: NetworkServiceIdentity
+  ) async throws {
+    throw NetworkSystemAPIError.authorizationUnavailable
   }
 }
 
@@ -35,6 +150,18 @@ public enum NetworkSystemAPIError: Error, Equatable, Sendable {
   case savedNetworkUnavailable
   case credentialUnavailable
   case operationFailed
+  case authorizationUnavailable
+  case authorizationDenied
+  case serviceNotFound
+  case serviceIdentityAmbiguous
+  case preferencesLockFailed
+  case preferencesCommitFailed
+  case preferencesApplyFailed
+  case preferencesUnlockFailed
+  case protocolUnavailable
+  case invalidConfigurationData
+  case readBackTimedOut
+  case readBackMismatch
 }
 
 /// Selects the first compatible network/profile pair after applying explicit,
@@ -211,6 +338,34 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
     interface.disassociate()
   }
 
+  public func setIPv4Configuration(
+    _ configuration: IPv4Configuration,
+    for service: NetworkServiceIdentity
+  ) async throws {
+    try await writeIPv4Configuration(
+      ipv4Dictionary(configuration),
+      expected: configuration,
+      for: service
+    )
+  }
+
+  public func restoreIPv4Configuration(
+    _ configurationData: Data,
+    expected: IPv4Configuration?,
+    for service: NetworkServiceIdentity
+  ) async throws {
+    guard
+      let dictionary = try? PropertyListSerialization.propertyList(
+        from: configurationData,
+        options: [],
+        format: nil
+      ) as? [String: Any]
+    else {
+      throw NetworkSystemAPIError.invalidConfigurationData
+    }
+    try await writeIPv4Configuration(dictionary, expected: expected, for: service)
+  }
+
   private func savedWiFiCredentialIsAvailable(ssidData: Data) -> Bool {
     var password: NSString?
     let userStatus = CWKeychainFindWiFiPassword(.user, ssidData, &password)
@@ -372,6 +527,7 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
       kind: kind,
       enabled: SCNetworkServiceGetEnabled(service),
       ipv4: parseIPv4(ipv4),
+      ipv4ConfigurationData: propertyListData(ipv4),
       dnsServers: stringArray(dns, key: kSCPropNetDNSServerAddresses as String),
       webProxy: parseProxy(
         proxies,
@@ -414,6 +570,131 @@ public actor LiveNetworkSystemAPI: NetworkSystemAPI {
       return [:]
     }
     return configuration
+  }
+
+  private func propertyListData(_ dictionary: [String: Any]) -> Data? {
+    try? PropertyListSerialization.data(
+      fromPropertyList: dictionary,
+      format: .binary,
+      options: 0
+    )
+  }
+
+  private func ipv4Dictionary(_ configuration: IPv4Configuration) -> [String: Any] {
+    switch configuration {
+    case .dhcp:
+      return [
+        kSCPropNetIPv4ConfigMethod as String: kSCValNetIPv4ConfigMethodDHCP as String
+      ]
+    case .manual(let address, let subnetMask, let router):
+      var dictionary: [String: Any] = [
+        kSCPropNetIPv4ConfigMethod as String: kSCValNetIPv4ConfigMethodManual as String,
+        kSCPropNetIPv4Addresses as String: [address],
+        kSCPropNetIPv4SubnetMasks as String: [subnetMask],
+      ]
+      if let router, !router.isEmpty {
+        dictionary[kSCPropNetIPv4Router as String] = router
+      }
+      return dictionary
+    }
+  }
+
+  private func writeIPv4Configuration(
+    _ dictionary: [String: Any],
+    expected: IPv4Configuration?,
+    for identity: NetworkServiceIdentity
+  ) async throws {
+    var authorization: AuthorizationRef?
+    let authorizationStatus = AuthorizationCreate(
+      nil,
+      nil,
+      [.interactionAllowed, .extendRights, .preAuthorize],
+      &authorization
+    )
+    guard authorizationStatus == errAuthorizationSuccess, let authorization else {
+      throw authorizationStatus == errAuthorizationCanceled
+        ? NetworkSystemAPIError.authorizationDenied
+        : NetworkSystemAPIError.authorizationUnavailable
+    }
+    defer { AuthorizationFree(authorization, []) }
+
+    guard
+      let preferences = SCPreferencesCreateWithAuthorization(
+        nil,
+        "DeskSetupSwitcher.NetworkIPv4" as CFString,
+        nil,
+        authorization
+      )
+    else {
+      throw NetworkSystemAPIError.authorizationDenied
+    }
+    let matches = (SCNetworkServiceCopyAll(preferences) as? [SCNetworkService] ?? [])
+      .filter { service in
+        guard let snapshot = readService(service), let portable = snapshot.portableIdentity else {
+          return false
+        }
+        return portable == identity
+      }
+    guard matches.count == 1, let service = matches.first else {
+      throw matches.isEmpty
+        ? NetworkSystemAPIError.serviceNotFound
+        : NetworkSystemAPIError.serviceIdentityAmbiguous
+    }
+    guard let serviceID = SCNetworkServiceGetServiceID(service) as String?,
+      let ipv4Protocol = SCNetworkServiceCopyProtocol(service, kSCNetworkProtocolTypeIPv4)
+    else {
+      throw NetworkSystemAPIError.protocolUnavailable
+    }
+    let monitor = DynamicStoreChangeMonitor.make(
+      keys: [
+        "Setup:/Network/Service/\(serviceID)/IPv4",
+        "State:/Network/Service/\(serviceID)/IPv4",
+      ]
+    )
+
+    guard SCPreferencesLock(preferences, false) else {
+      throw NetworkSystemAPIError.preferencesLockFailed
+    }
+    var isLocked = true
+    defer {
+      if isLocked {
+        _ = SCPreferencesUnlock(preferences)
+      }
+    }
+    guard SCNetworkProtocolSetConfiguration(ipv4Protocol, dictionary as CFDictionary)
+    else {
+      throw NetworkSystemAPIError.operationFailed
+    }
+    guard SCPreferencesCommitChanges(preferences) else {
+      throw NetworkSystemAPIError.preferencesCommitFailed
+    }
+    guard SCPreferencesApplyChanges(preferences) else {
+      throw NetworkSystemAPIError.preferencesApplyFailed
+    }
+    guard SCPreferencesUnlock(preferences) else {
+      throw NetworkSystemAPIError.preferencesUnlockFailed
+    }
+    isLocked = false
+
+    if currentIPv4Configuration(for: identity) == expected {
+      return
+    }
+    guard let monitor, await monitor.waitForChange(timeout: 8) else {
+      throw NetworkSystemAPIError.readBackTimedOut
+    }
+    guard currentIPv4Configuration(for: identity) == expected else {
+      throw NetworkSystemAPIError.readBackMismatch
+    }
+  }
+
+  private func currentIPv4Configuration(
+    for identity: NetworkServiceIdentity
+  ) -> IPv4Configuration? {
+    let matches = readSystemConfiguration().services.filter {
+      $0.portableIdentity == identity
+    }
+    guard matches.count == 1 else { return nil }
+    return matches[0].ipv4
   }
 
   private func parseIPv4(_ configuration: [String: Any]) -> IPv4Configuration? {

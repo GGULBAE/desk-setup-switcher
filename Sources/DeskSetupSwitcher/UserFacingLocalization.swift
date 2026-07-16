@@ -348,7 +348,7 @@ func appProfileSummaryValue(_ item: ProfileSummaryItem) -> String {
   case .wifiNetwork:
     primary = appLocalizedOnlyKnownValue(item.value.primaryText, keys: ["Value unavailable"])
     secondary = item.value.secondaryText
-  case .ipv4:
+  case .ipv4, .networkServiceIPv4:
     primary = appLocalizedIPv4Primary(item.value.primaryText)
     secondary = item.value.secondaryText.map(appLocalizedIPv4Secondary)
   case .dnsServers:
@@ -363,8 +363,11 @@ func appProfileSummaryValue(_ item: ProfileSummaryItem) -> String {
       keys: ["Off", "Value unavailable"]
     )
     secondary = item.value.secondaryText
+  case .displayColorProfile:
+    primary = item.value.primaryText
+    secondary = item.value.secondaryText
   case .displayMode, .displayRole, .displayActivity, .displayRotation,
-    .displayPosition, .outputVolume, .outputMute, .wifiPower,
+    .displayPosition, .inputVolume, .outputVolume, .outputMute, .wifiPower,
     .pointerSpeed, .naturalScrolling, .keyRepeatInterval, .initialKeyRepeatDelay,
     .standardFunctionKeys:
     primary = appLocalizedPresentationText(item.value.primaryText)

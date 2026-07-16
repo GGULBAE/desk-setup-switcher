@@ -5,8 +5,8 @@ import Testing
 
 @Suite("Profile capture summary builder")
 struct ProfileCaptureSummaryBuilderTests {
-  @Test("permission-hidden Wi-Fi is the only actionable incomplete capture evidence")
-  func partialCaptureClassification() {
+  @Test("hidden Wi-Fi permission evidence does not degrade visible capture")
+  func hiddenPermissionEvidenceIsDormant() {
     let display = DisplayTargetSettings(
       identity: DisplayIdentity(isBuiltIn: true),
       isPrimary: .init(value: true),
@@ -39,18 +39,14 @@ struct ProfileCaptureSummaryBuilderTests {
       evidence: evidence
     )
 
-    #expect(summary.status == .partial)
-    #expect(
-      summary.items.contains(
-        .init(group: .network, key: "wifi.ssid", disposition: .permissionRequired)
-      )
-    )
-    #expect(summary.applicableCount == 5)
+    #expect(summary.status == .complete)
+    #expect(!summary.items.contains { $0.group == .network })
+    #expect(summary.applicableCount == 3)
     #expect(summary.excludedCount == 0)
     #expect(summary.unreadableCount == 0)
-    #expect(summary.permissionRequiredCount == 1)
+    #expect(summary.permissionRequiredCount == 0)
     #expect(summary.unsupportedCount == 0)
-    #expect(summary.wifiNetworkWasNotCaptured)
+    #expect(!summary.wifiNetworkWasNotCaptured)
   }
 
   @Test("snapshot-only values are omitted from the user-facing capture result")

@@ -24,8 +24,14 @@ enum UIAuditVariant: String {
   case editor
   case editorPolish = "editor-polish"
   case editorDisplay = "editor-display"
+  case editorDisplayColor = "editor-display-color"
   case editorAudio = "editor-audio"
+  case editorAudioUnsupported = "editor-audio-unsupported"
   case editorNetwork = "editor-network"
+  case editorNetworkEthernetDHCP = "editor-network-ethernet-dhcp"
+  case editorNetworkEthernetManual = "editor-network-ethernet-manual"
+  case editorNetworkWiFiDHCP = "editor-network-wifi-dhcp"
+  case editorNetworkWiFiManual = "editor-network-wifi-manual"
   case validation
   case permissions
   case diagnostics
@@ -35,8 +41,11 @@ enum UIAuditVariant: String {
     case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
       .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult:
       true
-    case .editor, .editorPolish, .editorDisplay, .editorAudio, .editorNetwork,
-      .validation, .permissions, .diagnostics:
+    case .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
+      .editorAudioUnsupported,
+      .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
+      .editorNetworkWiFiDHCP, .editorNetworkWiFiManual, .validation, .permissions,
+      .diagnostics:
       false
     }
   }
@@ -136,7 +145,7 @@ extension View {
       uuidString: "10000000-0000-0000-0000-000000000001")!
     private static let partialProfileID = UUID(
       uuidString: "10000000-0000-0000-0000-000000000002")!
-    private static let disabledProfileID = UUID(
+    private static let legacyProfileID = UUID(
       uuidString: "10000000-0000-0000-0000-000000000003")!
     private static let builtInDisplayID = UUID(
       uuidString: "20000000-0000-0000-0000-000000000001")!
@@ -163,7 +172,7 @@ extension View {
     static func fixture(_ variant: UIAuditVariant) -> UIAuditFixtureState {
       var ready = readyProfile()
       let partial = partialProfile()
-      let disabled = disabledProfile()
+      let legacy = legacyProfile()
 
       if variant == .validation {
         ready.name = "Validation Sample"
@@ -171,6 +180,8 @@ extension View {
         ready.settings.audio.value.defaultInputUID.value = nil
         ready.settings.network.value.wifiSSID.value = "  "
       }
+
+      configureNetworkEvidence(variant, profile: &ready)
 
       let profiles: [DeskProfile]
       switch variant {
@@ -189,11 +200,18 @@ extension View {
         }
       case .overview, .menuPolish, .trayDelete, .trayCapturePermission,
         .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
-        .editor, .editorPolish, .editorDisplay, .editorAudio, .editorNetwork,
-        .validation, .permissions, .diagnostics:
-        profiles = [ready, partial, disabled]
+        .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
+        .editorAudioUnsupported,
+        .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
+        .editorNetworkWiFiDHCP, .editorNetworkWiFiManual, .validation, .permissions,
+        .diagnostics:
+        profiles = [ready, partial, legacy]
       }
-      let snapshot = syntheticSnapshot(settings: ready.settings)
+      let snapshot = syntheticSnapshot(
+        settings: ready.settings,
+        supportsDisplayModes: variant != .editorDisplayColor,
+        supportsAudioVolume: variant != .editorAudioUnsupported
+      )
       let captureSummary: ProfileCaptureSummary? =
         variant == .overview || variant == .menuPolish || variant == .trayCapturePermission
         ? partialCaptureSummary() : nil
@@ -204,16 +222,13 @@ extension View {
       let readiness = Dictionary(
         uniqueKeysWithValues: profiles.map { profile in
           if profile.id == partial.id { return (profile.id, ProfileReadiness.partial) }
-          if profile.id == disabled.id { return (profile.id, ProfileReadiness.unavailable) }
           return (
             profile.id,
             variant == .validation ? ProfileReadiness.partial : ProfileReadiness.ready
           )
         }
       )
-      let operations = Dictionary(
-        uniqueKeysWithValues: profiles.filter(\.isEnabled).map { ($0.id, 7) }
-      )
+      let operations = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, 7) })
 
       return UIAuditFixtureState(
         profiles: profiles,
@@ -273,11 +288,11 @@ extension View {
       )
     }
 
-    private static func disabledProfile() -> DeskProfile {
+    private static func legacyProfile() -> DeskProfile {
       DeskProfile(
-        id: disabledProfileID,
-        name: "Archived Synthetic Profile",
-        profileDescription: "Disabled profile used to review the Settings sidebar state.",
+        id: legacyProfileID,
+        name: "Legacy Synthetic Profile",
+        profileDescription: "Legacy false activation value retained only for migration review.",
         symbolName: "archivebox",
         isEnabled: false,
         settings: comprehensiveSettings(),
@@ -304,6 +319,11 @@ extension View {
         refreshRate: 60
       )
       let externalMode = DisplayMode(width: 2560, height: 1440, refreshRate: 60)
+      let colorProfile = ColorSyncProfileTarget(
+        registeredProfileID: "synthetic-srgb",
+        fileSHA256: String(repeating: "a", count: 64),
+        displayName: "Synthetic sRGB ICC"
+      )
 
       return ProfileSettings(
         display: .init(
@@ -315,6 +335,7 @@ extension View {
               origin: .init(isIncluded: false, value: .init(x: 0, y: 0)),
               mirroring: .init(value: .extended),
               mode: .init(value: builtInMode),
+              colorProfile: .init(value: colorProfile),
               rotationDegrees: .init(isIncluded: false, value: 0),
               isActive: .init(isIncluded: false, value: true)
             ),
@@ -325,6 +346,7 @@ extension View {
               origin: .init(isIncluded: false, value: .init(x: 1728, y: 0)),
               mirroring: .init(value: .extended),
               mode: .init(value: externalMode),
+              colorProfile: .init(value: colorProfile),
               rotationDegrees: .init(isIncluded: false, value: 0),
               isActive: .init(isIncluded: false, value: true)
             ),
@@ -342,8 +364,8 @@ extension View {
         ),
         network: .init(
           value: .init(
-            wifiPower: .init(value: true),
-            wifiSSID: .init(value: "Synthetic Studio"),
+            wifiPower: .init(isIncluded: false, value: true),
+            wifiSSID: .init(isIncluded: false, value: "Synthetic Studio"),
             serviceIPv4: [
               .init(
                 identity: .init(
@@ -351,7 +373,13 @@ extension View {
                   serviceName: "Synthetic Ethernet",
                   interfaceType: "Ethernet"
                 ),
-                configuration: .init(isIncluded: false, value: .dhcp)
+                configuration: .init(
+                  value: .manual(
+                    address: "192.0.2.40",
+                    subnetMask: "255.255.255.0",
+                    router: "192.0.2.1"
+                  )
+                )
               ),
               .init(
                 identity: .init(
@@ -359,7 +387,7 @@ extension View {
                   serviceName: "Synthetic Wi-Fi",
                   interfaceType: "IEEE80211"
                 ),
-                configuration: .init(isIncluded: false, value: .dhcp)
+                configuration: .init(value: .dhcp)
               ),
             ],
             ipv4: .init(isIncluded: false, value: .dhcp),
@@ -369,6 +397,7 @@ extension View {
           )
         ),
         input: .init(
+          isIncluded: false,
           value: .init(
             pointerSpeed: .init(value: 4.5),
             naturalScrolling: .init(value: true),
@@ -380,7 +409,11 @@ extension View {
       )
     }
 
-    private static func syntheticSnapshot(settings: ProfileSettings) -> SystemSnapshotResult {
+    private static func syntheticSnapshot(
+      settings: ProfileSettings,
+      supportsDisplayModes: Bool = true,
+      supportsAudioVolume: Bool = true
+    ) -> SystemSnapshotResult {
       let displaySettings = settings.display.value
       let audioSettings = settings.audio.value
       let displayCatalog = displaySettings.displays.map { display in
@@ -397,9 +430,14 @@ extension View {
         capturedAt: capturedAt,
         payload: .display(displaySettings),
         items: [],
-        displayModeCatalog: displayCatalog,
-        displayColorEvidence: displaySettings.displays.map {
-          DisplayColorEvidenceEntry(identity: $0.identity, colorSpaceName: "Synthetic sRGB")
+        displayModeCatalog: supportsDisplayModes ? displayCatalog : [],
+        displayColorProfileCatalog: displaySettings.displays.compactMap { display in
+          guard let profile = display.colorProfile.value else { return nil }
+          return DisplayColorProfileCatalogEntry(
+            identity: display.identity,
+            profiles: [profile],
+            canApply: true
+          )
         }
       )
       let audioItems = [
@@ -432,13 +470,49 @@ extension View {
         group: .audio,
         capturedAt: capturedAt,
         payload: .audio(audioSettings),
-        items: audioItems
+        items: audioItems,
+        audioDeviceCatalog: [
+          .init(
+            uid: "synthetic-input",
+            name: "Synthetic Microphone",
+            supportsInput: true,
+            supportsOutput: false
+          ),
+          .init(
+            uid: "synthetic-output",
+            name: "Synthetic Speakers",
+            supportsInput: false,
+            supportsOutput: true
+          ),
+        ],
+        audioVolumeControlCatalog: [
+          .init(
+            role: .input,
+            deviceUID: "synthetic-input",
+            currentValue: audioSettings.inputVolume.value,
+            canApply: supportsAudioVolume
+          ),
+          .init(
+            role: .output,
+            deviceUID: "synthetic-output",
+            currentValue: audioSettings.outputVolume.value,
+            canApply: supportsAudioVolume
+          ),
+        ]
       )
+      let networkRollbackCatalog = settings.network.value.serviceIPv4.map { service in
+        NetworkIPv4RollbackCatalogEntry(
+          identity: service.identity,
+          configurationData: Data("synthetic-\(service.identity.kind.rawValue)".utf8),
+          currentConfiguration: service.configuration.value
+        )
+      }
       let networkSnapshot = AdapterSnapshot(
         group: .network,
         capturedAt: capturedAt,
         payload: .network(settings.network.value),
         items: [],
+        networkIPv4RollbackCatalog: networkRollbackCatalog,
         savedWiFiNetworkNames: ["Synthetic Saved Wi-Fi"]
       )
       return SystemSnapshotResult(
@@ -470,21 +544,64 @@ extension View {
       )
     }
 
+    private static func configureNetworkEvidence(
+      _ variant: UIAuditVariant,
+      profile: inout DeskProfile
+    ) {
+      let selection: (NetworkServiceKind, IPv4Configuration)? =
+        switch variant {
+        case .editorNetworkEthernetDHCP:
+          (.ethernet, .dhcp)
+        case .editorNetworkEthernetManual:
+          (
+            .ethernet,
+            .manual(
+              address: "192.0.2.40",
+              subnetMask: "255.255.255.0",
+              router: "192.0.2.1"
+            )
+          )
+        case .editorNetworkWiFiDHCP:
+          (.wifi, .dhcp)
+        case .editorNetworkWiFiManual:
+          (
+            .wifi,
+            .manual(
+              address: "198.51.100.40",
+              subnetMask: "255.255.255.0",
+              router: "198.51.100.1"
+            )
+          )
+        case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
+          .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
+          .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
+          .editorAudioUnsupported,
+          .editorNetwork, .validation, .permissions, .diagnostics:
+          nil
+        }
+      guard let selection,
+        var service = profile.settings.network.value.serviceIPv4.first(where: {
+          $0.identity.kind == selection.0
+        })
+      else { return }
+      service.configuration = .init(value: selection.1)
+      profile.settings.network.value.serviceIPv4 = [service]
+    }
+
     private static func partialCaptureSummary() -> ProfileCaptureSummary {
       ProfileCaptureSummary(items: [
         .init(group: .display, key: "display.0.primary", disposition: .savedApplicable),
         .init(group: .display, key: "display.0.origin", disposition: .savedApplicable),
         .init(group: .display, key: "display.0.mirroring", disposition: .savedApplicable),
         .init(group: .display, key: "display.0.mode", disposition: .savedApplicable),
+        .init(group: .display, key: "display.0.colorProfile", disposition: .savedApplicable),
         .init(group: .audio, key: "defaultInput", disposition: .savedApplicable),
         .init(group: .audio, key: "defaultOutput", disposition: .savedApplicable),
-        .init(group: .audio, key: "systemOutput", disposition: .savedApplicable),
+        .init(group: .audio, key: "inputVolume", disposition: .savedApplicable),
         .init(group: .audio, key: "outputVolume", disposition: .savedApplicable),
-        .init(group: .audio, key: "outputMute", disposition: .savedApplicable),
-        .init(group: .network, key: "wifi.power", disposition: .savedApplicable),
-        .init(group: .input, key: "KeyRepeat", disposition: .savedApplicable),
-        .init(group: .input, key: "InitialKeyRepeat", disposition: .savedApplicable),
-        .init(group: .network, key: "wifi.ssid", disposition: .permissionRequired),
+        .init(
+          group: .network, key: "network.serviceIPv4.ethernet.0", disposition: .savedApplicable),
+        .init(group: .network, key: "network.serviceIPv4.wifi.1", disposition: .savedApplicable),
       ])
     }
 
@@ -499,8 +616,10 @@ extension View {
             status: .succeeded
           ),
           .init(operation: .init(group: .audio, key: "outputVolume"), status: .succeeded),
-          .init(operation: .init(group: .network, key: "wifi.ssid"), status: .notVerified),
-          .init(operation: .init(group: .network, key: "network.dns"), status: .unsupported),
+          .init(
+            operation: .init(group: .network, key: "network.serviceIPv4.ethernet.0"),
+            status: .notVerified
+          ),
         ]
       )
     }

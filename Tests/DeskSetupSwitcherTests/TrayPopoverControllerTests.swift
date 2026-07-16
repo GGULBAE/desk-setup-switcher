@@ -147,6 +147,84 @@ struct TrayPopoverControllerTests {
     #expect(state.closeGenerations == Array(UInt64(1)...20))
   }
 
+  @Test("late first-layout completion restores the viewport exactly once")
+  func lateLayoutCompletionRestoresViewport() {
+    let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 2))
+    let factory = SurfaceFactorySpy()
+    factory.popover.automaticallyCompletesPresentation = false
+    let recorder = GeometryTraceRecorderSpy()
+    let controller = TrayPopoverController(
+      rootView: Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity),
+      sessionState: state,
+      factory: factory,
+      traceRecorder: recorder
+    )
+
+    controller.show()
+    factory.popover.mutateHostingOrigin()
+    #expect(controller.hostingViewBounds.origin != .zero)
+
+    factory.popover.trigger(.contentWindowAttached, generation: 1)
+    factory.popover.trigger(.firstLayoutCompleted, generation: 1)
+    factory.popover.trigger(.didBecomeKey, generation: 1)
+
+    #expect(controller.contentSize.height == TrayGeometry.twoProfileHeight)
+    #expect(controller.hostingViewBounds == CGRect(origin: .zero, size: controller.contentSize))
+    #expect(controller.hostingViewFrame == CGRect(origin: .zero, size: controller.contentSize))
+    #expect(state.attachGenerations == [1])
+    #expect(
+      recorder.records.count(where: { $0.stage == .finalViewportSynchronized }) == 1
+    )
+    #expect(recorder.records.allSatisfy { $0.anchorRect == factory.statusItem.anchor.bounds })
+    #expect(recorder.records.allSatisfy { $0.screenScale == factory.metrics.backingScaleFactor })
+  }
+
+  @Test("stale presentation completion cannot alter a reopened generation")
+  func staleLayoutCompletionIsIgnored() {
+    let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 1))
+    let factory = SurfaceFactorySpy()
+    factory.popover.automaticallyCompletesPresentation = false
+    let controller = TrayPopoverController(
+      rootView: Color.clear,
+      sessionState: state,
+      factory: factory
+    )
+
+    controller.show()
+    controller.requestClose(sessionGeneration: 1)
+    controller.show()
+    factory.popover.mutateHostingOrigin()
+
+    factory.popover.trigger(.firstLayoutCompleted, generation: 1)
+    #expect(controller.hostingViewBounds.origin != .zero)
+    #expect(state.attachGenerations.isEmpty)
+
+    factory.popover.trigger(.firstLayoutCompleted, generation: 2)
+    #expect(controller.hostingViewBounds.origin == .zero)
+    #expect(state.attachGenerations == [2])
+  }
+
+  @Test("native asymmetric safe area does not add a second SwiftUI horizontal inset")
+  func safeAreaOwnershipIsSymmetric() {
+    let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 2))
+    let factory = SurfaceFactorySpy()
+    factory.popover.installContentWindow(
+      safeAreaInsets: NSEdgeInsets(top: 3, left: 11, bottom: 5, right: 2)
+    )
+    let controller = TrayPopoverController(
+      rootView: Color.clear,
+      sessionState: state,
+      factory: factory
+    )
+
+    controller.show()
+
+    #expect(controller.nativeContentViewSafeAreaInsets.left == 11)
+    #expect(controller.nativeContentViewSafeAreaInsets.right == 2)
+    #expect(controller.rootHorizontalInsets.leading == TrayGeometry.outerPadding)
+    #expect(controller.rootHorizontalInsets.trailing == TrayGeometry.outerPadding)
+  }
+
   @Test("state updates never resize an open session")
   func openSessionDoesNotResize() {
     let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 1))
@@ -311,30 +389,94 @@ private final class PopoverSurfaceSpy: TrayPopoverSurface {
   }
   var contentViewController: NSViewController?
   private(set) var isShown = false
-  var contentWindow: NSWindow? { nil }
+  var contentWindow: NSWindow?
   private var didClose: (@MainActor () -> Void)?
+  private var presentationStage: (@MainActor (UInt64, TrayPopoverPresentationStage) -> Void)?
   private(set) var contentSizeAssignments: [CGSize] = []
   var mutatesHostingOriginWhenShown = false
+  var automaticallyCompletesPresentation = true
 
   func setDidCloseHandler(_ handler: @escaping @MainActor () -> Void) {
     didClose = handler
   }
 
+  func setPresentationStageHandler(
+    _ handler: @escaping @MainActor (UInt64, TrayPopoverPresentationStage) -> Void
+  ) {
+    presentationStage = handler
+  }
+
   func show(
     relativeTo positioningRect: NSRect,
     of positioningView: NSView,
-    preferredEdge: NSRectEdge
+    preferredEdge: NSRectEdge,
+    presentationGeneration: UInt64
   ) {
     isShown = true
-    if mutatesHostingOriginWhenShown, let view = contentViewController?.view {
-      view.bounds.origin = CGPoint(x: 19, y: 23)
-      view.frame.origin = CGPoint(x: 7, y: 11)
+    if mutatesHostingOriginWhenShown {
+      mutateHostingOrigin()
+    }
+    presentationStage?(presentationGeneration, .showReturned)
+    if automaticallyCompletesPresentation {
+      presentationStage?(presentationGeneration, .contentWindowAttached)
+      presentationStage?(presentationGeneration, .firstLayoutCompleted)
     }
   }
 
   func performClose(_ sender: Any?) {
     isShown = false
     didClose?()
+  }
+
+  func mutateHostingOrigin() {
+    guard let view = contentViewController?.view else { return }
+    view.bounds.origin = CGPoint(x: 19, y: 23)
+    view.frame.origin = CGPoint(x: 7, y: 11)
+  }
+
+  func trigger(_ stage: TrayPopoverPresentationStage, generation: UInt64) {
+    presentationStage?(generation, stage)
+  }
+
+  func installContentWindow(safeAreaInsets: NSEdgeInsets) {
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 368, height: 316),
+      styleMask: .borderless,
+      backing: .buffered,
+      defer: false
+    )
+    window.contentView = SafeAreaContentView(
+      frame: window.contentView?.bounds ?? .zero,
+      insets: safeAreaInsets
+    )
+    contentWindow = window
+  }
+}
+
+@MainActor
+private final class GeometryTraceRecorderSpy: TrayGeometryTraceRecording {
+  private(set) var records: [TrayGeometryTraceRecord] = []
+
+  func record(_ value: TrayGeometryTraceRecord) {
+    records.append(value)
+  }
+}
+
+private final class SafeAreaContentView: NSView {
+  private let insets: NSEdgeInsets
+
+  init(frame: NSRect, insets: NSEdgeInsets) {
+    self.insets = insets
+    super.init(frame: frame)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    nil
+  }
+
+  override var safeAreaInsets: NSEdgeInsets {
+    insets
   }
 }
 

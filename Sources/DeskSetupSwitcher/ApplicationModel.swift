@@ -84,6 +84,7 @@ func appApplicationItemStatusTitle(_ status: ApplicationItemStatus) -> String {
 func appApplicationItemTitle(_ key: String) -> String {
   switch key {
   case "display-safety-confirmation": return appLocalized("Display safety confirmation")
+  case "high-risk-safety-confirmation": return appLocalized("Protected change confirmation")
   case "display.atomic-configuration": return appLocalized("Complete display configuration")
   case "defaultInput": return appLocalized("Default input device")
   case "defaultOutput": return appLocalized("Default output device")
@@ -111,10 +112,10 @@ func appApplicationItemTitle(_ key: String) -> String {
 
 func appApplicationStatusTitle(
   _ status: ProfileReadiness,
-  isAwaitingDisplayConfirmation: Bool
+  isAwaitingSafetyConfirmation: Bool
 ) -> String {
-  isAwaitingDisplayConfirmation
-    ? appLocalized("Awaiting display confirmation") : appReadinessTitle(status)
+  isAwaitingSafetyConfirmation
+    ? appLocalized("Awaiting protected-change confirmation") : appReadinessTitle(status)
 }
 
 struct PendingApplyRequest: Identifiable, Sendable {
@@ -132,6 +133,8 @@ struct PendingImportRequest: Identifiable, Sendable {
 struct SafetyConfirmationState: Identifiable, Sendable {
   let id: UUID
   let profileID: UUID
+  let guardedGroups: [SettingGroup]
+  let changeSummaries: [String]
   var secondsRemaining: Int
 }
 
@@ -229,7 +232,7 @@ final class ApplicationModel: ObservableObject {
   private let loginItemService: any LoginItemServicing
   private let launchAtLoginPreferenceKey = "launchAtLoginEnabled"
   private let launchAtLoginPreferenceCreatedKey = "launchAtLoginPreferenceCreated"
-  private let displaySafetyConfirmationKey = "display-safety-confirmation"
+  private let highRiskSafetyConfirmationKey = "high-risk-safety-confirmation"
   private var hasStarted = false
   private var safetyCountdownTask: Task<Void, Never>?
   private var loginItemOperationFailure: LoginItemOperationFailure?
@@ -246,6 +249,7 @@ final class ApplicationModel: ObservableObject {
 
   var shouldDeferTermination: Bool {
     isApplyTransactionInProgress || isProfileStoreMutationInProgress
+      || safetyConfirmation != nil
   }
 
   private enum LoginItemOperationFailure: Equatable {
@@ -874,7 +878,7 @@ final class ApplicationModel: ObservableObject {
           makeSafetyOutcomeItem(
             status: .succeeded,
             message: appLocalized(
-              "Display changes are temporary and are waiting for confirmation.")
+              "Protected changes are temporary and are waiting for confirmation.")
           )
         )
       } else if result.didExecute {
@@ -902,14 +906,15 @@ final class ApplicationModel: ObservableObject {
       if let safetyConfirmationID {
         armSafetyCountdown(
           confirmationID: safetyConfirmationID,
-          profileID: currentProfile.id
+          profileID: currentProfile.id,
+          operations: currentPreparation.operations
         )
       }
 
       if result.didExecute {
         if safetyConfirmationID != nil {
           lastMessage = appLocalized(
-            "Display changes for \(currentProfile.name) are temporary. Confirm or revert them within 15 seconds."
+            "Protected changes for \(currentProfile.name) are temporary. Confirm or revert them within 15 seconds."
           )
         } else {
           if let count = verification?.notVerifiedCount, count > 0 {
@@ -960,6 +965,9 @@ final class ApplicationModel: ObservableObject {
     terminationRequestIsDeferred = true
     lastMessage = appLocalized(
       "Quit is waiting for the current protected operation to be safely recorded.")
+    if !isApplyTransactionInProgress, safetyConfirmation != nil {
+      revertHighRiskChanges()
+    }
   }
 
   func confirmHighRiskChanges() {
@@ -977,60 +985,61 @@ final class ApplicationModel: ObservableObject {
       case .confirmed:
         safetyConfirmation = nil
         operationalStatusByProfile[state.profileID] = .applied
-        lastMessage = appLocalized("Kept the display changes.")
+        lastMessage = appLocalized("Kept the protected changes.")
         outcome = SafetyOutcome(
           profileStatus: .applied,
           itemStatus: .succeeded,
-          message: appLocalized("The user confirmed and kept the display changes.")
+          message: appLocalized("The user confirmed and kept the protected changes.")
         )
       case .confirmationFailed:
         safetyConfirmation = nil
         operationalStatusByProfile[state.profileID] = .partial
         lastMessage = appLocalized(
-          "The display settings could not be committed, so the previous configuration was restored."
+          "The protected settings could not be committed, so the previous configuration was restored."
         )
         outcome = SafetyOutcome(
           profileStatus: .partial,
           itemStatus: .rolledBack,
           message: appLocalized(
-            "Confirmation failed and the previous display configuration was restored.")
+            "Confirmation failed and the previous configuration was restored.")
         )
       case .rollbackFailed:
         safetyConfirmation = nil
         operationalStatusByProfile[state.profileID] = .failed
         lastMessage = appLocalized(
-          "The display settings could not be committed or fully restored. Review diagnostics immediately."
+          "The protected settings could not be committed or fully restored. Review diagnostics immediately."
         )
         outcome = SafetyOutcome(
           profileStatus: .failed,
           itemStatus: .rollbackFailed,
           message: appLocalized(
-            "Confirmation failed and the previous display configuration could not be fully restored."
+            "Confirmation failed and the previous configuration could not be fully restored."
           )
         )
       case .unknownOrExpired:
         safetyConfirmation = nil
         operationalStatusByProfile[state.profileID] = .partial
-        lastMessage = appLocalized("The display confirmation had already expired.")
+        lastMessage = appLocalized("The protected-change confirmation had already expired.")
         outcome = SafetyOutcome(
           profileStatus: .partial,
           itemStatus: .skipped,
           message: appLocalized(
-            "The confirmation outcome was unavailable. Verify the current display configuration."
+            "The confirmation outcome was unavailable. Verify the current system configuration."
           )
         )
       case .transactionInProgress:
         armSafetyCountdown(confirmationID: state.id, profileID: state.profileID)
-        lastMessage = appLocalized("Display confirmation is busy; the safety timer was restarted.")
+        lastMessage = appLocalized(
+          "Protected-change confirmation is busy; the safety timer was restarted.")
         return
       case .reverted:
         safetyConfirmation = nil
         operationalStatusByProfile[state.profileID] = .partial
-        lastMessage = appLocalized("Restored the previous display configuration.")
+        lastMessage = appLocalized("Restored the previous configuration.")
         outcome = SafetyOutcome(
           profileStatus: .partial,
           itemStatus: .rolledBack,
-          message: appLocalized("The previous display configuration was restored.")
+          message: appLocalized("The previous configuration was restored.")
         )
       }
 
@@ -1069,18 +1078,18 @@ final class ApplicationModel: ObservableObject {
           notVerifiedCount: verification?.notVerifiedCount ?? 0
         ) {
         case .kept:
-          lastMessage = appLocalized("Kept the display changes.")
+          lastMessage = appLocalized("Kept the protected changes.")
         case .partial:
           lastMessage = appLocalized(
-            "The display changes were kept, but some settings failed, were skipped, or were unavailable."
+            "The protected changes were kept, but some settings failed, were skipped, or were unavailable."
           )
         case .failed:
           lastMessage = appLocalized(
-            "The display changes were kept, but one or more other profile items failed."
+            "The protected changes were kept, but one or more other profile items failed."
           )
         case .notVerified:
           lastMessage = appLocalized(
-            "The display changes were kept, but read-back could not verify every applied setting."
+            "The protected changes were kept, but read-back could not verify every applied setting."
           )
         }
       }
@@ -1088,9 +1097,9 @@ final class ApplicationModel: ObservableObject {
       await persistApplicationSummary(summary, profileID: state.profileID)
       recordDiagnostic(
         severity: resolution.status == .confirmed ? .info : .warning,
-        component: "display-safety",
+        component: "high-risk-safety",
         code: resolution.status.rawValue,
-        message: appLocalized("The guarded display-change confirmation was resolved.")
+        message: appLocalized("The guarded high-risk change confirmation was resolved.")
       )
       await refreshReadiness()
     }
@@ -1128,7 +1137,7 @@ final class ApplicationModel: ObservableObject {
         recordSnapshotDiagnostic(snapshot)
       } else if recoveredInterruptedConfirmation {
         lastMessage = appLocalized(
-          "A display confirmation was interrupted. Temporary app-scoped changes should have reverted; verify the current display configuration."
+          "A protected-change confirmation was interrupted. Temporary app-scoped changes should have reverted; verify the current system configuration."
         )
       }
       await refreshReadiness()
@@ -1175,16 +1184,6 @@ final class ApplicationModel: ObservableObject {
     var normalRejectionReasons: [UUID: [ApplyRejectionReason]] = [:]
     var forceRejectionReasons: [UUID: [ApplyRejectionReason]] = [:]
     for profile in profiles {
-      guard profile.isEnabled else {
-        statuses[profile.id] = .unavailable
-        operationCounts[profile.id] = 0
-        forceOperationCounts[profile.id] = 0
-        normalAvailability[profile.id] = false
-        forceAvailability[profile.id] = false
-        normalRejectionReasons[profile.id] = [.profileDisabled]
-        forceRejectionReasons[profile.id] = [.profileDisabled]
-        continue
-      }
       let preparation = await applyEngine.prepare(
         profile: profile,
         mode: .normal,
@@ -1309,11 +1308,26 @@ final class ApplicationModel: ObservableObject {
     AccessibilityNotification.Announcement(announcement).post()
   }
 
-  private func armSafetyCountdown(confirmationID: UUID, profileID: UUID) {
+  private func armSafetyCountdown(
+    confirmationID: UUID,
+    profileID: UUID,
+    operations: [PlannedOperation]? = nil
+  ) {
     safetyCountdownTask?.cancel()
+    let existing = safetyConfirmation?.id == confirmationID ? safetyConfirmation : nil
+    let highRiskOperations = (operations ?? lastApplyResult?.preparation.operations ?? [])
+      .filter { $0.risk == .high }
+    let guardedGroups =
+      existing?.guardedGroups
+      ?? Array(Set(highRiskOperations.map(\.group))).sorted { $0.rawValue < $1.rawValue }
+    let changeSummaries =
+      existing?.changeSummaries
+      ?? highRiskOperations.map(\.summary)
     safetyConfirmation = SafetyConfirmationState(
       id: confirmationID,
       profileID: profileID,
+      guardedGroups: guardedGroups,
+      changeSummaries: changeSummaries,
       secondsRemaining: 15
     )
 
@@ -1346,7 +1360,8 @@ final class ApplicationModel: ObservableObject {
 
     if resolution.status == .transactionInProgress {
       armSafetyCountdown(confirmationID: state.id, profileID: state.profileID)
-      lastMessage = appLocalized("Display confirmation is busy; the safety timer was restarted.")
+      lastMessage = appLocalized(
+        "Protected-change confirmation is busy; the safety timer was restarted.")
       return
     }
 
@@ -1355,13 +1370,13 @@ final class ApplicationModel: ObservableObject {
 
     if resolution.status == .unknownOrExpired {
       operationalStatusByProfile[state.profileID] = .partial
-      lastMessage = appLocalized("The display confirmation had already expired.")
+      lastMessage = appLocalized("The protected-change confirmation had already expired.")
       var summary = resolveSafetyOutcome(
         SafetyOutcome(
           profileStatus: .partial,
           itemStatus: .skipped,
           message: appLocalized(
-            "The rollback outcome was unavailable. Verify the current display configuration.")
+            "The rollback outcome was unavailable. Verify the current system configuration.")
         ),
         rollbackResults: [],
         profileID: state.profileID
@@ -1383,8 +1398,9 @@ final class ApplicationModel: ObservableObject {
     operationalStatusByProfile[state.profileID] = failed ? .failed : .partial
     lastMessage =
       failed
-      ? appLocalized("Automatic display rollback failed; review the itemized result immediately.")
-      : appLocalized("Restored the previous display configuration.")
+      ? appLocalized(
+        "Automatic protected-change rollback failed; review the itemized result immediately.")
+      : appLocalized("Restored the previous configuration.")
 
     var summary = resolveSafetyOutcome(
       SafetyOutcome(
@@ -1392,8 +1408,8 @@ final class ApplicationModel: ObservableObject {
         itemStatus: failed ? .rollbackFailed : .rolledBack,
         message:
           failed
-          ? appLocalized("The previous display configuration could not be fully restored.")
-          : appLocalized("The previous display configuration was restored.")
+          ? appLocalized("The previous configuration could not be fully restored.")
+          : appLocalized("The previous configuration was restored.")
       ),
       rollbackResults: resolution.rollbackResults,
       profileID: state.profileID
@@ -1409,11 +1425,11 @@ final class ApplicationModel: ObservableObject {
     await persistApplicationSummary(summary, profileID: state.profileID)
     recordDiagnostic(
       severity: failed ? .error : .warning,
-      component: "display-safety",
+      component: "high-risk-safety",
       code: resolution.status.rawValue,
       message:
         appLocalized(
-          "The guarded display rollback completed with \(resolution.rollbackResults.count) item results."
+          "The guarded high-risk rollback completed with \(resolution.rollbackResults.count) item results."
         )
     )
     await refreshReadiness()
@@ -1612,7 +1628,7 @@ final class ApplicationModel: ObservableObject {
     merged.name = saveCandidate.name
     merged.profileDescription = saveCandidate.profileDescription
     merged.symbolName = saveCandidate.symbolName
-    merged.isEnabled = saveCandidate.isEnabled
+    merged.isEnabled = true
     merged.settings = saveCandidate.settings
     merged.conditions = saveCandidate.conditions
     return merged
@@ -1646,6 +1662,10 @@ final class ApplicationModel: ObservableObject {
 
   private func finishApplyTransaction() {
     isApplyTransactionInProgress = false
+    if terminationRequestIsDeferred, safetyConfirmation != nil {
+      revertHighRiskChanges()
+      return
+    }
     completeDeferredTerminationIfPossible()
   }
 
@@ -1781,7 +1801,7 @@ final class ApplicationModel: ObservableObject {
   ) -> ApplicationItemSummary {
     ApplicationItemSummary(
       group: .display,
-      key: displaySafetyConfirmationKey,
+      key: highRiskSafetyConfirmationKey,
       status: status,
       message: message
     )
@@ -1799,7 +1819,7 @@ final class ApplicationModel: ObservableObject {
     if var result = lastApplyResult, result.preparation.profileID == profileID {
       result.completedAt = completedAt
       result.safetyConfirmationID = nil
-      result.itemResults.removeAll { $0.key == displaySafetyConfirmationKey }
+      result.itemResults.removeAll { $0.key == highRiskSafetyConfirmationKey }
       result.itemResults.append(
         makeSafetyOutcomeItem(status: outcome.itemStatus, message: outcome.message)
       )
@@ -1837,7 +1857,7 @@ final class ApplicationModel: ObservableObject {
       summary.status =
         summary.items.contains(where: isFailedApplicationItem) ? .failed : .partial
       summary.appliedAt = Date()
-      summary.items.removeAll { $0.key == displaySafetyConfirmationKey }
+      summary.items.removeAll { $0.key == highRiskSafetyConfirmationKey }
       summary.items.append(
         makeSafetyOutcomeItem(
           status: .skipped,

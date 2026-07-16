@@ -1,0 +1,10 @@
+source=detached NSHostingView with synthetic profile and snapshot
+synthetic-settings-host=true
+fixture=21-wifi-dhcp-ko-light
+language=ko
+viewport=980x720
+variant=editor-network-wifi-dhcp
+display-mode=standard
+live-display-audio-network-mutations=false
+detached-ax-limit=virtual SwiftUI children require an onscreen accessibility host
+role=AXGroup

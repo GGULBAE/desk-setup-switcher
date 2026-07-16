@@ -2,7 +2,7 @@
 
 ## Current status
 
-The version 0.1.0 no-Developer-ID packaging path passes locally. The current tray/settings refinement passed `make verify` on 2026-07-16 with 339 default cases (132 XCTest + 207 Swift Testing), six opt-in skips, universal Debug/Release, Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. The current app contains `arm64` and `x86_64`; DMG SHA-256 is `567917f169e90799db177d0a5f22a8b13115cb30ed63f7e766fc4bb992ab35e3`. This package was not installed or launched.
+The version 0.1.0 no-Developer-ID packaging path passes locally. The current tray/settings end-to-end contract passed `make verify` on 2026-07-16 with 366 default cases (134 XCTest + 232 Swift Testing), five opt-in skips, universal Debug/Release, Analyze, DMG creation, SHA-256 validation, and mounted-image inspection. The current app contains `arm64` and `x86_64`; DMG SHA-256 is `76bc6d9f1187ea30f68be16ee81ee4a334d877a4e26c2497f35a9ffc781678b3`. This package was not installed or launched.
 
 Initial Actions run `29154880831` for implementation commit `0d8f510` exposed the Swift 6.1 actor-isolation issue. Repair commit `4e45328` is pushed, and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) succeeded on 2026-07-11 under macOS 15/Xcode 16.4/Swift 6.1.2; full `make verify` and unsigned-package upload passed. No release has been published, and the downloaded/quarantined Gatekeeper path remains untested.
 

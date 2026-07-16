@@ -114,6 +114,8 @@ public struct NetworkServiceConfigurationSnapshot: Codable, Hashable, Sendable {
   public var kind: NetworkServiceKind?
   public var enabled: Bool
   public var ipv4: IPv4Configuration?
+  /// Exact property-list representation used only for preflight rollback.
+  public var ipv4ConfigurationData: Data?
   public var dnsServers: [String]
   public var webProxy: ProxyConfiguration?
   public var secureWebProxy: ProxyConfiguration?
@@ -126,6 +128,7 @@ public struct NetworkServiceConfigurationSnapshot: Codable, Hashable, Sendable {
     kind: NetworkServiceKind? = nil,
     enabled: Bool,
     ipv4: IPv4Configuration? = nil,
+    ipv4ConfigurationData: Data? = nil,
     dnsServers: [String] = [],
     webProxy: ProxyConfiguration? = nil,
     secureWebProxy: ProxyConfiguration? = nil
@@ -137,6 +140,7 @@ public struct NetworkServiceConfigurationSnapshot: Codable, Hashable, Sendable {
     self.kind = kind
     self.enabled = enabled
     self.ipv4 = ipv4
+    self.ipv4ConfigurationData = ipv4ConfigurationData
     self.dnsServers = dnsServers
     self.webProxy = webProxy
     self.secureWebProxy = secureWebProxy
@@ -211,4 +215,13 @@ enum NetworkOperationPayload: Codable, Hashable, Sendable {
   case setWiFiPower(Bool)
   case associateSavedNetwork(ssid: String)
   case disassociateWiFi
+  case setServiceIPv4(
+    identity: NetworkServiceIdentity,
+    configuration: IPv4Configuration
+  )
+  case restoreServiceIPv4(
+    identity: NetworkServiceIdentity,
+    configurationData: Data,
+    expected: IPv4Configuration?
+  )
 }

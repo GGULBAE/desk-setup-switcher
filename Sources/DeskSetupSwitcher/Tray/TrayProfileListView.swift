@@ -183,7 +183,7 @@ struct TrayProfileListView: View {
       hasUsableCachedReadiness: model.readinessByProfile[profile.id] != nil,
       isTransactionLocked:
         model.isApplyTransactionInProgress || model.isProfileStoreMutationInProgress,
-      isDisplayConfirmationPending: model.safetyConfirmation != nil
+      isSafetyConfirmationPending: model.safetyConfirmation != nil
     )
   }
 

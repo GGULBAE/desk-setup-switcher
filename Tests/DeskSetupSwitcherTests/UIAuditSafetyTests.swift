@@ -175,6 +175,8 @@ import Testing
       #expect(ProfileWorkspaceLayoutMode(width: 680) == .compact)
       #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio, .network])
       #expect(!ProfileEditorSurfacePolicy.visibleGroups.contains(.input))
+      #expect(!ProfileEditorSurfacePolicy.showsActivationControl)
+      #expect(!ProfileEditorSurfacePolicy.showsUnsupportedControls)
       #expect(!ProfileEditorSurfacePolicy.showsDescription)
       #expect(!ProfileEditorSurfacePolicy.showsConditions)
       #expect(!ProfileEditorSurfacePolicy.showsCurrentSettingsDraftRefresh)
@@ -225,6 +227,35 @@ import Testing
       #expect(!window.isReleasedWhenClosed)
       #expect(window.collectionBehavior.contains(.managed))
       #expect(window.collectionBehavior.contains(.participatesInCycle))
+    }
+
+    @Test("closing the persistent safety host invokes its rollback hook")
+    func workflowCloseInvokesSafetyHook() throws {
+      var closeRequests = 0
+      let controller = TrayWorkflowWindowController(
+        rootView: Color.clear,
+        onWindowClose: { closeRequests += 1 }
+      )
+      let window = try #require(controller.window)
+
+      #expect(controller.windowShouldClose(window) == false)
+      #expect(closeRequests == 1)
+      #expect(!window.isReleasedWhenClosed)
+    }
+
+    @Test("safety state records network scope and sanitized change summaries")
+    func safetyStateDescribesNetworkChanges() {
+      let state = SafetyConfirmationState(
+        id: UUID(),
+        profileID: UUID(),
+        guardedGroups: [.network],
+        changeSummaries: ["Apply the service IPv4 configuration with authorization."],
+        secondsRemaining: 15
+      )
+
+      #expect(state.guardedGroups == [.network])
+      #expect(state.changeSummaries.count == 1)
+      #expect(state.secondsRemaining == 15)
     }
 
     @Test("ordinary app activation remains until the last destination is hidden")

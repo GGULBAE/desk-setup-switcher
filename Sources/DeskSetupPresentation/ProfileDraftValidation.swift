@@ -48,6 +48,13 @@ public struct DraftFieldIdentifier: RawRepresentable, Hashable, Sendable,
     Self(rawValue: "settings.network.\(field.rawValue)")
   }
 
+  public static func networkService(
+    at index: Int,
+    _ field: NetworkDraftField
+  ) -> Self {
+    Self(rawValue: "settings.network.serviceIPv4.\(max(0, index)).\(field.rawValue)")
+  }
+
   public static func dnsServer(at index: Int) -> Self {
     Self(rawValue: "settings.network.dnsServers.\(max(0, index))")
   }
@@ -65,6 +72,7 @@ public enum DisplayDraftField: String, Equatable, Sendable {
   case modePixelWidth
   case modePixelHeight
   case modeRefreshRate
+  case colorProfile
   case rotationDegrees
 }
 
@@ -247,23 +255,18 @@ public struct ProfileDraftValidator: Equatable, Sendable {
     validateDisplay(settings.display, issues: &issues)
     validateAudio(settings.audio, issues: &issues)
     validateNetwork(settings.network, issues: &issues)
-    validateInput(settings.input, issues: &issues)
   }
 
   private func validateDisplay(
     _ group: SettingGroupConfiguration<DisplayProfileSettings>,
     issues: inout [DraftValidationIssue]
   ) {
-    guard group.isIncluded else { return }
-    guard group.value.hasIncludedOption else {
-      append(
-        .selectAtLeastOneSetting,
-        field: .group(.display),
-        group: .display,
-        to: &issues
-      )
-      return
-    }
+    guard
+      group.value.displays.contains(where: {
+        $0.isPrimary.isIncluded || $0.mirroring.isIncluded || $0.mode.isIncluded
+          || $0.colorProfile.isIncluded
+      })
+    else { return }
 
     let primaryOptions = group.value.displays.map(\.isPrimary)
     let includesPrimaryDisplay = primaryOptions.contains(where: \.isIncluded)
@@ -334,16 +337,38 @@ public struct ProfileDraftValidator: Equatable, Sendable {
         )
       }
 
-      if display.rotationDegrees.isIncluded,
-        !Set([0, 90, 180, 270]).contains(display.rotationDegrees.value)
-      {
-        append(
-          .invalidRotation,
-          field: .display(display.id, .rotationDegrees),
+      if display.colorProfile.isIncluded {
+        guard let target = display.colorProfile.value else {
+          append(
+            .required,
+            field: .display(display.id, .colorProfile),
+            group: .display,
+            to: &issues
+          )
+          continue
+        }
+        if isBlank(target.registeredProfileID) || isBlank(target.fileSHA256) {
+          append(
+            .cannotBeBlank,
+            field: .display(display.id, .colorProfile),
+            group: .display,
+            to: &issues
+          )
+        }
+        validateStringLength(
+          target.registeredProfileID,
+          field: .display(display.id, .colorProfile),
           group: .display,
-          to: &issues
+          issues: &issues
+        )
+        validateStringLength(
+          target.fileSHA256,
+          field: .display(display.id, .colorProfile),
+          group: .display,
+          issues: &issues
         )
       }
+
     }
   }
 
@@ -351,34 +376,12 @@ public struct ProfileDraftValidator: Equatable, Sendable {
     _ group: SettingGroupConfiguration<AudioProfileSettings>,
     issues: inout [DraftValidationIssue]
   ) {
-    validateStringLength(
-      group.value.defaultInputUID.value,
-      field: .audio(.defaultInputDevice),
-      group: .audio,
-      issues: &issues
-    )
-    validateStringLength(
-      group.value.defaultOutputUID.value,
-      field: .audio(.defaultOutputDevice),
-      group: .audio,
-      issues: &issues
-    )
-    validateStringLength(
-      group.value.systemOutputUID.value,
-      field: .audio(.systemOutputDevice),
-      group: .audio,
-      issues: &issues
-    )
-    guard group.isIncluded else { return }
-    guard group.value.hasIncludedOption else {
-      append(
-        .selectAtLeastOneSetting,
-        field: .group(.audio),
-        group: .audio,
-        to: &issues
-      )
-      return
-    }
+    guard
+      group.value.defaultInputUID.isIncluded
+        || group.value.defaultOutputUID.isIncluded
+        || group.value.inputVolume.isIncluded
+        || group.value.outputVolume.isIncluded
+    else { return }
 
     validateIncludedString(
       group.value.defaultInputUID,
@@ -389,12 +392,6 @@ public struct ProfileDraftValidator: Equatable, Sendable {
     validateIncludedString(
       group.value.defaultOutputUID,
       field: .audio(.defaultOutputDevice),
-      group: .audio,
-      issues: &issues
-    )
-    validateIncludedString(
-      group.value.systemOutputUID,
-      field: .audio(.systemOutputDevice),
       group: .audio,
       issues: &issues
     )
@@ -412,72 +409,31 @@ public struct ProfileDraftValidator: Equatable, Sendable {
       group: .audio,
       issues: &issues
     )
-    validateIncludedPresence(
-      group.value.outputMuted,
-      field: .audio(.outputMute),
-      group: .audio,
-      issues: &issues
-    )
   }
 
   private func validateNetwork(
     _ group: SettingGroupConfiguration<NetworkProfileSettings>,
     issues: inout [DraftValidationIssue]
   ) {
-    let wifiNameIsTooLong = validateStringLength(
-      group.value.wifiSSID.value,
-      field: .network(.wifiSSID),
-      group: .network,
-      issues: &issues
-    )
-    guard group.isIncluded else { return }
-    guard group.value.hasIncludedOption else {
-      append(
-        .selectAtLeastOneSetting,
-        field: .group(.network),
-        group: .network,
-        to: &issues
-      )
-      return
-    }
+    guard group.value.serviceIPv4.contains(where: { $0.configuration.isIncluded })
+    else { return }
 
-    validateIncludedPresence(
-      group.value.wifiPower,
-      field: .network(.wifiPower),
-      group: .network,
-      issues: &issues
-    )
-    validateIncludedString(
-      group.value.wifiSSID,
-      field: .network(.wifiSSID),
-      group: .network,
-      issues: &issues
-    )
-    if group.value.wifiSSID.isIncluded,
-      let ssid = group.value.wifiSSID.value,
-      !ssid.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-      !wifiNameIsTooLong,
-      !(1...32).contains(ssid.utf8.count)
-    {
-      append(
-        .invalidWiFiNetworkName,
-        field: .network(.wifiSSID),
-        group: .network,
-        to: &issues
-      )
-    }
-
-    if group.value.ipv4.isIncluded {
-      guard let configuration = group.value.ipv4.value else {
-        append(.required, field: .network(.ipv4), group: .network, to: &issues)
-        validateDNSAndProxies(group.value, issues: &issues)
-        return
+    for (index, service) in group.value.serviceIPv4.enumerated()
+    where service.configuration.isIncluded {
+      guard let configuration = service.configuration.value else {
+        append(
+          .required,
+          field: .networkService(at: index, .ipv4),
+          group: .network,
+          to: &issues
+        )
+        continue
       }
       if case .manual(let address, let subnetMask, let router) = configuration {
         if !isIPv4Address(address) {
           append(
             .invalidIPv4Address,
-            field: .network(.ipv4Address),
+            field: .networkService(at: index, .ipv4Address),
             group: .network,
             to: &issues
           )
@@ -485,7 +441,7 @@ public struct ProfileDraftValidator: Equatable, Sendable {
         if !isContiguousIPv4Mask(subnetMask) {
           append(
             .invalidSubnetMask,
-            field: .network(.ipv4SubnetMask),
+            field: .networkService(at: index, .ipv4SubnetMask),
             group: .network,
             to: &issues
           )
@@ -493,7 +449,7 @@ public struct ProfileDraftValidator: Equatable, Sendable {
         if let router, !isIPv4Address(router) {
           append(
             .invalidIPv4Address,
-            field: .network(.ipv4Router),
+            field: .networkService(at: index, .ipv4Router),
             group: .network,
             to: &issues
           )
@@ -501,114 +457,6 @@ public struct ProfileDraftValidator: Equatable, Sendable {
       }
     }
 
-    validateDNSAndProxies(group.value, issues: &issues)
-  }
-
-  private func validateDNSAndProxies(
-    _ settings: NetworkProfileSettings,
-    issues: inout [DraftValidationIssue]
-  ) {
-    if settings.dnsServers.isIncluded {
-      for (index, server) in settings.dnsServers.value.enumerated()
-      where !isIPAddress(server) {
-        append(
-          .invalidIPAddress,
-          field: .dnsServer(at: index),
-          group: .network,
-          to: &issues
-        )
-      }
-    }
-
-    validateProxy(
-      settings.webProxy,
-      valueField: .network(.webProxy),
-      hostField: .network(.webProxyHost),
-      portField: .network(.webProxyPort),
-      issues: &issues
-    )
-    validateProxy(
-      settings.secureWebProxy,
-      valueField: .network(.secureWebProxy),
-      hostField: .network(.secureWebProxyHost),
-      portField: .network(.secureWebProxyPort),
-      issues: &issues
-    )
-  }
-
-  private func validateProxy(
-    _ option: SettingOption<ProxyConfiguration?>,
-    valueField: DraftFieldIdentifier,
-    hostField: DraftFieldIdentifier,
-    portField: DraftFieldIdentifier,
-    issues: inout [DraftValidationIssue]
-  ) {
-    guard option.isIncluded else { return }
-    guard let proxy = option.value else {
-      append(.required, field: valueField, group: .network, to: &issues)
-      return
-    }
-    guard proxy.enabled else { return }
-    if isBlank(proxy.host) {
-      append(.cannotBeBlank, field: hostField, group: .network, to: &issues)
-    }
-    validateInteger(
-      proxy.port,
-      range: 1...65_535,
-      field: portField,
-      group: .network,
-      issues: &issues
-    )
-  }
-
-  private func validateInput(
-    _ group: SettingGroupConfiguration<InputProfileSettings>,
-    issues: inout [DraftValidationIssue]
-  ) {
-    guard group.isIncluded else { return }
-    guard group.value.hasIncludedOption else {
-      append(
-        .selectAtLeastOneSetting,
-        field: .group(.input),
-        group: .input,
-        to: &issues
-      )
-      return
-    }
-
-    validateIncludedNumber(
-      group.value.pointerSpeed,
-      range: -1...10,
-      field: .input(.pointerSpeed),
-      group: .input,
-      issues: &issues
-    )
-    validateIncludedPresence(
-      group.value.naturalScrolling,
-      field: .input(.naturalScrolling),
-      group: .input,
-      issues: &issues
-    )
-    validateIncludedNumber(
-      group.value.keyRepeatInterval,
-      range: 1...120,
-      field: .input(.keyRepeatInterval),
-      group: .input,
-      issues: &issues
-    )
-    validateIncludedNumber(
-      group.value.initialKeyRepeatDelay,
-      range: 1...300,
-      field: .input(.initialKeyRepeatDelay),
-      group: .input,
-      issues: &issues
-    )
-    validateIncludedPresence(
-      group.value.useStandardFunctionKeys,
-      field: .input(.standardFunctionKeys),
-      group: .input,
-      issues: &issues
-    )
   }
 
   private func validateIncludedString(
@@ -625,6 +473,7 @@ public struct ProfileDraftValidator: Equatable, Sendable {
     if isBlank(value) {
       append(.cannotBeBlank, field: field, group: group, to: &issues)
     }
+    validateStringLength(value, field: field, group: group, issues: &issues)
   }
 
   private func validateIncludedNumber(

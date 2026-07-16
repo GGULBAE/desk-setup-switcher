@@ -2,13 +2,13 @@
 
 ## Status
 
-Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. The current tray/settings refinement on Tray Surface Architecture v2 passed integrated non-live `make verify` on 2026-07-16 with 339 default cases (132 XCTest plus 207 Swift Testing cases, six opt-in skips), zero failures, lint, Swift and universal Xcode Debug/Release, Analyze, and mounted package/checksum verification. The current DMG SHA-256 is `567917f169e90799db177d0a5f22a8b13115cb30ed63f7e766fc4bb992ab35e3`; it is universal and ad-hoc signed without Developer ID, but it was not installed or launched. Earlier live-read and installed checks remain historical baselines. This is not a public release or mutation proof: actual corrected v2 popover interaction, live setting mutation, physical Intel, live Keychain write, full VoiceOver/TCC audit, and quarantined Gatekeeper remain unverified. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. The current tray/settings end-to-end contract on Tray Surface Architecture v2 passed integrated non-live `make verify` on 2026-07-16 with 366 default cases (134 XCTest plus 232 Swift Testing cases, five opt-in skips), zero failures, lint, Swift and universal Xcode Debug/Release, Analyze, and mounted package/checksum verification. The current DMG SHA-256 is `76bc6d9f1187ea30f68be16ee81ee4a334d877a4e26c2497f35a9ffc781678b3`; it is universal and ad-hoc signed without Developer ID, but it was not installed or launched. Earlier live-read and installed checks remain historical baselines. This is not a public release or mutation proof: actual corrected v2 popover interaction, live setting mutation, physical Intel, live Keychain write, full VoiceOver/TCC audit, and quarantined Gatekeeper remain unverified. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
 ## Product promise
 
 Desk Setup Switcher is a free, open-source, local-first macOS menu-bar app that lets a person capture the current desk-related settings as a profile and deliberately apply a saved profile later. It never changes profiles automatically.
 
-The app covers displays, audio, network state, and the macOS-wide mouse and keyboard settings that can be accessed safely. Legacy/imported conditions remain in the versioned format for round-trip compatibility, but the current manual workflow neither edits them nor lets them silently block readiness or Apply. They never act as triggers.
+The current visible surface covers displays, audio, and service-specific network state. Legacy mouse/keyboard settings and imported conditions remain in the versioned format for round-trip compatibility, but the current manual workflow neither edits nor applies them and never lets conditions silently block readiness or Apply. Conditions never act as triggers.
 
 ## Product principles
 

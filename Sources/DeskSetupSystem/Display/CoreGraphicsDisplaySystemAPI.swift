@@ -1,5 +1,6 @@
-import ColorSync
+@preconcurrency import ColorSync
 import CoreGraphics
+import CryptoKit
 import Foundation
 
 #if canImport(DeskSetupCore)
@@ -8,6 +9,23 @@ import Foundation
 
 public struct CoreGraphicsDisplaySystemAPI: DisplaySystemAPI {
   private let matcher: DisplayIdentityMatcher
+
+  private static let colorSyncDisplayDeviceClass =
+    kColorSyncDisplayDeviceClass!.takeUnretainedValue()
+  private static let colorSyncDeviceDefaultProfileID =
+    kColorSyncDeviceDefaultProfileID!.takeUnretainedValue()
+  private static let colorSyncDeviceID = kColorSyncDeviceID!.takeUnretainedValue()
+  private static let colorSyncDeviceClass = kColorSyncDeviceClass!.takeUnretainedValue()
+  private static let colorSyncDeviceProfileID =
+    kColorSyncDeviceProfileID!.takeUnretainedValue()
+  private static let colorSyncDeviceProfileURL =
+    kColorSyncDeviceProfileURL!.takeUnretainedValue()
+  private static let colorSyncDeviceModeDescription =
+    kColorSyncDeviceModeDescription!.takeUnretainedValue()
+  private static let colorSyncDeviceProfileIsCurrent =
+    kColorSyncDeviceProfileIsCurrent!.takeUnretainedValue()
+  private static let colorSyncCustomProfiles =
+    kColorSyncCustomProfiles!.takeUnretainedValue()
 
   public init(matcher: DisplayIdentityMatcher = .init()) {
     self.matcher = matcher
@@ -25,6 +43,24 @@ public struct CoreGraphicsDisplaySystemAPI: DisplaySystemAPI {
   ) async throws {
     try await MainActor.run {
       try applySynchronously(configuration, commitScope: commitScope)
+    }
+  }
+
+  public func setColorProfile(
+    _ target: ColorSyncProfileTarget,
+    for display: DisplayIdentity
+  ) async throws {
+    try await MainActor.run {
+      try setColorProfileSynchronously(target, for: display)
+    }
+  }
+
+  public func restoreColorProfileMapping(
+    _ mapping: ColorSyncCustomProfileMapping,
+    for display: DisplayIdentity
+  ) async throws {
+    try await MainActor.run {
+      try restoreColorProfileMappingSynchronously(mapping, for: display)
     }
   }
 
@@ -175,6 +211,7 @@ public struct CoreGraphicsDisplaySystemAPI: DisplaySystemAPI {
   private func makeSystemDisplay(_ displayID: CGDirectDisplayID) -> DisplaySystemDisplay {
     let bounds = CGDisplayBounds(displayID)
     let mirrorSource = CGDisplayMirrorsDisplay(displayID)
+    let colorState = colorProfileState(for: displayID)
     return DisplaySystemDisplay(
       sessionID: displayID,
       identity: DisplayIdentity(
@@ -198,7 +235,249 @@ public struct CoreGraphicsDisplaySystemAPI: DisplaySystemAPI {
       isActive: CGDisplayIsActive(displayID) != 0,
       currentMode: CGDisplayCopyDisplayMode(displayID).map(makeDisplayMode),
       supportedModes: allModes(for: displayID),
-      currentColorSpaceName: CGDisplayCopyColorSpace(displayID).name as String?
+      currentColorSpaceName: CGDisplayCopyColorSpace(displayID).name as String?,
+      availableColorProfiles: colorState?.profiles.map(\.target) ?? [],
+      currentColorProfile: colorState?.profiles.first(where: \.isCurrent)?.target,
+      currentColorProfileMapping: colorState?.mapping,
+      canSetColorProfile: colorState?.canSet ?? false
+    )
+  }
+
+  private func setColorProfileSynchronously(
+    _ target: ColorSyncProfileTarget,
+    for identity: DisplayIdentity
+  ) throws {
+    let displays = try activeDisplaysSynchronously()
+    let display = try resolve(identity, among: displays)
+    guard let deviceUUID = CGDisplayCreateUUIDFromDisplayID(display.sessionID)?.takeRetainedValue(),
+      let state = colorProfileState(for: display.sessionID),
+      state.canSet
+    else {
+      throw DisplayAdapterError.colorProfileUnavailable
+    }
+    let matches = state.profiles.filter { $0.target == target }
+    guard matches.count == 1, let match = matches.first else {
+      throw DisplayAdapterError.colorProfileUnavailable
+    }
+    let mapping: [CFString: Any] = [
+      Self.colorSyncDeviceDefaultProfileID: match.url as CFURL
+    ]
+    guard
+      ColorSyncDeviceSetCustomProfiles(
+        Self.colorSyncDisplayDeviceClass,
+        deviceUUID,
+        mapping as CFDictionary
+      )
+    else {
+      throw DisplayAdapterError.colorProfileMutationFailed
+    }
+    guard
+      colorProfileState(for: display.sessionID)?.profiles.first(where: \.isCurrent)?.target
+        == target
+    else {
+      throw DisplayAdapterError.colorProfileReadBackMismatch
+    }
+  }
+
+  private func restoreColorProfileMappingSynchronously(
+    _ mapping: ColorSyncCustomProfileMapping,
+    for identity: DisplayIdentity
+  ) throws {
+    let displays = try activeDisplaysSynchronously()
+    let display = try resolve(identity, among: displays)
+    guard let deviceUUID = CGDisplayCreateUUIDFromDisplayID(display.sessionID)?.takeRetainedValue()
+    else {
+      throw DisplayAdapterError.colorProfileUnavailable
+    }
+    let dictionary = colorSyncDictionary(from: mapping)
+    guard
+      ColorSyncDeviceSetCustomProfiles(
+        Self.colorSyncDisplayDeviceClass,
+        deviceUUID,
+        dictionary as CFDictionary
+      )
+    else {
+      throw DisplayAdapterError.colorProfileMutationFailed
+    }
+    guard colorProfileState(for: display.sessionID)?.mapping == mapping else {
+      throw DisplayAdapterError.colorProfileReadBackMismatch
+    }
+  }
+
+  private struct RuntimeColorProfile {
+    let target: ColorSyncProfileTarget
+    let url: URL
+    let isCurrent: Bool
+  }
+
+  private struct ColorProfileState {
+    let profiles: [RuntimeColorProfile]
+    let mapping: ColorSyncCustomProfileMapping
+    let canSet: Bool
+  }
+
+  private final class ColorProfileIterationBox {
+    let deviceUUID: UUID
+    var profiles: [RuntimeColorProfile] = []
+
+    init(deviceUUID: UUID) {
+      self.deviceUUID = deviceUUID
+    }
+  }
+
+  private func colorProfileState(for displayID: CGDirectDisplayID) -> ColorProfileState? {
+    guard let unmanagedUUID = CGDisplayCreateUUIDFromDisplayID(displayID) else { return nil }
+    let deviceUUID = unmanagedUUID.takeRetainedValue()
+    let uuid = Self.foundationUUID(deviceUUID)
+    let box = ColorProfileIterationBox(deviceUUID: uuid)
+    ColorSyncIterateDeviceProfiles(
+      { dictionary, userInfo in
+        guard let dictionary, let userInfo else { return false }
+        let box = Unmanaged<ColorProfileIterationBox>.fromOpaque(userInfo)
+          .takeUnretainedValue()
+        let values = dictionary as NSDictionary
+        guard let rawDeviceID = values[Self.colorSyncDeviceID],
+          CFGetTypeID(rawDeviceID as CFTypeRef) == CFUUIDGetTypeID(),
+          let deviceClass = values[Self.colorSyncDeviceClass] as? String,
+          deviceClass == (Self.colorSyncDisplayDeviceClass as String),
+          let profileID = values[Self.colorSyncDeviceProfileID] as? String,
+          let url = values[Self.colorSyncDeviceProfileURL] as? URL
+        else { return true }
+        let deviceID = unsafeDowncast(rawDeviceID as AnyObject, to: CFUUID.self)
+        guard CoreGraphicsDisplaySystemAPI.foundationUUID(deviceID) == box.deviceUUID else {
+          return true
+        }
+        let description =
+          (values[Self.colorSyncDeviceModeDescription] as? String)?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+          )
+        let displayName =
+          description?.isEmpty == false
+          ? description!
+          : url.deletingPathExtension().lastPathComponent
+        guard
+          let target = CoreGraphicsDisplaySystemAPI.portableColorProfileTarget(
+            registeredProfileID: profileID,
+            url: url,
+            displayName: displayName
+          )
+        else { return true }
+        let isCurrent =
+          (values[Self.colorSyncDeviceProfileIsCurrent] as? NSNumber)?.boolValue ?? false
+        box.profiles.append(
+          RuntimeColorProfile(
+            target: target,
+            url: url,
+            isCurrent: isCurrent
+          )
+        )
+        return true
+      },
+      Unmanaged.passUnretained(box).toOpaque()
+    )
+
+    guard
+      let unmanagedInfo = ColorSyncDeviceCopyDeviceInfo(
+        Self.colorSyncDisplayDeviceClass,
+        deviceUUID
+      )
+    else { return nil }
+    let info = unmanagedInfo.takeRetainedValue() as NSDictionary
+    let mapping = customProfileMapping(from: info[Self.colorSyncCustomProfiles] as? NSDictionary)
+    let uniqueProfiles = Dictionary(
+      grouping: box.profiles,
+      by: \.target
+    ).compactMap { _, matches in
+      matches.count == 1 ? matches[0] : nil
+    }.sorted {
+      let nameOrder = $0.target.displayName.localizedCaseInsensitiveCompare(
+        $1.target.displayName
+      )
+      if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
+      return $0.target.registeredProfileID < $1.target.registeredProfileID
+    }
+    return ColorProfileState(
+      profiles: uniqueProfiles,
+      mapping: mapping,
+      canSet: !uniqueProfiles.isEmpty
+    )
+  }
+
+  private func customProfileMapping(
+    from dictionary: NSDictionary?
+  ) -> ColorSyncCustomProfileMapping {
+    guard let dictionary, dictionary.count > 0 else {
+      return ColorSyncCustomProfileMapping(
+        entries: [
+          ColorSyncCustomProfileMappingEntry(
+            key: Self.colorSyncDeviceDefaultProfileID as String,
+            value: .unset
+          )
+        ]
+      )
+    }
+    let entries = dictionary.compactMap { rawKey, rawValue -> ColorSyncCustomProfileMappingEntry? in
+      guard let key = rawKey as? String else { return nil }
+      let value: ColorSyncCustomProfileMappingValue
+      if let url = rawValue as? URL {
+        value = .profileURL(url)
+      } else if rawValue is NSNull {
+        value = .unset
+      } else if let scope = rawValue as? String {
+        value = .scope(scope)
+      } else {
+        return nil
+      }
+      return ColorSyncCustomProfileMappingEntry(key: key, value: value)
+    }.sorted { $0.key < $1.key }
+    return ColorSyncCustomProfileMapping(entries: entries)
+  }
+
+  private func colorSyncDictionary(
+    from mapping: ColorSyncCustomProfileMapping
+  ) -> [CFString: Any] {
+    Dictionary(
+      uniqueKeysWithValues: mapping.entries.map { entry in
+        let value: Any
+        switch entry.value {
+        case .profileURL(let url): value = url as CFURL
+        case .unset: value = kCFNull as Any
+        case .scope(let scope): value = scope as CFString
+        }
+        return (entry.key as CFString, value)
+      })
+  }
+
+  private static func foundationUUID(_ uuid: CFUUID) -> UUID {
+    let bytes = CFUUIDGetUUIDBytes(uuid)
+    return UUID(
+      uuid: (
+        bytes.byte0, bytes.byte1, bytes.byte2, bytes.byte3,
+        bytes.byte4, bytes.byte5, bytes.byte6, bytes.byte7,
+        bytes.byte8, bytes.byte9, bytes.byte10, bytes.byte11,
+        bytes.byte12, bytes.byte13, bytes.byte14, bytes.byte15
+      )
+    )
+  }
+
+  private static func sha256(url: URL) -> String? {
+    guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
+    return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+  }
+
+  /// Converts one public ColorSync enumeration record into a portable profile
+  /// target. The runtime file URL is used only to hash the ICC bytes and never
+  /// crosses into the persisted model.
+  static func portableColorProfileTarget(
+    registeredProfileID: String,
+    url: URL,
+    displayName: String
+  ) -> ColorSyncProfileTarget? {
+    guard let hash = sha256(url: url) else { return nil }
+    return ColorSyncProfileTarget(
+      registeredProfileID: registeredProfileID,
+      fileSHA256: hash,
+      displayName: displayName
     )
   }
 

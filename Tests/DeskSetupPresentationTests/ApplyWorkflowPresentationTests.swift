@@ -151,7 +151,7 @@ struct ApplyWorkflowPresentationTests {
     #expect(preparation.omissions.map(\.key) == ["network.dns"])
   }
 
-  @Test("display confirmation keeps its specific reason while the transaction is locked")
+  @Test("protected confirmation keeps its specific reason while the transaction is locked")
   func displayConfirmationReasonPrecedesGenericLock() {
     let state = PrimaryApplyActionState(
       profile: profileWithIncludedSetting(),
@@ -159,11 +159,11 @@ struct ApplyWorkflowPresentationTests {
       normalOperationCount: 1,
       availableOperationCount: 1,
       isTransactionLocked: true,
-      isDisplayConfirmationPending: true
+      isSafetyConfirmationPending: true
     )
 
     #expect(!state.isEnabled)
-    #expect(state.disabledReason == .pendingDisplayConfirmation)
+    #expect(state.disabledReason == .pendingSafetyConfirmation)
   }
 
   @Test("capture summary distinguishes complete partial and unusable captures")

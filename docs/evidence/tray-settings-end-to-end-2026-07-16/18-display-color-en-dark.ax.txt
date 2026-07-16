@@ -1,0 +1,10 @@
+source=detached NSHostingView with synthetic profile and snapshot
+synthetic-settings-host=true
+fixture=18-display-color-en-dark
+language=en
+viewport=980x720
+variant=editor-display-color
+display-mode=standard
+live-display-audio-network-mutations=false
+detached-ax-limit=virtual SwiftUI children require an onscreen accessibility host
+role=AXGroup

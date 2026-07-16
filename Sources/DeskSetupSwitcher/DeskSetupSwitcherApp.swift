@@ -144,7 +144,10 @@ struct DeskSetupSwitcherApp: App {
     case .permissions, .diagnostics: initialSettingsTab = .system
     case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
       .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
-      .editor, .editorPolish, .editorDisplay, .editorAudio, .editorNetwork, .validation:
+      .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
+      .editorAudioUnsupported,
+      .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
+      .editorNetworkWiFiDHCP, .editorNetworkWiFiManual, .validation:
       initialSettingsTab = .profiles
     }
     let settingsNavigation = SettingsNavigationModel(selectedTab: initialSettingsTab)
@@ -208,7 +211,12 @@ struct DeskSetupSwitcherApp: App {
     .environmentObject(profileEditor)
     let workflowController = TrayWorkflowWindowController(
       rootView: workflowRoot,
-      activationCoordinator: windowActivationCoordinator
+      activationCoordinator: windowActivationCoordinator,
+      onWindowClose: {
+        if model.safetyConfirmation != nil {
+          model.revertHighRiskChanges()
+        }
+      }
     )
     workflowCloseRelay.controller = workflowController
     workflowWindowController = workflowController
@@ -371,7 +379,10 @@ struct DeskSetupSwitcherApp: App {
       case .permissions, .diagnostics: initialTab = .system
       case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
         .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
-        .editor, .editorPolish, .editorDisplay, .editorAudio, .editorNetwork, .validation:
+        .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
+        .editorAudioUnsupported,
+        .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
+        .editorNetworkWiFiDHCP, .editorNetworkWiFiManual, .validation:
         initialTab = .profiles
       }
       _selectedSettingsTab = State(initialValue: initialTab)
@@ -387,8 +398,11 @@ struct DeskSetupSwitcherApp: App {
           router: trayActionRouter
         )
         .frame(width: TrayGeometry.width, height: trayPresentation.viewport.height)
-      case .editor, .editorPolish, .editorDisplay, .editorAudio, .editorNetwork,
-        .validation, .permissions, .diagnostics:
+      case .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
+        .editorAudioUnsupported,
+        .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
+        .editorNetworkWiFiDHCP, .editorNetworkWiFiManual, .validation, .permissions,
+        .diagnostics:
         SettingsView(selectedTab: $selectedSettingsTab)
           .frame(minWidth: 680, minHeight: 480)
       }

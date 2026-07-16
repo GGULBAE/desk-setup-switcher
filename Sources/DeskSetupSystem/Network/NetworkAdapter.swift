@@ -27,7 +27,7 @@ public struct NetworkAdapter: SystemSettingsAdapter {
     AdapterCapability(
       group: .network,
       state: .supported,
-      reason: "Network snapshots, Wi-Fi power, and saved-network association use public macOS APIs."
+      reason: "Network snapshots and authorized service IPv4 changes use public macOS APIs."
     )
   }
 
@@ -38,11 +38,18 @@ public struct NetworkAdapter: SystemSettingsAdapter {
       primaryService?.dnsServers.isEmpty == false
       ? primaryService?.dnsServers ?? []
       : system.dnsServers
+    var selectedKinds = Set<NetworkServiceKind>()
     let serviceIPv4 = system.services.compactMap { service -> NetworkServiceIPv4Settings? in
       guard let identity = service.portableIdentity else { return nil }
+      let isFirstWritableService =
+        service.ipv4ConfigurationData != nil
+        && selectedKinds.insert(identity.kind).inserted
       return NetworkServiceIPv4Settings(
         identity: identity,
-        configuration: .init(isIncluded: false, value: service.ipv4)
+        configuration: .init(
+          isIncluded: isFirstWritableService,
+          value: service.ipv4
+        )
       )
     }
     let settings = NetworkProfileSettings(
@@ -78,6 +85,16 @@ public struct NetworkAdapter: SystemSettingsAdapter {
       capturedAt: now(),
       payload: .network(settings),
       items: snapshotItems(for: system),
+      networkIPv4RollbackCatalog: system.services.compactMap { service in
+        guard let identity = service.portableIdentity,
+          let data = service.ipv4ConfigurationData
+        else { return nil }
+        return NetworkIPv4RollbackCatalogEntry(
+          identity: identity,
+          configurationData: data,
+          currentConfiguration: service.ipv4
+        )
+      },
       savedWiFiNetworkNames: system.savedWiFiNetworkNames
     )
   }
@@ -314,7 +331,7 @@ public struct NetworkAdapter: SystemSettingsAdapter {
       let currentMatches = currentSettings.serviceIPv4.filter {
         $0.identity == target.identity
       }
-      guard desiredMatches == 1, currentMatches.count == 1 else {
+      guard desiredMatches == 1 else {
         omissions.append(
           omission(
             key: key,
@@ -325,12 +342,56 @@ public struct NetworkAdapter: SystemSettingsAdapter {
         )
         continue
       }
-      appendUnsupportedChange(
-        key: key,
-        desired: target.configuration,
-        current: currentMatches[0].configuration,
-        reason: "DHCP and static IPv4 changes require an authorized, rollback-safe implementation.",
-        omissions: &omissions
+      guard !currentMatches.isEmpty else {
+        // The service editor is absent in this runtime; preserve the saved
+        // target without turning a hidden field into a partial profile.
+        continue
+      }
+      guard currentMatches.count == 1 else {
+        omissions.append(
+          omission(
+            key: key,
+            status: .skipped,
+            reason:
+              "The network service identity is ambiguous, so its IPv4 configuration was not changed."
+          )
+        )
+        continue
+      }
+      guard let desiredConfiguration = target.configuration.value else {
+        omissions.append(
+          omission(
+            key: key,
+            status: .skipped,
+            reason: "The service-specific IPv4 target is missing."
+          )
+        )
+        continue
+      }
+      let rollbackMatches = (snapshot.networkIPv4RollbackCatalog ?? []).filter {
+        $0.identity == target.identity
+      }
+      guard rollbackMatches.count == 1, let rollback = rollbackMatches.first else {
+        // Without exact rollback evidence this service row is hidden.
+        continue
+      }
+      guard desiredConfiguration != currentMatches[0].configuration.value else { continue }
+      operations.append(
+        try operation(
+          key: key,
+          summary: "Apply the service IPv4 configuration with authorization.",
+          risk: .high,
+          isFatalOnFailure: true,
+          payload: .setServiceIPv4(
+            identity: target.identity,
+            configuration: desiredConfiguration
+          ),
+          rollback: .restoreServiceIPv4(
+            identity: target.identity,
+            configurationData: rollback.configurationData,
+            expected: rollback.currentConfiguration
+          )
+        )
       )
     }
 
@@ -518,9 +579,10 @@ public struct NetworkAdapter: SystemSettingsAdapter {
             SnapshotItem(
               key: "network.serviceIPv4.\(kind.rawValue).\(index)",
               label: "\(kind.rawValue.capitalized) IPv4 configuration",
-              state: isPortable ? .unsupported : .unreadable,
-              detail: isPortable
-                ? "Readable for this service; applying requires authorized rollback support."
+              state: isPortable && service.ipv4ConfigurationData != nil
+                ? .storable : .unreadable,
+              detail: isPortable && service.ipv4ConfigurationData != nil
+                ? "Readable and writable with authorization and exact rollback."
                 : "The service lacks the public metadata required for portable matching."
             )
           )
@@ -644,6 +706,10 @@ public struct NetworkAdapter: SystemSettingsAdapter {
       return ssid
     case .disassociateWiFi:
       return "Not associated"
+    case .setServiceIPv4(_, let configuration):
+      return ipv4Preview(configuration)
+    case .restoreServiceIPv4(_, _, let expected):
+      return expected.map(ipv4Preview) ?? "No IPv4 configuration"
     }
   }
 
@@ -740,6 +806,43 @@ public struct NetworkAdapter: SystemSettingsAdapter {
       try await systemAPI.associateToSavedWiFi(ssid: ssid)
     case .disassociateWiFi:
       try await systemAPI.disassociateWiFi()
+    case .setServiceIPv4(let identity, let configuration):
+      try await systemAPI.setIPv4Configuration(configuration, for: identity)
+      guard try await currentIPv4(for: identity) == configuration else {
+        throw NetworkSystemAPIError.readBackMismatch
+      }
+    case .restoreServiceIPv4(let identity, let data, let expected):
+      try await systemAPI.restoreIPv4Configuration(
+        data,
+        expected: expected,
+        for: identity
+      )
+      guard try await currentIPv4(for: identity) == expected else {
+        throw NetworkSystemAPIError.readBackMismatch
+      }
+    }
+  }
+
+  private func currentIPv4(
+    for identity: NetworkServiceIdentity
+  ) async throws -> IPv4Configuration? {
+    let matches = try await systemAPI.readSnapshot().services.filter {
+      $0.portableIdentity == identity
+    }
+    guard matches.count == 1 else {
+      throw matches.isEmpty
+        ? NetworkSystemAPIError.serviceNotFound
+        : NetworkSystemAPIError.serviceIdentityAmbiguous
+    }
+    return matches[0].ipv4
+  }
+
+  private func ipv4Preview(_ configuration: IPv4Configuration) -> String {
+    switch configuration {
+    case .dhcp:
+      return "DHCP"
+    case .manual:
+      return "Manual IPv4"
     }
   }
 

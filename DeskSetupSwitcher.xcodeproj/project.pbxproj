@@ -18,6 +18,7 @@
 		A07BBC648E0EC9D04D055279 = { isa = PBXBuildFile; fileRef = E2E10A35868C518643D24330; };
 		B83C650D2283938D93C3EF90 = { isa = PBXBuildFile; fileRef = A0C1B758EF142ACB1375B2E7; };
 		B2B2C4B117856339B3AB83D1 = { isa = PBXBuildFile; fileRef = C3447FB4204613188A0FB9F8; };
+		3BDFF5EA150D343DB142BAA4 = { isa = PBXBuildFile; fileRef = 74C5595D9AB1B1976210E57E; };
 		F1094329DF4F10773C3AF429 = { isa = PBXBuildFile; fileRef = C9B5ABB26C739AFA1F519ADD; };
 		CA6FBE1461EF618D684B8AE3 = { isa = PBXBuildFile; fileRef = DFFF1EC03BEBA1B1B13939D8; };
 		76096C65941441F5FF67A8E3 = { isa = PBXBuildFile; fileRef = 0C845085D581DF989DAA0290; };
@@ -27,6 +28,7 @@
 		85E31A4942A00E2104B13643 = { isa = PBXBuildFile; fileRef = A31719566B87E80590DF7FC5; };
 		1E537E53165E7AFF2C1A6488 = { isa = PBXBuildFile; fileRef = 36359FD870E2D91E91CD4034; };
 		D223B5D76EF35DADBD76915E = { isa = PBXBuildFile; fileRef = 6841B8865D54FA6E4544A973; };
+		B7F7A265C6840389716DBD38 = { isa = PBXBuildFile; fileRef = 1AB7322691A8381D818E2060; };
 		4275D6E3389ABC9721BAAF1A = { isa = PBXBuildFile; fileRef = 7F3AB0F301C6792D8F0AC7E3; };
 		8DBA626876C6230A4CC3EF5A = { isa = PBXBuildFile; fileRef = B89F6EEC772EC82EF16B6D44; };
 		5448CB9EA489EB000260AB87 = { isa = PBXBuildFile; fileRef = 5BAE4E5E6ED173FC0F47E3E9; };
@@ -106,6 +108,7 @@
 		E2E10A35868C518643D24330 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Models/Profile.swift"; sourceTree = "<group>"; };
 		A0C1B758EF142ACB1375B2E7 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Models/ProfileApplicabilityNormalizer.swift"; sourceTree = "<group>"; };
 		C3447FB4204613188A0FB9F8 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Models/Settings.swift"; sourceTree = "<group>"; };
+		74C5595D9AB1B1976210E57E = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Models/VisibleSettingRegistry.swift"; sourceTree = "<group>"; };
 		C9B5ABB26C739AFA1F519ADD = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Storage/ProfileDocumentMigrator.swift"; sourceTree = "<group>"; };
 		DFFF1EC03BEBA1B1B13939D8 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Storage/ProfileDocumentValidator.swift"; sourceTree = "<group>"; };
 		0C845085D581DF989DAA0290 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Storage/ProfileImportExport.swift"; sourceTree = "<group>"; };
@@ -115,6 +118,7 @@
 		A31719566B87E80590DF7FC5 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Utilities/CIDR.swift"; sourceTree = "<group>"; };
 		36359FD870E2D91E91CD4034 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Utilities/DisplayIdentityMatcher.swift"; sourceTree = "<group>"; };
 		6841B8865D54FA6E4544A973 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ApplyWorkflowPresentation.swift"; sourceTree = "<group>"; };
+		1AB7322691A8381D818E2060 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/AudioVolumePresentation.swift"; sourceTree = "<group>"; };
 		7F3AB0F301C6792D8F0AC7E3 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ConditionPresentation.swift"; sourceTree = "<group>"; };
 		B89F6EEC772EC82EF16B6D44 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/DirtyApplyProtection.swift"; sourceTree = "<group>"; };
 		5BAE4E5E6ED173FC0F47E3E9 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ProfileCaptureSummaryBuilder.swift"; sourceTree = "<group>"; };
@@ -231,6 +235,7 @@
 				E2E10A35868C518643D24330,
 				A0C1B758EF142ACB1375B2E7,
 				C3447FB4204613188A0FB9F8,
+				74C5595D9AB1B1976210E57E,
 				C9B5ABB26C739AFA1F519ADD,
 				DFFF1EC03BEBA1B1B13939D8,
 				0C845085D581DF989DAA0290,
@@ -240,6 +245,7 @@
 				A31719566B87E80590DF7FC5,
 				36359FD870E2D91E91CD4034,
 				6841B8865D54FA6E4544A973,
+				1AB7322691A8381D818E2060,
 				7F3AB0F301C6792D8F0AC7E3,
 				B89F6EEC772EC82EF16B6D44,
 				5BAE4E5E6ED173FC0F47E3E9,
@@ -413,6 +419,7 @@
 				A07BBC648E0EC9D04D055279,
 				B83C650D2283938D93C3EF90,
 				B2B2C4B117856339B3AB83D1,
+				3BDFF5EA150D343DB142BAA4,
 				F1094329DF4F10773C3AF429,
 				CA6FBE1461EF618D684B8AE3,
 				76096C65941441F5FF67A8E3,
@@ -422,6 +429,7 @@
 				85E31A4942A00E2104B13643,
 				1E537E53165E7AFF2C1A6488,
 				D223B5D76EF35DADBD76915E,
+				B7F7A265C6840389716DBD38,
 				4275D6E3389ABC9721BAAF1A,
 				8DBA626876C6230A4CC3EF5A,
 				5448CB9EA489EB000260AB87,

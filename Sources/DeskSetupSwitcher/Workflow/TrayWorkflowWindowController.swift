@@ -50,8 +50,8 @@ struct ApplyPreviewView: View {
 
       if request.preparation.operations.contains(where: { $0.risk == .high }) {
         Label(
-          "Display changes remain temporary and will be restored if the app exits or you do not confirm within 15 seconds.",
-          systemImage: "display.trianglebadge.exclamationmark"
+          "High-risk display and network changes remain temporary and will be restored if the safety window closes, the app exits, or you do not confirm within 15 seconds.",
+          systemImage: "exclamationmark.shield"
         )
         .padding(10)
         .background(.yellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
@@ -238,7 +238,6 @@ struct ApplyPreviewView: View {
 
   private func rejectionText(_ reason: ApplyRejectionReason) -> String {
     switch reason {
-    case .profileDisabled: appLocalized("The profile is disabled.")
     case .noIncludedSettings: appLocalized("The profile has no included settings.")
     case .conditionsUnsatisfied:
       appLocalized("One or more readiness conditions are not satisfied.")
@@ -250,7 +249,7 @@ struct ApplyPreviewView: View {
     case .transactionInProgress: appLocalized("Another apply transaction is running.")
     case .safetyConfirmationCapacityReached:
       appLocalized(
-        "Confirm or revert the previous display change before starting another high-risk change.")
+        "Confirm or revert the previous protected change first.")
     }
   }
 }
@@ -480,21 +479,40 @@ struct SafetyConfirmationView: View {
 
   var body: some View {
     VStack(spacing: 16) {
-      Image(systemName: "display.trianglebadge.exclamationmark")
+      Image(systemName: "exclamationmark.shield")
         .font(.system(size: 42))
         .accessibilityHidden(true)
-      Text("Keep these display settings?")
+      Text("Keep these protected settings?")
         .font(.headline)
       Text(
         appLocalized(
-          "The previous display configuration will return in \(state.secondsRemaining) seconds.")
+          "The previous configuration will return in \(state.secondsRemaining) seconds.")
       )
       .multilineTextAlignment(.center)
       .accessibilityLabel(
         appLocalized("Automatic rollback in \(state.secondsRemaining) seconds"))
 
+      if !state.changeSummaries.isEmpty {
+        VStack(alignment: .leading, spacing: 6) {
+          if !state.guardedGroups.isEmpty {
+            Text(state.guardedGroups.map(appSettingGroupTitle).joined(separator: " · "))
+              .font(.caption.bold())
+          }
+          ForEach(Array(state.changeSummaries.enumerated()), id: \.offset) { _, summary in
+            Label(
+              appLocalizedRuntime(summary),
+              systemImage: "arrow.triangle.2.circlepath"
+            )
+            .font(.caption)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+      }
+
       ProgressView(value: Double(state.secondsRemaining), total: 15)
-        .accessibilityLabel("Display confirmation time remaining")
+        .accessibilityLabel("Protected change confirmation time remaining")
         .accessibilityValue(appLocalized("\(state.secondsRemaining) seconds remaining"))
 
       HStack {
@@ -522,12 +540,15 @@ final class TrayWorkflowWindowController: NSWindowController,
 {
   private var presentationRequest: (id: UUID, task: Task<TrayDestinationPresentation, Never>)?
   private let activationCoordinator: ApplicationWindowActivationCoordinator?
+  private let onWindowClose: @MainActor () -> Void
 
   init<Content: View>(
     rootView: Content,
-    activationCoordinator: ApplicationWindowActivationCoordinator? = nil
+    activationCoordinator: ApplicationWindowActivationCoordinator? = nil,
+    onWindowClose: @escaping @MainActor () -> Void = {}
   ) {
     self.activationCoordinator = activationCoordinator
+    self.onWindowClose = onWindowClose
     let hostingController = NSHostingController(rootView: rootView)
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 620, height: 500),
@@ -586,6 +607,7 @@ final class TrayWorkflowWindowController: NSWindowController,
   }
 
   func windowShouldClose(_ sender: NSWindow) -> Bool {
+    onWindowClose()
     sender.orderOut(nil)
     activationCoordinator?.windowDidHide(sender)
     return false

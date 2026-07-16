@@ -123,23 +123,9 @@ struct TrayRootView: View {
       )
       .frame(maxWidth: .infinity, minHeight: 170)
       .id(TrayFocusTarget.emptyState)
-    } else if enabledProfiles.isEmpty {
-      VStack(spacing: 10) {
-        ContentUnavailableView(
-          appLocalized("No Enabled Profiles"),
-          systemImage: "pause.rectangle",
-          description: Text(appLocalized("Enable a profile in Settings before applying it."))
-        )
-        Button {
-          route(.openSettings)
-        } label: {
-          Label(appLocalized("Manage Profiles"), systemImage: "slider.horizontal.3")
-        }
-      }
-      .frame(maxWidth: .infinity, minHeight: 190)
     } else {
       TrayProfileListView(
-        profiles: enabledProfiles,
+        profiles: model.profiles,
         presentation: presentation,
         router: router,
         focusedControl: $focusedControl
@@ -278,10 +264,6 @@ struct TrayRootView: View {
       .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
       .accessibilityElement(children: .contain)
     }
-  }
-
-  private var enabledProfiles: [DeskProfile] {
-    model.profiles.filter(\.isEnabled)
   }
 
   private func route(_ action: TrayAction) {

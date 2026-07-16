@@ -7,6 +7,21 @@ import Testing
 
 @Suite("Network adapter")
 struct NetworkAdapterTests {
+  @Test("dynamic-store completion handles an early signal without sleeping")
+  func dynamicStoreEarlySignal() async {
+    let monitor = DynamicStoreChangeMonitor()
+    monitor.signalChange()
+
+    #expect(await monitor.waitForChange(timeout: 8))
+  }
+
+  @Test("dynamic-store completion times out deterministically without sleeping")
+  func dynamicStoreTimeout() async {
+    let monitor = DynamicStoreChangeMonitor()
+
+    #expect(!(await monitor.waitForChange(timeout: 0)))
+  }
+
   private struct ScannedNetwork: Equatable {
     var identifier: String
     var supportedSecurity: Set<String>
@@ -163,7 +178,8 @@ struct NetworkAdapterTests {
     #expect(settings.wifiSSID.isIncluded == false)
     #expect(settings.serviceIPv4.count == 2)
     #expect(Set(settings.serviceIPv4.map(\.identity.kind)) == [.ethernet, .wifi])
-    #expect(settings.serviceIPv4.allSatisfy { !$0.configuration.isIncluded })
+    #expect(settings.serviceIPv4.allSatisfy { $0.configuration.isIncluded })
+    #expect(snapshot.networkIPv4RollbackCatalog?.count == 2)
     #expect(snapshot.savedWiFiNetworkNames == ["Synthetic Saved Wi-Fi", "Synthetic Wi-Fi"])
     #expect(settings.ipv4.value == .dhcp)
     #expect(settings.ipv4.isIncluded == false)
@@ -481,6 +497,130 @@ struct NetworkAdapterTests {
     #expect(!result.message.lowercased().contains("password"))
   }
 
+  @Test("service IPv4 plans authorized apply read-back and exact rollback")
+  func serviceIPv4RoundTrip() async throws {
+    let api = MockNetworkSystemAPI(snapshot: .associatedFixture)
+    let adapter = NetworkAdapter(systemAPI: api)
+    let snapshot = try await adapter.snapshot()
+    guard case .network(let current) = snapshot.payload else {
+      Issue.record("Expected network settings payload")
+      return
+    }
+    var target = try #require(
+      current.serviceIPv4.first(where: { $0.identity.kind == .ethernet })
+    )
+    let desiredConfiguration = IPv4Configuration.manual(
+      address: "198.51.100.20",
+      subnetMask: "255.255.255.0",
+      router: "198.51.100.1"
+    )
+    target.configuration = .init(value: desiredConfiguration)
+
+    let validation = await adapter.validate(
+      .network(.init(serviceIPv4: [target])),
+      against: snapshot
+    )
+    let plan = try await adapter.plan(
+      .network(.init(serviceIPv4: [target])),
+      from: snapshot,
+      mode: .normal
+    )
+    let operation = try #require(plan.operations.first)
+
+    #expect(validation.isEmpty)
+    #expect(plan.operations.count == 1)
+    #expect(plan.omissions.isEmpty)
+    #expect(operation.key.hasPrefix("network.serviceIPv4."))
+    #expect(operation.risk == .high)
+    #expect(operation.isFatalOnFailure)
+    #expect(operation.preview == .init(previousValue: "DHCP", desiredValue: "Manual IPv4"))
+    #expect(await adapter.apply(operation).status == .succeeded)
+    #expect(await api.ipv4(for: target.identity) == desiredConfiguration)
+    #expect(await adapter.rollback(operation).status == .rolledBack)
+    #expect(await api.ipv4(for: target.identity) == .dhcp)
+
+    let rollbackData = try #require(
+      snapshot.networkIPv4RollbackCatalog?.first(where: {
+        $0.identity == target.identity
+      })?.configurationData
+    )
+    #expect(
+      await api.recordedCalls().suffix(2) == [
+        .setIPv4(target.identity, desiredConfiguration),
+        .restoreIPv4(target.identity, rollbackData, .dhcp),
+      ]
+    )
+  }
+
+  @Test("authorized service failures and read-back mismatches fail closed")
+  func serviceIPv4FailuresAreSanitized() async throws {
+    let failures: [NetworkSystemAPIError] = [
+      .authorizationDenied,
+      .preferencesLockFailed,
+      .preferencesCommitFailed,
+      .preferencesApplyFailed,
+      .readBackTimedOut,
+      .readBackMismatch,
+    ]
+
+    for failure in failures {
+      let api = MockNetworkSystemAPI(snapshot: .associatedFixture)
+      await api.setIPv4Failure(failure)
+      let adapter = NetworkAdapter(systemAPI: api)
+      let snapshot = try await adapter.snapshot()
+      guard case .network(let current) = snapshot.payload else {
+        Issue.record("Expected network settings payload")
+        continue
+      }
+      var target = try #require(current.serviceIPv4.first)
+      target.configuration = .init(
+        value: .manual(
+          address: "203.0.113.20",
+          subnetMask: "255.255.255.0",
+          router: nil
+        )
+      )
+      let plan = try await adapter.plan(
+        .network(.init(serviceIPv4: [target])),
+        from: snapshot,
+        mode: .normal
+      )
+      let operation = try #require(plan.operations.first)
+
+      let result = await adapter.apply(operation)
+
+      #expect(result.status == .failed)
+      #expect(!result.message.contains(target.identity.serviceName))
+      #expect(!result.message.contains("203.0.113.20"))
+    }
+
+    let mismatchAPI = MockNetworkSystemAPI(snapshot: .associatedFixture)
+    await mismatchAPI.setIgnoreIPv4Writes(true)
+    let mismatchAdapter = NetworkAdapter(systemAPI: mismatchAPI)
+    let mismatchSnapshot = try await mismatchAdapter.snapshot()
+    guard case .network(let mismatchCurrent) = mismatchSnapshot.payload else {
+      Issue.record("Expected network settings payload")
+      return
+    }
+    var mismatchTarget = try #require(mismatchCurrent.serviceIPv4.first)
+    mismatchTarget.configuration = .init(
+      value: .manual(
+        address: "203.0.113.30",
+        subnetMask: "255.255.255.0",
+        router: nil
+      )
+    )
+    let mismatchPlan = try await mismatchAdapter.plan(
+      .network(.init(serviceIPv4: [mismatchTarget])),
+      from: mismatchSnapshot,
+      mode: .normal
+    )
+    #expect(
+      await mismatchAdapter.apply(try #require(mismatchPlan.operations.first)).status
+        == .failed
+    )
+  }
+
   private func compatiblePair(
     networks: [ScannedNetwork],
     profiles: [SavedProfile]
@@ -497,17 +637,21 @@ struct NetworkAdapterTests {
   }
 }
 
-private actor MockNetworkSystemAPI: NetworkSystemAPI {
+actor MockNetworkSystemAPI: NetworkSystemAPI {
   enum Call: Equatable, Sendable {
     case preflight(String)
     case setPower(Bool)
     case associate(String)
     case disassociate
+    case setIPv4(NetworkServiceIdentity, IPv4Configuration)
+    case restoreIPv4(NetworkServiceIdentity, Data, IPv4Configuration?)
   }
 
   private var snapshotValue: NetworkSystemSnapshot
   private var calls: [Call] = []
   private var associationFails = false
+  private var ipv4Failure: NetworkSystemAPIError?
+  private var ignoresIPv4Writes = false
   private var preflightResults: [String: SavedWiFiAssociationPreflight]
 
   init(
@@ -542,8 +686,55 @@ private actor MockNetworkSystemAPI: NetworkSystemAPI {
     calls.append(.disassociate)
   }
 
+  func setIPv4Configuration(
+    _ configuration: IPv4Configuration,
+    for service: NetworkServiceIdentity
+  ) async throws {
+    calls.append(.setIPv4(service, configuration))
+    if let ipv4Failure { throw ipv4Failure }
+    if !ignoresIPv4Writes {
+      updateIPv4(configuration, for: service)
+    }
+  }
+
+  func restoreIPv4Configuration(
+    _ configurationData: Data,
+    expected: IPv4Configuration?,
+    for service: NetworkServiceIdentity
+  ) async throws {
+    calls.append(.restoreIPv4(service, configurationData, expected))
+    if let ipv4Failure { throw ipv4Failure }
+    if !ignoresIPv4Writes {
+      updateIPv4(expected, for: service)
+    }
+  }
+
   func setAssociationFailure(_ enabled: Bool) {
     associationFails = enabled
+  }
+
+  func setIPv4Failure(_ error: NetworkSystemAPIError?) {
+    ipv4Failure = error
+  }
+
+  func setIgnoreIPv4Writes(_ ignored: Bool) {
+    ignoresIPv4Writes = ignored
+  }
+
+  func ipv4(for identity: NetworkServiceIdentity) -> IPv4Configuration? {
+    snapshotValue.services.first(where: { $0.portableIdentity == identity })?.ipv4
+  }
+
+  private func updateIPv4(
+    _ configuration: IPv4Configuration?,
+    for identity: NetworkServiceIdentity
+  ) {
+    guard
+      let index = snapshotValue.services.firstIndex(where: {
+        $0.portableIdentity == identity
+      })
+    else { return }
+    snapshotValue.services[index].ipv4 = configuration
   }
 
   func recordedCalls() -> [Call] {
@@ -618,6 +809,7 @@ extension NetworkSystemSnapshot {
           kind: .wifi,
           enabled: true,
           ipv4: .dhcp,
+          ipv4ConfigurationData: Data("synthetic-wifi-ipv4".utf8),
           dnsServers: ["192.0.2.53"],
           webProxy: .init(enabled: false, host: "", port: 0)
         ),
@@ -628,7 +820,8 @@ extension NetworkSystemSnapshot {
           interfaceType: "Ethernet",
           kind: .ethernet,
           enabled: true,
-          ipv4: .dhcp
+          ipv4: .dhcp,
+          ipv4ConfigurationData: Data("synthetic-ethernet-ipv4".utf8)
         ),
       ],
       savedWiFiNetworkNames: ["Synthetic Saved Wi-Fi", "Synthetic Wi-Fi"]

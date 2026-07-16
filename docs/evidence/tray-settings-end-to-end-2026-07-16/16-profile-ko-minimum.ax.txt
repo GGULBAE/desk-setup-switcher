@@ -1,0 +1,10 @@
+source=detached NSHostingView with synthetic profile and snapshot
+synthetic-settings-host=true
+fixture=16-profile-ko-minimum
+language=ko
+viewport=680x480
+variant=editor-display
+display-mode=minimum
+live-display-audio-network-mutations=false
+detached-ax-limit=virtual SwiftUI children require an onscreen accessibility host
+role=AXGroup

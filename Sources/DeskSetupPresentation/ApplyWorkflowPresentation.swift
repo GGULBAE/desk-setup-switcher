@@ -36,12 +36,11 @@ public enum PrimaryApplyActionKind: String, Equatable, Sendable {
 }
 
 public enum PrimaryApplyDisabledReason: String, Equatable, Sendable {
-  case profileDisabled
   case preparing
   case readinessRefreshing
   case applying
   case transactionInProgress
-  case pendingDisplayConfirmation
+  case pendingSafetyConfirmation
   case noIncludedSettings
   case alreadyMatches
   case noAvailableOperations
@@ -53,13 +52,12 @@ public enum PrimaryApplyDisabledReason: String, Equatable, Sendable {
 
   public var defaultMessage: String {
     switch self {
-    case .profileDisabled: "Enable this profile to apply it."
     case .preparing: "Preparing this profile…"
     case .readinessRefreshing: "Checking whether this profile can be applied…"
     case .applying: "This profile is being applied."
     case .transactionInProgress: "Another profile action is still in progress."
-    case .pendingDisplayConfirmation:
-      "Confirm or revert the previous display change first."
+    case .pendingSafetyConfirmation:
+      "Confirm or revert the previous protected change first."
     case .noIncludedSettings: "Include at least one setting before applying this profile."
     case .alreadyMatches: "The Mac already matches this profile."
     case .noAvailableOperations: "No available setting can be applied."
@@ -69,10 +67,9 @@ public enum PrimaryApplyDisabledReason: String, Equatable, Sendable {
 
   public var symbolName: String {
     switch self {
-    case .profileDisabled: "pause.circle"
     case .preparing, .readinessRefreshing: "arrow.clockwise"
     case .applying, .transactionInProgress: "hourglass"
-    case .pendingDisplayConfirmation: "display.trianglebadge.exclamationmark"
+    case .pendingSafetyConfirmation: "exclamationmark.shield"
     case .noIncludedSettings: "square.dashed"
     case .alreadyMatches: "checkmark.circle"
     case .noAvailableOperations: "exclamationmark.circle"
@@ -102,7 +99,7 @@ public struct PrimaryApplyActionState: Equatable, Sendable {
   /// Selects one state-aware primary action from cached readiness and operation counts.
   ///
   /// A refresh does not invalidate a usable cached action. Per-profile preparation,
-  /// transaction locks, and pending display confirmation always prevent execution.
+  /// transaction locks, and a pending high-risk confirmation always prevent execution.
   public init(
     profile: DeskProfile,
     readiness: ProfileReadiness,
@@ -112,7 +109,7 @@ public struct PrimaryApplyActionState: Equatable, Sendable {
     isRefreshing: Bool = false,
     hasUsableCachedReadiness: Bool = false,
     isTransactionLocked: Bool = false,
-    isDisplayConfirmationPending: Bool = false
+    isSafetyConfirmationPending: Bool = false
   ) {
     let kind: PrimaryApplyActionKind = readiness == .partial ? .availableItems : .normal
     let usesCache = isRefreshing && hasUsableCachedReadiness
@@ -130,8 +127,8 @@ public struct PrimaryApplyActionState: Equatable, Sendable {
       self = disabled(.applying)
       return
     }
-    if isDisplayConfirmationPending {
-      self = disabled(.pendingDisplayConfirmation)
+    if isSafetyConfirmationPending {
+      self = disabled(.pendingSafetyConfirmation)
       return
     }
     if isTransactionLocked {
@@ -144,10 +141,6 @@ public struct PrimaryApplyActionState: Equatable, Sendable {
     }
     if isRefreshing, !hasUsableCachedReadiness {
       self = disabled(.readinessRefreshing)
-      return
-    }
-    guard profile.isEnabled else {
-      self = disabled(.profileDisabled)
       return
     }
     let hasIncludedSettings = SettingGroup.safeApplicationSequence.contains {

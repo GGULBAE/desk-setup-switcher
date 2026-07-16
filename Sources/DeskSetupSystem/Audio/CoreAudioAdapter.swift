@@ -113,7 +113,29 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       group: group,
       capturedAt: now(),
       payload: .audio(settings),
-      items: items
+      items: items,
+      audioDeviceCatalog: devices.map {
+        AudioDeviceCatalogEntry(
+          uid: $0.uid,
+          name: $0.name,
+          supportsInput: $0.supportsInput,
+          supportsOutput: $0.supportsOutput
+        )
+      },
+      audioVolumeControlCatalog: [
+        AudioVolumeControlCatalogEntry(
+          role: .input,
+          deviceUID: defaultInputUID,
+          currentValue: inputVolume.value,
+          canApply: inputVolume.isIncluded
+        ),
+        AudioVolumeControlCatalogEntry(
+          role: .output,
+          deviceUID: defaultOutputUID,
+          currentValue: outputVolume.value,
+          canApply: outputVolume.isIncluded
+        ),
+      ]
     )
   }
 
@@ -362,7 +384,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       )
     }
     do {
-      try perform(decode(operation.payload))
+      try performAndVerify(decode(operation.payload))
       return OperationResult(
         operationID: operation.id,
         status: .succeeded,
@@ -386,7 +408,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       )
     }
     do {
-      try perform(decode(rollbackPayload))
+      try performAndVerify(decode(rollbackPayload))
       return OperationResult(
         operationID: operation.id,
         status: .rolledBack,
@@ -655,50 +677,12 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
     label: String,
     issues: inout [ValidationIssue]
   ) where Value: Hashable & Sendable {
-    switch state {
-    case .available(_, true):
-      break
-    case .available(_, false):
-      issues.append(
-        ValidationIssue(
-          group: group,
-          key: key,
-          severity: .notice,
-          isFatal: false,
-          message: "The device's \(label) control is read-only."
-        )
-      )
-    case .unsupported:
-      issues.append(
-        ValidationIssue(
-          group: group,
-          key: key,
-          severity: .notice,
-          isFatal: false,
-          message: "The device does not support \(label)."
-        )
-      )
-    case .unreadable(let reason):
-      issues.append(
-        ValidationIssue(
-          group: group,
-          key: key,
-          severity: .warning,
-          isFatal: false,
-          message: reason
-        )
-      )
-    case nil:
-      issues.append(
-        ValidationIssue(
-          group: group,
-          key: key,
-          severity: .warning,
-          isFatal: false,
-          message: "The device's \(label) capability could not be inspected."
-        )
-      )
-    }
+    // A non-writable control is not an editor field in this runtime. Preserve
+    // its saved value, but do not turn a hidden control into readiness noise.
+    _ = state
+    _ = key
+    _ = label
+    _ = issues
   }
 
   private func planDefaultDevice(
@@ -802,19 +786,12 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
           )
         )
       case .available(_, false), .unsupported:
-        omissions.append(
-          unsupportedOmission(
-            key: "outputVolume",
-            reason: "The output device does not provide writable software volume."
-          )
-        )
-      case .unreadable(let reason):
-        omissions.append(skippedOmission(key: "outputVolume", reason: reason))
+        break
+      case .unreadable:
+        break
       }
     } catch {
-      omissions.append(
-        skippedOmission(key: "outputVolume", reason: "Software volume could not be inspected.")
-      )
+      return
     }
   }
 
@@ -858,22 +835,12 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
           )
         )
       case .available(_, false), .unsupported:
-        omissions.append(
-          unsupportedOmission(
-            key: "inputVolume",
-            reason: "The input device does not provide writable software volume."
-          )
-        )
-      case .unreadable(let reason):
-        omissions.append(skippedOmission(key: "inputVolume", reason: reason))
+        break
+      case .unreadable:
+        break
       }
     } catch {
-      omissions.append(
-        skippedOmission(
-          key: "inputVolume",
-          reason: "Input software volume could not be inspected."
-        )
-      )
+      return
     }
   }
 
@@ -917,19 +884,12 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
           )
         )
       case .available(_, false), .unsupported:
-        omissions.append(
-          unsupportedOmission(
-            key: "outputMute",
-            reason: "The output device does not provide writable software mute."
-          )
-        )
-      case .unreadable(let reason):
-        omissions.append(skippedOmission(key: "outputMute", reason: reason))
+        break
+      case .unreadable:
+        break
       }
     } catch {
-      omissions.append(
-        skippedOmission(key: "outputMute", reason: "Software mute could not be inspected.")
-      )
+      return
     }
   }
 
@@ -976,6 +936,34 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       try api.setInputVolume(value, forDeviceUID: deviceUID)
     case .setOutputMute(let deviceUID, let value):
       try api.setOutputMute(value, forDeviceUID: deviceUID)
+    }
+  }
+
+  private func performAndVerify(_ command: AudioOperationCommand) throws {
+    try perform(command)
+    switch command {
+    case .setDefaultDevice(let role, let uid):
+      guard try api.defaultDeviceUID(for: role) == uid else {
+        throw AudioSystemError.malformedProperty("default device read-back")
+      }
+    case .setOutputVolume(let deviceUID, let value):
+      guard case .available(let actual, _) = try api.outputVolume(forDeviceUID: deviceUID),
+        abs(actual - value) <= 0.01
+      else {
+        throw AudioSystemError.malformedProperty("output volume read-back")
+      }
+    case .setInputVolume(let deviceUID, let value):
+      guard case .available(let actual, _) = try api.inputVolume(forDeviceUID: deviceUID),
+        abs(actual - value) <= 0.01
+      else {
+        throw AudioSystemError.malformedProperty("input volume read-back")
+      }
+    case .setOutputMute(let deviceUID, let value):
+      guard case .available(let actual, _) = try api.outputMute(forDeviceUID: deviceUID),
+        actual == value
+      else {
+        throw AudioSystemError.malformedProperty("output mute read-back")
+      }
     }
   }
 

@@ -44,17 +44,18 @@ public struct AdapterRegistry: Sendable {
 }
 
 extension SettingGroup {
-  /// Low-dependency groups are applied before network and display mutations.
+  /// Low-dependency groups are applied first. Network is last so rollback
+  /// restores connectivity before reversing display and audio changes.
   public static var safeApplicationSequence: [SettingGroup] {
-    [.input, .audio, .network, .display]
+    [.input, .audio, .display, .network]
   }
 
   public var safeApplicationOrder: Int {
     switch self {
     case .input: 0
     case .audio: 1
-    case .network: 2
-    case .display: 3
+    case .display: 2
+    case .network: 3
     }
   }
 }

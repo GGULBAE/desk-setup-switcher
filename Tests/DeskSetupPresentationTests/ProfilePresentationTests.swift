@@ -22,7 +22,17 @@ struct ProfilePresentationTests {
         network: .init(
           value: .init(
             wifiPower: .init(value: true),
-            wifiSSID: .init(isIncluded: false, value: "Excluded Network")
+            wifiSSID: .init(isIncluded: false, value: "Excluded Network"),
+            serviceIPv4: [
+              .init(
+                identity: .init(
+                  kind: .ethernet,
+                  serviceName: "Synthetic Ethernet",
+                  interfaceType: "Ethernet"
+                ),
+                configuration: .init(value: .dhcp)
+              )
+            ]
           )
         ),
         input: .init(
@@ -36,12 +46,9 @@ struct ProfilePresentationTests {
 
     let summaries = ProfilePresentationBuilder().summaries(for: profile)
 
-    #expect(summaries.map(\.group) == [.display, .audio, .network, .input])
-    #expect(summaries[2].items.map(\.kind) == [.wifiPower])
+    #expect(summaries.map(\.group) == [.display, .audio, .network])
+    #expect(summaries[2].items.map(\.kind) == [.networkServiceIPv4])
     #expect(!summaries[2].summaryText.contains("Excluded Network"))
-    #expect(
-      summaries[3].items.map(\.kind) == [.pointerSpeed, .naturalScrolling]
-    )
   }
 
   @Test("display summary favors product details and hides identifiers")
@@ -92,7 +99,7 @@ struct ProfilePresentationTests {
 
     #expect(
       summary?.items.map(\.kind) == [
-        .defaultOutput, .outputVolume, .outputMute, .defaultInput,
+        .defaultInput, .defaultOutput, .outputVolume,
       ]
     )
     #expect(summary?.summaryText.contains("Synthetic Speakers") == true)
@@ -102,7 +109,7 @@ struct ProfilePresentationTests {
     #expect(summary?.summaryText.contains("synthetic-input-uid") == false)
     #expect(
       summary?.technicalDetails.map(\.value) == [
-        "synthetic-output-uid", "synthetic-input-uid",
+        "synthetic-input-uid", "synthetic-output-uid",
       ]
     )
   }
@@ -129,8 +136,8 @@ struct ProfilePresentationTests {
 
     #expect(summary?.items[0].label == "Display 1")
     #expect(summary?.items[0].value.primaryText == "External display 1")
-    #expect(summary?.items[3].label == "Display 2")
-    #expect(summary?.items[3].value.primaryText == "External display 2")
+    let secondDisplay = summary?.items.first { $0.label == "Display 2" }
+    #expect(secondDisplay?.value.primaryText == "External display 2")
   }
 
   @Test("included unavailable values remain visible without invented values")
@@ -144,8 +151,16 @@ struct ProfilePresentationTests {
       ),
       network: .init(
         value: .init(
-          wifiSSID: .init(value: nil),
-          ipv4: .init(value: nil)
+          serviceIPv4: [
+            .init(
+              identity: .init(
+                kind: .wifi,
+                serviceName: "Synthetic Wi-Fi",
+                interfaceType: "IEEE80211"
+              ),
+              configuration: .init(value: nil)
+            )
+          ]
         )
       )
     )
@@ -155,23 +170,33 @@ struct ProfilePresentationTests {
     let network = builder.summary(for: .network, in: settings)
 
     #expect(audio?.items.map(\.value.primaryText) == ["No device saved", "Value unavailable"])
-    #expect(network?.items.map(\.value.primaryText) == ["Value unavailable", "Value unavailable"])
+    #expect(network?.items.map(\.value.primaryText) == ["Value unavailable"])
   }
 
-  @Test("network and input values have deterministic friendly formatting")
-  func networkAndInputFormatting() {
+  @Test("service IPv4 values format deterministically while input remains dormant")
+  func serviceIPv4Formatting() {
     let settings = ProfileSettings(
       network: .init(
         value: .init(
           wifiPower: .init(value: true),
           wifiSSID: .init(value: "Synthetic Network"),
-          ipv4: .init(
-            value: .manual(
-              address: "192.0.2.20",
-              subnetMask: "255.255.255.0",
-              router: "192.0.2.1"
+          serviceIPv4: [
+            .init(
+              identity: .init(
+                kind: .ethernet,
+                serviceName: "Synthetic Ethernet",
+                interfaceType: "Ethernet"
+              ),
+              configuration: .init(
+                value: .manual(
+                  address: "192.0.2.20",
+                  subnetMask: "255.255.255.0",
+                  router: "192.0.2.1"
+                )
+              )
             )
-          ),
+          ],
+          ipv4: .init(value: .dhcp),
           dnsServers: .init(value: ["192.0.2.53", "198.51.100.53"]),
           webProxy: .init(value: .init(enabled: false, host: "proxy.invalid", port: 8080))
         )
@@ -190,19 +215,14 @@ struct ProfilePresentationTests {
     let network = builder.summary(for: .network, in: settings)
     let input = builder.summary(for: .input, in: settings)
 
-    #expect(network?.items[0].value.primaryText == "On")
-    #expect(network?.items[1].value.primaryText == "Synthetic Network")
-    #expect(network?.items[2].value.primaryText == "Manual — 192.0.2.20")
-    #expect(network?.items[2].value.secondaryText?.contains("255.255.255.0") == true)
-    #expect(network?.items[4].value.primaryText == "Off")
-    #expect(
-      input?.items.map(\.value.primaryText) == [
-        "1.5", "On", "0.13 seconds", "Standard function keys",
-      ])
+    #expect(network?.items.map(\.kind) == [.networkServiceIPv4])
+    #expect(network?.items[0].value.primaryText == "Manual — 192.0.2.20")
+    #expect(network?.items[0].value.secondaryText?.contains("255.255.255.0") == true)
+    #expect(input == nil)
   }
 
-  @Test("Wi-Fi summaries preserve target whitespace but reject blank values")
-  func wifiSummariesPreserveExactTargetName() throws {
+  @Test("legacy Wi-Fi formatter preserves target whitespace but its summary is dormant")
+  func wifiSummariesPreserveExactTargetName() {
     let target = "  Synthetic Target Wi-Fi  "
     #expect(FriendlyValueFormatter.wifiNetworkName(target) == target)
     #expect(FriendlyValueFormatter.wifiNetworkName(" \t\n ") == nil)
@@ -211,10 +231,7 @@ struct ProfilePresentationTests {
     let settings = ProfileSettings(
       network: .init(value: .init(wifiSSID: .init(value: target)))
     )
-    let summary = try #require(
-      ProfilePresentationBuilder().summary(for: .network, in: settings)
-    )
-    #expect(summary.items.first?.value.primaryText == target)
+    #expect(ProfilePresentationBuilder().summary(for: .network, in: settings) == nil)
   }
 
   @Test("operation preview keeps audio names visible and UIDs disclosed separately")
@@ -345,7 +362,7 @@ struct ProfilePresentationTests {
     #expect(state.forceApply.isEnabled)
   }
 
-  @Test("menu action reasons cover unavailable applying no-op disabled and lock states")
+  @Test("menu action reasons ignore legacy activation while preserving other lock states")
   func menuDisabledReasons() {
     let unavailable = menuState(readiness: .unavailable)
     let applying = menuState(readiness: .applying, isTransactionLocked: true)
@@ -365,13 +382,13 @@ struct ProfilePresentationTests {
     #expect(applying.apply.disabledReason == .applying)
     #expect(applying.review.disabledReason == .applying)
     #expect(noOp.apply.disabledReason == .noChanges)
-    #expect(disabled.apply.disabledReason == .profileDisabled)
+    #expect(disabled.apply.isEnabled)
     #expect(disabled.review.isEnabled)
     #expect(locked.apply.disabledReason == .transactionInProgress)
     #expect(locked.review.disabledReason == .transactionInProgress)
   }
 
-  @Test("condition and display-confirmation rejections have specific explanations")
+  @Test("condition and protected-change rejections have specific explanations")
   func explicitRejectionReasons() {
     let condition = menuState(
       readiness: .partial,
@@ -384,7 +401,7 @@ struct ProfilePresentationTests {
     let refreshing = menuState(readiness: .ready, isRefreshing: true)
 
     #expect(condition.apply.disabledReason == .conditionsUnsatisfied)
-    #expect(displayConfirmation.apply.disabledReason == .pendingDisplayConfirmation)
+    #expect(displayConfirmation.apply.disabledReason == .pendingSafetyConfirmation)
     #expect(refreshing.apply.disabledReason == .readinessRefreshing)
     #expect(refreshing.review.disabledReason == .readinessRefreshing)
   }

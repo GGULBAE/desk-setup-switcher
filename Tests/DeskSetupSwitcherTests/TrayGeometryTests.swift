@@ -11,20 +11,45 @@ struct TrayGeometryTests {
     backingScaleFactor: 2
   )
 
-  @Test("zero, one, three, and overflow profile fixtures use deterministic policy sizes")
+  @Test("zero, one, two, three, and overflow profile fixtures use deterministic policy sizes")
   func profileCountSizes() {
-    let sizes = [0, 1, 3, 10].map {
+    let sizes = [0, 1, 2, 3, 10].map {
       policy.viewport(
         for: TrayGeometryContext(profileCount: $0),
         on: primaryScreen
       )
     }
 
-    #expect(sizes.map(\.width) == Array(repeating: TrayGeometry.width, count: 4))
+    #expect(sizes.map(\.width) == Array(repeating: TrayGeometry.width, count: 5))
     #expect(sizes[0].height == TrayGeometry.compactHeight)
     #expect(sizes[1].height == TrayGeometry.singleProfileHeight)
-    #expect(sizes[2].height == TrayGeometry.maximumHeight)
+    #expect(sizes[2].height == TrayGeometry.twoProfileHeight)
     #expect(sizes[3].height == TrayGeometry.maximumHeight)
+    #expect(sizes[4].height == TrayGeometry.maximumHeight)
+  }
+
+  @Test("two-profile standard fixture leaves no more than twenty-four points below cards")
+  func twoProfileBottomGap() {
+    // The fixture height is the deterministic root/card layout captured from
+    // the standard two-profile synthetic state; it is not child-size feedback.
+    let standardFixtureContentHeight: CGFloat = 294
+    let viewport = policy.viewport(
+      for: TrayGeometryContext(profileCount: 2),
+      on: primaryScreen
+    )
+
+    #expect(viewport.height - standardFixtureContentHeight <= 24)
+    #expect(viewport.height - standardFixtureContentHeight >= 0)
+  }
+
+  @Test("native safe-area values never become a second root horizontal inset")
+  func horizontalInsetOwnership() {
+    let insets = policy.rootHorizontalInsets(
+      nativeSafeArea: TraySafeAreaInsets(top: 4, leading: 13, bottom: 6, trailing: 1)
+    )
+
+    #expect(insets.leading == TrayGeometry.outerPadding)
+    #expect(insets.trailing == TrayGeometry.outerPadding)
   }
 
   @Test("all state changes preserve the current open-session viewport")

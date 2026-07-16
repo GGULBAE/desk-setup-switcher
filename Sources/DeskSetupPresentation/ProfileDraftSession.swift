@@ -272,7 +272,6 @@ public struct ProfileDraftSession: Equatable, Sendable {
       && lhs.name == rhs.name
       && lhs.profileDescription == rhs.profileDescription
       && lhs.symbolName == rhs.symbolName
-      && lhs.isEnabled == rhs.isEnabled
       && lhs.settings == rhs.settings
       && lhs.conditions == rhs.conditions
   }

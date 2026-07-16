@@ -558,7 +558,7 @@ private struct DiagnosticsSettingsView: View {
             "Status",
             value: appApplicationStatusTitle(
               result.status,
-              isAwaitingDisplayConfirmation: result.safetyConfirmationID != nil
+              isAwaitingSafetyConfirmation: result.safetyConfirmationID != nil
             )
           )
           LabeledContent(

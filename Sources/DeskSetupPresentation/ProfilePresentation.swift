@@ -195,6 +195,7 @@ public enum FriendlyValueFormatter {
 public enum ProfileSummaryItemKind: String, Equatable, Sendable {
   case display
   case displayMode
+  case displayColorProfile
   case displayRole
   case displayMirroring
   case displayActivity
@@ -205,6 +206,8 @@ public enum ProfileSummaryItemKind: String, Equatable, Sendable {
   case outputMute
   case systemOutput
   case defaultInput
+  case inputVolume
+  case networkServiceIPv4
   case wifiPower
   case wifiNetwork
   case ipv4
@@ -258,7 +261,7 @@ public struct ProfileGroupSummary: Equatable, Sendable {
 /// The optional name map is transient presentation metadata and never changes
 /// the persisted profile schema.
 public struct ProfilePresentationBuilder: Equatable, Sendable {
-  public static let groupOrder: [SettingGroup] = [.display, .audio, .network, .input]
+  public static let groupOrder: [SettingGroup] = [.display, .audio, .network]
 
   public var audioDeviceNamesByUID: [String: String]
 
@@ -276,6 +279,7 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
     for group: SettingGroup,
     in settings: ProfileSettings
   ) -> ProfileGroupSummary? {
+    let settings = ProfileApplicabilityNormalizer().normalize(settings)
     guard settings.payload(for: group) != nil else { return nil }
 
     switch group {
@@ -286,7 +290,7 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
     case .network:
       return networkSummary(settings.network.value)
     case .input:
-      return inputSummary(settings.input.value)
+      return nil
     }
   }
 
@@ -332,6 +336,16 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
             value: .init(
               primaryText: FriendlyValueFormatter.displayMode(display.mode.value)
             )
+          ))
+      }
+      if display.colorProfile.isIncluded {
+        items.append(
+          .init(
+            kind: .displayColorProfile,
+            label: "Display\(suffix) color profile",
+            value: optionalValue(display.colorProfile.value) {
+              .init(primaryText: $0.displayName)
+            }
           ))
       }
       if display.isPrimary.isIncluded {
@@ -386,6 +400,15 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
   private func audioSummary(_ settings: AudioProfileSettings) -> ProfileGroupSummary {
     var items: [ProfileSummaryItem] = []
 
+    if settings.defaultInputUID.isIncluded {
+      items.append(
+        audioItem(
+          kind: .defaultInput,
+          label: "Default input",
+          uid: settings.defaultInputUID.value,
+          role: .defaultInput
+        ))
+    }
     if settings.defaultOutputUID.isIncluded {
       items.append(
         audioItem(
@@ -393,6 +416,16 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
           label: "Default output",
           uid: settings.defaultOutputUID.value,
           role: .defaultOutput
+        ))
+    }
+    if settings.inputVolume.isIncluded {
+      items.append(
+        .init(
+          kind: .inputVolume,
+          label: "Input volume",
+          value: optionalValue(settings.inputVolume.value) {
+            .init(primaryText: FriendlyValueFormatter.percentage($0))
+          }
         ))
     }
     if settings.outputVolume.isIncluded {
@@ -405,34 +438,6 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
           }
         ))
     }
-    if settings.outputMuted.isIncluded {
-      items.append(
-        .init(
-          kind: .outputMute,
-          label: "Output mute",
-          value: optionalValue(settings.outputMuted.value) {
-            .init(primaryText: $0 ? "Muted" : "Not muted")
-          }
-        ))
-    }
-    if settings.systemOutputUID.isIncluded {
-      items.append(
-        audioItem(
-          kind: .systemOutput,
-          label: "Alert output",
-          uid: settings.systemOutputUID.value,
-          role: .systemOutput
-        ))
-    }
-    if settings.defaultInputUID.isIncluded {
-      items.append(
-        audioItem(
-          kind: .defaultInput,
-          label: "Default input",
-          uid: settings.defaultInputUID.value,
-          role: .defaultInput
-        ))
-    }
 
     return ProfileGroupSummary(group: .audio, items: items)
   }
@@ -440,121 +445,16 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
   private func networkSummary(_ settings: NetworkProfileSettings) -> ProfileGroupSummary {
     var items: [ProfileSummaryItem] = []
 
-    if settings.wifiPower.isIncluded {
+    for service in settings.serviceIPv4 where service.configuration.isIncluded {
       items.append(
         .init(
-          kind: .wifiPower,
-          label: "Wi-Fi",
-          value: optionalValue(settings.wifiPower.value) {
-            .init(primaryText: $0 ? "On" : "Off")
-          }
-        ))
-    }
-    if settings.wifiSSID.isIncluded {
-      items.append(
-        .init(
-          kind: .wifiNetwork,
-          label: "Wi-Fi network",
-          value: .init(
-            primaryText: FriendlyValueFormatter.wifiNetworkName(settings.wifiSSID.value)
-              ?? "Value unavailable"
-          )
-        ))
-    }
-    if settings.ipv4.isIncluded {
-      items.append(
-        .init(
-          kind: .ipv4,
-          label: "IPv4",
-          value: ipv4Value(settings.ipv4.value)
-        ))
-    }
-    if settings.dnsServers.isIncluded {
-      let servers = settings.dnsServers.value.filter { !$0.isEmpty }
-      items.append(
-        .init(
-          kind: .dnsServers,
-          label: "DNS servers",
-          value: .init(
-            primaryText: servers.isEmpty ? "No custom DNS servers" : servers.joined(separator: ", ")
-          )
-        ))
-    }
-    if settings.webProxy.isIncluded {
-      items.append(
-        .init(
-          kind: .webProxy,
-          label: "Web proxy",
-          value: proxyValue(settings.webProxy.value)
-        ))
-    }
-    if settings.secureWebProxy.isIncluded {
-      items.append(
-        .init(
-          kind: .secureWebProxy,
-          label: "Secure web proxy",
-          value: proxyValue(settings.secureWebProxy.value)
+          kind: .networkServiceIPv4,
+          label: "\(service.identity.serviceName) IPv4",
+          value: ipv4Value(service.configuration.value)
         ))
     }
 
     return ProfileGroupSummary(group: .network, items: items)
-  }
-
-  private func inputSummary(_ settings: InputProfileSettings) -> ProfileGroupSummary {
-    var items: [ProfileSummaryItem] = []
-
-    if settings.pointerSpeed.isIncluded {
-      items.append(
-        .init(
-          kind: .pointerSpeed,
-          label: "Pointer speed",
-          value: optionalValue(settings.pointerSpeed.value) {
-            .init(primaryText: FriendlyValueFormatter.decimal($0))
-          }
-        ))
-    }
-    if settings.naturalScrolling.isIncluded {
-      items.append(
-        .init(
-          kind: .naturalScrolling,
-          label: "Natural scrolling",
-          value: optionalValue(settings.naturalScrolling.value) {
-            .init(primaryText: $0 ? "On" : "Off")
-          }
-        ))
-    }
-    if settings.keyRepeatInterval.isIncluded {
-      items.append(
-        .init(
-          kind: .keyRepeatInterval,
-          label: "Key repeat interval",
-          value: optionalValue(settings.keyRepeatInterval.value) {
-            .init(primaryText: "\(FriendlyValueFormatter.decimal($0)) seconds")
-          }
-        ))
-    }
-    if settings.initialKeyRepeatDelay.isIncluded {
-      items.append(
-        .init(
-          kind: .initialKeyRepeatDelay,
-          label: "Initial key repeat delay",
-          value: optionalValue(settings.initialKeyRepeatDelay.value) {
-            .init(primaryText: "\(FriendlyValueFormatter.decimal($0)) seconds")
-          }
-        ))
-    }
-    if settings.useStandardFunctionKeys.isIncluded {
-      items.append(
-        .init(
-          kind: .standardFunctionKeys,
-          label: "Function keys",
-          value: optionalValue(settings.useStandardFunctionKeys.value) {
-            .init(primaryText: $0 ? "Standard function keys" : "Media controls")
-          }
-        ))
-    }
-
-    return ProfileGroupSummary(group: .input, items: items)
   }
 
   private func audioItem(
@@ -686,11 +586,9 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
 
   private func hasIncludedDisplayValue(_ display: DisplayTargetSettings) -> Bool {
     display.isPrimary.isIncluded
-      || display.origin.isIncluded
       || display.mirroring.isIncluded
       || display.mode.isIncluded
-      || display.rotationDegrees.isIncluded
-      || display.isActive.isIncluded
+      || display.colorProfile.isIncluded
   }
 
   private func mirroringValue(_ mirroring: DisplayMirroring) -> FriendlyDisplayValue {
@@ -723,12 +621,6 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
     }
   }
 
-  private func proxyValue(_ proxy: ProxyConfiguration?) -> FriendlyDisplayValue {
-    guard let proxy else { return .init(primaryText: "Value unavailable") }
-    guard proxy.enabled else { return .init(primaryText: "Off") }
-    return .init(primaryText: "\(proxy.host):\(proxy.port)")
-  }
-
   private func optionalValue<Value>(
     _ value: Value?,
     transform: (Value) -> FriendlyDisplayValue
@@ -739,11 +631,10 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
 }
 
 public enum MenuActionDisabledReason: String, CaseIterable, Equatable, Sendable {
-  case profileDisabled
   case readinessRefreshing
   case applying
   case transactionInProgress
-  case pendingDisplayConfirmation
+  case pendingSafetyConfirmation
   case noIncludedSettings
   case conditionsUnsatisfied
   case noChanges
@@ -754,12 +645,11 @@ public enum MenuActionDisabledReason: String, CaseIterable, Equatable, Sendable 
 
   public var defaultMessage: String {
     switch self {
-    case .profileDisabled: "Enable this profile to apply it."
     case .readinessRefreshing: "Checking whether this profile can be applied…"
     case .applying: "This profile is being applied."
     case .transactionInProgress: "Another profile action is still in progress."
-    case .pendingDisplayConfirmation:
-      "Confirm or revert the previous display change first."
+    case .pendingSafetyConfirmation:
+      "Confirm or revert the previous protected change first."
     case .noIncludedSettings: "Include at least one setting before applying this profile."
     case .conditionsUnsatisfied: "The profile conditions are not satisfied."
     case .noChanges: "The Mac already matches this profile."
@@ -772,10 +662,9 @@ public enum MenuActionDisabledReason: String, CaseIterable, Equatable, Sendable 
 
   public var symbolName: String {
     switch self {
-    case .profileDisabled: "pause.circle"
     case .readinessRefreshing: "arrow.clockwise"
     case .applying, .transactionInProgress: "hourglass"
-    case .pendingDisplayConfirmation: "display.trianglebadge.exclamationmark"
+    case .pendingSafetyConfirmation: "exclamationmark.shield"
     case .noIncludedSettings: "square.dashed"
     case .conditionsUnsatisfied: "checklist.unchecked"
     case .noChanges: "checkmark.circle"
@@ -830,12 +719,6 @@ public struct MenuProfileActionState: Equatable, Sendable {
     if let sharedBlocker {
       apply = Self.disabled(sharedBlocker)
       forceApply = Self.disabled(sharedBlocker)
-      return
-    }
-
-    guard profile.isEnabled else {
-      apply = Self.disabled(.profileDisabled)
-      forceApply = Self.disabled(.profileDisabled)
       return
     }
 
@@ -924,9 +807,8 @@ public struct MenuProfileActionState: Equatable, Sendable {
     _ rejectionReasons: Set<ApplyRejectionReason>
   ) -> MenuActionDisabledReason? {
     let ordered: [(ApplyRejectionReason, MenuActionDisabledReason)] = [
-      (.profileDisabled, .profileDisabled),
       (.transactionInProgress, .transactionInProgress),
-      (.safetyConfirmationCapacityReached, .pendingDisplayConfirmation),
+      (.safetyConfirmationCapacityReached, .pendingSafetyConfirmation),
       (.noIncludedSettings, .noIncludedSettings),
       (.conditionsUnsatisfied, .conditionsUnsatisfied),
       (.noOperations, .noChanges),

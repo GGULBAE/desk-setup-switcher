@@ -8,7 +8,7 @@ import XCTest
 #endif
 
 final class SystemSnapshotCoordinatorTests: XCTestCase {
-  func testSuccessfulSnapshotsBuildSettingsAndPreserveOptionInclusion() async throws {
+  func testSuccessfulSnapshotsBuildVisibleSettingsAndPreserveDormantValues() async throws {
     let displayValue = DisplayProfileSettings()
     let audioValue = AudioProfileSettings(
       defaultInputUID: .init(isIncluded: true, value: "input-uid"),
@@ -16,7 +16,17 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     )
     let networkValue = NetworkProfileSettings(
       wifiPower: .init(isIncluded: true, value: true),
-      wifiSSID: .init(isIncluded: false, value: "Office")
+      wifiSSID: .init(isIncluded: false, value: "Office"),
+      serviceIPv4: [
+        .init(
+          identity: .init(
+            kind: .ethernet,
+            serviceName: "Synthetic Ethernet",
+            interfaceType: "Ethernet"
+          ),
+          configuration: .init(value: .dhcp)
+        )
+      ]
     )
     let inputValue = InputProfileSettings(
       pointerSpeed: .init(isIncluded: true, value: 1.25),
@@ -52,14 +62,17 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
 
     XCTAssertEqual(result.capturedAt, Date(timeIntervalSince1970: 1_700_000_000))
     XCTAssertEqual(result.groups.map(\.group), [.display, .audio, .network, .input])
-    XCTAssertTrue(result.settings.display.isIncluded)
+    XCTAssertFalse(result.settings.display.isIncluded)
     XCTAssertTrue(result.settings.audio.isIncluded)
     XCTAssertTrue(result.settings.network.isIncluded)
-    XCTAssertTrue(result.settings.input.isIncluded)
+    XCTAssertFalse(result.settings.input.isIncluded)
     XCTAssertEqual(result.settings.display.value, displayValue)
     XCTAssertEqual(result.settings.audio.value, audioValue)
-    XCTAssertEqual(result.settings.network.value, networkValue)
-    XCTAssertEqual(result.settings.input.value, inputValue)
+    XCTAssertEqual(result.settings.network.value.serviceIPv4, networkValue.serviceIPv4)
+    XCTAssertEqual(result.settings.network.value.wifiPower.value, true)
+    XCTAssertFalse(result.settings.network.value.wifiPower.isIncluded)
+    XCTAssertEqual(result.settings.input.value.pointerSpeed.value, 1.25)
+    XCTAssertFalse(result.settings.input.value.pointerSpeed.isIncluded)
     XCTAssertFalse(result.settings.audio.value.outputVolume.isIncluded)
     XCTAssertEqual(result.settings.audio.value.outputVolume.value, 0.8)
     XCTAssertFalse(result.settings.network.value.wifiSSID.isIncluded)

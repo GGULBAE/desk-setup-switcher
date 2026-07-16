@@ -1,7 +1,6 @@
 import Foundation
 
 public enum ApplyRejectionReason: String, Codable, Hashable, Sendable {
-  case profileDisabled
   case noIncludedSettings
   case conditionsUnsatisfied
   case unavailableItems
@@ -375,9 +374,6 @@ public actor ApplyEngine {
     )
 
     var rejectionReasons: [ApplyRejectionReason] = []
-    if !profile.isEnabled {
-      appendUnique(.profileDisabled, to: &rejectionReasons)
-    }
     if includedGroups.isEmpty {
       appendUnique(.noIncludedSettings, to: &rejectionReasons)
     }
@@ -772,6 +768,11 @@ public actor ApplyEngine {
     _ operations: [PlannedOperation]
   ) -> [PlannedOperation] {
     operations.enumerated().sorted { lhs, rhs in
+      let lhsIsNetwork = lhs.element.group == .network
+      let rhsIsNetwork = rhs.element.group == .network
+      if lhsIsNetwork != rhsIsNetwork {
+        return !lhsIsNetwork
+      }
       if lhs.element.risk != rhs.element.risk {
         return lhs.element.risk < rhs.element.risk
       }

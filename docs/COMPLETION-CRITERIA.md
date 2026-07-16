@@ -75,7 +75,7 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] Tray capture returns a value-free complete/permission-needed/failure presentation, rejects captures with no applicable leaf, and never exposes an SSID. An explicit Capture action explains undetermined Location permission; denied/restricted states offer System Settings or Wi-Fi-free capture. The persistent permission workflow must become visible and key before router close; deterministic ordering is covered without live TCC mutation. Actual v2 TCC/focus interaction remains unchecked.
 - [x] User-facing capture results retain saved applicable leaves and actionable permission gaps only. Snapshot-only, unreadable, unsupported, and runtime-identifier evidence is omitted from presentation; the always-unsupported network service-order query and item were removed.
 - [x] Deterministic presentation logic summarizes included display/audio/network/input values, keeps opaque identifiers in technical details, preserves imported symbols, and models Ready/Partial/Unavailable/Applying, locked, disabled, and zero-operation actions.
-- [x] Setting inclusion and disclosure are independent in source; collapsing preserves configured values. The dense editor `Form` is replaced by wider card groups and padded option rows beside regular-size Include controls, avoiding the observed Korean Audio-row compression. Common display/audio/network/input values use typed pickers, toggles, semantic sliders, and a typed ephemeral display-mode catalog, while unsupported snapshot-only values are read-only and never persisted as catalog metadata.
+- [x] The current editor is flat and always expanded: there is no group/option disclosure state, each visible leaf owns Include, and unsupported/read-only/ambiguous controls are absent. Typed display/audio/network catalogs are session-only and never persist runtime handles, URLs, or rollback dictionaries in profile JSON.
 - [x] A pure field validator reports localized field identifiers for missing leaves/values, ranges, modes, addresses, masks, DNS, ports, and input bounds before save; the UI attaches non-color invalid/error metadata and first-error focus routing.
 - [x] Tray/apply source uses one state-aware primary slot plus direct Edit and a named destructive Delete control. Delete confirmation stays inside the profile card and fixed open-session viewport; one scroll region owns overflow, while Cancel/`Esc` changes no storage. Ready + operations selects normal Apply and Partial + executable operations selects Apply Available. Ellipsis, separate availability review, and manual refresh remain absent.
 - [x] The tray top-scroll request is generation-tagged and emitted only after popover attachment; its anchor is the first content block rather than a spacing-producing sibling. Focused tests cover stale attachment and 20 reopen generations.
@@ -150,7 +150,7 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] The UI-audit follow-up has a verified behavior-focused local commit and a clean worktree. This row is closed by the final commit/status handoff; push/CI evidence is not required and must not be inferred.
 - [ ] Optional release publication and manual/hardware evidence are complete. They remain unapproved or unrun and do not negate the completed implementation gates.
 
-## Tray/settings refinement completion ledger
+## Historical tray/settings refinement completion ledger
 
 - [x] The final non-live `make verify` passes localization/source policy, 339 cases (132 XCTest + 207 Swift Testing, six opt-in skips), Swift and universal Xcode Debug/Release, Analyze, DMG/checksum, mounted metadata/resources/`x86_64 arm64`, and ad-hoc signature classification.
 - [x] The verified local no-Developer-ID DMG SHA-256 is `567917f169e90799db177d0a5f22a8b13115cb30ed63f7e766fc4bb992ab35e3`; it was not installed, launched, pushed, or published.
@@ -165,6 +165,23 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [ ] Actual installed status-item/popover geometry, red-close/frontmost behavior, native bilingual rendering, keyboard traversal, and VoiceOver are manually verified.
 - [ ] Display/audio/network hardware mutation and rollback are verified. These remain explicitly unrun and are not required for the non-live implementation gate.
 - [ ] Push, CI, tag, signing/notarization, or release publication is performed for this milestone. They remain operator decisions outside the local goal.
+
+## Tray/settings end-to-end completion ledger
+
+- [x] Tray geometry declares and tests 368-point width, 260/300/316/560-point height tiers, symmetric 16-point content insets, a bounded two-profile bottom gap, generation-safe first attachment, late-layout recovery, stale completion rejection, and 20 reopen cycles without sleeps.
+- [x] Legacy activation is normalized to true and no longer appears in UI, filters profiles, or rejects apply; deterministic storage, tray, presentation, and engine cases cover a legacy false profile.
+- [x] Display, Audio, and Network are flat and always expanded; description, conditions, Input, display origin/rotation/active, audio system-output/mute, Wi‑Fi power/SSID, global IPv4, DNS, and proxies remain round-trip compatible but dormant.
+- [x] `VisibleSettingRegistry` declares all nine visible setting kinds and every capture/edit/validate/plan/apply/verify/rollback stage. A real-adapter synthetic invariant proves that each projected field produces a real operation, succeeds read-back, and restores its original value.
+- [x] Public Core Graphics topology and ColorSync ICC mapping implement portable ID/hash persistence, current-catalog enumeration, topology-before-color apply, reverse rollback, stale/hot-plug/mismatch failure, and profile JSON without runtime paths/URLs.
+- [x] Core Audio default roles and input/output volumes implement typed catalogs, scalar/percent conversion, device-before-volume ordering, exact read-back/rollback, and silent omission of non-settable controls.
+- [x] Authorized service IPv4 implements portable exact identity, DHCP/manual validation, exact serialized rollback data, SystemConfiguration lock/set/commit/apply/unlock failure taxonomy, dynamic-store early completion/timeout without sleeps, exact read-back, network-last apply, and network-first protected rollback.
+- [x] Protected display/network safety covers Keep, Revert, timeout, confirmation failure, safety-window close, and termination deferral/rollback with sanitized scope and change summaries.
+- [x] English/Korean localization parity, placeholders, new accessibility labels/hints, non-color status, 12 tray evidence pairs, and 10 current editor evidence pairs are recorded in [TRAY-SETTINGS-END-TO-END-AUDIT-2026-07-16.md](TRAY-SETTINGS-END-TO-END-AUDIT-2026-07-16.md).
+- [x] The final integrated non-live `make verify` passes 366 cases (134 XCTest + 232 Swift Testing, five opt-in skips), all build/Analyze/package stages, and mounted universal-DMG verification. SHA-256 `76bc6d9f1187ea30f68be16ee81ee4a334d877a4e26c2497f35a9ffc781678b3` is synchronized here.
+- [ ] The behavior-focused local commit and clean-worktree handoff are recorded. This row is checked only after the implementation commit succeeds.
+- [ ] Actual installed tray/window behavior, native bilingual rendering, keyboard traversal, and VoiceOver are manually verified.
+- [ ] Display/ColorSync, audio, and Ethernet/Wi‑Fi IPv4 hardware mutation plus independent rollback are verified. They remain explicitly unrun.
+- [ ] Push, CI, tag, Developer ID signing, notarization, or publication is performed. They remain outside this local goal.
 
 ## Manual hardware evidence format
 

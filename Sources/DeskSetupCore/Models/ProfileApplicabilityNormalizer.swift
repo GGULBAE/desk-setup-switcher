@@ -17,6 +17,9 @@ public struct ProfileApplicabilityNormalizer: Sendable {
 
   public func normalize(_ profile: DeskProfile) -> DeskProfile {
     var normalized = profile
+    // `isEnabled` remains in schema v1 for decode/round-trip compatibility,
+    // but profile activation is no longer a product behavior.
+    normalized.isEnabled = true
     normalized.settings = normalize(profile.settings)
     return normalized
   }
@@ -35,9 +38,8 @@ public struct ProfileApplicabilityNormalizer: Sendable {
     normalized.audio.value.systemOutputUID.isIncluded = false
     normalized.audio.value.outputMuted.isIncluded = false
 
-    for index in normalized.network.value.serviceIPv4.indices {
-      normalized.network.value.serviceIPv4[index].configuration.isIncluded = false
-    }
+    normalized.network.value.wifiPower.isIncluded = false
+    normalized.network.value.wifiSSID.isIncluded = false
     normalized.network.value.ipv4.isIncluded = false
     normalized.network.value.dnsServers.isIncluded = false
     normalized.network.value.webProxy.isIncluded = false
@@ -49,18 +51,10 @@ public struct ProfileApplicabilityNormalizer: Sendable {
     normalized.input.value.initialKeyRepeatDelay.isIncluded = false
     normalized.input.value.useStandardFunctionKeys.isIncluded = false
 
-    if !normalized.display.value.hasIncludedOption {
-      normalized.display.isIncluded = false
-    }
-    if !normalized.audio.value.hasIncludedOption {
-      normalized.audio.isIncluded = false
-    }
-    if !normalized.network.value.hasIncludedOption {
-      normalized.network.isIncluded = false
-    }
-    if !normalized.input.value.hasIncludedOption {
-      normalized.input.isIncluded = false
-    }
+    normalized.display.isIncluded = normalized.display.value.hasIncludedOption
+    normalized.audio.isIncluded = normalized.audio.value.hasIncludedOption
+    normalized.network.isIncluded = normalized.network.value.hasIncludedOption
+    normalized.input.isIncluded = normalized.input.value.hasIncludedOption
 
     return normalized
   }

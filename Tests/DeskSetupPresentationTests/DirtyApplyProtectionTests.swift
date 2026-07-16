@@ -220,33 +220,6 @@ struct DirtyApplyProtectionTests {
     #expect(cancelSession.isDirty)
   }
 
-  @Test("disclosure changes never alter inclusion or saved values")
-  func disclosureIsIndependentFromProfileValues() {
-    let profile = profile(id: targetID, volume: 0.5)
-    var disclosure = DisclosureState<String>()
-
-    disclosure.toggle("audio.outputVolume")
-    #expect(disclosure.isExpanded("audio.outputVolume"))
-    disclosure.toggle("audio.outputVolume")
-
-    #expect(!disclosure.isExpanded("audio.outputVolume"))
-    #expect(profile.settings.audio.isIncluded)
-    #expect(profile.settings.audio.value.outputVolume.isIncluded)
-    #expect(profile.settings.audio.value.outputVolume.value == 0.5)
-  }
-
-  @Test("advanced numeric entry is collapsed by default and explicitly controllable")
-  func advancedNumericDisclosureState() {
-    let fieldID = DraftFieldIdentifier.input(.pointerSpeed)
-    var disclosure = DisclosureState<DraftFieldIdentifier>()
-
-    #expect(!disclosure.isExpanded(fieldID))
-    disclosure.setExpanded(true, for: fieldID)
-    #expect(disclosure.isExpanded(fieldID))
-    disclosure.setExpanded(false, for: fieldID)
-    #expect(!disclosure.isExpanded(fieldID))
-  }
-
   @Test("choosing a primary display changes values without changing inclusion")
   func primarySelectionPreservesInclusion() {
     let first = DisplayTargetSettings(

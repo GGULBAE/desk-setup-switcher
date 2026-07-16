@@ -126,7 +126,7 @@ import Testing
         ),
         SettingsFixture(
           name: "15-network-en-dark",
-          variant: .editorNetwork,
+          variant: .editorNetworkEthernetManual,
           languageCode: "en",
           colorScheme: .dark,
           displayMode: .standard,
@@ -146,6 +146,46 @@ import Testing
           languageCode: "en",
           colorScheme: .light,
           displayMode: .largeText,
+          size: CGSize(width: 980, height: 720)
+        ),
+        SettingsFixture(
+          name: "18-display-color-en-dark",
+          variant: .editorDisplayColor,
+          languageCode: "en",
+          colorScheme: .dark,
+          displayMode: .standard,
+          size: CGSize(width: 980, height: 720)
+        ),
+        SettingsFixture(
+          name: "19-audio-unsupported-en-light",
+          variant: .editorAudioUnsupported,
+          languageCode: "en",
+          colorScheme: .light,
+          displayMode: .standard,
+          size: CGSize(width: 980, height: 720)
+        ),
+        SettingsFixture(
+          name: "20-ethernet-dhcp-en-light",
+          variant: .editorNetworkEthernetDHCP,
+          languageCode: "en",
+          colorScheme: .light,
+          displayMode: .standard,
+          size: CGSize(width: 980, height: 720)
+        ),
+        SettingsFixture(
+          name: "21-wifi-dhcp-ko-light",
+          variant: .editorNetworkWiFiDHCP,
+          languageCode: "ko",
+          colorScheme: .light,
+          displayMode: .standard,
+          size: CGSize(width: 980, height: 720)
+        ),
+        SettingsFixture(
+          name: "22-wifi-manual-en-dark",
+          variant: .editorNetworkWiFiManual,
+          languageCode: "en",
+          colorScheme: .dark,
+          displayMode: .standard,
           size: CGSize(width: 980, height: 720)
         ),
       ]

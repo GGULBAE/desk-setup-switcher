@@ -6,6 +6,18 @@ struct TrayScreenMetrics: Equatable, Sendable {
   let backingScaleFactor: CGFloat
 }
 
+struct TrayHorizontalInsets: Equatable, Sendable {
+  let leading: CGFloat
+  let trailing: CGFloat
+}
+
+struct TraySafeAreaInsets: Equatable, Sendable {
+  let top: CGFloat
+  let leading: CGFloat
+  let bottom: CGFloat
+  let trailing: CGFloat
+}
+
 enum TrayCaptureGeometryPhase: Equatable, Sendable {
   case idle
   case pending
@@ -39,8 +51,9 @@ struct TrayGeometryContext: Equatable, Sendable {
 /// may scroll within this viewport but never feeds a measured height back here.
 struct TrayGeometry: Equatable, Sendable {
   static let width: CGFloat = 368
-  static let compactHeight: CGFloat = 300
-  static let singleProfileHeight: CGFloat = 350
+  static let compactHeight: CGFloat = 260
+  static let singleProfileHeight: CGFloat = 300
+  static let twoProfileHeight: CGFloat = 316
   static let maximumHeight: CGFloat = 560
   static let screenMargin: CGFloat = 32
 
@@ -51,6 +64,12 @@ struct TrayGeometry: Equatable, Sendable {
   static let headerHeight: CGFloat = 32
   static let footerHeight: CGFloat = 0
 
+  /// Native popover chrome owns any AppKit safe-area insets. The SwiftUI root
+  /// therefore applies exactly one symmetric content inset of its own.
+  func rootHorizontalInsets(nativeSafeArea _: TraySafeAreaInsets) -> TrayHorizontalInsets {
+    TrayHorizontalInsets(leading: Self.outerPadding, trailing: Self.outerPadding)
+  }
+
   func viewport(for context: TrayGeometryContext, on screen: TrayScreenMetrics) -> CGSize {
     let idealHeight: CGFloat
     switch context.profileCount {
@@ -58,6 +77,8 @@ struct TrayGeometry: Equatable, Sendable {
       idealHeight = Self.compactHeight
     case 1:
       idealHeight = Self.singleProfileHeight
+    case 2:
+      idealHeight = Self.twoProfileHeight
     default:
       idealHeight = Self.maximumHeight
     }

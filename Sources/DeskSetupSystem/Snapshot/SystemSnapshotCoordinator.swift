@@ -79,6 +79,18 @@ public struct SystemSnapshotResult: Equatable, Sendable {
     groups.flatMap { $0.snapshot?.displayColorEvidence ?? [] }
   }
 
+  public var displayColorProfileCatalog: [DisplayColorProfileCatalogEntry] {
+    groups.flatMap { $0.snapshot?.displayColorProfileCatalog ?? [] }
+  }
+
+  public var audioDeviceCatalog: [AudioDeviceCatalogEntry] {
+    groups.flatMap { $0.snapshot?.audioDeviceCatalog ?? [] }
+  }
+
+  public var audioVolumeControlCatalog: [AudioVolumeControlCatalogEntry] {
+    groups.flatMap { $0.snapshot?.audioVolumeControlCatalog ?? [] }
+  }
+
   public var savedWiFiNetworkNames: [String] {
     groups.flatMap { $0.snapshot?.savedWiFiNetworkNames ?? [] }
   }
@@ -226,6 +238,7 @@ public struct SystemSnapshotCoordinator: Sendable {
       )
     }
 
+    settings = ProfileApplicabilityNormalizer().normalize(settings)
     return SystemSnapshotResult(
       capturedAt: now(),
       groups: groupResults,

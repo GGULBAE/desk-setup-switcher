@@ -64,6 +64,12 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
           isIncluded: display.currentMode != nil,
           value: display.currentMode ?? fallbackMode
         ),
+        colorProfile: SettingOption(
+          isIncluded: display.canSetColorProfile
+            && display.currentColorProfile != nil
+            && display.currentColorProfileMapping != nil,
+          value: display.currentColorProfile
+        ),
         rotationDegrees: SettingOption(
           isIncluded: false,
           value: display.rotationDegrees
@@ -89,6 +95,16 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
             "Bounds \(display.bounds.width)×\(display.bounds.height) at (\(display.bounds.x), \(display.bounds.y))."
         )
       )
+      if target.colorProfile.isIncluded {
+        items.append(
+          SnapshotItem(
+            key: "display.colorProfile.\(index)",
+            label: "ColorSync ICC profile",
+            state: .storable,
+            detail: "A public ColorSync profile catalog and rollback mapping are available."
+          )
+        )
+      }
     }
 
     if displays.isEmpty {
@@ -114,6 +130,14 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
         display.currentColorSpaceName.map {
           DisplayColorEvidenceEntry(identity: display.identity, colorSpaceName: $0)
         }
+      },
+      displayColorProfileCatalog: displays.map {
+        DisplayColorProfileCatalogEntry(
+          identity: $0.identity,
+          profiles: $0.availableColorProfiles,
+          canApply: $0.canSetColorProfile
+            && $0.currentColorProfileMapping != nil
+        )
       }
     )
   }
@@ -144,7 +168,14 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
     }
 
     do {
-      return analyze(settings, current: try await systemAPI.activeDisplays()).issues
+      let current = try await systemAPI.activeDisplays()
+      let displayAnalysis = analyze(settings, current: current)
+      let colorAnalysis = try analyzeColorProfiles(
+        settings,
+        current: current,
+        createOperations: false
+      )
+      return displayAnalysis.issues + colorAnalysis.issues
     } catch {
       return [
         makeIssue(
@@ -170,7 +201,13 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
     }
     _ = mode
 
-    let analysis = analyze(settings, current: try await systemAPI.activeDisplays())
+    let current = try await systemAPI.activeDisplays()
+    let analysis = analyze(settings, current: current)
+    let colorAnalysis = try analyzeColorProfiles(
+      settings,
+      current: current,
+      createOperations: true
+    )
     var operations: [PlannedOperation] = []
     if let finalConfiguration = analysis.finalConfiguration,
       let rollbackConfiguration = analysis.rollbackConfiguration,
@@ -193,11 +230,13 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
       )
     }
 
+    operations.append(contentsOf: colorAnalysis.operations)
+
     return AdapterPlan(
       group: .display,
       operations: operations,
-      omissions: analysis.omissions,
-      issues: analysis.issues
+      omissions: analysis.omissions + colorAnalysis.omissions,
+      issues: analysis.issues + colorAnalysis.issues
     )
   }
 
@@ -233,10 +272,7 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
   }
 
   public func apply(_ operation: PlannedOperation) async -> OperationResult {
-    guard operation.group == .display,
-      operation.key == "display.atomic-configuration",
-      let configuration = try? decode(operation.payload)
-    else {
+    guard operation.group == .display else {
       return OperationResult(
         operationID: operation.id,
         status: .failed,
@@ -245,12 +281,37 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
     }
 
     do {
-      try await systemAPI.apply(configuration, commitScope: .appOnly)
+      if operation.key == "display.atomic-configuration" {
+        let configuration = try decode(operation.payload)
+        try await systemAPI.apply(configuration, commitScope: .appOnly)
+        guard try await configurationMatchesCurrentState(configuration) else {
+          throw DisplayAdapterError.topologyChanged
+        }
+      } else if operation.key.hasPrefix("display.colorProfile."),
+        let colorOperation = try? JSONDecoder().decode(
+          DisplayColorProfileOperation.self,
+          from: operation.payload
+        )
+      {
+        try await systemAPI.setColorProfile(
+          colorOperation.target,
+          for: colorOperation.display
+        )
+        guard
+          try await currentColorProfile(for: colorOperation.display)
+            == colorOperation.target
+        else {
+          throw DisplayAdapterError.colorProfileReadBackMismatch
+        }
+      } else {
+        throw DisplayAdapterError.invalidOperationPayload
+      }
       return OperationResult(
         operationID: operation.id,
         status: .succeeded,
-        message:
-          "The display configuration was applied temporarily and will revert if the app exits before confirmation."
+        message: operation.key == "display.atomic-configuration"
+          ? "The display configuration was applied temporarily and will revert if the app exits before confirmation."
+          : "The ColorSync ICC display profile was applied and verified."
       )
     } catch {
       return OperationResult(
@@ -262,10 +323,7 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
   }
 
   public func confirm(_ operation: PlannedOperation) async -> OperationResult {
-    guard operation.group == .display,
-      operation.key == "display.atomic-configuration",
-      let configuration = try? decode(operation.payload)
-    else {
+    guard operation.group == .display else {
       return OperationResult(
         operationID: operation.id,
         status: .failed,
@@ -274,11 +332,33 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
     }
 
     do {
-      try await systemAPI.apply(configuration, commitScope: .sessionOnly)
+      if operation.key == "display.atomic-configuration" {
+        let configuration = try decode(operation.payload)
+        try await systemAPI.apply(configuration, commitScope: .sessionOnly)
+        guard try await configurationMatchesCurrentState(configuration) else {
+          throw DisplayAdapterError.topologyChanged
+        }
+      } else if operation.key.hasPrefix("display.colorProfile."),
+        let colorOperation = try? JSONDecoder().decode(
+          DisplayColorProfileOperation.self,
+          from: operation.payload
+        )
+      {
+        guard
+          try await currentColorProfile(for: colorOperation.display)
+            == colorOperation.target
+        else {
+          throw DisplayAdapterError.colorProfileReadBackMismatch
+        }
+      } else {
+        throw DisplayAdapterError.invalidOperationPayload
+      }
       return OperationResult(
         operationID: operation.id,
         status: .succeeded,
-        message: "The confirmed display configuration was committed for the login session."
+        message: operation.key == "display.atomic-configuration"
+          ? "The confirmed display configuration was committed for the login session."
+          : "The ColorSync ICC display profile was kept."
       )
     } catch {
       return OperationResult(
@@ -291,8 +371,7 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
 
   public func rollback(_ operation: PlannedOperation) async -> OperationResult {
     guard operation.group == .display,
-      let rollbackPayload = operation.rollbackPayload,
-      let configuration = try? decode(rollbackPayload)
+      let rollbackPayload = operation.rollbackPayload
     else {
       return OperationResult(
         operationID: operation.id,
@@ -302,11 +381,35 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
     }
 
     do {
-      try await systemAPI.apply(configuration, commitScope: .sessionOnly)
+      if operation.key == "display.atomic-configuration" {
+        let configuration = try decode(rollbackPayload)
+        try await systemAPI.apply(configuration, commitScope: .sessionOnly)
+        guard try await configurationMatchesCurrentState(configuration) else {
+          throw DisplayAdapterError.topologyChanged
+        }
+      } else if operation.key.hasPrefix("display.colorProfile."),
+        let rollback = try? JSONDecoder().decode(
+          DisplayColorProfileRollback.self,
+          from: rollbackPayload
+        )
+      {
+        try await systemAPI.restoreColorProfileMapping(
+          rollback.mapping,
+          for: rollback.display
+        )
+        guard try await currentColorProfile(for: rollback.display) == rollback.expectedTarget
+        else {
+          throw DisplayAdapterError.colorProfileReadBackMismatch
+        }
+      } else {
+        throw DisplayAdapterError.invalidOperationPayload
+      }
       return OperationResult(
         operationID: operation.id,
         status: .rolledBack,
-        message: "The previous display configuration was restored."
+        message: operation.key == "display.atomic-configuration"
+          ? "The previous display configuration was restored."
+          : "The previous ColorSync ICC display profile mapping was restored."
       )
     } catch {
       return OperationResult(
@@ -327,6 +430,145 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
           "Display discovery and supported mutations use public Core Graphics APIs. Rotation and active-state mutation are not attempted."
       )
     ]
+  }
+
+  private func analyzeColorProfiles(
+    _ desired: DisplayProfileSettings,
+    current displays: [DisplaySystemDisplay],
+    createOperations: Bool
+  ) throws -> DisplayColorAnalysis {
+    var analysis = DisplayColorAnalysis()
+
+    for target in desired.displays where target.colorProfile.isIncluded {
+      let key = "display.colorProfile.\(target.id.uuidString)"
+      guard let desiredProfile = target.colorProfile.value else {
+        recordColorIssue(
+          key: key,
+          message: "Choose a ColorSync ICC display profile.",
+          isFatal: true,
+          in: &analysis
+        )
+        continue
+      }
+
+      let display: DisplaySystemDisplay
+      switch resolve(target.identity, among: displays) {
+      case .matched(let match):
+        display = match
+      case .ambiguous:
+        recordColorIssue(
+          key: key,
+          message: "The saved display identity is ambiguous.",
+          isFatal: true,
+          in: &analysis
+        )
+        continue
+      case .missing:
+        // The row is absent when its display is not resolvable in this runtime.
+        continue
+      }
+
+      guard display.canSetColorProfile,
+        let rollbackMapping = display.currentColorProfileMapping
+      else {
+        // Unsupported ColorSync controls are hidden, not disabled or omitted.
+        continue
+      }
+      let matches = display.availableColorProfiles.filter { $0 == desiredProfile }
+      guard matches.count == 1 else {
+        recordColorIssue(
+          key: key,
+          message: matches.isEmpty
+            ? "The saved ColorSync ICC profile is no longer available for this display."
+            : "The saved ColorSync ICC profile identity is ambiguous.",
+          isFatal: true,
+          in: &analysis
+        )
+        continue
+      }
+      guard display.currentColorProfile != desiredProfile, createOperations else { continue }
+
+      let payload = DisplayColorProfileOperation(
+        display: display.identity,
+        target: desiredProfile
+      )
+      let rollback = DisplayColorProfileRollback(
+        display: display.identity,
+        mapping: rollbackMapping,
+        expectedTarget: display.currentColorProfile
+      )
+      analysis.operations.append(
+        PlannedOperation(
+          group: .display,
+          key: key,
+          summary: "Apply the ColorSync ICC profile for a display",
+          risk: .high,
+          isFatalOnFailure: true,
+          preview: OperationPreview(
+            previousValue: display.currentColorProfile?.displayName ?? "Factory default",
+            desiredValue: desiredProfile.displayName
+          ),
+          payload: try encodeJSON(payload),
+          rollbackPayload: try encodeJSON(rollback)
+        )
+      )
+    }
+
+    return analysis
+  }
+
+  private func recordColorIssue(
+    key: String,
+    message: String,
+    isFatal: Bool,
+    in analysis: inout DisplayColorAnalysis
+  ) {
+    analysis.issues.append(makeIssue(key: key, message: message, isFatal: isFatal))
+    analysis.omissions.append(
+      PlanOmission(
+        group: .display,
+        key: key,
+        status: .skipped,
+        reason: message
+      )
+    )
+  }
+
+  private func configurationMatchesCurrentState(
+    _ configuration: DisplayAtomicConfiguration
+  ) async throws -> Bool {
+    let current = try await systemAPI.activeDisplays()
+    guard current.count == configuration.targets.count else { return false }
+    for target in configuration.targets {
+      guard case .matched(let display) = resolve(target.identity, among: current),
+        display.bounds.x == target.origin.x,
+        display.bounds.y == target.origin.y,
+        let currentMode = display.currentMode,
+        DisplayModeMatcher().matches(currentMode, target.mode)
+      else { return false }
+
+      let currentMirrorIdentity = display.mirrorSourceSessionID.flatMap { sourceID in
+        current.first(where: { $0.sessionID == sourceID })?.identity
+      }
+      guard currentMirrorIdentity == target.mirrorSource else { return false }
+    }
+    return true
+  }
+
+  private func currentColorProfile(
+    for identity: DisplayIdentity
+  ) async throws -> ColorSyncProfileTarget? {
+    let displays = try await systemAPI.activeDisplays()
+    guard case .matched(let display) = resolve(identity, among: displays) else {
+      throw DisplayAdapterError.topologyChanged
+    }
+    return display.currentColorProfile
+  }
+
+  private func encodeJSON<Value: Encodable>(_ value: Value) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return try encoder.encode(value)
   }
 
   private func analyze(
@@ -706,6 +948,23 @@ private struct DisplayAnalysis {
   var omissions: [PlanOmission] = []
   var finalConfiguration: DisplayAtomicConfiguration?
   var rollbackConfiguration: DisplayAtomicConfiguration?
+}
+
+private struct DisplayColorAnalysis {
+  var issues: [ValidationIssue] = []
+  var omissions: [PlanOmission] = []
+  var operations: [PlannedOperation] = []
+}
+
+private struct DisplayColorProfileOperation: Codable, Hashable, Sendable {
+  let display: DisplayIdentity
+  let target: ColorSyncProfileTarget
+}
+
+private struct DisplayColorProfileRollback: Codable, Hashable, Sendable {
+  let display: DisplayIdentity
+  let mapping: ColorSyncCustomProfileMapping
+  let expectedTarget: ColorSyncProfileTarget?
 }
 
 private enum DisplayResolution {

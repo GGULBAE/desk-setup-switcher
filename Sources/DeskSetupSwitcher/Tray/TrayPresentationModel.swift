@@ -176,7 +176,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
 
   var geometryContext: TrayGeometryContext {
     TrayGeometryContext(
-      profileCount: model.profiles.filter(\.isEnabled).count,
+      profileCount: model.profiles.count,
       deletionConfirmationVisible: deletion.pendingProfileID != nil,
       capturePhase: capturePhase.geometryPhase,
       applyBannerVisible: model.lastApplySummary != nil
@@ -581,15 +581,15 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   }
 
   private func confirmDeletion(profileID: UUID) {
-    let enabledProfiles = model.profiles.filter(\.isEnabled)
-    guard let index = enabledProfiles.firstIndex(where: { $0.id == profileID }),
+    let profiles = model.profiles
+    guard let index = profiles.firstIndex(where: { $0.id == profileID }),
       deletion.confirm(profileID: profileID)
     else { return }
 
     if profileEditor.isDirty, profileEditor.selectedProfileID == profileID {
       profileEditor.revertDraft()
     }
-    let remaining = enabledProfiles.filter { $0.id != profileID }
+    let remaining = profiles.filter { $0.id != profileID }
     if remaining.isEmpty {
       focusTarget = .emptyState
     } else {

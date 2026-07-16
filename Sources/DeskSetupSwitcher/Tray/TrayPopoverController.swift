@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import SwiftUI
 
 #if canImport(DeskSetupCore)
@@ -29,12 +30,56 @@ struct TrayStatusItemPresentation: Equatable, Sendable {
   var accessibilityValue: String
 }
 
+enum TrayPopoverPresentationStage: String, Equatable, Sendable {
+  case beforeShow
+  case showReturned
+  case contentWindowAttached
+  case firstLayoutCompleted
+  case didBecomeKey
+  case finalViewportSynchronized
+}
+
+struct TrayGeometryTraceRecord: Equatable, Sendable {
+  let generation: UInt64
+  let stage: TrayPopoverPresentationStage
+  let policyViewport: CGSize
+  let hostingFrame: CGRect
+  let hostingBounds: CGRect
+  let hostingSafeArea: TraySafeAreaInsets
+  let contentViewFrame: CGRect
+  let contentViewBounds: CGRect
+  let contentViewSafeArea: TraySafeAreaInsets
+  let anchorRect: CGRect
+  let screenScale: CGFloat
+}
+
+@MainActor
+protocol TrayGeometryTraceRecording: AnyObject {
+  func record(_ value: TrayGeometryTraceRecord)
+}
+
+@MainActor
+final class DebugTrayGeometryTraceRecorder: TrayGeometryTraceRecording {
+  private let logger = Logger(
+    subsystem: "DeskSetupSwitcher",
+    category: "TrayGeometry"
+  )
+
+  func record(_ value: TrayGeometryTraceRecord) {
+    #if DEBUG
+      logger.debug(
+        "generation=\(value.generation) stage=\(value.stage.rawValue, privacy: .public) viewport=\(String(describing: value.policyViewport), privacy: .public) hostFrame=\(String(describing: value.hostingFrame), privacy: .public) hostBounds=\(String(describing: value.hostingBounds), privacy: .public) hostSafeArea=\(String(describing: value.hostingSafeArea), privacy: .public) contentFrame=\(String(describing: value.contentViewFrame), privacy: .public) contentBounds=\(String(describing: value.contentViewBounds), privacy: .public) contentSafeArea=\(String(describing: value.contentViewSafeArea), privacy: .public) anchor=\(String(describing: value.anchorRect), privacy: .public) scale=\(value.screenScale)"
+      )
+    #endif
+  }
+}
+
 struct TrayStatusItemPresentationBuilder: Sendable {
   static let maximumDisplayedNameLength = 18
 
   func presentation(for snapshot: TrayStatusItemSnapshot) -> TrayStatusItemPresentation {
     if let applying = snapshot.profiles.first(where: {
-      $0.isEnabled && snapshot.visibleReadinessByProfile[$0.id] == .applying
+      snapshot.visibleReadinessByProfile[$0.id] == .applying
     }) {
       let displayName = compactName(applying.name)
       let status = appLocalized("Applying \(applying.name)…")
@@ -50,8 +95,7 @@ struct TrayStatusItemPresentationBuilder: Sendable {
     let matchingProfiles: [DeskProfile]
     if snapshot.hasFreshReadiness {
       matchingProfiles = snapshot.profiles.filter { profile in
-        profile.isEnabled
-          && snapshot.visibleReadinessByProfile[profile.id] == .ready
+        snapshot.visibleReadinessByProfile[profile.id] == .ready
           && snapshot.operationCountByProfile[profile.id] == 0
           && snapshot.operationCountByProfile[profile.id] != nil
           && SettingGroup.allCases.contains { profile.settings.payload(for: $0) != nil }
@@ -78,7 +122,7 @@ struct TrayStatusItemPresentationBuilder: Sendable {
       state: .noMatch,
       symbolName: TrayStatusItemPresentation.fallbackSymbolName,
       title: "",
-      toolTip: appLocalized("Desk Setup Switcher — no enabled profile is confirmed to match"),
+      toolTip: appLocalized("Desk Setup Switcher — no profile is confirmed to match"),
       accessibilityValue: status
     )
   }
@@ -113,8 +157,15 @@ protocol TrayPopoverSurface: AnyObject {
   var isShown: Bool { get }
   var contentWindow: NSWindow? { get }
   func setDidCloseHandler(_ handler: @escaping @MainActor () -> Void)
+  func setPresentationStageHandler(
+    _ handler: @escaping @MainActor (UInt64, TrayPopoverPresentationStage) -> Void
+  )
   func show(
-    relativeTo positioningRect: NSRect, of positioningView: NSView, preferredEdge: NSRectEdge)
+    relativeTo positioningRect: NSRect,
+    of positioningView: NSView,
+    preferredEdge: NSRectEdge,
+    presentationGeneration: UInt64
+  )
   func performClose(_ sender: Any?)
 }
 
@@ -210,6 +261,8 @@ private final class AppKitTrayStatusItemSurface: TrayStatusItemSurface {
 private final class AppKitTrayPopoverSurface: NSObject, TrayPopoverSurface, NSPopoverDelegate {
   private let popover = NSPopover()
   private var didCloseHandler: (@MainActor () -> Void)?
+  private var presentationStageHandler: (@MainActor (UInt64, TrayPopoverPresentationStage) -> Void)?
+  private var didBecomeKeyObserver: NSObjectProtocol?
 
   override init() {
     super.init()
@@ -244,12 +297,21 @@ private final class AppKitTrayPopoverSurface: NSObject, TrayPopoverSurface, NSPo
     didCloseHandler = handler
   }
 
+  func setPresentationStageHandler(
+    _ handler: @escaping @MainActor (UInt64, TrayPopoverPresentationStage) -> Void
+  ) {
+    presentationStageHandler = handler
+  }
+
   func show(
     relativeTo positioningRect: NSRect,
     of positioningView: NSView,
-    preferredEdge: NSRectEdge
+    preferredEdge: NSRectEdge,
+    presentationGeneration: UInt64
   ) {
     popover.show(relativeTo: positioningRect, of: positioningView, preferredEdge: preferredEdge)
+    presentationStageHandler?(presentationGeneration, .showReturned)
+    observePresentationCompletion(generation: presentationGeneration)
   }
 
   func performClose(_ sender: Any?) {
@@ -257,7 +319,43 @@ private final class AppKitTrayPopoverSurface: NSObject, TrayPopoverSurface, NSPo
   }
 
   func popoverDidClose(_ notification: Notification) {
+    stopObservingPresentationCompletion()
     didCloseHandler?()
+  }
+
+  private func observePresentationCompletion(generation: UInt64) {
+    stopObservingPresentationCompletion()
+    guard let window = contentWindow else { return }
+    presentationStageHandler?(generation, .contentWindowAttached)
+
+    didBecomeKeyObserver = NotificationCenter.default.addObserver(
+      forName: NSWindow.didBecomeKeyNotification,
+      object: window,
+      queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        self?.presentationStageHandler?(generation, .didBecomeKey)
+      }
+    }
+    if window.isKeyWindow {
+      presentationStageHandler?(generation, .didBecomeKey)
+    }
+
+    // The next main-run-loop turn is AppKit's first opportunity to finish the
+    // native popover attachment/layout pass. This is event ordering, not a
+    // timing delay, and the controller rejects stale generations.
+    DispatchQueue.main.async { [weak self, weak window] in
+      guard let self, let window, window === self.contentWindow else { return }
+      window.contentView?.layoutSubtreeIfNeeded()
+      self.presentationStageHandler?(generation, .firstLayoutCompleted)
+    }
+  }
+
+  private func stopObservingPresentationCompletion() {
+    if let didBecomeKeyObserver {
+      NotificationCenter.default.removeObserver(didBecomeKeyObserver)
+    }
+    didBecomeKeyObserver = nil
   }
 }
 
@@ -325,8 +423,12 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
   private let factory: any TraySurfaceFactory
   private let sessionState: any TraySessionStateUpdating
   private let hostingController: NSHostingController<AnyView>
+  private let traceRecorder: any TrayGeometryTraceRecording
   private var sessionGeometry: TrayOpenSessionGeometry
   private var generationCounter: UInt64 = 0
+  private var finalizedPresentationGeneration: UInt64?
+  private var currentAnchorRect: CGRect = .zero
+  private var currentScreenScale: CGFloat = 1
 
   private(set) var activeSessionGeneration: UInt64?
 
@@ -334,15 +436,21 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     rootView: Content,
     sessionState: any TraySessionStateUpdating,
     geometry: TrayGeometry = TrayGeometry(),
-    factory: any TraySurfaceFactory = AppKitTraySurfaceFactory()
+    factory: any TraySurfaceFactory = AppKitTraySurfaceFactory(),
+    traceRecorder: any TrayGeometryTraceRecording = DebugTrayGeometryTraceRecorder()
   ) {
     self.factory = factory
     self.sessionState = sessionState
     statusItem = factory.makeStatusItem()
     popover = factory.makePopover()
     dismissalMonitor = factory.makeDismissalMonitor()
-    hostingController = NSHostingController(rootView: AnyView(rootView))
+    hostingController = NSHostingController(
+      rootView: AnyView(
+        rootView.ignoresSafeArea(.container, edges: .horizontal)
+      )
+    )
     hostingController.sizingOptions = []
+    self.traceRecorder = traceRecorder
     sessionGeometry = TrayOpenSessionGeometry(policy: geometry)
     super.init()
 
@@ -350,6 +458,9 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     popover.contentViewController = hostingController
     popover.setDidCloseHandler { [weak self] in
       self?.finishClosingCurrentSession()
+    }
+    popover.setPresentationStageHandler { [weak self] generation, stage in
+      self?.handlePresentationStage(stage, generation: generation)
     }
     statusItem.configure(target: self, action: #selector(togglePopover(_:)))
     statusItem.update(sessionState.statusItemPresentation)
@@ -382,6 +493,21 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     popover.contentViewController?.view.bounds ?? .zero
   }
 
+  var nativeContentViewBounds: CGRect {
+    popover.contentWindow?.contentView?.bounds ?? .zero
+  }
+
+  var nativeContentViewSafeAreaInsets: NSEdgeInsets {
+    popover.contentWindow?.contentView?.safeAreaInsets
+      ?? NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+  }
+
+  var rootHorizontalInsets: TrayHorizontalInsets {
+    sessionGeometry.policy.rootHorizontalInsets(
+      nativeSafeArea: traySafeAreaInsets(nativeContentViewSafeAreaInsets)
+    )
+  }
+
   var popoverBehavior: NSPopover.Behavior {
     popover.behavior
   }
@@ -403,21 +529,25 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
 
     generationCounter &+= 1
     let generation = generationCounter
+    let screen = factory.screenMetrics(for: anchorView)
     let viewport = sessionGeometry.open(
       context: sessionState.geometryContext,
-      screen: factory.screenMetrics(for: anchorView)
+      screen: screen
     )
     activeSessionGeneration = generation
+    finalizedPresentationGeneration = nil
+    currentAnchorRect = anchorView.bounds
+    currentScreenScale = screen.backingScaleFactor
 
     synchronizeViewport(viewport)
     sessionState.trayDidOpen(sessionGeneration: generation, viewport: viewport)
-    popover.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .minY)
-    // NSPopover attaches the hosting view to its private content window during
-    // show. Reassert the explicit viewport after that attachment so an origin,
-    // fitting-size, or safe-area value retained by AppKit from the previous
-    // generation cannot shift the SwiftUI root on reopen.
-    synchronizeViewport(viewport)
-    sessionState.trayContentDidAttach(sessionGeneration: generation)
+    trace(stage: .beforeShow, generation: generation, viewport: viewport)
+    popover.show(
+      relativeTo: currentAnchorRect,
+      of: anchorView,
+      preferredEdge: .minY,
+      presentationGeneration: generation
+    )
     dismissalMonitor.start(
       anchorView: anchorView,
       contentWindow: { [weak popover] in popover?.contentWindow },
@@ -440,6 +570,7 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     guard let generation = activeSessionGeneration else { return }
     dismissalMonitor.stop()
     activeSessionGeneration = nil
+    finalizedPresentationGeneration = nil
     sessionGeometry.close()
     sessionState.trayDidClose(sessionGeneration: generation)
   }
@@ -456,5 +587,59 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     hostingController.view.layoutSubtreeIfNeeded()
     popover.contentWindow?.contentView?.needsLayout = true
     popover.contentWindow?.contentView?.layoutSubtreeIfNeeded()
+  }
+
+  private func handlePresentationStage(
+    _ stage: TrayPopoverPresentationStage,
+    generation: UInt64
+  ) {
+    guard activeSessionGeneration == generation,
+      let viewport = sessionGeometry.viewport
+    else { return }
+
+    trace(stage: stage, generation: generation, viewport: viewport)
+    guard stage == .firstLayoutCompleted,
+      finalizedPresentationGeneration != generation
+    else { return }
+
+    finalizedPresentationGeneration = generation
+    synchronizeViewport(viewport)
+    trace(stage: .finalViewportSynchronized, generation: generation, viewport: viewport)
+    sessionState.trayContentDidAttach(sessionGeneration: generation)
+  }
+
+  private func trace(
+    stage: TrayPopoverPresentationStage,
+    generation: UInt64,
+    viewport: CGSize
+  ) {
+    let contentView = popover.contentWindow?.contentView
+    traceRecorder.record(
+      TrayGeometryTraceRecord(
+        generation: generation,
+        stage: stage,
+        policyViewport: viewport,
+        hostingFrame: hostingController.view.frame,
+        hostingBounds: hostingController.view.bounds,
+        hostingSafeArea: traySafeAreaInsets(hostingController.view.safeAreaInsets),
+        contentViewFrame: contentView?.frame ?? .zero,
+        contentViewBounds: contentView?.bounds ?? .zero,
+        contentViewSafeArea: traySafeAreaInsets(
+          contentView?.safeAreaInsets
+            ?? NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        ),
+        anchorRect: currentAnchorRect,
+        screenScale: currentScreenScale
+      )
+    )
+  }
+
+  private func traySafeAreaInsets(_ insets: NSEdgeInsets) -> TraySafeAreaInsets {
+    TraySafeAreaInsets(
+      top: insets.top,
+      leading: insets.left,
+      bottom: insets.bottom,
+      trailing: insets.right
+    )
   }
 }

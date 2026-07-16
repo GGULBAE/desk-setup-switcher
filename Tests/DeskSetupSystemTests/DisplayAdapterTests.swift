@@ -295,9 +295,159 @@ struct DisplayAdapterTests {
     #expect(plan.operations.isEmpty)
     #expect(plan.omissions.count == 1)
   }
+
+  @Test("ColorSync profile target is portable and apply verifies exact rollback")
+  func colorProfileRoundTrip() async throws {
+    let original = colorProfile("original", hash: "a", name: "Synthetic Original ICC")
+    let target = colorProfile("target", hash: "b", name: "Synthetic Target ICC")
+    let mapping = ColorSyncCustomProfileMapping(
+      entries: [.init(key: "default", value: .scope("synthetic-original"))]
+    )
+    var displays = makeDisplays()
+    displays[0].availableColorProfiles = [original, target]
+    displays[0].currentColorProfile = original
+    displays[0].currentColorProfileMapping = mapping
+    displays[0].canSetColorProfile = true
+    let api = MockDisplaySystemAPI(displays: displays)
+    let adapter = CoreGraphicsDisplayAdapter(systemAPI: api)
+    let snapshot = try await adapter.snapshot()
+    var settings = try displaySettings(from: snapshot)
+    settings.displays[0].colorProfile = .init(value: target)
+
+    let validation = await adapter.validate(.display(settings), against: snapshot)
+    let plan = try await adapter.plan(.display(settings), from: snapshot, mode: .normal)
+    let operation = try #require(
+      plan.operations.first(where: { $0.key.hasPrefix("display.colorProfile.") })
+    )
+
+    #expect(validation.isEmpty)
+    #expect(plan.omissions.isEmpty)
+    #expect(operation.risk == .high)
+    #expect(operation.isFatalOnFailure)
+    #expect(
+      operation.preview
+        == .init(
+          previousValue: original.displayName,
+          desiredValue: target.displayName
+        ))
+    let encodedSettings = String(
+      decoding: try JSONEncoder().encode(settings),
+      as: UTF8.self
+    )
+    #expect(encodedSettings.contains(target.registeredProfileID))
+    #expect(encodedSettings.contains(target.fileSHA256))
+    #expect(!encodedSettings.contains("file://"))
+    #expect(await adapter.apply(operation).status == .succeeded)
+    #expect(await adapter.confirm(operation).status == .succeeded)
+    #expect(await api.currentColorProfile(for: displays[0].identity) == target)
+    #expect(await adapter.rollback(operation).status == .rolledBack)
+    #expect(await api.currentColorProfile(for: displays[0].identity) == original)
+    #expect(await api.recordedMutationNames() == ["color.set", "color.restore"])
+  }
+
+  @Test("ColorSync enumeration records hash ICC bytes without persisting runtime URLs")
+  func colorProfileEnumerationCreatesPortableTarget() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "DeskSetupSwitcher-ColorSync-\(UUID().uuidString)",
+      isDirectory: true
+    )
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("Synthetic.icc")
+    try Data("abc".utf8).write(to: url)
+
+    let target = try #require(
+      CoreGraphicsDisplaySystemAPI.portableColorProfileTarget(
+        registeredProfileID: "synthetic-profile",
+        url: url,
+        displayName: "Synthetic ICC"
+      )
+    )
+    let encoded = String(decoding: try JSONEncoder().encode(target), as: UTF8.self)
+
+    #expect(target.registeredProfileID == "synthetic-profile")
+    #expect(
+      target.fileSHA256
+        == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    )
+    #expect(target.displayName == "Synthetic ICC")
+    #expect(!encoded.contains(url.path))
+    #expect(!encoded.contains("file://"))
+  }
+
+  @Test("ColorSync read-back mismatch and hot-plug fail closed")
+  func colorProfileFailures() async throws {
+    let original = colorProfile("original", hash: "c", name: "Original ICC")
+    let target = colorProfile("target", hash: "d", name: "Target ICC")
+    var displays = makeDisplays()
+    displays[0].availableColorProfiles = [original, target]
+    displays[0].currentColorProfile = original
+    displays[0].currentColorProfileMapping = .init(
+      entries: [.init(key: "default", value: .scope("original"))]
+    )
+    displays[0].canSetColorProfile = true
+    let api = MockDisplaySystemAPI(displays: displays)
+    let adapter = CoreGraphicsDisplayAdapter(systemAPI: api)
+    let snapshot = try await adapter.snapshot()
+    var settings = try displaySettings(from: snapshot)
+    settings.displays[0].colorProfile = .init(value: target)
+    let plan = try await adapter.plan(.display(settings), from: snapshot, mode: .normal)
+    let operation = try #require(
+      plan.operations.first(where: { $0.key.hasPrefix("display.colorProfile.") })
+    )
+
+    await api.setIgnoreColorWrites(true)
+    #expect(await adapter.apply(operation).status == .failed)
+
+    await api.setIgnoreColorWrites(false)
+    await api.replaceDisplays(Array(displays.dropFirst()))
+    #expect(await adapter.apply(operation).status == .failed)
+  }
+
+  @Test("display topology applies before color and rollback reverses that order")
+  func topologyAndColorTransactionOrdering() async throws {
+    let original = colorProfile("original", hash: "e", name: "Original ICC")
+    let target = colorProfile("target", hash: "f", name: "Target ICC")
+    var displays = makeDisplays()
+    displays[0].availableColorProfiles = [original, target]
+    displays[0].currentColorProfile = original
+    displays[0].currentColorProfileMapping = .init(
+      entries: [.init(key: "default", value: .scope("original"))]
+    )
+    displays[0].canSetColorProfile = true
+    let api = MockDisplaySystemAPI(displays: displays)
+    let adapter = CoreGraphicsDisplayAdapter(systemAPI: api)
+    let initialSnapshot = try await adapter.snapshot()
+    var settings = try displaySettings(from: initialSnapshot)
+    settings.displays[0].colorProfile = .init(value: target)
+    settings.displays[1].mode.value = try #require(
+      displays[1].supportedModes.first(where: { $0 != displays[1].currentMode })
+    )
+    let profile = DeskProfile(
+      name: "Synthetic",
+      settings: .init(
+        display: .init(value: settings)
+      ))
+    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+
+    let result = await engine.apply(profile: profile, mode: .normal)
+    let confirmationID = try #require(result.safetyConfirmationID)
+    let rollback = await engine.revertSafetyRollback(confirmationID)
+
+    #expect(result.status == .applied)
+    #expect(rollback.status == .reverted)
+    #expect(
+      await api.recordedMutationNames() == [
+        "topology.appOnly",
+        "color.set",
+        "color.restore",
+        "topology.sessionOnly",
+      ]
+    )
+  }
 }
 
-private actor MockDisplaySystemAPI: DisplaySystemAPI {
+actor MockDisplaySystemAPI: DisplaySystemAPI {
   struct ApplyCall: Hashable, Sendable {
     var configuration: DisplayAtomicConfiguration
     var commitScope: DisplayConfigurationCommitScope
@@ -305,9 +455,17 @@ private actor MockDisplaySystemAPI: DisplaySystemAPI {
 
   private var displays: [DisplaySystemDisplay]
   private var applyCalls: [ApplyCall] = []
+  private var mutationNames: [String] = []
+  private var targetByMapping: [ColorSyncCustomProfileMapping: ColorSyncProfileTarget?] = [:]
+  private var ignoresColorWrites = false
 
   init(displays: [DisplaySystemDisplay]) {
     self.displays = displays
+    for display in displays {
+      if let mapping = display.currentColorProfileMapping {
+        targetByMapping[mapping] = display.currentColorProfile
+      }
+    }
   }
 
   func activeDisplays() async throws -> [DisplaySystemDisplay] {
@@ -321,15 +479,92 @@ private actor MockDisplaySystemAPI: DisplaySystemAPI {
     applyCalls.append(
       ApplyCall(configuration: configuration, commitScope: commitScope)
     )
+    mutationNames.append("topology.\(commitScope.rawValue)")
+    let sessionIDByIdentity = Dictionary(
+      uniqueKeysWithValues: displays.map { ($0.identity, $0.sessionID) }
+    )
+    for target in configuration.targets {
+      guard let index = displays.firstIndex(where: { $0.identity == target.identity }) else {
+        continue
+      }
+      displays[index].bounds = DisplaySystemBounds(
+        x: target.origin.x,
+        y: target.origin.y,
+        width: target.mode.width,
+        height: target.mode.height
+      )
+      displays[index].isMain = target.origin == DisplayPoint(x: 0, y: 0)
+      displays[index].currentMode = target.mode
+      displays[index].mirrorSourceSessionID = target.mirrorSource.flatMap {
+        sessionIDByIdentity[$0]
+      }
+    }
+  }
+
+  func setColorProfile(
+    _ target: ColorSyncProfileTarget,
+    for display: DisplayIdentity
+  ) async throws {
+    mutationNames.append("color.set")
+    guard let index = displays.firstIndex(where: { $0.identity == display }),
+      displays[index].canSetColorProfile,
+      displays[index].availableColorProfiles.count(where: { $0 == target }) == 1
+    else {
+      throw DisplayAdapterError.colorProfileUnavailable
+    }
+    guard !ignoresColorWrites else { return }
+    let mapping = ColorSyncCustomProfileMapping(
+      entries: [.init(key: "default", value: .scope("target:\(target.fileSHA256)"))]
+    )
+    displays[index].currentColorProfile = target
+    displays[index].currentColorProfileMapping = mapping
+    targetByMapping[mapping] = target
+  }
+
+  func restoreColorProfileMapping(
+    _ mapping: ColorSyncCustomProfileMapping,
+    for display: DisplayIdentity
+  ) async throws {
+    mutationNames.append("color.restore")
+    guard let index = displays.firstIndex(where: { $0.identity == display }) else {
+      throw DisplayAdapterError.topologyChanged
+    }
+    guard !ignoresColorWrites else { return }
+    displays[index].currentColorProfileMapping = mapping
+    displays[index].currentColorProfile = targetByMapping[mapping] ?? nil
   }
 
   func recordedApplyCalls() -> [ApplyCall] {
     applyCalls
   }
+
+  func recordedMutationNames() -> [String] {
+    mutationNames
+  }
+
+  func currentColorProfile(for identity: DisplayIdentity) -> ColorSyncProfileTarget? {
+    displays.first(where: { $0.identity == identity })?.currentColorProfile
+  }
+
+  func setIgnoreColorWrites(_ ignored: Bool) {
+    ignoresColorWrites = ignored
+  }
+
+  func replaceDisplays(_ updated: [DisplaySystemDisplay]) {
+    displays = updated
+  }
 }
 
 private enum DisplayTestError: Error {
   case missingDisplayPayload
+}
+
+private func colorProfile(_ id: String, hash: Character, name: String) -> ColorSyncProfileTarget {
+  ColorSyncProfileTarget(
+    registeredProfileID: "synthetic-\(id)",
+    fileSHA256: String(repeating: hash, count: 64),
+    displayName: name
+  )
 }
 
 private func displaySettings(from snapshot: AdapterSnapshot) throws -> DisplayProfileSettings {

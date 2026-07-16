@@ -6,7 +6,7 @@ import Testing
 
 @Suite("Profile draft validation")
 struct ProfileDraftValidationTests {
-  @Test("included groups without leaves report stable group fields")
+  @Test("legacy group toggles without visible leaves do not block save")
   func noLeafGroups() {
     let settings = ProfileSettings(
       display: .init(value: .init()),
@@ -17,14 +17,9 @@ struct ProfileDraftValidationTests {
 
     let result = ProfileDraftValidator().validate(settings)
 
-    #expect(!result.isValid)
-    #expect(
-      result.issues.map(\.fieldID) == [
-        .group(.display), .group(.audio), .group(.network), .group(.input),
-      ]
-    )
-    #expect(result.issues.allSatisfy { $0.message == .selectAtLeastOneSetting })
-    #expect(result.firstInvalidField == .group(.display))
+    #expect(result.isValid)
+    #expect(result.issues.isEmpty)
+    #expect(result.firstInvalidField == nil)
   }
 
   @Test("missing and blank audio values identify their exact controls")
@@ -47,7 +42,6 @@ struct ProfileDraftValidationTests {
         issue(.audio(.defaultInputDevice), .audio, .required),
         issue(.audio(.defaultOutputDevice), .audio, .cannotBeBlank),
         issue(.audio(.outputVolume), .audio, .required),
-        issue(.audio(.outputMute), .audio, .required),
       ]
     )
   }
@@ -85,7 +79,6 @@ struct ProfileDraftValidationTests {
         .display(displayID, .modePixelWidth),
         .display(displayID, .modePixelHeight),
         .display(displayID, .modeRefreshRate),
-        .display(displayID, .rotationDegrees),
       ]
     )
     #expect(
@@ -134,7 +127,7 @@ struct ProfileDraftValidationTests {
     )
   }
 
-  @Test("volume and input ranges reject non-finite and out-of-range values")
+  @Test("visible volume ranges reject non-finite and out-of-range values")
   func numericRanges() {
     let settings = ProfileSettings(
       audio: .init(value: .init(outputVolume: .init(value: 1.01))),
@@ -151,24 +144,13 @@ struct ProfileDraftValidationTests {
 
     #expect(
       result.issues == [
-        issue(.audio(.outputVolume), .audio, .outOfRange(minimum: 0, maximum: 1)),
-        issue(.input(.pointerSpeed), .input, .outOfRange(minimum: -1, maximum: 10)),
-        issue(
-          .input(.keyRepeatInterval),
-          .input,
-          .outOfRange(minimum: 1, maximum: 120)
-        ),
-        issue(
-          .input(.initialKeyRepeatDelay),
-          .input,
-          .outOfRange(minimum: 1, maximum: 300)
-        ),
+        issue(.audio(.outputVolume), .audio, .outOfRange(minimum: 0, maximum: 1))
       ]
     )
   }
 
-  @Test("Wi-Fi manual IPv4 DNS and proxy errors have field-specific identifiers")
-  func networkFieldValidation() {
+  @Test("hidden legacy network values are dormant during visible-field validation")
+  func hiddenLegacyNetworkValuesAreDormant() {
     let settings = ProfileSettings(
       network: .init(
         value: .init(
@@ -192,27 +174,11 @@ struct ProfileDraftValidationTests {
 
     let result = ProfileDraftValidator().validate(settings)
 
-    #expect(
-      result.issues == [
-        issue(.network(.wifiPower), .network, .required),
-        issue(.network(.wifiSSID), .network, .cannotBeBlank),
-        issue(.network(.ipv4Address), .network, .invalidIPv4Address),
-        issue(.network(.ipv4SubnetMask), .network, .invalidSubnetMask),
-        issue(.network(.ipv4Router), .network, .invalidIPv4Address),
-        issue(.dnsServer(at: 0), .network, .invalidIPAddress),
-        issue(.network(.webProxy), .network, .required),
-        issue(.network(.secureWebProxyHost), .network, .cannotBeBlank),
-        issue(
-          .network(.secureWebProxyPort),
-          .network,
-          .outOfRange(minimum: 1, maximum: 65_535)
-        ),
-      ]
-    )
+    #expect(result.isValid)
   }
 
-  @Test("Wi-Fi names enforce the adapter's UTF-8 byte limit before save")
-  func wifiByteLengthValidation() {
+  @Test("hidden legacy Wi-Fi names do not participate in save validation")
+  func hiddenWiFiNameValidationIsDormant() {
     let settings = ProfileSettings(
       network: .init(
         value: .init(
@@ -223,14 +189,11 @@ struct ProfileDraftValidationTests {
 
     let result = ProfileDraftValidator().validate(settings)
 
-    #expect(
-      result.issue(for: .network(.wifiSSID))?.message
-        == .invalidWiFiNetworkName
-    )
+    #expect(result.isValid)
   }
 
-  @Test("nil manual network configuration reports the option without hiding proxy errors")
-  func missingNetworkConfigurationContinuesValidation() {
+  @Test("legacy global IPv4 and proxy values do not participate in save validation")
+  func hiddenGlobalNetworkConfigurationIsDormant() {
     let settings = ProfileSettings(
       network: .init(
         value: .init(
@@ -244,21 +207,145 @@ struct ProfileDraftValidationTests {
 
     let result = ProfileDraftValidator().validate(settings)
 
+    #expect(result.isValid)
+  }
+
+  @Test("service-specific DHCP and manual IPv4 values validate independently")
+  func serviceSpecificIPv4Validation() {
+    let ethernet = NetworkServiceIdentity(
+      kind: .ethernet,
+      serviceName: "Synthetic Ethernet",
+      interfaceType: "Ethernet"
+    )
+    let wifi = NetworkServiceIdentity(
+      kind: .wifi,
+      serviceName: "Synthetic Wi-Fi",
+      interfaceType: "IEEE80211"
+    )
+    let settings = ProfileSettings(
+      network: .init(
+        value: .init(
+          serviceIPv4: [
+            .init(
+              identity: ethernet,
+              configuration: .init(value: .dhcp)
+            ),
+            .init(
+              identity: wifi,
+              configuration: .init(
+                value: .manual(
+                  address: "999.0.0.1",
+                  subnetMask: "255.0.255.0",
+                  router: "not-an-address"
+                )
+              )
+            ),
+          ]
+        )
+      )
+    )
+
+    let result = ProfileDraftValidator().validate(settings)
+
     #expect(
       result.issues == [
-        issue(.network(.ipv4), .network, .required),
-        issue(.network(.webProxyHost), .network, .cannotBeBlank),
-        issue(
-          .network(.webProxyPort),
-          .network,
-          .outOfRange(minimum: 1, maximum: 65_535)
-        ),
+        issue(.networkService(at: 1, .ipv4Address), .network, .invalidIPv4Address),
+        issue(.networkService(at: 1, .ipv4SubnetMask), .network, .invalidSubnetMask),
+        issue(.networkService(at: 1, .ipv4Router), .network, .invalidIPv4Address),
       ]
     )
   }
 
-  @Test("excluded groups preserve invalid values without blocking save")
-  func excludedGroupsAreNotValidated() {
+  @Test("missing service IPv4 target points to the exact selected service")
+  func missingServiceIPv4Target() {
+    let settings = ProfileSettings(
+      network: .init(
+        value: .init(
+          serviceIPv4: [
+            .init(
+              identity: .init(
+                kind: .ethernet,
+                serviceName: "Synthetic Ethernet",
+                interfaceType: "Ethernet"
+              ),
+              configuration: .init(value: nil)
+            )
+          ]
+        )
+      )
+    )
+
+    #expect(
+      ProfileDraftValidator().validate(settings).issues == [
+        issue(.networkService(at: 0, .ipv4), .network, .required)
+      ]
+    )
+  }
+
+  @Test("blank portable ColorSync identity is rejected before save")
+  func blankColorSyncIdentity() {
+    var settings = ProfileSettings()
+    let displayID = UUID()
+    settings.display.value.displays = [
+      DisplayTargetSettings(
+        id: displayID,
+        identity: DisplayIdentity(uuid: UUID()),
+        isPrimary: .init(value: true),
+        origin: .init(isIncluded: false, value: DisplayPoint(x: 0, y: 0)),
+        mirroring: .init(isIncluded: false, value: .extended),
+        mode: .init(
+          isIncluded: false,
+          value: DisplayMode(width: 1_920, height: 1_080, refreshRate: 60)
+        ),
+        colorProfile: .init(
+          value: ColorSyncProfileTarget(
+            registeredProfileID: " ",
+            fileSHA256: "",
+            displayName: "Synthetic ICC"
+          )
+        ),
+        rotationDegrees: .init(isIncluded: false, value: 0),
+        isActive: .init(isIncluded: false, value: true)
+      )
+    ]
+
+    #expect(
+      ProfileDraftValidator().validate(settings).issues == [
+        issue(.display(displayID, .colorProfile), .display, .cannotBeBlank)
+      ]
+    )
+  }
+
+  @Test("valid service-specific manual IPv4 permits an absent router")
+  func validServiceManualIPv4() {
+    let settings = ProfileSettings(
+      network: .init(
+        value: .init(
+          serviceIPv4: [
+            .init(
+              identity: .init(
+                kind: .wifi,
+                serviceName: "Synthetic Wi-Fi",
+                interfaceType: "IEEE80211"
+              ),
+              configuration: .init(
+                value: .manual(
+                  address: "192.0.2.40",
+                  subnetMask: "255.255.255.0",
+                  router: nil
+                )
+              )
+            )
+          ]
+        )
+      )
+    )
+
+    #expect(ProfileDraftValidator().validate(settings).isValid)
+  }
+
+  @Test("legacy group toggles cannot suppress an included visible leaf")
+  func groupToggleDoesNotSuppressVisibleLeafValidation() {
     let settings = ProfileSettings(
       audio: .init(
         isIncluded: false,
@@ -270,7 +357,11 @@ struct ProfileDraftValidationTests {
       )
     )
 
-    #expect(ProfileDraftValidator().validate(settings).isValid)
+    #expect(
+      ProfileDraftValidator().validate(settings).issues == [
+        issue(.audio(.outputVolume), .audio, .outOfRange(minimum: 0, maximum: 1))
+      ]
+    )
   }
 
   @Test("valid values pass and disabled proxy values need no host or port")
@@ -333,7 +424,7 @@ struct ProfileDraftValidationTests {
     #expect(issue.defaultMessage == "Enter a value from 0 through 1000.")
   }
 
-  @Test("profile metadata and advanced device values respect storage length limits")
+  @Test("profile metadata respects limits while dormant hidden values round trip")
   func editableStringLengthLimits() {
     let tooLong = String(repeating: "a", count: 1_025)
     let profile = DeskProfile(
@@ -355,7 +446,6 @@ struct ProfileDraftValidationTests {
       result.issues.map(\.fieldID) == [
         .profileName,
         .profileDescription,
-        .audio(.defaultInputDevice),
       ]
     )
     #expect(

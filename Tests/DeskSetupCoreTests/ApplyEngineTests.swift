@@ -104,6 +104,30 @@ struct ApplyEngineTests {
     )
   }
 
+  @Test("a legacy false activation value remains visible and fully applicable")
+  func legacyDisabledProfileStillApplies() async throws {
+    let operation = PlannedOperation(
+      group: .audio,
+      key: "defaultOutput",
+      summary: "Synthetic output change"
+    )
+    let adapter = MockSystemSettingsAdapter(
+      group: .audio,
+      plan: AdapterPlan(group: .audio, operations: [operation])
+    )
+    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+    var profile = makeProfile(including: [.audio])
+    profile.isEnabled = false
+
+    let preparation = await engine.prepare(profile: profile, mode: .normal)
+    let result = await engine.execute(preparation)
+
+    #expect(preparation.canExecute)
+    #expect(preparation.operations.map(\.key) == [operation.key])
+    #expect(result.didExecute)
+    #expect(result.itemResults.map(\.status) == [.succeeded])
+  }
+
   @Test("normal mode rejects an unavailable included group")
   func normalRejectsUnavailableGroup() async throws {
     let adapter = MockSystemSettingsAdapter(
@@ -243,10 +267,10 @@ struct ApplyEngineTests {
     #expect(
       preparation.operations.map(\.key) == [
         "audio.low",
-        "network.low",
         "display.low",
         "audio.moderate",
         "display.high",
+        "network.low",
       ])
     #expect(await inputAdapter.recordedInvocations().isEmpty)
   }
@@ -400,8 +424,18 @@ private func makeProfile(including groups: Set<SettingGroup>) -> DeskProfile {
   settings.audio.value.defaultOutputUID = .init(
     isIncluded: groups.contains(.audio), value: "test-output")
   settings.network.isIncluded = groups.contains(.network)
-  settings.network.value.wifiPower = .init(
-    isIncluded: groups.contains(.network), value: true)
+  settings.network.value.serviceIPv4 =
+    groups.contains(.network)
+    ? [
+      NetworkServiceIPv4Settings(
+        identity: .init(
+          kind: .ethernet,
+          serviceName: "Synthetic Ethernet",
+          interfaceType: "Ethernet"
+        ),
+        configuration: .init(value: .dhcp)
+      )
+    ] : []
   settings.input.isIncluded = groups.contains(.input)
   settings.input.value.pointerSpeed = .init(
     isIncluded: groups.contains(.input), value: 1)

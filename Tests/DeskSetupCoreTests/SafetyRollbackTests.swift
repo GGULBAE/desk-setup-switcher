@@ -89,6 +89,60 @@ struct SafetyRollbackTests {
       ])
   }
 
+  @Test("network applies last and is the first protected operation rolled back")
+  func networkIsLastAppliedAndFirstRolledBack() async throws {
+    let audio = PlannedOperation(group: .audio, key: "audio", summary: "Audio")
+    let display = PlannedOperation(
+      group: .display,
+      key: "display",
+      summary: "Display",
+      risk: .high,
+      isFatalOnFailure: true,
+      rollbackPayload: Data([0x01])
+    )
+    let network = PlannedOperation(
+      group: .network,
+      key: "network",
+      summary: "Network",
+      risk: .high,
+      isFatalOnFailure: true,
+      rollbackPayload: Data([0x02])
+    )
+    let audioAdapter = MockSystemSettingsAdapter(
+      group: .audio,
+      plan: AdapterPlan(group: .audio, operations: [audio])
+    )
+    let displayAdapter = MockSystemSettingsAdapter(
+      group: .display,
+      plan: AdapterPlan(group: .display, operations: [display])
+    )
+    let networkAdapter = MockSystemSettingsAdapter(
+      group: .network,
+      plan: AdapterPlan(group: .network, operations: [network])
+    )
+    let engine = ApplyEngine(
+      registry: try AdapterRegistry([networkAdapter, audioAdapter, displayAdapter])
+    )
+
+    let result = await engine.apply(profile: multiGroupSafetyProfile(), mode: .normal)
+    let confirmationID = try #require(result.safetyConfirmationID)
+    let reverted = await engine.revertSafetyRollback(confirmationID)
+
+    #expect(result.itemResults.map(\.key) == ["audio", "display", "network"])
+    #expect(reverted.rollbackResults.map(\.key) == ["network", "display"])
+    #expect(await audioAdapter.recordedInvocations().last == .apply(audio.id))
+    #expect(
+      await displayAdapter.recordedInvocations().suffix(2) == [
+        .apply(display.id),
+        .rollback(display.id),
+      ])
+    #expect(
+      await networkAdapter.recordedInvocations().suffix(2) == [
+        .apply(network.id),
+        .rollback(network.id),
+      ])
+  }
+
   @Test("rollback failure is reported and still consumes the token")
   func rollbackFailureIsOneShot() async throws {
     let high = highRiskOperation(key: "high")
@@ -186,4 +240,35 @@ private func safetyProfile() -> DeskProfile {
   settings.audio.isIncluded = true
   settings.audio.value.defaultOutputUID = .init(isIncluded: true, value: "test-output")
   return DeskProfile(name: "Safety profile", settings: settings)
+}
+
+private func multiGroupSafetyProfile() -> DeskProfile {
+  var profile = safetyProfile()
+  profile.settings.display.isIncluded = true
+  profile.settings.display.value.displays = [
+    DisplayTargetSettings(
+      identity: DisplayIdentity(uuid: UUID()),
+      isPrimary: .init(value: true),
+      origin: .init(isIncluded: false, value: DisplayPoint(x: 0, y: 0)),
+      mirroring: .init(isIncluded: false, value: .extended),
+      mode: .init(
+        isIncluded: false,
+        value: DisplayMode(width: 1, height: 1, refreshRate: 0)
+      ),
+      rotationDegrees: .init(isIncluded: false, value: 0),
+      isActive: .init(isIncluded: false, value: true)
+    )
+  ]
+  profile.settings.network.isIncluded = true
+  profile.settings.network.value.serviceIPv4 = [
+    NetworkServiceIPv4Settings(
+      identity: NetworkServiceIdentity(
+        kind: .ethernet,
+        serviceName: "Synthetic Ethernet",
+        interfaceType: "Ethernet"
+      ),
+      configuration: .init(value: .dhcp)
+    )
+  ]
+  return profile
 }

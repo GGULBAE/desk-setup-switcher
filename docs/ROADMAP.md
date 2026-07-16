@@ -132,7 +132,7 @@ Remaining:
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
-## M4.4 — Tray reopen and profile-detail refinement (corrected locally)
+## M4.4 — Tray reopen and profile-detail refinement (historical; superseded by M4.5)
 
 - Reset zero-origin AppKit viewport geometry for every tray generation; after `NSPopover.show`, attach one generation-scoped top-scroll request directly to the first content block so the first open cannot miss it and no anchor-only stack row adds blank spacing. A deterministic 20-cycle regression preserves the fixed viewport and one-scroll architecture.
 - Keep Settings/Profile Edit and other workflow destinations app-lifetime persistent, frontmost-before-tray-close, exactly-once, and recoverable after repeated red-close cycles. While at least one destination is visible, the process and windows participate in the ordinary macOS app/window cycle; the final explicit close restores tray-only accessory policy.
@@ -143,8 +143,23 @@ Remaining:
 - Record synthetic Display/Audio/Network evidence and the [refinement audit](TRAY-SETTINGS-REFINEMENT-AUDIT-2026-07-15.md). No installed app, live mutation, TCC change, Keychain write, push, or publication is part of this milestone.
 - Integrated non-live `make verify` passes 339 cases (132 XCTest + 207 Swift Testing, six opt-in skips), all build/Analyze stages, and universal mounted-DMG verification. Current local SHA-256 is `567917f169e90799db177d0a5f22a8b13115cb30ed63f7e766fc4bb992ab35e3`.
 
-## Current next task — installed interaction audit
+## M4.5 — Tray/settings end-to-end contract (implemented locally)
 
-Run user-driven checks for the actual status item, 20 visible reopen cycles, application/Space switching with Settings/Profile Edit held open, red-close recovery and frontmost ordering, native English/Korean rendering, keyboard focus, and VoiceOver. Use an explicit install/preflight boundary; do not infer display/audio/network mutation authority. Import/export, the full permission matrix, login approval/retry/reboot, Gatekeeper, physical Intel, and live mutation/rollback remain separately authorized work.
+- Make first attachment deterministic: 368-point width, 260/300/316/560-point height tiers for 0/1/2/3+ profiles, symmetric 16-point root padding, generation-guarded post-show attachment, one first-layout completion, and one final viewport synchronization without sleeps.
+- Remove profile activation as a product concept. Legacy false values normalize to active applicability and no longer hide a row or block apply.
+- Remove group/option disclosure and every disabled/read-only/future placeholder from the default editor. Keep the visible surface flat, always expanded, and limited to complete Display/Audio/Network vertical slices.
+- Establish `VisibleSettingRegistry` as the nine-kind capture→edit→validate→plan→apply→verify→rollback invariant, with typed runtime catalogs and unsupported/ambiguous controls absent.
+- Add portable public ColorSync ICC profile selection with ID + ICC SHA-256 persistence, current-catalog resolution, exact read-back, and prior-mapping rollback after display topology.
+- Complete default input/output and settable input/output-volume Core Audio slices, with device switching before device-scoped volume and unsupported controls omitted.
+- Add authorized per-service DHCP/manual IPv4 apply with exact serialized rollback data, public SystemConfiguration lock/commit/apply/unlock orchestration, dynamic-store completion, exact read-back, network-last apply, and network-first protected rollback.
+- Generalize the 15-second safety window to protected display/network operations; window close, timeout, Revert, confirmation failure, and termination restore temporary state.
+- Record deterministic vertical-slice, rollback-order, first-attach, twenty-reopen, dynamic completion/timeout, localization, and synthetic evidence. The [end-to-end audit](TRAY-SETTINGS-END-TO-END-AUDIT-2026-07-16.md) distinguishes mock/offscreen proof from installed/native/hardware gaps.
+- Integrated non-live `make verify` passes 366 cases (134 XCTest + 232 Swift Testing, five opt-in skips), all build/Analyze stages, and universal mounted-DMG verification. Current local SHA-256 is `76bc6d9f1187ea30f68be16ee81ee4a334d877a4e26c2497f35a9ffc781678b3`.
+
+No live display/audio/network mutation, install, push, tag, signing/notarization, or publication is part of M4.5.
+
+## Current next task — installed and hardware verification audit
+
+Run user-driven checks for the actual status item, 20 visible reopen cycles, application/Space switching with Settings/Profile Edit held open, red-close recovery and frontmost ordering, native English/Korean rendering, keyboard focus, and VoiceOver. After a separate explicit mutation approval and preflight snapshot, execute the support-matrix ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 procedures and independently verify rollback. Import/export, the full permission matrix, login approval/retry/reboot, Gatekeeper, and physical Intel remain separately authorized work.
 
 Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

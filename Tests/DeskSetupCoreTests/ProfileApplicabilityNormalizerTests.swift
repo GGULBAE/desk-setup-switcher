@@ -104,7 +104,7 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(!normalized.settings.audio.value.systemOutputUID.isIncluded)
     #expect(!normalized.settings.audio.value.outputMuted.isIncluded)
     #expect(normalized.settings.network.value.serviceIPv4[0].configuration.value == ipv4)
-    #expect(!normalized.settings.network.value.serviceIPv4[0].configuration.isIncluded)
+    #expect(normalized.settings.network.value.serviceIPv4[0].configuration.isIncluded)
     #expect(normalized.settings.network.value.ipv4.value == ipv4)
     #expect(!normalized.settings.network.value.ipv4.isIncluded)
     #expect(normalized.settings.network.value.dnsServers.value == ["192.0.2.53", "2001:db8::53"])

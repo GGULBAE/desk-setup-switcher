@@ -29,6 +29,7 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     settings: ProfileSettings,
     evidence: [CaptureSnapshotEvidence]
   ) -> ProfileCaptureSummary {
+    let settings = ProfileApplicabilityNormalizer().normalize(settings)
     var items: [CaptureSummaryItem] = []
 
     func applicable(_ included: Bool, _ group: SettingGroup, _ key: String) {
@@ -41,82 +42,58 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     for (index, display) in settings.display.value.displays.enumerated() {
       let prefix = "display.\(index)"
       applicable(
-        settings.display.isIncluded && display.isPrimary.isIncluded,
+        display.isPrimary.isIncluded,
         .display,
         "\(prefix).primary"
       )
       applicable(
-        settings.display.isIncluded && display.origin.isIncluded,
-        .display,
-        "\(prefix).origin"
-      )
-      applicable(
-        settings.display.isIncluded && display.mirroring.isIncluded,
+        display.mirroring.isIncluded,
         .display,
         "\(prefix).mirroring"
       )
       applicable(
-        settings.display.isIncluded && display.mode.isIncluded,
+        display.mode.isIncluded,
         .display,
         "\(prefix).mode"
+      )
+      applicable(
+        display.colorProfile.isIncluded,
+        .display,
+        "\(prefix).colorProfile"
       )
     }
 
     let audio = settings.audio.value
     applicable(
-      settings.audio.isIncluded && audio.defaultInputUID.isIncluded,
+      audio.defaultInputUID.isIncluded,
       .audio,
       "defaultInput"
     )
     applicable(
-      settings.audio.isIncluded && audio.defaultOutputUID.isIncluded,
+      audio.defaultOutputUID.isIncluded,
       .audio,
       "defaultOutput"
     )
-    applicable(
-      settings.audio.isIncluded && audio.systemOutputUID.isIncluded,
-      .audio,
-      "systemOutput"
-    )
-    applicable(settings.audio.isIncluded && audio.outputVolume.isIncluded, .audio, "outputVolume")
-    applicable(settings.audio.isIncluded && audio.outputMuted.isIncluded, .audio, "outputMute")
+    applicable(audio.inputVolume.isIncluded, .audio, "inputVolume")
+    applicable(audio.outputVolume.isIncluded, .audio, "outputVolume")
 
     let network = settings.network.value
-    applicable(settings.network.isIncluded && network.wifiPower.isIncluded, .network, "wifi.power")
-    applicable(settings.network.isIncluded && network.wifiSSID.isIncluded, .network, "wifi.ssid")
-    let input = settings.input.value
-    applicable(
-      settings.input.isIncluded && input.pointerSpeed.isIncluded,
-      .input,
-      "com.apple.mouse.scaling"
-    )
-    applicable(
-      settings.input.isIncluded && input.naturalScrolling.isIncluded,
-      .input,
-      "com.apple.swipescrolldirection"
-    )
-    applicable(
-      settings.input.isIncluded && input.keyRepeatInterval.isIncluded,
-      .input,
-      "KeyRepeat"
-    )
-    applicable(
-      settings.input.isIncluded && input.initialKeyRepeatDelay.isIncluded,
-      .input,
-      "InitialKeyRepeat"
-    )
-    applicable(
-      settings.input.isIncluded && input.useStandardFunctionKeys.isIncluded,
-      .input,
-      "com.apple.keyboard.fnState"
-    )
+    for (index, service) in network.serviceIPv4.enumerated() {
+      applicable(
+        service.configuration.isIncluded,
+        .network,
+        "network.serviceIPv4.\(service.identity.kind.rawValue).\(index)"
+      )
+    }
 
     var seenEvidence = Set<CaptureSnapshotEvidence>()
     for item in evidence where seenEvidence.insert(item).inserted {
       let disposition: CaptureItemDisposition?
       switch item.state {
       case .permissionRequired:
-        disposition = .permissionRequired
+        // Permission-gated legacy Wi-Fi/Location values are not editor fields.
+        // Their denial must not make an otherwise unrelated capture incomplete.
+        disposition = nil
       case .detected, .storable, .unreadable, .unsupported:
         disposition = nil
       }

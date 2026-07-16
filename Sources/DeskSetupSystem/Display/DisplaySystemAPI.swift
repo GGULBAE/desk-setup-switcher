@@ -24,6 +24,30 @@ public struct DisplaySystemBounds: Hashable, Sendable {
   }
 }
 
+public enum ColorSyncCustomProfileMappingValue: Codable, Hashable, Sendable {
+  case profileURL(URL)
+  case unset
+  case scope(String)
+}
+
+public struct ColorSyncCustomProfileMappingEntry: Codable, Hashable, Sendable {
+  public var key: String
+  public var value: ColorSyncCustomProfileMappingValue
+
+  public init(key: String, value: ColorSyncCustomProfileMappingValue) {
+    self.key = key
+    self.value = value
+  }
+}
+
+public struct ColorSyncCustomProfileMapping: Codable, Hashable, Sendable {
+  public var entries: [ColorSyncCustomProfileMappingEntry]
+
+  public init(entries: [ColorSyncCustomProfileMappingEntry]) {
+    self.entries = entries
+  }
+}
+
 /// A live, session-scoped display record. `sessionID` must never be copied into a profile
 /// or other persisted core model.
 public struct DisplaySystemDisplay: Hashable, Sendable {
@@ -37,6 +61,10 @@ public struct DisplaySystemDisplay: Hashable, Sendable {
   public var currentMode: DisplayMode?
   public var supportedModes: [DisplayMode]
   public var currentColorSpaceName: String?
+  public var availableColorProfiles: [ColorSyncProfileTarget]
+  public var currentColorProfile: ColorSyncProfileTarget?
+  public var currentColorProfileMapping: ColorSyncCustomProfileMapping?
+  public var canSetColorProfile: Bool
 
   public init(
     sessionID: UInt32,
@@ -48,7 +76,11 @@ public struct DisplaySystemDisplay: Hashable, Sendable {
     isActive: Bool,
     currentMode: DisplayMode?,
     supportedModes: [DisplayMode],
-    currentColorSpaceName: String? = nil
+    currentColorSpaceName: String? = nil,
+    availableColorProfiles: [ColorSyncProfileTarget] = [],
+    currentColorProfile: ColorSyncProfileTarget? = nil,
+    currentColorProfileMapping: ColorSyncCustomProfileMapping? = nil,
+    canSetColorProfile: Bool = false
   ) {
     self.sessionID = sessionID
     self.identity = identity
@@ -60,6 +92,10 @@ public struct DisplaySystemDisplay: Hashable, Sendable {
     self.currentMode = currentMode
     self.supportedModes = supportedModes
     self.currentColorSpaceName = currentColorSpaceName
+    self.availableColorProfiles = availableColorProfiles
+    self.currentColorProfile = currentColorProfile
+    self.currentColorProfileMapping = currentColorProfileMapping
+    self.canSetColorProfile = canSetColorProfile
   }
 }
 
@@ -97,6 +133,30 @@ public protocol DisplaySystemAPI: Sendable {
     _ configuration: DisplayAtomicConfiguration,
     commitScope: DisplayConfigurationCommitScope
   ) async throws
+  func setColorProfile(
+    _ target: ColorSyncProfileTarget,
+    for display: DisplayIdentity
+  ) async throws
+  func restoreColorProfileMapping(
+    _ mapping: ColorSyncCustomProfileMapping,
+    for display: DisplayIdentity
+  ) async throws
+}
+
+extension DisplaySystemAPI {
+  public func setColorProfile(
+    _ target: ColorSyncProfileTarget,
+    for display: DisplayIdentity
+  ) async throws {
+    throw DisplayAdapterError.colorProfileUnavailable
+  }
+
+  public func restoreColorProfileMapping(
+    _ mapping: ColorSyncCustomProfileMapping,
+    for display: DisplayIdentity
+  ) async throws {
+    throw DisplayAdapterError.colorProfileUnavailable
+  }
 }
 
 public enum DisplayAdapterError: Error, Hashable, Sendable {
@@ -105,6 +165,9 @@ public enum DisplayAdapterError: Error, Hashable, Sendable {
   case invalidOperationPayload
   case modeUnavailable
   case topologyChanged
+  case colorProfileUnavailable
+  case colorProfileMutationFailed
+  case colorProfileReadBackMismatch
 }
 
 extension DisplayAdapterError: LocalizedError {
@@ -120,6 +183,12 @@ extension DisplayAdapterError: LocalizedError {
       "A requested display mode is no longer available."
     case .topologyChanged:
       "The active display topology changed after the operation was planned."
+    case .colorProfileUnavailable:
+      "The requested ColorSync display profile is unavailable."
+    case .colorProfileMutationFailed:
+      "ColorSync rejected the display profile mapping."
+    case .colorProfileReadBackMismatch:
+      "ColorSync did not report the requested display profile after applying it."
     }
   }
 }

@@ -79,6 +79,83 @@ public struct DisplayColorEvidenceEntry: Codable, Hashable, Sendable {
   }
 }
 
+/// Session-only ColorSync choices for one display. Profile JSON stores only a
+/// `ColorSyncProfileTarget`; the adapter resolves its URL from this catalog.
+public struct DisplayColorProfileCatalogEntry: Codable, Hashable, Sendable {
+  public var identity: DisplayIdentity
+  public var profiles: [ColorSyncProfileTarget]
+  public var canApply: Bool
+
+  public init(
+    identity: DisplayIdentity,
+    profiles: [ColorSyncProfileTarget],
+    canApply: Bool
+  ) {
+    self.identity = identity
+    self.profiles = profiles
+    self.canApply = canApply
+  }
+}
+
+public struct NetworkIPv4RollbackCatalogEntry: Codable, Hashable, Sendable {
+  public var identity: NetworkServiceIdentity
+  public var configurationData: Data
+  public var currentConfiguration: IPv4Configuration?
+
+  public init(
+    identity: NetworkServiceIdentity,
+    configurationData: Data,
+    currentConfiguration: IPv4Configuration?
+  ) {
+    self.identity = identity
+    self.configurationData = configurationData
+    self.currentConfiguration = currentConfiguration
+  }
+}
+
+public struct AudioDeviceCatalogEntry: Codable, Hashable, Sendable {
+  public var uid: String
+  public var name: String
+  public var supportsInput: Bool
+  public var supportsOutput: Bool
+
+  public init(
+    uid: String,
+    name: String,
+    supportsInput: Bool,
+    supportsOutput: Bool
+  ) {
+    self.uid = uid
+    self.name = name
+    self.supportsInput = supportsInput
+    self.supportsOutput = supportsOutput
+  }
+}
+
+public enum AudioVolumeCatalogRole: String, Codable, Hashable, Sendable {
+  case input
+  case output
+}
+
+public struct AudioVolumeControlCatalogEntry: Codable, Hashable, Sendable {
+  public var role: AudioVolumeCatalogRole
+  public var deviceUID: String?
+  public var currentValue: Double?
+  public var canApply: Bool
+
+  public init(
+    role: AudioVolumeCatalogRole,
+    deviceUID: String?,
+    currentValue: Double?,
+    canApply: Bool
+  ) {
+    self.role = role
+    self.deviceUID = deviceUID
+    self.currentValue = currentValue
+    self.canApply = canApply
+  }
+}
+
 public struct AdapterSnapshot: Codable, Hashable, Sendable {
   public var group: SettingGroup
   public var capturedAt: Date
@@ -88,6 +165,14 @@ public struct AdapterSnapshot: Codable, Hashable, Sendable {
   public var displayModeCatalog: [DisplayModeCatalogEntry]?
   /// Optional session-only evidence; absent in older serialized plans.
   public var displayColorEvidence: [DisplayColorEvidenceEntry]?
+  /// Optional session-only public ColorSync ICC profile catalog.
+  public var displayColorProfileCatalog: [DisplayColorProfileCatalogEntry]?
+  /// Optional exact preflight dictionaries for authorized service IPv4 rollback.
+  public var networkIPv4RollbackCatalog: [NetworkIPv4RollbackCatalogEntry]?
+  /// Typed session-only Core Audio device choices for the editor.
+  public var audioDeviceCatalog: [AudioDeviceCatalogEntry]?
+  /// Typed writable-volume projection; unsupported controls remain non-visible.
+  public var audioVolumeControlCatalog: [AudioVolumeControlCatalogEntry]?
   /// Optional read-only saved-network choices; contains no credential material.
   public var savedWiFiNetworkNames: [String]?
 
@@ -98,6 +183,10 @@ public struct AdapterSnapshot: Codable, Hashable, Sendable {
     items: [SnapshotItem],
     displayModeCatalog: [DisplayModeCatalogEntry]? = nil,
     displayColorEvidence: [DisplayColorEvidenceEntry]? = nil,
+    displayColorProfileCatalog: [DisplayColorProfileCatalogEntry]? = nil,
+    networkIPv4RollbackCatalog: [NetworkIPv4RollbackCatalogEntry]? = nil,
+    audioDeviceCatalog: [AudioDeviceCatalogEntry]? = nil,
+    audioVolumeControlCatalog: [AudioVolumeControlCatalogEntry]? = nil,
     savedWiFiNetworkNames: [String]? = nil
   ) {
     self.group = group
@@ -106,6 +195,10 @@ public struct AdapterSnapshot: Codable, Hashable, Sendable {
     self.items = items
     self.displayModeCatalog = displayModeCatalog
     self.displayColorEvidence = displayColorEvidence
+    self.displayColorProfileCatalog = displayColorProfileCatalog
+    self.networkIPv4RollbackCatalog = networkIPv4RollbackCatalog
+    self.audioDeviceCatalog = audioDeviceCatalog
+    self.audioVolumeControlCatalog = audioVolumeControlCatalog
     self.savedWiFiNetworkNames = savedWiFiNetworkNames
   }
 }

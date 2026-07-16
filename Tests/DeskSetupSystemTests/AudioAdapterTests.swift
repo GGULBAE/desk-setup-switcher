@@ -109,7 +109,7 @@ final class AudioAdapterTests: XCTestCase {
     XCTAssertEqual(api.mute(for: "output-B")?.value, false)
   }
 
-  func testUnsupportedVolumeAndMuteAreItemOmissionsNotFatalGroupIssues() async throws {
+  func testUnsupportedVolumeAndMuteStayDormantWithoutReadinessNoise() async throws {
     let api = makeAPI()
     api.setInputVolumeState(.unsupported, for: "input-A")
     api.setVolumeState(.unsupported, for: "output-A")
@@ -127,11 +127,8 @@ final class AudioAdapterTests: XCTestCase {
 
     XCTAssertFalse(issues.contains(where: \.isFatal))
     XCTAssertTrue(plan.operations.isEmpty)
-    XCTAssertEqual(
-      Set(plan.omissions.map(\.key)),
-      ["inputVolume", "outputVolume", "outputMute"]
-    )
-    XCTAssertTrue(plan.omissions.allSatisfy { $0.status == .unsupported })
+    XCTAssertTrue(issues.isEmpty)
+    XCTAssertTrue(plan.omissions.isEmpty)
   }
 
   func testNoOpsAreNotPlannedOrReportedUnavailable() async throws {
@@ -190,6 +187,70 @@ final class AudioAdapterTests: XCTestCase {
     XCTAssertTrue(api.mutations().isEmpty)
   }
 
+  func testDeviceSwitchPlansBeforeVolumeAndResolvesTheNewDeviceControl() async throws {
+    let api = makeAPI()
+    let adapter = makeAdapter(api: api)
+    let snapshot = try await adapter.snapshot()
+    let desired = AudioProfileSettings(
+      defaultOutputUID: .init(value: "output-B"),
+      outputVolume: .init(value: 0.8)
+    )
+
+    let plan = try await adapter.plan(.audio(desired), from: snapshot, mode: .normal)
+    let commands = try plan.operations.map {
+      try JSONDecoder().decode(AudioOperationCommand.self, from: $0.payload)
+    }
+
+    XCTAssertEqual(
+      commands,
+      [
+        .setDefaultDevice(role: .output, uid: "output-B"),
+        .setOutputVolume(deviceUID: "output-B", value: 0.8),
+      ]
+    )
+    for operation in plan.operations {
+      let result = await adapter.apply(operation)
+      XCTAssertEqual(result.status, .succeeded)
+    }
+    XCTAssertEqual(
+      api.mutations(),
+      [
+        .setDefaultDevice(role: .output, uid: "output-B"),
+        .setOutputVolume(deviceUID: "output-B", value: 0.8),
+      ]
+    )
+  }
+
+  func testReadBackMismatchAndHotPlugFailClosed() async throws {
+    let mismatchAPI = makeAPI()
+    mismatchAPI.setIgnoredMutation(.setOutputVolume(deviceUID: "output-A", value: 0.9))
+    let mismatchAdapter = makeAdapter(api: mismatchAPI)
+    let mismatchSnapshot = try await mismatchAdapter.snapshot()
+    let mismatchPlan = try await mismatchAdapter.plan(
+      .audio(.init(outputVolume: .init(value: 0.9))),
+      from: mismatchSnapshot,
+      mode: .normal
+    )
+    let mismatchOperation = try XCTUnwrap(mismatchPlan.operations.first)
+
+    let mismatchResult = await mismatchAdapter.apply(mismatchOperation)
+    XCTAssertEqual(mismatchResult.status, .failed)
+
+    let hotPlugAPI = makeAPI()
+    let hotPlugAdapter = makeAdapter(api: hotPlugAPI)
+    let hotPlugSnapshot = try await hotPlugAdapter.snapshot()
+    let hotPlugPlan = try await hotPlugAdapter.plan(
+      .audio(.init(defaultOutputUID: .init(value: "output-B"))),
+      from: hotPlugSnapshot,
+      mode: .normal
+    )
+    hotPlugAPI.removeDevice(uid: "output-B")
+
+    let hotPlugOperation = try XCTUnwrap(hotPlugPlan.operations.first)
+    let hotPlugResult = await hotPlugAdapter.apply(hotPlugOperation)
+    XCTAssertEqual(hotPlugResult.status, .failed)
+  }
+
   private func makeAdapter(api: MockAudioSystemAPI) -> CoreAudioAdapter {
     CoreAudioAdapter(
       api: api,
@@ -246,7 +307,7 @@ final class AudioAdapterTests: XCTestCase {
   }
 }
 
-private final class MockAudioSystemAPI: AudioSystemAPI, @unchecked Sendable {
+final class MockAudioSystemAPI: AudioSystemAPI, @unchecked Sendable {
   private let lock = NSLock()
   private var deviceValues: [AudioDeviceDescriptor]
   private var defaultValues: [AudioDefaultDeviceRole: String]
@@ -254,6 +315,7 @@ private final class MockAudioSystemAPI: AudioSystemAPI, @unchecked Sendable {
   private var volumeValues: [String: AudioControlState<Double>]
   private var muteValues: [String: AudioControlState<Bool>]
   private var mutationValues: [AudioOperationCommand] = []
+  private var ignoredMutation: AudioOperationCommand?
 
   init(
     devices: [AudioDeviceDescriptor],
@@ -313,8 +375,13 @@ private final class MockAudioSystemAPI: AudioSystemAPI, @unchecked Sendable {
       guard supported else {
         throw AudioSystemError.deviceHasWrongScope(uid: uid, role: role)
       }
+      let command = AudioOperationCommand.setDefaultDevice(role: role, uid: uid)
+      if ignoredMutation == command {
+        mutationValues.append(command)
+        return
+      }
       defaultValues[role] = uid
-      mutationValues.append(.setDefaultDevice(role: role, uid: uid))
+      mutationValues.append(command)
     }
   }
 
@@ -325,8 +392,13 @@ private final class MockAudioSystemAPI: AudioSystemAPI, @unchecked Sendable {
       }
       switch volumeValues[uid] ?? .unsupported {
       case .available(_, true):
+        let command = AudioOperationCommand.setOutputVolume(deviceUID: uid, value: value)
+        if ignoredMutation == command {
+          mutationValues.append(command)
+          return
+        }
         volumeValues[uid] = .available(value: value, isSettable: true)
-        mutationValues.append(.setOutputVolume(deviceUID: uid, value: value))
+        mutationValues.append(command)
       case .available(_, false):
         throw AudioSystemError.controlNotSettable(uid: uid, key: "volume")
       case .unsupported:
@@ -344,8 +416,13 @@ private final class MockAudioSystemAPI: AudioSystemAPI, @unchecked Sendable {
       }
       switch inputVolumeValues[uid] ?? .unsupported {
       case .available(_, true):
+        let command = AudioOperationCommand.setInputVolume(deviceUID: uid, value: value)
+        if ignoredMutation == command {
+          mutationValues.append(command)
+          return
+        }
         inputVolumeValues[uid] = .available(value: value, isSettable: true)
-        mutationValues.append(.setInputVolume(deviceUID: uid, value: value))
+        mutationValues.append(command)
       case .available(_, false):
         throw AudioSystemError.controlNotSettable(uid: uid, key: "input volume")
       case .unsupported:
@@ -402,6 +479,14 @@ private final class MockAudioSystemAPI: AudioSystemAPI, @unchecked Sendable {
 
   func setMuteState(_ state: AudioControlState<Bool>, for uid: String) {
     withLock { muteValues[uid] = state }
+  }
+
+  func setIgnoredMutation(_ command: AudioOperationCommand?) {
+    withLock { ignoredMutation = command }
+  }
+
+  func removeDevice(uid: String) {
+    withLock { deviceValues.removeAll { $0.uid == uid } }
   }
 
   private func withLock<T>(_ body: () throws -> T) rethrows -> T {

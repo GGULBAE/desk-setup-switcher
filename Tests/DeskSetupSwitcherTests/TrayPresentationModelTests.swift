@@ -113,9 +113,8 @@ import Testing
       let model = UIAuditFixtures.makeModel(configuration: .disabled)
       model.configureForUIAudit(fixture)
       let presentation = makePresentation(model: model)
-      let enabled = fixture.profiles.filter(\.isEnabled)
-      let first = enabled[0].id
-      let next = enabled[1].id
+      let first = fixture.profiles[0].id
+      let next = fixture.profiles[1].id
 
       await presentation.executeStayOpen(.requestDelete(first))
       #expect(presentation.focusTarget == .cancelDelete(first))

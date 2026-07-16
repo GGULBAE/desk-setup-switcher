@@ -130,6 +130,25 @@ public enum DisplayMirroring: Codable, Hashable, Sendable {
   case mirrors(DisplayIdentity)
 }
 
+/// Portable identity for a ColorSync ICC display profile. Runtime file URLs
+/// are resolved from the current public ColorSync catalog and are never stored
+/// in profile JSON.
+public struct ColorSyncProfileTarget: Codable, Hashable, Sendable {
+  public var registeredProfileID: String
+  public var fileSHA256: String
+  public var displayName: String
+
+  public init(
+    registeredProfileID: String,
+    fileSHA256: String,
+    displayName: String
+  ) {
+    self.registeredProfileID = registeredProfileID
+    self.fileSHA256 = fileSHA256
+    self.displayName = displayName
+  }
+}
+
 public struct DisplayTargetSettings: Codable, Hashable, Sendable, Identifiable {
   public var id: UUID
   public var identity: DisplayIdentity
@@ -137,6 +156,7 @@ public struct DisplayTargetSettings: Codable, Hashable, Sendable, Identifiable {
   public var origin: SettingOption<DisplayPoint>
   public var mirroring: SettingOption<DisplayMirroring>
   public var mode: SettingOption<DisplayMode>
+  public var colorProfile: SettingOption<ColorSyncProfileTarget?>
   public var rotationDegrees: SettingOption<Int>
   public var isActive: SettingOption<Bool>
 
@@ -147,6 +167,10 @@ public struct DisplayTargetSettings: Codable, Hashable, Sendable, Identifiable {
     origin: SettingOption<DisplayPoint>,
     mirroring: SettingOption<DisplayMirroring>,
     mode: SettingOption<DisplayMode>,
+    colorProfile: SettingOption<ColorSyncProfileTarget?> = .init(
+      isIncluded: false,
+      value: nil
+    ),
     rotationDegrees: SettingOption<Int>,
     isActive: SettingOption<Bool>
   ) {
@@ -156,8 +180,54 @@ public struct DisplayTargetSettings: Codable, Hashable, Sendable, Identifiable {
     self.origin = origin
     self.mirroring = mirroring
     self.mode = mode
+    self.colorProfile = colorProfile
     self.rotationDegrees = rotationDegrees
     self.isActive = isActive
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case id
+    case identity
+    case isPrimary
+    case origin
+    case mirroring
+    case mode
+    case colorProfile
+    case rotationDegrees
+    case isActive
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(UUID.self, forKey: .id)
+    identity = try container.decode(DisplayIdentity.self, forKey: .identity)
+    isPrimary = try container.decode(SettingOption<Bool>.self, forKey: .isPrimary)
+    origin = try container.decode(SettingOption<DisplayPoint>.self, forKey: .origin)
+    mirroring = try container.decode(SettingOption<DisplayMirroring>.self, forKey: .mirroring)
+    mode = try container.decode(SettingOption<DisplayMode>.self, forKey: .mode)
+    colorProfile =
+      try container.decodeIfPresent(
+        SettingOption<ColorSyncProfileTarget?>.self,
+        forKey: .colorProfile
+      ) ?? .init(isIncluded: false, value: nil)
+    rotationDegrees = try container.decode(
+      SettingOption<Int>.self,
+      forKey: .rotationDegrees
+    )
+    isActive = try container.decode(SettingOption<Bool>.self, forKey: .isActive)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(id, forKey: .id)
+    try container.encode(identity, forKey: .identity)
+    try container.encode(isPrimary, forKey: .isPrimary)
+    try container.encode(origin, forKey: .origin)
+    try container.encode(mirroring, forKey: .mirroring)
+    try container.encode(mode, forKey: .mode)
+    try container.encode(colorProfile, forKey: .colorProfile)
+    try container.encode(rotationDegrees, forKey: .rotationDegrees)
+    try container.encode(isActive, forKey: .isActive)
   }
 }
 
@@ -445,13 +515,13 @@ public struct ProfileSettings: Codable, Hashable, Sendable {
 
   public func payload(for group: SettingGroup) -> SettingsPayload? {
     switch group {
-    case .display where display.isIncluded && display.value.hasIncludedOption:
+    case .display where display.value.hasIncludedOption:
       return .display(display.value)
-    case .audio where audio.isIncluded && audio.value.hasIncludedOption:
+    case .audio where audio.value.hasIncludedOption:
       return .audio(audio.value)
-    case .network where network.isIncluded && network.value.hasIncludedOption:
+    case .network where network.value.hasIncludedOption:
       return .network(network.value)
-    case .input where input.isIncluded && input.value.hasIncludedOption:
+    case .input where input.value.hasIncludedOption:
       return .input(input.value)
     default:
       return nil
@@ -466,6 +536,7 @@ extension DisplayProfileSettings {
         || display.origin.isIncluded
         || display.mirroring.isIncluded
         || display.mode.isIncluded
+        || display.colorProfile.isIncluded
         || display.rotationDegrees.isIncluded
         || display.isActive.isIncluded
     }

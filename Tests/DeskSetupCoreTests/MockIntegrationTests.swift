@@ -227,8 +227,18 @@ private func makeIntegrationProfile(including groups: Set<SettingGroup>) -> Desk
   settings.audio.value.defaultOutputUID = .init(
     isIncluded: groups.contains(.audio), value: "test-output")
   settings.network.isIncluded = groups.contains(.network)
-  settings.network.value.wifiPower = .init(
-    isIncluded: groups.contains(.network), value: true)
+  settings.network.value.serviceIPv4 =
+    groups.contains(.network)
+    ? [
+      NetworkServiceIPv4Settings(
+        identity: .init(
+          kind: .ethernet,
+          serviceName: "Synthetic Ethernet",
+          interfaceType: "Ethernet"
+        ),
+        configuration: .init(value: .dhcp)
+      )
+    ] : []
   settings.input.isIncluded = groups.contains(.input)
   settings.input.value.pointerSpeed = .init(
     isIncluded: groups.contains(.input), value: 1)
