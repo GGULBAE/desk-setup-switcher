@@ -4,7 +4,7 @@
 
 Two user-provided screenshots from the preceding installed build showed an empty tray whose inner content was horizontally displaced and an apply preview that appeared to have no effect. The screenshots were inspected only for layout and workflow semantics; they are not copied into the repository. Diagnostics were inspected only through sanitized component/code metadata. No display, ColorSync, audio, network, mouse, keyboard, TCC, Keychain, or profile-store mutation was performed by development or verification commands.
 
-One explicitly gated live-read check prepared the selected profile twice through the current adapters and compared only execution-equivalence booleans. It passed without applying any operation and emitted no device identifiers or setting values. This is adjacent read-only evidence, not hardware-mutation proof.
+One explicitly gated live-read check prepared the selected profile twice through the current adapters. The first failing assertion showed that rendering whole `ApplyPreparation` operands could expose local values in transient test output, so the regression now asserts a standalone Boolean and provides only sanitized mode/group/count/equality flags. The final normal and available-items run passed without applying any operation. This is adjacent read-only evidence, not hardware-mutation proof.
 
 ## Empty-state diagnosis and correction
 
@@ -25,18 +25,26 @@ Deterministic tests cover both branches:
 - stable review → execution preflight → exactly one adapter apply call → itemized result;
 - changed execution preflight → zero adapter calls → visible refreshed review.
 
+## Repeated refreshed-review diagnosis and correction
+
+A later installed screenshot showed the orange refreshed-review notice recurring after every Apply Profile confirmation. The gated read-only reproduction proved that the visible operation values, capabilities, readiness, and counts were stable, but one Core Audio operation and rollback payload differed at the raw byte level. `JSONEncoder` may emit keyed enum fields in different object order, so byte equality incorrectly classified semantically identical commands as changed Mac state.
+
+Core Audio now emits sorted-key JSON. The core comparison also canonicalizes any JSON object before comparing operation and rollback payloads, then falls back to exact bytes for non-JSON data. A deterministic regression proves reordered keys are equivalent while a changed rollback value remains non-equivalent. This preserves stale-state protection without allowing encoder order to create an infinite review loop.
+
+After the correction, the selected profile's adjacent preparations passed in both normal and available-items modes in 0.148 seconds. No apply, authorization prompt, or setting mutation ran.
+
 ## Verification, package, and installation
 
 With all live and UI-audit flags unset, `make verify` passed with zero failures:
 
 - 134 XCTest cases, including five skipped opt-in cases;
-- 236 Swift Testing cases, including two disabled opt-in cases;
+- 237 Swift Testing cases, including two disabled opt-in cases;
 - English/Korean localization and source-policy lint;
 - Swift Debug/Release and universal Xcode Debug/Release;
 - Xcode Analyze;
 - DMG creation, checksum, read-only mount, metadata/resources, `x86_64 arm64`, and ad-hoc/no-Developer-ID signature verification.
 
-The verified DMG SHA-256 is `e2927513543903b794bea08628064b29c12604e18706bef169c20b3e89760bcd`. It replaced `/Applications/Desk Setup Switcher.app` through a staged copy with rollback backup. The installed bundle ID, version 0.1.0, architectures, and code signature passed read-only checks. The app was not launched automatically after replacement.
+The verified DMG SHA-256 is `62a2999a6d235f163753e7cccccf34b3b64605405635ca562a621c2e4bb48662`. It replaced `/Applications/Desk Setup Switcher.app` through a staged copy with rollback backup. The installed bundle ID, version 0.1.0, architectures, and code signature passed read-only checks. The app was not launched automatically after replacement. The pre-canonicalization package SHA-256 `e2927513543903b794bea08628064b29c12604e18706bef169c20b3e89760bcd` is historical.
 
 ## Remaining manual evidence
 

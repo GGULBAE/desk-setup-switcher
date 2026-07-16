@@ -56,7 +56,8 @@ public struct ApplyPreparation: Codable, Hashable, Sendable {
   /// Compares only execution-relevant planning data. Fresh preparations receive new
   /// timestamps and item identifiers, so those fields must not force a second preview.
   /// Rollback payloads are included: if the host changed after the preview, execution
-  /// pauses and presents the refreshed plan instead of using stale backup state.
+  /// pauses and presents the refreshed plan instead of using stale backup state. JSON
+  /// object key ordering is not state and is canonicalized before byte comparison.
   public func isExecutionEquivalent(to other: ApplyPreparation) -> Bool {
     guard profileID == other.profileID,
       mode == other.mode,
@@ -88,8 +89,8 @@ public struct ApplyPreparation: Codable, Hashable, Sendable {
         && lhs.risk == rhs.risk
         && lhs.isFatalOnFailure == rhs.isFatalOnFailure
         && lhs.preview == rhs.preview
-        && lhs.payload == rhs.payload
-        && lhs.rollbackPayload == rhs.rollbackPayload
+        && executionPayloadsMatch(lhs.payload, rhs.payload)
+        && executionPayloadsMatch(lhs.rollbackPayload, rhs.rollbackPayload)
     }
     guard operationsMatch else { return false }
 
@@ -100,6 +101,28 @@ public struct ApplyPreparation: Codable, Hashable, Sendable {
         && lhs.reason == rhs.reason
     }
   }
+}
+
+private func executionPayloadsMatch(_ lhs: Data?, _ rhs: Data?) -> Bool {
+  guard lhs != rhs else { return true }
+  guard let lhs, let rhs,
+    let canonicalLHS = canonicalJSONData(lhs),
+    let canonicalRHS = canonicalJSONData(rhs)
+  else { return false }
+  return canonicalLHS == canonicalRHS
+}
+
+private func canonicalJSONData(_ data: Data) -> Data? {
+  guard
+    let object = try? JSONSerialization.jsonObject(
+      with: data,
+      options: [.fragmentsAllowed]
+    )
+  else { return nil }
+  return try? JSONSerialization.data(
+    withJSONObject: object,
+    options: [.sortedKeys, .fragmentsAllowed]
+  )
 }
 
 public struct ApplyExecutionResult: Codable, Hashable, Sendable {

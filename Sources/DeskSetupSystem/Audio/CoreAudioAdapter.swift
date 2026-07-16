@@ -968,7 +968,9 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
   }
 
   private func encode(_ command: AudioOperationCommand) throws -> Data {
-    try JSONEncoder().encode(command)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return try encoder.encode(command)
   }
 
   private func decode(_ data: Data) throws -> AudioOperationCommand {

@@ -356,6 +356,40 @@ struct ApplyEngineTests {
     #expect(!preview.isExecutionEquivalent(to: refreshed))
   }
 
+  @Test("execution equivalence ignores JSON object order but detects changed values")
+  func executionEquivalenceCanonicalizesJSONPayloads() async throws {
+    let operation = PlannedOperation(
+      group: .audio,
+      key: "inputVolume",
+      summary: "Change input volume",
+      payload: Data(#"{"command":{"device":"synthetic","value":0.05}}"#.utf8),
+      rollbackPayload: Data(#"{"command":{"device":"synthetic","value":0.5}}"#.utf8)
+    )
+    let adapter = MockSystemSettingsAdapter(
+      group: .audio,
+      plan: AdapterPlan(group: .audio, operations: [operation])
+    )
+    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+    let preview = await engine.prepare(
+      profile: makeProfile(including: [.audio]),
+      mode: .normal
+    )
+    var reordered = preview
+    reordered.operations[0].payload = Data(
+      #"{"command":{"value":0.05,"device":"synthetic"}}"#.utf8
+    )
+    reordered.operations[0].rollbackPayload = Data(
+      #"{"command":{"value":0.5,"device":"synthetic"}}"#.utf8
+    )
+
+    #expect(preview.isExecutionEquivalent(to: reordered))
+
+    reordered.operations[0].rollbackPayload = Data(
+      #"{"command":{"value":0.6,"device":"synthetic"}}"#.utf8
+    )
+    #expect(!preview.isExecutionEquivalent(to: reordered))
+  }
+
   @Test("a failed nonfatal partial write is restored before later operations continue")
   func failedNonfatalOperationSelfRollsBack() async throws {
     let first = PlannedOperation(

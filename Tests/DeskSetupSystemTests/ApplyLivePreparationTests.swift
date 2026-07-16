@@ -23,26 +23,27 @@ struct ApplyLivePreparationTests {
       registry: try AdapterRegistry(LiveAdapterFactory.makeAdapters())
     )
 
-    let first = await engine.prepare(profile: profile, mode: .normal)
-    let second = await engine.prepare(profile: profile, mode: .normal)
-    let operationContracts = zip(first.operations, second.operations).map { lhs, rhs in
-      "\(lhs.group.rawValue):summary=\(lhs.summary == rhs.summary),preview=\(lhs.preview == rhs.preview),payload=\(lhs.payload == rhs.payload),rollback=\(lhs.rollbackPayload == rhs.rollbackPayload)"
-    }
-    let sanitizedComparison = [
-      "groups=\(first.includedGroups == second.includedGroups)",
-      "capabilities=\(first.capabilities == second.capabilities)",
-      "readiness=\(first.readiness == second.readiness)",
-      "rejections=\(first.rejectionReasons == second.rejectionReasons)",
-      "validations=\(first.validationIssues == second.validationIssues)",
-      "operation-count=\(first.operations.count == second.operations.count)",
-      "omissions=\(first.omissions == second.omissions)",
-      "operations=[\(operationContracts.joined(separator: ";"))]",
-    ].joined(separator: ",")
+    for mode in [ApplyMode.normal, .force] {
+      let first = await engine.prepare(profile: profile, mode: mode)
+      let second = await engine.prepare(profile: profile, mode: mode)
+      let operationContracts = zip(first.operations, second.operations).map { lhs, rhs in
+        "\(lhs.group.rawValue):summary=\(lhs.summary == rhs.summary),preview=\(lhs.preview == rhs.preview),payload=\(lhs.payload == rhs.payload),rollback=\(lhs.rollbackPayload == rhs.rollbackPayload)"
+      }
+      let sanitizedComparison = [
+        "mode=\(mode.rawValue)",
+        "groups=\(first.includedGroups == second.includedGroups)",
+        "capabilities=\(first.capabilities == second.capabilities)",
+        "readiness=\(first.readiness == second.readiness)",
+        "rejections=\(first.rejectionReasons == second.rejectionReasons)",
+        "validation-count=\(first.validationIssues.count == second.validationIssues.count)",
+        "operation-count=\(first.operations.count == second.operations.count)",
+        "omission-count=\(first.omissions.count == second.omissions.count)",
+        "operations=[\(operationContracts.joined(separator: ";"))]",
+      ].joined(separator: ",")
+      let isEquivalent = first.isExecutionEquivalent(to: second)
 
-    #expect(
-      first.isExecutionEquivalent(to: second),
-      Comment(rawValue: sanitizedComparison)
-    )
+      #expect(isEquivalent, Comment(rawValue: sanitizedComparison))
+    }
   }
 
   private static var liveReadTestsEnabled: Bool {

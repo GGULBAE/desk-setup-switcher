@@ -169,6 +169,15 @@ No live display/audio/network mutation, install, push, tag, signing/notarization
 
 Evidence: [installed empty/apply follow-up](INSTALLED-EMPTY-APPLY-FOLLOWUP-2026-07-16.md).
 
+## M4.7 — canonical execution-plan comparison
+
+- Reproduce the repeated refreshed-review loop with the explicitly gated read-only selected-profile preparation check. Adjacent plans had equal visible values but different Core Audio JSON byte ordering.
+- Encode new Core Audio operation and rollback commands with sorted keys and canonicalize JSON object ordering in the core execution-equivalence comparison.
+- Preserve fail-closed behavior for changed JSON values, changed rollback evidence, and non-JSON operation bytes.
+- Prevent the opt-in live regression from rendering preparation operands on failure; its diagnostic comment contains only modes, groups, counts, and equality booleans.
+- Integrated non-live `make verify` passes 371 default cases (134 XCTest with five skips + 237 Swift Testing with two disabled opt-in cases), all build/Analyze stages, and universal mounted-DMG verification. SHA-256 is `62a2999a6d235f163753e7cccccf34b3b64605405635ca562a621c2e4bb48662`.
+- A separate read-only adjacent preparation passed normal and available-items modes in 0.148 seconds. The verified package replaced `/Applications/Desk Setup Switcher.app` without automatic launch or setting mutation.
+
 ## Current next task — reinstalled smoke check, then hardware audit
 
 Launch the reinstalled app and first run user-driven checks for the empty tray alignment, repeated opens, Review→Apply Profile wording, and visible result/error states. Continue with application/Space switching, red-close recovery, native English/Korean rendering, keyboard focus, and VoiceOver. Only after a separate explicit mutation approval and preflight snapshot, execute the support-matrix ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 procedures and independently verify rollback. Import/export, the full permission matrix, login approval/retry/reboot, Gatekeeper, and physical Intel remain separately authorized work.
