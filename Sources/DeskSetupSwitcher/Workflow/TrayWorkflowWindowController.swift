@@ -521,8 +521,13 @@ final class TrayWorkflowWindowController: NSWindowController,
   TrayWorkflowWindowPresenting, NSWindowDelegate
 {
   private var presentationRequest: (id: UUID, task: Task<TrayDestinationPresentation, Never>)?
+  private let activationCoordinator: ApplicationWindowActivationCoordinator?
 
-  init<Content: View>(rootView: Content) {
+  init<Content: View>(
+    rootView: Content,
+    activationCoordinator: ApplicationWindowActivationCoordinator? = nil
+  ) {
+    self.activationCoordinator = activationCoordinator
     let hostingController = NSHostingController(rootView: rootView)
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 620, height: 500),
@@ -535,6 +540,7 @@ final class TrayWorkflowWindowController: NSWindowController,
     window.isReleasedWhenClosed = false
     window.tabbingMode = .disallowed
     window.contentMinSize = CGSize(width: 520, height: 360)
+    window.collectionBehavior = [.managed, .participatesInCycle]
     window.center()
     super.init(window: window)
     window.delegate = self
@@ -553,6 +559,7 @@ final class TrayWorkflowWindowController: NSWindowController,
       let waiter = WindowPresentationAwaiter(window: window)
       return await waiter.present {
         self.prepareForPresentation()
+        self.activationCoordinator?.windowWillPresent(window)
         NSApplication.shared.activate(ignoringOtherApps: true)
         self.showWindow(nil)
         window.makeKeyAndOrderFront(nil)
@@ -560,6 +567,14 @@ final class TrayWorkflowWindowController: NSWindowController,
     }
     presentationRequest = (id, task)
     let result = await task.value
+    switch result {
+    case .presented:
+      break
+    case .failed, .cancelled:
+      if let window {
+        activationCoordinator?.windowDidHide(window)
+      }
+    }
     if presentationRequest?.id == id {
       presentationRequest = nil
     }
@@ -572,6 +587,7 @@ final class TrayWorkflowWindowController: NSWindowController,
 
   func windowShouldClose(_ sender: NSWindow) -> Bool {
     sender.orderOut(nil)
+    activationCoordinator?.windowDidHide(sender)
     return false
   }
 

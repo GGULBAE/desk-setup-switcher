@@ -27,6 +27,7 @@ enum ProfileEditorSurfacePolicy {
   static let visibleGroups: Set<SettingGroup> = [.display, .audio, .network]
   static let showsDescription = false
   static let showsConditions = false
+  static let showsCurrentSettingsDraftRefresh = false
 }
 
 struct ProfilesSettingsView: View {
@@ -401,38 +402,15 @@ struct ProfilesSettingsView: View {
         Spacer()
       }
 
-      ViewThatFits(in: .horizontal) {
-        HStack(spacing: 10) {
-          captureSettingsButton
-          Spacer()
-          revertDraftButton
-          saveDraftButton
-        }
-
-        VStack(alignment: .trailing, spacing: 6) {
-          HStack {
-            Spacer()
-            captureSettingsButton
-          }
-          HStack(spacing: 10) {
-            Spacer()
-            revertDraftButton
-            saveDraftButton
-          }
-        }
+      HStack(spacing: 10) {
+        Spacer()
+        revertDraftButton
+        saveDraftButton
       }
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 12)
     .background(.bar)
-  }
-
-  private var captureSettingsButton: some View {
-    Button("Update Draft from Current Settings") {
-      requestDeferredAction(.captureCurrentSettings)
-    }
-    .accessibilityHint("Reads the current Mac and updates only this unsaved draft")
-    .disabled(profileEditor.activity.isBusy)
   }
 
   private var revertDraftButton: some View {
@@ -621,44 +599,6 @@ struct ProfilesSettingsView: View {
     return true
   }
 
-  private func captureCurrentSettingsIntoDraft() async {
-    guard let targetID = profileEditor.draft?.id else { return }
-    profileEditor.beginCapture()
-    switch await model.captureCurrentProfileSettings() {
-    case .captured(let snapshot, let summary):
-      guard profileEditor.draft?.id == targetID else {
-        profileEditor.finishWithError(
-          appLocalized("The selected profile changed before the snapshot finished."))
-        return
-      }
-      guard
-        SettingGroup.safeApplicationSequence.contains(where: {
-          snapshot.profileSettings.payload(for: $0) != nil
-        })
-      else {
-        profileEditor.finishWithError(
-          appLocalized("No settings could be added safely from this snapshot."))
-        return
-      }
-      let previousSettings = profileEditor.draft?.settings
-      profileEditor.replaceSettingsFromSnapshot(
-        snapshot.profileSettings,
-        expectedProfileID: targetID
-      )
-      profileEditor.finishWithMessage(
-        previousSettings == snapshot.profileSettings
-          ? appLocalized("The draft already matches the current settings.")
-          : summary.status == .partial
-            ? appLocalized(
-              "Current settings replaced the draft settings with \(summary.excludedCount) snapshot-only and \(summary.omittedCount) unavailable items. Review and save them."
-            )
-            : appLocalized(
-              "Current settings replaced the draft settings. Review and save them."))
-    case .rejected(let message, _):
-      profileEditor.finishWithError(message)
-    }
-  }
-
   private func persistSelection(_ target: ProfileSelectionTarget) {
     model.selectProfile(id: target.profileID)
   }
@@ -673,8 +613,6 @@ struct ProfilesSettingsView: View {
       profilePendingDeletion = model.profiles.first(where: { $0.id == profile.id }) ?? profile
     case .importProfiles:
       model.importProfiles()
-    case .captureCurrentSettings:
-      Task { await captureCurrentSettingsIntoDraft() }
     }
   }
 }
@@ -684,7 +622,6 @@ private enum DeferredProfileAction: Identifiable {
   case duplicate(UUID)
   case delete(DeskProfile)
   case importProfiles
-  case captureCurrentSettings
 
   var id: String {
     switch self {
@@ -692,7 +629,6 @@ private enum DeferredProfileAction: Identifiable {
     case .duplicate(let id): "duplicate-\(id.uuidString)"
     case .delete(let profile): "delete-\(profile.id.uuidString)"
     case .importProfiles: "import"
-    case .captureCurrentSettings: "capture-current-settings"
     }
   }
 }

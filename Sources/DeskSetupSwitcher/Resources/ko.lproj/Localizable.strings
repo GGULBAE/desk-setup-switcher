@@ -676,8 +676,6 @@
 "Save and Continue" = "저장하고 계속";
 "Discard Changes" = "변경사항 버리기";
 "This profile has changes that have not been saved." = "이 프로필에 저장하지 않은 변경사항이 있습니다.";
-"Update Draft from Current Settings" = "현재 설정으로 초안 업데이트";
-"Reads the current Mac and updates only this unsaved draft" = "현재 Mac을 읽어 이 저장되지 않은 초안만 업데이트합니다";
 "Revert Changes" = "변경사항 되돌리기";
 "All changes are saved." = "모든 변경사항이 저장되었습니다.";
 "Unsaved changes" = "저장하지 않은 변경사항";

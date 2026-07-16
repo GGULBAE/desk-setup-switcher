@@ -417,6 +417,7 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     // fitting-size, or safe-area value retained by AppKit from the previous
     // generation cannot shift the SwiftUI root on reopen.
     synchronizeViewport(viewport)
+    sessionState.trayContentDidAttach(sessionGeneration: generation)
     dismissalMonitor.start(
       anchorView: anchorView,
       contentWindow: { [weak popover] in popover?.contentWindow },

@@ -314,6 +314,7 @@ import Testing
         )
       )
       presentation.trayDidOpen(sessionGeneration: 1, viewport: viewport)
+      presentation.trayContentDidAttach(sessionGeneration: 1)
 
       let root = TrayRootView(presentation: presentation, router: router)
         .environmentObject(model)

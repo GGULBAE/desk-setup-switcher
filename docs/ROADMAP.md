@@ -132,18 +132,19 @@ Remaining:
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
-## M4.4 — Tray reopen and profile-detail refinement (implemented locally)
+## M4.4 — Tray reopen and profile-detail refinement (corrected locally)
 
-- Reset zero-origin AppKit viewport geometry and top-scroll state for every tray generation; a deterministic 20-cycle regression preserves the fixed viewport and one-scroll architecture.
-- Keep Settings/Profile Edit and other workflow destinations app-lifetime persistent, frontmost-before-tray-close, exactly-once, and recoverable after repeated red-close cycles.
+- Reset zero-origin AppKit viewport geometry for every tray generation; after `NSPopover.show`, attach one generation-scoped top-scroll request directly to the first content block so the first open cannot miss it and no anchor-only stack row adds blank spacing. A deterministic 20-cycle regression preserves the fixed viewport and one-scroll architecture.
+- Keep Settings/Profile Edit and other workflow destinations app-lifetime persistent, frontmost-before-tray-close, exactly-once, and recoverable after repeated red-close cycles. While at least one destination is visible, the process and windows participate in the ordinary macOS app/window cycle; the final explicit close restores tray-only accessory policy.
+- Remove the profile editor's current-settings draft refresh button and helper copy. Tray Capture remains the explicit current-state entry point and creates a new reviewable profile.
 - Replace Quit's power glyph with localized `xmark` semantics and derive a variable-length status-item symbol/name only from fresh enabled-profile matching or applying state.
 - Reduce the profile surface to alias/symbol/enabled plus Display, Audio, and Network while preserving and excluding hidden legacy data.
 - Add public Core Audio input-volume snapshot/apply/rollback coverage and portable Ethernet/Wi-Fi service IPv4 identity/read capability. Color-mode and IPv4 writes remain explicitly disabled where public rollback-safe support is unavailable.
 - Record synthetic Display/Audio/Network evidence and the [refinement audit](TRAY-SETTINGS-REFINEMENT-AUDIT-2026-07-15.md). No installed app, live mutation, TCC change, Keychain write, push, or publication is part of this milestone.
-- Integrated non-live `make verify` passes 338 cases (132 XCTest + 206 Swift Testing, six opt-in skips), all build/Analyze stages, and universal mounted-DMG verification. Current local SHA-256 is `539c203607782302799d68acdda2f64666f0ace5897fa325a79e1dfdcfc98f78`.
+- Integrated non-live `make verify` passes 339 cases (132 XCTest + 207 Swift Testing, six opt-in skips), all build/Analyze stages, and universal mounted-DMG verification. Current local SHA-256 is `567917f169e90799db177d0a5f22a8b13115cb30ed63f7e766fc4bb992ab35e3`.
 
-## Current next task — authorized installed interaction audit
+## Current next task — installed interaction audit
 
-Run user-driven checks for the actual status item, 20 visible reopen cycles, Settings/Profile Edit red-close recovery and frontmost ordering, native English/Korean rendering, keyboard focus, and VoiceOver. Use an explicit install/preflight boundary; do not infer display/audio/network mutation authority. Import/export, the full permission matrix, login approval/retry/reboot, Gatekeeper, physical Intel, and live mutation/rollback remain separately authorized work.
+Run user-driven checks for the actual status item, 20 visible reopen cycles, application/Space switching with Settings/Profile Edit held open, red-close recovery and frontmost ordering, native English/Korean rendering, keyboard focus, and VoiceOver. Use an explicit install/preflight boundary; do not infer display/audio/network mutation authority. Import/export, the full permission matrix, login approval/retry/reboot, Gatekeeper, physical Intel, and live mutation/rollback remain separately authorized work.
 
 Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

@@ -177,6 +177,7 @@ import Testing
       #expect(!ProfileEditorSurfacePolicy.visibleGroups.contains(.input))
       #expect(!ProfileEditorSurfacePolicy.showsDescription)
       #expect(!ProfileEditorSurfacePolicy.showsConditions)
+      #expect(!ProfileEditorSurfacePolicy.showsCurrentSettingsDraftRefresh)
     }
 
     @Test("runtime settings window exposes stable resizable geometry")
@@ -189,16 +190,24 @@ import Testing
       #expect(window.contentView?.bounds.width == 900)
       #expect(window.contentView?.bounds.height == 568)
       #expect(!window.isReleasedWhenClosed)
+      #expect(window.collectionBehavior.contains(.managed))
+      #expect(window.collectionBehavior.contains(.participatesInCycle))
     }
 
     @Test("settings red-close preserves one controller and root for ten reopen cycles")
     func runtimeSettingsWindowReopenLifecycle() throws {
-      let controller = RuntimeSettingsWindowController(rootView: Color.clear)
+      let activation = ApplicationWindowActivationCoordinator { _ in }
+      let controller = RuntimeSettingsWindowController(
+        rootView: Color.clear,
+        activationCoordinator: activation
+      )
       let window = try #require(controller.window)
       let contentController = try #require(window.contentViewController)
 
       for _ in 0..<10 {
+        activation.windowWillPresent(window)
         #expect(controller.windowShouldClose(window) == false)
+        #expect(activation.presentedWindowCount == 0)
         #expect(controller.window === window)
         #expect(window.contentViewController === contentController)
         #expect(!window.isReleasedWhenClosed)
@@ -214,16 +223,49 @@ import Testing
       #expect(window.styleMask.contains(.resizable))
       #expect(window.contentMinSize == CGSize(width: 520, height: 360))
       #expect(!window.isReleasedWhenClosed)
+      #expect(window.collectionBehavior.contains(.managed))
+      #expect(window.collectionBehavior.contains(.participatesInCycle))
+    }
+
+    @Test("ordinary app activation remains until the last destination is hidden")
+    func persistentWindowActivationLifetime() {
+      var policies: [NSApplication.ActivationPolicy] = []
+      let activation = ApplicationWindowActivationCoordinator { policy in
+        policies.append(policy)
+      }
+      let settings = NSWindow()
+      let workflow = NSWindow()
+
+      activation.windowWillPresent(settings)
+      activation.windowWillPresent(settings)
+      activation.windowWillPresent(workflow)
+      #expect(activation.presentedWindowCount == 2)
+      #expect(policies == [.regular])
+
+      activation.windowDidHide(settings)
+      activation.windowDidHide(settings)
+      #expect(activation.presentedWindowCount == 1)
+      #expect(policies == [.regular])
+
+      activation.windowDidHide(workflow)
+      #expect(activation.presentedWindowCount == 0)
+      #expect(policies == [.regular, .accessory])
     }
 
     @Test("workflow red-close preserves one controller and root for ten reopen cycles")
     func workflowWindowReopenLifecycle() throws {
-      let controller = TrayWorkflowWindowController(rootView: Color.clear)
+      let activation = ApplicationWindowActivationCoordinator { _ in }
+      let controller = TrayWorkflowWindowController(
+        rootView: Color.clear,
+        activationCoordinator: activation
+      )
       let window = try #require(controller.window)
       let contentController = try #require(window.contentViewController)
 
       for _ in 0..<10 {
+        activation.windowWillPresent(window)
         #expect(controller.windowShouldClose(window) == false)
+        #expect(activation.presentedWindowCount == 0)
         #expect(controller.window === window)
         #expect(window.contentViewController === contentController)
         #expect(!window.isReleasedWhenClosed)

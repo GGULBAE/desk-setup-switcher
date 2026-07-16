@@ -676,8 +676,6 @@
 "Save and Continue" = "Save and Continue";
 "Discard Changes" = "Discard Changes";
 "This profile has changes that have not been saved." = "This profile has changes that have not been saved.";
-"Update Draft from Current Settings" = "Update Draft from Current Settings";
-"Reads the current Mac and updates only this unsaved draft" = "Reads the current Mac and updates only this unsaved draft";
 "Revert Changes" = "Revert Changes";
 "All changes are saved." = "All changes are saved.";
 "Unsaved changes" = "Unsaved changes";

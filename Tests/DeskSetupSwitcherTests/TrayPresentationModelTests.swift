@@ -19,6 +19,7 @@ import Testing
         sessionGeneration: 1,
         viewport: CGSize(width: 368, height: 560)
       )
+      presentation.trayContentDidAttach(sessionGeneration: 1)
       #expect(
         presentation.scrollResetRequest
           == TrayScrollResetRequest(sessionGeneration: 1, anchor: .top)
@@ -32,6 +33,7 @@ import Testing
         sessionGeneration: 2,
         viewport: CGSize(width: 368, height: 560)
       )
+      presentation.trayContentDidAttach(sessionGeneration: 2)
       #expect(
         presentation.scrollResetRequest
           == TrayScrollResetRequest(sessionGeneration: 2, anchor: .top)
@@ -59,6 +61,7 @@ import Testing
         sessionGeneration: 10,
         viewport: CGSize(width: 368, height: 560)
       )
+      presentation.trayContentDidAttach(sessionGeneration: 10)
       await presentation.executeStayOpen(.capture)
       await gate.waitUntilEntered()
       #expect(presentation.capturePhase == .running)
@@ -69,6 +72,7 @@ import Testing
         sessionGeneration: 11,
         viewport: CGSize(width: 368, height: 560)
       )
+      presentation.trayContentDidAttach(sessionGeneration: 11)
       await presentation.executeStayOpen(.capture)
       #expect(await gate.entryCount == 1)
       #expect(presentation.capturePhase == .running)
@@ -88,7 +92,12 @@ import Testing
       let viewport = CGSize(width: 368, height: 560)
 
       for generation in UInt64(1)...20 {
+        let previousRequest = presentation.scrollResetRequest
         presentation.trayDidOpen(sessionGeneration: generation, viewport: viewport)
+        #expect(presentation.scrollResetRequest == previousRequest)
+        presentation.trayContentDidAttach(sessionGeneration: generation &- 1)
+        #expect(presentation.scrollResetRequest == previousRequest)
+        presentation.trayContentDidAttach(sessionGeneration: generation)
         #expect(
           presentation.scrollResetRequest
             == TrayScrollResetRequest(sessionGeneration: generation, anchor: .top)

@@ -105,6 +105,7 @@ struct DeskSetupSwitcherApp: App {
   @StateObject private var settingsNavigation: SettingsNavigationModel
   @StateObject private var trayPresentation: TrayPresentationModel
   private let uiAuditConfiguration: UIAuditConfiguration
+  private let windowActivationCoordinator: ApplicationWindowActivationCoordinator
   private let settingsWindowController: RuntimeSettingsWindowController
   private let workflowWindowController: TrayWorkflowWindowController
   private let destinationCoordinator: TrayDestinationCoordinator
@@ -189,7 +190,12 @@ struct DeskSetupSwitcherApp: App {
     .environmentObject(model)
     .environmentObject(locationPermission)
     .environmentObject(profileEditor)
-    let settingsController = RuntimeSettingsWindowController(rootView: settingsRoot)
+    let windowActivationCoordinator = ApplicationWindowActivationCoordinator()
+    self.windowActivationCoordinator = windowActivationCoordinator
+    let settingsController = RuntimeSettingsWindowController(
+      rootView: settingsRoot,
+      activationCoordinator: windowActivationCoordinator
+    )
     settingsWindowController = settingsController
 
     let workflowCloseRelay = TrayWorkflowCloseRelay()
@@ -200,7 +206,10 @@ struct DeskSetupSwitcherApp: App {
     .environmentObject(model)
     .environmentObject(locationPermission)
     .environmentObject(profileEditor)
-    let workflowController = TrayWorkflowWindowController(rootView: workflowRoot)
+    let workflowController = TrayWorkflowWindowController(
+      rootView: workflowRoot,
+      activationCoordinator: windowActivationCoordinator
+    )
     workflowCloseRelay.controller = workflowController
     workflowWindowController = workflowController
 
@@ -251,6 +260,7 @@ struct DeskSetupSwitcherApp: App {
             )
           )
           presentation.trayDidOpen(sessionGeneration: 1, viewport: viewport)
+          presentation.trayContentDidAttach(sessionGeneration: 1)
         }
         let auditRoot = UIAuditHostView(
           configuration: uiAuditConfiguration,

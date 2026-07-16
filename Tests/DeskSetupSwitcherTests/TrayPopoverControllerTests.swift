@@ -35,6 +35,7 @@ struct TrayPopoverControllerTests {
     #expect(controller.hostingViewSafeAreaInsets.right == 0)
     #expect(controller.contentViewBounds.size == controller.contentSize)
     #expect(state.openEvents == [.init(generation: 1, viewport: controller.contentSize)])
+    #expect(state.attachGenerations == [1])
     #expect(factory.monitor.startCount == 1)
   }
 
@@ -142,6 +143,7 @@ struct TrayPopoverControllerTests {
     #expect(factory.monitor.startCount == 20)
     #expect(factory.monitor.stopCount == 20)
     #expect(state.openEvents.map(\.generation) == Array(UInt64(1)...20))
+    #expect(state.attachGenerations == Array(UInt64(1)...20))
     #expect(state.closeGenerations == Array(UInt64(1)...20))
   }
 
@@ -229,6 +231,7 @@ private final class SessionStateSpy: TraySessionStateUpdating {
 
   var context: TrayGeometryContext
   private(set) var openEvents: [OpenEvent] = []
+  private(set) var attachGenerations: [UInt64] = []
   private(set) var closeGenerations: [UInt64] = []
 
   init(context: TrayGeometryContext) {
@@ -239,6 +242,10 @@ private final class SessionStateSpy: TraySessionStateUpdating {
 
   func trayDidOpen(sessionGeneration: UInt64, viewport: CGSize) {
     openEvents.append(.init(generation: sessionGeneration, viewport: viewport))
+  }
+
+  func trayContentDidAttach(sessionGeneration: UInt64) {
+    attachGenerations.append(sessionGeneration)
   }
 
   func trayDidClose(sessionGeneration: UInt64) {

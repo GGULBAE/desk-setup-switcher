@@ -5,6 +5,42 @@ import SwiftUI
   import DeskSetupCore
 #endif
 
+/// Keeps app-owned destinations in the ordinary macOS window cycle while any
+/// one is visible, then restores menu-bar-only behavior after the last window
+/// is explicitly hidden.
+@MainActor
+final class ApplicationWindowActivationCoordinator {
+  typealias PolicySetter = @MainActor (NSApplication.ActivationPolicy) -> Void
+
+  private var presentedWindowIDs: Set<ObjectIdentifier> = []
+  private let setActivationPolicy: PolicySetter
+
+  init(
+    setActivationPolicy: @escaping PolicySetter = { policy in
+      _ = NSApplication.shared.setActivationPolicy(policy)
+    }
+  ) {
+    self.setActivationPolicy = setActivationPolicy
+  }
+
+  var presentedWindowCount: Int { presentedWindowIDs.count }
+
+  func windowWillPresent(_ window: NSWindow) {
+    let wasEmpty = presentedWindowIDs.isEmpty
+    presentedWindowIDs.insert(ObjectIdentifier(window))
+    if wasEmpty {
+      setActivationPolicy(.regular)
+    }
+  }
+
+  func windowDidHide(_ window: NSWindow) {
+    guard presentedWindowIDs.remove(ObjectIdentifier(window)) != nil else { return }
+    if presentedWindowIDs.isEmpty {
+      setActivationPolicy(.accessory)
+    }
+  }
+}
+
 @MainActor
 protocol RuntimeSettingsWindowPresenting: AnyObject {
   func presentAndWaitUntilKey() async -> TrayDestinationPresentation
@@ -24,8 +60,13 @@ final class RuntimeSettingsWindowController: NSWindowController,
   RuntimeSettingsWindowPresenting, NSWindowDelegate
 {
   private var presentationRequest: (id: UUID, task: Task<TrayDestinationPresentation, Never>)?
+  private let activationCoordinator: ApplicationWindowActivationCoordinator?
 
-  init<Content: View>(rootView: Content) {
+  init<Content: View>(
+    rootView: Content,
+    activationCoordinator: ApplicationWindowActivationCoordinator? = nil
+  ) {
+    self.activationCoordinator = activationCoordinator
     let hostingController = NSHostingController(rootView: rootView)
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 900, height: 568),
@@ -40,6 +81,7 @@ final class RuntimeSettingsWindowController: NSWindowController,
     window.isMovableByWindowBackground = true
     window.isReleasedWhenClosed = false
     window.tabbingMode = .disallowed
+    window.collectionBehavior = [.managed, .participatesInCycle]
     window.contentMinSize = CGSize(width: 680, height: 480)
     window.setContentSize(CGSize(width: 900, height: 568))
     window.center()
@@ -49,6 +91,9 @@ final class RuntimeSettingsWindowController: NSWindowController,
 
   func showSettings() {
     prepareForPresentation()
+    if let window {
+      activationCoordinator?.windowWillPresent(window)
+    }
     NSApplication.shared.activate(ignoringOtherApps: true)
     showWindow(nil)
     window?.makeKeyAndOrderFront(nil)
@@ -71,6 +116,14 @@ final class RuntimeSettingsWindowController: NSWindowController,
     }
     presentationRequest = (id, task)
     let result = await task.value
+    switch result {
+    case .presented:
+      break
+    case .failed, .cancelled:
+      if let window {
+        activationCoordinator?.windowDidHide(window)
+      }
+    }
     if presentationRequest?.id == id {
       presentationRequest = nil
     }
@@ -82,6 +135,7 @@ final class RuntimeSettingsWindowController: NSWindowController,
     // controller/root view graph. The same window and app-lifetime draft can
     // therefore be made key again from the tray or Cmd+,.
     sender.orderOut(nil)
+    activationCoordinator?.windowDidHide(sender)
     return false
   }
 

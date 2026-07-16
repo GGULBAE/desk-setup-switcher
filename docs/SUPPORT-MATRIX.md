@@ -11,7 +11,7 @@
 - **Unsupported:** intentionally omitted; the app reports an item-level reason.
 - **Pending:** implementation or required evidence is incomplete.
 
-“Unit verified,” “mock verified,” and “live-read verified” must never be shortened to “hardware verified.” As of 2026-07-15, **no live setting mutation is hardware verified**. Tray Surface v2 and its deterministic tests passed the full non-live local gate. Its package is build/mount verified but was not installed or launched; all earlier installed tray interactions used the superseded `MenuBarExtra` implementation.
+“Unit verified,” “mock verified,” and “live-read verified” must never be shortened to “hardware verified.” As of 2026-07-16, **no live setting mutation is hardware verified**. Tray Surface v2 and its deterministic tests passed the full non-live local gate. The corrected package is build/mount verified but was not installed or launched; a user-provided screenshot covers only the preceding installed v2 build and exposed the presentation defects corrected here.
 
 ## Tray Surface v2 evidence
 
@@ -30,7 +30,7 @@
 | macOS | 14 Sonoma or later | Deployment target is 14.0. Tray Surface v2 passed full local `make verify` on 2026-07-15 with 326 default cases (130 XCTest plus 196 Swift Testing cases, six opt-in skips), zero failures, and no live flag. Earlier measured-height, permission, tray/editor, apply-reliability, header/editor, and 2026-07-11 gates remain historical evidence |
 | Apple Silicon | arm64 | Default tests passed on the current Tray Surface v2 source. The opt-in live-read smoke tests passed on the preceding capture source on an Apple M5 Mac; the display gate covers both active displays and the legitimate online-but-inactive sleep state |
 | Intel Mac | x86_64 | Current Swift/Xcode Debug/Release and packaged executable contain x86_64; physical Intel execution is pending |
-| Distribution | Direct no-Developer-ID DMG | Current `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`, SHA-256 `539c203607782302799d68acdda2f64666f0ace5897fa325a79e1dfdcfc98f78`, passed checksum, mount, metadata/resources, `x86_64 arm64`, and ad-hoc/no-Developer-ID signature verification. It was not installed or launched. Earlier checksums remain historical; nothing is published and the Gatekeeper path remains pending |
+| Distribution | Direct no-Developer-ID DMG | Current `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`, SHA-256 `567917f169e90799db177d0a5f22a8b13115cb30ed63f7e766fc4bb992ab35e3`, passed checksum, mount, metadata/resources, `x86_64 arm64`, and ad-hoc/no-Developer-ID signature verification. It was not installed or launched. Earlier checksums remain historical; nothing is published and the Gatekeeper path remains pending |
 | CI | GitHub Actions | UI-hardening commit `5f0cabc` passed full `make verify` and unsigned-package upload in [run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967). Initial failure run `29154880831` and repair run `29155207923` remain historical Swift 6.1 compatibility evidence |
 | App Store | Not required | No sandbox/App Store claim |
 | Signing/notarization | Optional | App is ad-hoc signed for integrity only; no Developer ID identity or notarization exists |
@@ -161,14 +161,15 @@ Coverage still absent:
 - A live Keychain round trip
 - A current-tree synthetic-data screenshot/layout walkthrough and full keyboard/VoiceOver/focus/contrast/text-size audit
 
-## Tray and settings refinement evidence recorded on 2026-07-15
+## Tray and settings refinement evidence recorded on 2026-07-16
 
-The final non-live gate passes 338 default cases (132 XCTest plus 206 Swift Testing, six opt-in skips), Swift/Xcode Debug and Release, Analyze, and universal mounted-package verification. Current local DMG SHA-256 is `539c203607782302799d68acdda2f64666f0ace5897fa325a79e1dfdcfc98f78`; it was not installed or launched.
+The final non-live gate passes 339 default cases (132 XCTest plus 207 Swift Testing, six opt-in skips), Swift/Xcode Debug and Release, Analyze, and universal mounted-package verification. Current local DMG SHA-256 is `567917f169e90799db177d0a5f22a8b13115cb30ed63f7e766fc4bb992ab35e3`; it was not installed or launched.
 
 | Capability | Implementation boundary | Current evidence |
 | --- | --- | --- |
-| Tray reopen geometry | Fixed `contentSize`; zero-origin hosting frame/bounds before and after show; one top-scroll request and one internal scroll view | Deterministic AppKit/SwiftUI tests cover deliberately displaced geometry and 20 open/close cycles. Actual menu-bar anchor, popover material, dismissal, and visible reopen behavior remain uninstalled/manual |
-| Persistent Settings/Profile Edit | App-lifetime controllers; red-close orders out; visible/key/front completion precedes tray close | Deterministic tests cover 10 reopen cycles per destination, non-key recovery, cancellation, coalescing, stale completion, and unsaved-root identity. Native window ordering after an installed click remains manual |
+| Tray reopen geometry | Fixed `contentSize`; zero-origin hosting frame/bounds before and after show; post-show generation-scoped top-scroll request; first content block owns the anchor; one internal scroll view | Deterministic AppKit/SwiftUI tests cover deliberately displaced geometry, stale attach rejection, and 20 open/close cycles. A user-provided installed screenshot exposed the former anchor-only spacing row; refreshed detached evidence shows it removed. Actual menu-bar anchor, popover material, dismissal, and corrected visible reopen behavior remain manual |
+| Persistent Settings/Profile Edit | App-lifetime controllers; red-close orders out; visible/key/front completion precedes tray close; shared `.regular`-while-visible/`.accessory`-when-hidden coordinator | Deterministic tests cover 10 reopen cycles per destination, two-window activation ownership, non-key recovery, cancellation, coalescing, stale completion, and unsaved-root identity. Native app/Space switching and window ordering after an installed click remain manual |
+| Settings profile actions | Fixed Revert/Save footer; no current-settings draft refresh action; tray Capture creates the current-state profile | Source policy and refreshed five-fixture detached evidence cover the simplified action bar. Save/revert behavior remains deterministic-test verified; corrected native rendering is manual |
 | Status-item profile indicator | Fresh enabled Ready plus known zero-operation match only; applying state wins; invalid/deleted/stale values fall back | Unit/AppKit tests cover fallback symbol, long name, preferred selected match, applying, failure, and deletion. A live status-item label was not inspected |
 | Audio input volume | Public Core Audio input scope with snapshot/validate/plan/apply/rollback; isolated unsupported/non-settable/hot-plug behavior | Deterministic adapter tests pass. No live input-volume mutation or hardware rollback was run |
 | Display color mode | Current Core Graphics color-space name is session-only read evidence; it is not a ColorSync profile, HDR state, or pixel encoding; no public rollback-safe mutation path | Synthetic editor evidence shows `Synthetic sRGB` and the unsupported reason. No vendor API, private API, or System Settings automation exists |

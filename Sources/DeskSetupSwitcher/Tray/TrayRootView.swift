@@ -36,10 +36,8 @@ struct TrayRootView: View {
       ScrollViewReader { proxy in
         ScrollView {
           VStack(alignment: .leading, spacing: TrayGeometry.sectionGap) {
-            Color.clear
-              .frame(height: 0)
-              .id(TrayScrollAnchor.top)
             profileContent
+              .id(TrayScrollAnchor.top)
             captureStatus
             captureSummary
             applySummary

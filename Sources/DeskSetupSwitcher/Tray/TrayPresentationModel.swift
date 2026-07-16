@@ -90,6 +90,7 @@ protocol TraySessionStateUpdating: AnyObject {
   func setStatusItemPresentationHandler(
     _ handler: @escaping @MainActor (TrayStatusItemPresentation) -> Void)
   func trayDidOpen(sessionGeneration: UInt64, viewport: CGSize)
+  func trayContentDidAttach(sessionGeneration: UInt64)
   func trayDidClose(sessionGeneration: UInt64)
 }
 
@@ -109,6 +110,8 @@ extension TraySessionStateUpdating {
   func setStatusItemPresentationHandler(
     _ handler: @escaping @MainActor (TrayStatusItemPresentation) -> Void
   ) {}
+
+  func trayContentDidAttach(sessionGeneration: UInt64) {}
 }
 
 /// App-lifetime surface state. Profiles and domain results remain authoritative
@@ -270,13 +273,17 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
 
   func trayDidOpen(sessionGeneration: UInt64, viewport: CGSize) {
     activeSessionGeneration = sessionGeneration
+    self.viewport = viewport
+    isTrayVisible = true
+    model.refreshReadinessFacts()
+  }
+
+  func trayContentDidAttach(sessionGeneration: UInt64) {
+    guard activeSessionGeneration == sessionGeneration else { return }
     scrollResetRequest = TrayScrollResetRequest(
       sessionGeneration: sessionGeneration,
       anchor: .top
     )
-    self.viewport = viewport
-    isTrayVisible = true
-    model.refreshReadinessFacts()
   }
 
   func trayDidClose(sessionGeneration: UInt64) {
