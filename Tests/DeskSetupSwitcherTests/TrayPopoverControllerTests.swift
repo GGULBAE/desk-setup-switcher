@@ -249,6 +249,52 @@ struct TrayPopoverControllerTests {
     #expect(factory.popover.contentSizeAssignments == [opened])
   }
 
+  @Test("status item anchor changes are coalesced until the tray closes")
+  func statusItemAnchorIsFrozenWhileOpen() {
+    let profile = statusProfile(name: "Meeting", symbol: "video")
+    let matching = TrayStatusItemPresentationBuilder().presentation(
+      for: TrayStatusItemSnapshot(
+        profiles: [profile],
+        selectedProfileID: profile.id,
+        visibleReadinessByProfile: [profile.id: .ready],
+        operationCountByProfile: [profile.id: 0],
+        hasFreshReadiness: true
+      )
+    )
+    let noMatch = TrayStatusItemPresentationBuilder().presentation(
+      for: TrayStatusItemSnapshot(
+        profiles: [profile],
+        selectedProfileID: profile.id,
+        visibleReadinessByProfile: [profile.id: .ready],
+        operationCountByProfile: [profile.id: 0],
+        hasFreshReadiness: false
+      )
+    )
+    let state = SessionStateSpy(
+      context: TrayGeometryContext(profileCount: 1),
+      statusItemPresentation: matching
+    )
+    let factory = SurfaceFactorySpy()
+    let controller = TrayPopoverController(
+      rootView: Color.clear,
+      sessionState: state,
+      factory: factory
+    )
+
+    controller.show()
+    let openAnchorWidth = factory.statusItem.anchor.bounds.width
+    state.emitStatusItemPresentation(noMatch)
+    state.emitStatusItemPresentation(noMatch)
+
+    #expect(factory.statusItem.presentations == [matching])
+    #expect(factory.statusItem.anchor.bounds.width == openAnchorWidth)
+
+    controller.requestClose(sessionGeneration: 1)
+
+    #expect(factory.statusItem.presentations == [matching, noMatch])
+    #expect(factory.statusItem.anchor.bounds.width < openAnchorWidth)
+  }
+
   @Test("dismiss and reopen reuse ownership but create a new geometry generation")
   func reopenDoesNotDuplicateOwnership() {
     let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 1))
@@ -311,9 +357,24 @@ private final class SessionStateSpy: TraySessionStateUpdating {
   private(set) var openEvents: [OpenEvent] = []
   private(set) var attachGenerations: [UInt64] = []
   private(set) var closeGenerations: [UInt64] = []
+  private var statusItemPresentationHandler: (@MainActor (TrayStatusItemPresentation) -> Void)?
+  var statusItemPresentation: TrayStatusItemPresentation
 
-  init(context: TrayGeometryContext) {
+  init(
+    context: TrayGeometryContext,
+    statusItemPresentation: TrayStatusItemPresentation =
+      TrayStatusItemPresentationBuilder().presentation(
+        for: TrayStatusItemSnapshot(
+          profiles: [],
+          selectedProfileID: nil,
+          visibleReadinessByProfile: [:],
+          operationCountByProfile: [:],
+          hasFreshReadiness: false
+        )
+      )
+  ) {
     self.context = context
+    self.statusItemPresentation = statusItemPresentation
   }
 
   var geometryContext: TrayGeometryContext { context }
@@ -328,6 +389,17 @@ private final class SessionStateSpy: TraySessionStateUpdating {
 
   func trayDidClose(sessionGeneration: UInt64) {
     closeGenerations.append(sessionGeneration)
+  }
+
+  func setStatusItemPresentationHandler(
+    _ handler: @escaping @MainActor (TrayStatusItemPresentation) -> Void
+  ) {
+    statusItemPresentationHandler = handler
+  }
+
+  func emitStatusItemPresentation(_ presentation: TrayStatusItemPresentation) {
+    statusItemPresentation = presentation
+    statusItemPresentationHandler?(presentation)
   }
 }
 
@@ -378,6 +450,10 @@ private final class StatusItemSurfaceSpy: TrayStatusItemSurface {
 
   func update(_ presentation: TrayStatusItemPresentation) {
     presentations.append(presentation)
+    anchor.frame.size.width =
+      presentation.title.isEmpty
+      ? 24
+      : min(172, max(48, CGFloat(presentation.title.count * 8 + 32)))
   }
 }
 

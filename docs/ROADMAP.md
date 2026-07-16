@@ -145,7 +145,7 @@ Remaining:
 
 ## M4.5 — Tray/settings end-to-end contract (implemented locally)
 
-- Make first attachment deterministic: 368-point width, 260/300/316/560-point height tiers for 0/1/2/3+ profiles, symmetric 16-point root padding, generation-guarded post-show attachment, one first-layout completion, and one final viewport synchronization without sleeps.
+- Make first attachment deterministic: 368-point width, 260/260/316/560-point height tiers for 0/1/2/3+ profiles, symmetric 16-point root padding, generation-guarded post-show attachment, one first-layout completion, and one final viewport synchronization without sleeps.
 - Remove profile activation as a product concept. Legacy false values normalize to active applicability and no longer hide a row or block apply.
 - Remove group/option disclosure and every disabled/read-only/future placeholder from the default editor. Keep the visible surface flat, always expanded, and limited to complete Display/Audio/Network vertical slices.
 - Establish `VisibleSettingRegistry` as the nine-kind capture→edit→validate→plan→apply→verify→rollback invariant, with typed runtime catalogs and unsupported/ambiguous controls absent.
@@ -177,6 +177,18 @@ Evidence: [installed empty/apply follow-up](INSTALLED-EMPTY-APPLY-FOLLOWUP-2026-
 - Prevent the opt-in live regression from rendering preparation operands on failure; its diagnostic comment contains only modes, groups, counts, and equality booleans.
 - Integrated non-live `make verify` passes 371 default cases (134 XCTest with five skips + 237 Swift Testing with two disabled opt-in cases), all build/Analyze stages, and universal mounted-DMG verification. SHA-256 is `62a2999a6d235f163753e7cccccf34b3b64605405635ca562a621c2e4bb48662`.
 - A separate read-only adjacent preparation passed normal and available-items modes in 0.148 seconds. The verified package replaced `/Applications/Desk Setup Switcher.app` without automatic launch or setting mutation.
+
+## M4.8 — tray, Settings, and workflow UI stability follow-up
+
+- Freeze the variable-width status-item anchor for each open popover generation: cached readiness remains usable during refresh, duplicate presentations are ignored, and the latest title/width is applied after close.
+- Keep empty idle tray content outside scrolling, make Capture icon-only with explicit accessibility copy, keep the header on one line, give every open generation a new top-anchored scroll identity, and remove animated focus scrolling.
+- Use one horizontal Settings workspace from the 680-point minimum upward instead of flipping the whole sidebar/editor anatomy at 760 points. Keep footer and save/revert action bars at stable heights.
+- Keep the runtime editor catalog stable while refresh is in flight, adopt at most the first completed read-only refresh in each presentation, suppress identical editor publications, replace lazy editor layout with deterministic layout, make invalid-save validation feedback reachable, and reset scroll only on profile identity or a hidden-window reopen.
+- Reset every refreshed apply preview to its top explanatory notice, keep notices and changes in one scroll region above a fixed footer, make workflow child screens fill one persistent canvas, bound protected-change summaries with internal scrolling, and use monospaced countdown digits.
+- Record the [UI stability audit](UI-STABILITY-AUDIT-2026-07-16.md), including the three installed references, before/after synthetic evidence, default and minimum-large-text preview evidence, accessibility limits, and manual 20-open/resize/profile-switch checks.
+- Integrated non-live `make verify` passes 375 default cases (134 XCTest with five skips + 241 Swift Testing with two disabled opt-in cases), all build/Analyze stages, and universal mounted-DMG verification. SHA-256 is `516b968718aeb3c1c247e1a2deca7a28d45820d119f31ea992d4b475071f3638`; the verified package replaced `/Applications/Desk Setup Switcher.app` without launch or setting mutation.
+
+No live display/audio/network mutation, UI automation, TCC action, Keychain write, push, tag, notarization, or publication is part of M4.8.
 
 ## Current next task — reinstalled smoke check, then hardware audit
 

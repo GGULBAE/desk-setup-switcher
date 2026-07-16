@@ -196,8 +196,10 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
           uniqueKeysWithValues: model.profiles.map { ($0.id, model.readiness(for: $0)) }
         ),
         operationCountByProfile: model.operationCountByProfile,
-        hasFreshReadiness:
-          model.readinessLastRefreshedAt != nil && !model.isReadinessRefreshInProgress
+        // A background refresh must not temporarily discard the last confirmed
+        // match. Doing so changes the status-item width exactly while it anchors
+        // the open popover.
+        hasFreshReadiness: model.readinessLastRefreshedAt != nil
       )
     )
   }

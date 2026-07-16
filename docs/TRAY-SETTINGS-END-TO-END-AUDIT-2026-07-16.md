@@ -1,5 +1,7 @@
 # Tray/settings end-to-end audit — 2026-07-16
 
+> Historical milestone evidence. The later [UI stability audit](UI-STABILITY-AUDIT-2026-07-16.md) supersedes the one-profile height, Settings breakpoint, scroll-identity, status-item anchor, and workflow-layout portions of this report.
+
 ## Scope and safety boundary
 
 This audit records the deterministic P0→P1→P2 tray/settings implementation. All automated work used synthetic profiles, injected system APIs, detached `NSHostingView` rendering, and non-live build/package commands. No display, ColorSync, audio, network, mouse, or keyboard setting was changed. No authorization prompt, TCC action, Keychain write, installation, launch of the packaged app, UI automation, push, tag, signing/notarization, or publication occurred.

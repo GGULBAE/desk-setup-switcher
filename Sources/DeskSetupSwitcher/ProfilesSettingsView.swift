@@ -10,17 +10,101 @@ import SwiftUI
   import DeskSetupSystem
 #endif
 
-enum ProfileWorkspaceLayoutMode: Equatable, Sendable {
-  case compact
-  case regular
+enum ProfileWorkspaceLayoutPolicy {
+  static let sidebarWidth: CGFloat = 210
+  static let minimumEditorWidth: CGFloat = 390
+  static let dividerWidth: CGFloat = 1
+  static let minimumContentWidth = sidebarWidth + dividerWidth + minimumEditorWidth
+}
 
-  static let compactBreakpoint: CGFloat = 760
+struct ProfileEditorCatalogSession: Equatable, Sendable {
+  private(set) var generation: UInt64?
+  private(set) var snapshot: SystemSnapshotResult?
+  private(set) var isAwaitingRefresh = false
+  private(set) var hasConsumedRefresh = false
 
-  init(width: CGFloat) {
-    self = width < Self.compactBreakpoint ? .compact : .regular
+  mutating func beginPresentation(
+    generation: UInt64,
+    snapshot: SystemSnapshotResult?,
+    isRefreshInProgress: Bool
+  ) {
+    guard self.generation != generation else {
+      if isRefreshInProgress {
+        beginRefresh()
+      } else {
+        observe(snapshot: snapshot)
+      }
+      return
+    }
+    self.generation = generation
+    self.snapshot = snapshot
+    isAwaitingRefresh = isRefreshInProgress
+    hasConsumedRefresh = false
   }
 
-  var isCompact: Bool { self == .compact }
+  mutating func beginRefresh() {
+    guard !hasConsumedRefresh else { return }
+    isAwaitingRefresh = true
+  }
+
+  mutating func observe(snapshot: SystemSnapshotResult?) {
+    guard let snapshot else { return }
+    if self.snapshot == nil {
+      self.snapshot = snapshot
+      if isAwaitingRefresh {
+        isAwaitingRefresh = false
+        hasConsumedRefresh = true
+      }
+      return
+    }
+    guard isAwaitingRefresh, !hasConsumedRefresh else { return }
+    self.snapshot = snapshot
+    isAwaitingRefresh = false
+    hasConsumedRefresh = true
+  }
+
+  mutating func finishRefresh(snapshot: SystemSnapshotResult?) {
+    guard isAwaitingRefresh, !hasConsumedRefresh else {
+      isAwaitingRefresh = false
+      return
+    }
+    if let snapshot {
+      self.snapshot = snapshot
+    }
+    isAwaitingRefresh = false
+    hasConsumedRefresh = true
+  }
+}
+
+enum ProfileEditorSavePolicy {
+  static func canAttemptSave(hasDraft: Bool, isDirty: Bool, isBusy: Bool) -> Bool {
+    hasDraft && isDirty && !isBusy
+  }
+}
+
+enum UnsavedPromptValidationAction: Equatable, Sendable {
+  case none
+  case cancelDeferredActionAndDismiss
+  case focusAndShowValidationSummary(DraftFieldIdentifier)
+}
+
+struct UnsavedPromptValidationHandoff: Equatable, Sendable {
+  private var pendingFocus: DraftFieldIdentifier?
+
+  mutating func rejectInvalidSave(
+    firstInvalidField: DraftFieldIdentifier?
+  ) -> UnsavedPromptValidationAction {
+    pendingFocus = firstInvalidField
+    return .cancelDeferredActionAndDismiss
+  }
+
+  mutating func presentationChanged(
+    isPresented: Bool
+  ) -> UnsavedPromptValidationAction {
+    guard !isPresented, let pendingFocus else { return .none }
+    self.pendingFocus = nil
+    return .focusAndShowValidationSummary(pendingFocus)
+  }
 }
 
 enum ProfileEditorSurfacePolicy {
@@ -41,6 +125,13 @@ struct ProfilesSettingsView: View {
   @State private var isUnsavedPromptPresented = false
   @State private var isResolvingUnsavedPrompt = false
   @State private var requestedValidationFocus: DraftFieldIdentifier?
+  @State private var unsavedPromptValidationHandoff = UnsavedPromptValidationHandoff()
+  @State private var catalogSession = ProfileEditorCatalogSession()
+  let presentationGeneration: UInt64
+
+  init(presentationGeneration: UInt64 = 0) {
+    self.presentationGeneration = presentationGeneration
+  }
 
   var body: some View {
     VStack(spacing: 12) {
@@ -49,29 +140,10 @@ struct ProfilesSettingsView: View {
 
       Divider()
 
-      ViewThatFits(in: .horizontal) {
-        HStack(spacing: 10) {
-          storageStatusLabel
-          Spacer(minLength: 12)
-          importExportButtons
-        }
-
-        VStack(alignment: .leading, spacing: 8) {
-          storageStatusLabel
-          HStack(spacing: 8) {
-            Spacer()
-            importExportButtons
-          }
-        }
-      }
-
-      if model.isProfileMutationLocked {
-        Label(
-          "Profile editing is locked until the current operation is safely recorded.",
-          systemImage: "lock"
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
+      HStack(spacing: 10) {
+        storageStatusLabel
+        Spacer(minLength: 12)
+        importExportButtons
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -79,6 +151,11 @@ struct ProfilesSettingsView: View {
       profileEditor.initialize(
         profiles: model.profiles,
         preferredProfileID: model.selectedProfileID
+      )
+      catalogSession.beginPresentation(
+        generation: presentationGeneration,
+        snapshot: model.lastSnapshot,
+        isRefreshInProgress: model.isReadinessRefreshInProgress
       )
       if profileEditor.session.pendingSelection != nil {
         isUnsavedPromptPresented = true
@@ -97,6 +174,23 @@ struct ProfilesSettingsView: View {
     .onChange(of: model.selectedProfileID) {
       synchronizeEditor()
     }
+    .onChange(of: model.lastSnapshot) { _, snapshot in
+      catalogSession.observe(snapshot: snapshot)
+    }
+    .onChange(of: model.isReadinessRefreshInProgress) { _, isRefreshing in
+      if isRefreshing {
+        catalogSession.beginRefresh()
+      } else {
+        catalogSession.finishRefresh(snapshot: model.lastSnapshot)
+      }
+    }
+    .onChange(of: presentationGeneration) { _, generation in
+      catalogSession.beginPresentation(
+        generation: generation,
+        snapshot: model.lastSnapshot,
+        isRefreshInProgress: model.isReadinessRefreshInProgress
+      )
+    }
     .onChange(of: profileEditor.session.pendingSelection) {
       if profileEditor.session.pendingSelection != nil {
         isUnsavedPromptPresented = true
@@ -107,6 +201,10 @@ struct ProfilesSettingsView: View {
       isPresented: $isUnsavedPromptPresented
     ) {
       Button("Save and Continue") {
+        guard draftCanBePersisted else {
+          rejectInvalidSaveAndReturnToEditor()
+          return
+        }
         isResolvingUnsavedPrompt = true
         Task {
           await saveAndContinue()
@@ -116,7 +214,7 @@ struct ProfilesSettingsView: View {
           }
         }
       }
-      .disabled(!draftCanBePersisted)
+      .disabled(!canSaveDraft)
       Button("Discard Changes", role: .destructive) {
         isResolvingUnsavedPrompt = true
         discardAndContinue()
@@ -128,8 +226,19 @@ struct ProfilesSettingsView: View {
     } message: {
       Text("This profile has changes that have not been saved.")
     }
-    .onChange(of: isUnsavedPromptPresented) {
-      if !isUnsavedPromptPresented, !isResolvingUnsavedPrompt,
+    .onChange(of: isUnsavedPromptPresented) { _, isPresented in
+      if case .focusAndShowValidationSummary(let fieldID) =
+        unsavedPromptValidationHandoff.presentationChanged(isPresented: isPresented)
+      {
+        Task { @MainActor in
+          // Let SwiftUI complete the native dialog-dismissal transition before
+          // routing focus back into the editor. The form performs one further
+          // run-loop yield before assigning its FocusState.
+          await Task.yield()
+          requestedValidationFocus = fieldID
+        }
+      }
+      if !isPresented, !isResolvingUnsavedPrompt,
         profileEditor.session.pendingSelection != nil || deferredAction != nil
       {
         cancelDeferredAction()
@@ -180,38 +289,18 @@ struct ProfilesSettingsView: View {
   }
 
   private var profileWorkspace: some View {
-    GeometryReader { geometry in
-      let layoutMode = ProfileWorkspaceLayoutMode(width: geometry.size.width)
-      let usesCompactLayout = layoutMode.isCompact
-
-      // The fixed breakpoint intentionally replaces the draggable HSplitView.
-      // AnyLayout keeps the sidebar/editor identity stable while the window is resized.
-      let layout =
-        usesCompactLayout
-        ? AnyLayout(VStackLayout(spacing: 0))
-        : AnyLayout(HStackLayout(spacing: 0))
-
-      layout {
-        sidebar
-          .frame(
-            minWidth: usesCompactLayout ? 0 : 210,
-            idealWidth: usesCompactLayout ? nil : 230,
-            maxWidth: usesCompactLayout ? .infinity : 260,
-            minHeight: usesCompactLayout ? 120 : 0,
-            idealHeight: usesCompactLayout ? 150 : nil,
-            maxHeight: usesCompactLayout ? 170 : .infinity
-          )
-        Divider()
-        editor
-          .frame(
-            minWidth: usesCompactLayout ? 0 : 390,
-            maxWidth: .infinity,
-            minHeight: usesCompactLayout ? 190 : 0,
-            maxHeight: .infinity
-          )
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    HStack(spacing: 0) {
+      sidebar
+        .frame(width: ProfileWorkspaceLayoutPolicy.sidebarWidth)
+      Divider()
+      editor
+        .frame(
+          minWidth: ProfileWorkspaceLayoutPolicy.minimumEditorWidth,
+          maxWidth: .infinity,
+          maxHeight: .infinity
+        )
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 
   private var sidebar: some View {
@@ -311,10 +400,10 @@ struct ProfilesSettingsView: View {
       if profileEditor.draft != nil {
         ProfileEditorForm(
           profile: draftBinding,
-          conditionContext: model.lastConditionContext,
-          systemSnapshot: model.lastSnapshot,
+          systemSnapshot: catalogSession.snapshot,
           validation: currentDraftValidation,
-          requestedValidationFocus: $requestedValidationFocus
+          requestedValidationFocus: $requestedValidationFocus,
+          presentationGeneration: presentationGeneration
         )
         .disabled(profileEditor.activity.isBusy)
         Divider()
@@ -342,12 +431,25 @@ struct ProfilesSettingsView: View {
   }
 
   private var storageStatusLabel: some View {
-    Label(model.storageStatus, systemImage: "externaldrive")
-      .font(.caption)
-      .foregroundStyle(.secondary)
-      .fixedSize(horizontal: false, vertical: true)
-      .accessibilityLabel(
-        appLocalized("Profile storage status: \(model.storageStatus)"))
+    Label(
+      model.isProfileMutationLocked
+        ? appLocalized("Profile editing is locked until the current operation is safely recorded.")
+        : model.storageStatus,
+      systemImage: model.isProfileMutationLocked ? "lock" : "externaldrive"
+    )
+    .font(.caption)
+    .foregroundStyle(.secondary)
+    .lineLimit(1)
+    .truncationMode(.tail)
+    .help(
+      model.isProfileMutationLocked
+        ? appLocalized("Profile editing is locked until the current operation is safely recorded.")
+        : model.storageStatus
+    )
+    .accessibilityLabel(
+      model.isProfileMutationLocked
+        ? appLocalized("Profile editing is locked until the current operation is safely recorded.")
+        : appLocalized("Profile storage status: \(model.storageStatus)"))
   }
 
   private var importExportButtons: some View {
@@ -388,23 +490,20 @@ struct ProfilesSettingsView: View {
   }
 
   private var editorActionBar: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack {
-        Label(editorActivityTitle, systemImage: editorActivitySymbol)
-          .font(.caption)
-          .foregroundStyle(editorActivityIsError ? .red : .secondary)
-          .accessibilityLabel(editorActivityAccessibilityLabel)
-        Spacer()
-      }
-
-      HStack(spacing: 10) {
-        Spacer()
-        revertDraftButton
-        saveDraftButton
-      }
+    HStack(spacing: 10) {
+      Label(editorActivityTitle, systemImage: editorActivitySymbol)
+        .font(.caption)
+        .foregroundStyle(editorActivityIsError ? .red : .secondary)
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .help(editorActivityTitle)
+        .accessibilityLabel(editorActivityAccessibilityLabel)
+      Spacer(minLength: 8)
+      revertDraftButton
+      saveDraftButton
     }
     .padding(.horizontal, 16)
-    .padding(.vertical, 12)
+    .frame(height: 52)
     .background(.bar)
   }
 
@@ -425,9 +524,11 @@ struct ProfilesSettingsView: View {
   }
 
   private var canSaveDraft: Bool {
-    return profileEditor.isDirty
-      && !profileEditor.activity.isBusy
-      && draftCanBePersisted
+    ProfileEditorSavePolicy.canAttemptSave(
+      hasDraft: profileEditor.draft != nil,
+      isDirty: profileEditor.isDirty,
+      isBusy: profileEditor.activity.isBusy
+    )
   }
 
   private var currentDraftValidation: ProfileDraftValidation {
@@ -502,6 +603,20 @@ struct ProfilesSettingsView: View {
     }
     deferredAction = nil
     isUnsavedPromptPresented = false
+  }
+
+  private func rejectInvalidSaveAndReturnToEditor() {
+    let action = unsavedPromptValidationHandoff.rejectInvalidSave(
+      firstInvalidField: currentDraftValidation.firstInvalidField
+    )
+    AccessibilityNotification.Announcement(
+      appLocalized("Fix the highlighted fields before saving.")
+    )
+    .post()
+    guard action == .cancelDeferredActionAndDismiss else { return }
+    // Returning to the editor cancels the pending selection/import action. The
+    // user can request it again after correcting the draft.
+    cancelDeferredAction()
   }
 
   private func discardAndContinue() {
@@ -631,18 +746,19 @@ private enum DeferredProfileAction: Identifiable {
 private struct ProfileEditorForm: View {
   @Environment(\.uiAuditConfiguration) private var uiAuditConfiguration
   @Binding var profile: DeskProfile
-  let conditionContext: ConditionContext
   let systemSnapshot: SystemSnapshotResult?
   let validation: ProfileDraftValidation
   @Binding var requestedValidationFocus: DraftFieldIdentifier?
+  let presentationGeneration: UInt64
   @FocusState private var focusedField: DraftFieldIdentifier?
+  @State private var showsValidationSummary = false
 
   var body: some View {
     ScrollView {
-      LazyVStack(alignment: .leading, spacing: 18) {
+      VStack(alignment: .leading, spacing: 18) {
         profileDetailsCard
 
-        if !validation.isValid {
+        if showsValidationSummary, !validation.isValid {
           validationSummary
         }
 
@@ -661,13 +777,28 @@ private struct ProfileEditorForm: View {
       .frame(maxWidth: 860)
       .frame(maxWidth: .infinity, alignment: .top)
     }
+    .id(
+      ProfileEditorScrollIdentity(
+        profileID: profile.id,
+        presentationGeneration: presentationGeneration
+      )
+    )
+    .defaultScrollAnchor(.top)
+    .scrollBounceBehavior(.basedOnSize)
     .background(Color(nsColor: .windowBackgroundColor))
     .onChange(of: profile.id) {
       focusedField = nil
       requestedValidationFocus = nil
+      showsValidationSummary = false
+    }
+    .onChange(of: presentationGeneration) {
+      focusedField = nil
+      requestedValidationFocus = nil
+      showsValidationSummary = false
     }
     .onChange(of: requestedValidationFocus) {
       guard let fieldID = requestedValidationFocus else { return }
+      showsValidationSummary = true
       revealAndFocus(fieldID)
     }
     .onAppear { configureSyntheticAuditFocus() }
@@ -1528,6 +1659,7 @@ private struct ProfileEditorForm: View {
     switch uiAuditConfiguration.variant {
     case .validation:
       if let firstValidationItem {
+        showsValidationSummary = true
         revealAndFocus(firstValidationItem.fieldID)
       }
     case .editor, .editorPolish, .editorAudio, .editorAudioUnsupported, .editorDisplay,
@@ -2092,20 +2224,24 @@ private let invalidPrimaryDisplaySelectionID = UUID(
 
 extension View {
   /// SwiftUI has no dedicated macOS invalid-field modifier. Expose the same
-  /// semantic as high-priority custom accessibility content while the inline
-  /// hint supplies the localized corrective message.
-  @ViewBuilder
+  /// semantic as custom accessibility content while keeping one modifier
+  /// hierarchy as validation changes, so a text field retains focus/caret.
+  /// Empty content is intended to remain silent for valid controls; native
+  /// VoiceOver confirmation remains part of the manual accessibility pass.
+  /// The inline hint supplies the localized corrective message for invalid
+  /// controls.
   fileprivate func accessibilityInvalid(_ isInvalid: Bool) -> some View {
-    if isInvalid {
-      accessibilityCustomContent(
-        "Validation status",
-        "Invalid",
-        importance: .high
-      )
-    } else {
-      self
-    }
+    accessibilityCustomContent(
+      Text(verbatim: isInvalid ? appLocalized("Validation status") : ""),
+      Text(verbatim: isInvalid ? appLocalized("Invalid") : ""),
+      importance: isInvalid ? .high : .default
+    )
   }
+}
+
+private struct ProfileEditorScrollIdentity: Hashable {
+  let profileID: UUID
+  let presentationGeneration: UInt64
 }
 
 private struct ProfileIconChoice {

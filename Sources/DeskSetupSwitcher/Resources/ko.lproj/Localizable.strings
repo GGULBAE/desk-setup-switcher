@@ -1036,6 +1036,7 @@
 "Validation error" = "유효성 검사 오류";
 "Validation status" = "유효성 상태";
 "Invalid" = "올바르지 않음";
+"Change input volume" = "입력 음량 변경";
 "Use Suggested Value" = "제안 값 사용";
 "Synthetic UI audit mode. Nothing is saved or applied." = "합성 UI 검토 모드입니다. 아무것도 저장하거나 적용하지 않습니다.";
 "System access is disabled for this synthetic review." = "이 합성 검토에서는 시스템 접근을 사용하지 않습니다.";

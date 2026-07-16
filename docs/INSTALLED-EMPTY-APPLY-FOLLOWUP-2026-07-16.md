@@ -1,5 +1,7 @@
 # Installed empty-state and apply-handoff follow-up — 2026-07-16
 
+> Historical installed follow-up. The later [UI stability audit](UI-STABILITY-AUDIT-2026-07-16.md) incorporates the subsequent tray, Settings, and refreshed-preview screenshots and supersedes the current implementation notes here.
+
 ## Scope and safety boundary
 
 Two user-provided screenshots from the preceding installed build showed an empty tray whose inner content was horizontally displaced and an apply preview that appeared to have no effect. The screenshots were inspected only for layout and workflow semantics; they are not copied into the repository. Diagnostics were inspected only through sanitized component/code metadata. No display, ColorSync, audio, network, mouse, keyboard, TCC, Keychain, or profile-store mutation was performed by development or verification commands.

@@ -1,0 +1,13 @@
+source=TrayRootView in attached offscreen NSWindow read-only accessibility attributes
+fixture=10-overflow-ko-light
+language=ko
+viewport=368x560
+profile-count=10
+requested-reduce-transparency=false
+applied-reduce-transparency=false
+reduce-transparency-limit=SwiftUI exposes this environment value as read-only in an offscreen host
+applied-increased-contrast=false
+swiftui-full-surface-background-layers=0
+declared-icon-labels=Capture Current Settings | Settings | Quit Desk Setup Switcher
+offscreen-ax-limit=virtual SwiftUI children may remain pending without ordering the window front
+role=AXGroup

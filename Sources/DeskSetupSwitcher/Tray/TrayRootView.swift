@@ -33,33 +33,11 @@ struct TrayRootView: View {
     VStack(alignment: .leading, spacing: TrayGeometry.sectionGap) {
       header
       Divider()
-      ScrollViewReader { proxy in
-        ScrollView {
-          VStack(alignment: .leading, spacing: TrayGeometry.sectionGap) {
-            profileContent
-              .id(TrayScrollAnchor.top)
-            captureStatus
-            captureSummary
-            applySummary
-            handoffError
-          }
-          .frame(maxWidth: .infinity, alignment: .topLeading)
-          .padding(.bottom, 2)
-        }
-        .scrollIndicators(.automatic)
-        .contentMargins(.vertical, 0, for: .scrollContent)
-        .onChange(of: presentation.scrollResetRequest) { _, request in
-          guard request?.anchor == .top else { return }
-          proxy.scrollTo(TrayScrollAnchor.top, anchor: .top)
-        }
-        .onChange(of: presentation.focusTarget) { _, target in
-          focusedControl = target
-          if let target {
-            withAnimation(.easeInOut(duration: 0.16)) {
-              proxy.scrollTo(target.scrollProfileID, anchor: .center)
-            }
-          }
-        }
+      if usesStaticEmptyBody {
+        profileContent
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+      } else {
+        scrollableBody
       }
     }
     .padding(TrayGeometry.outerPadding)
@@ -74,6 +52,9 @@ struct TrayRootView: View {
     HStack(spacing: 8) {
       Label(appLocalized("Desk Setup Switcher"), systemImage: "switch.2")
         .font(.headline)
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .layoutPriority(1)
         .accessibilityAddTraits(.isHeader)
 
       Spacer(minLength: 8)
@@ -82,8 +63,12 @@ struct TrayRootView: View {
         route(presentation.captureAction)
       } label: {
         Label(appLocalized("Capture"), systemImage: "camera.metering.center.weighted")
+          .labelStyle(.iconOnly)
+          .frame(width: 20, height: 20)
       }
+      .buttonStyle(.bordered)
       .controlSize(.regular)
+      .frame(minWidth: 32, minHeight: 32)
       .disabled(
         model.isProfileMutationLocked || profileEditor.session.pendingSelection != nil
           || presentation.hasCaptureTask
@@ -114,6 +99,49 @@ struct TrayRootView: View {
     .frame(minHeight: TrayGeometry.headerHeight)
   }
 
+  private var usesStaticEmptyBody: Bool {
+    guard model.profiles.isEmpty,
+      model.lastCaptureSummary == nil,
+      model.lastApplySummary == nil,
+      presentation.handoffError == nil
+    else { return false }
+    if case .idle = presentation.capturePhase {
+      return true
+    }
+    return false
+  }
+
+  private var scrollableBody: some View {
+    ScrollViewReader { proxy in
+      ScrollView {
+        VStack(alignment: .leading, spacing: TrayGeometry.sectionGap) {
+          profileContent
+            .id(TrayScrollAnchor.top)
+          captureStatus
+          captureSummary
+          applySummary
+          handoffError
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(.bottom, 2)
+      }
+      .id(presentation.activeSessionGeneration)
+      .defaultScrollAnchor(.top)
+      .scrollBounceBehavior(.basedOnSize)
+      .scrollIndicators(.automatic)
+      .contentMargins(.vertical, 0, for: .scrollContent)
+      .onChange(of: presentation.scrollResetRequest) { _, request in
+        guard request?.anchor == .top else { return }
+        proxy.scrollTo(TrayScrollAnchor.top, anchor: .top)
+      }
+      .onChange(of: presentation.focusTarget) { _, target in
+        focusedControl = target
+        guard let profileID = target?.scrollProfileID else { return }
+        proxy.scrollTo(profileID, anchor: .center)
+      }
+    }
+  }
+
   @ViewBuilder
   private var profileContent: some View {
     if model.profiles.isEmpty {
@@ -131,9 +159,8 @@ struct TrayRootView: View {
           .fixedSize(horizontal: false, vertical: true)
           .frame(maxWidth: 260)
       }
-      .frame(maxWidth: .infinity, alignment: .top)
-      .padding(.top, 14)
-      .padding(.bottom, 8)
+      .frame(maxWidth: .infinity, alignment: .center)
+      .padding(.vertical, 8)
       .accessibilityElement(children: .combine)
       .id(TrayFocusTarget.emptyState)
     } else {

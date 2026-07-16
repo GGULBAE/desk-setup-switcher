@@ -55,7 +55,7 @@ final class ProfileEditorModel: ObservableObject {
     session = ProfileDraftSession(
       selectedProfile: preferredProfile(in: profiles, id: preferredProfileID)
     )
-    activity = .saved
+    setActivity(.saved)
   }
 
   func synchronize(profiles: [DeskProfile], preferredProfileID: UUID?) {
@@ -140,11 +140,11 @@ final class ProfileEditorModel: ObservableObject {
     let result = mutateSession { $0.completeSave(with: profile) }
     switch result {
     case .saved, .savedAndSelected:
-      activity = .saved
+      setActivity(.saved)
       AccessibilityNotification.Announcement(appLocalized("Profile saved.")).post()
     case .rejected:
       let message = appLocalized("The saved profile did not match the active draft.")
-      activity = .error(message)
+      setActivity(.error(message))
       AccessibilityNotification.Announcement(message).post()
     }
     return result
@@ -152,24 +152,24 @@ final class ProfileEditorModel: ObservableObject {
 
   func revertDraft() {
     mutateSession { $0.revertDraft() }
-    activity = .saved
+    setActivity(.saved)
   }
 
   func beginSaving() {
-    activity = .saving
+    setActivity(.saving)
   }
 
   func beginCapture() {
-    activity = .capturing
+    setActivity(.capturing)
   }
 
   func finishWithMessage(_ message: String) {
-    activity = .message(message)
+    setActivity(.message(message))
     AccessibilityNotification.Announcement(message).post()
   }
 
   func finishWithError(_ message: String) {
-    activity = .error(message)
+    setActivity(.error(message))
     AccessibilityNotification.Announcement(message).post()
   }
 
@@ -186,7 +186,9 @@ final class ProfileEditorModel: ObservableObject {
   ) -> Result {
     var updated = session
     let result = mutation(&updated)
-    session = updated
+    if updated != session {
+      session = updated
+    }
     return result
   }
 
@@ -198,7 +200,12 @@ final class ProfileEditorModel: ObservableObject {
     case .message where !force:
       return
     case .saved, .changed, .saving, .capturing, .message, .error:
-      activity = session.isDirty ? .changed : .saved
+      setActivity(session.isDirty ? .changed : .saved)
     }
+  }
+
+  private func setActivity(_ newValue: ProfileEditorActivity) {
+    guard activity != newValue else { return }
+    activity = newValue
   }
 }

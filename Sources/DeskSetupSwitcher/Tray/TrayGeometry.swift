@@ -52,7 +52,10 @@ struct TrayGeometryContext: Equatable, Sendable {
 struct TrayGeometry: Equatable, Sendable {
   static let width: CGFloat = 368
   static let compactHeight: CGFloat = 260
-  static let singleProfileHeight: CGFloat = 300
+  // Empty and first-profile states share a viewport so capture does not make
+  // the popover grow on the next open and a single compact card has no large
+  // unused tail.
+  static let singleProfileHeight: CGFloat = compactHeight
   static let twoProfileHeight: CGFloat = 316
   static let maximumHeight: CGFloat = 560
   static let screenMargin: CGFloat = 32

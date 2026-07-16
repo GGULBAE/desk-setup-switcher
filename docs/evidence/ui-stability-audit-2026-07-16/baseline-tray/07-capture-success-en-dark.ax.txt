@@ -1,0 +1,13 @@
+source=detached NSHostingView read-only accessibility attributes
+fixture=07-capture-success-en-dark
+language=en
+viewport=368x560
+profile-count=3
+requested-reduce-transparency=false
+applied-reduce-transparency=false
+reduce-transparency-limit=SwiftUI exposes this environment value as read-only in a detached host
+applied-increased-contrast=false
+swiftui-full-surface-background-layers=0
+declared-icon-labels=Capture Current Settings | Settings | Quit Desk Setup Switcher
+detached-ax-limit=virtual SwiftUI children require an onscreen accessibility host and remain pending
+role=AXGroup

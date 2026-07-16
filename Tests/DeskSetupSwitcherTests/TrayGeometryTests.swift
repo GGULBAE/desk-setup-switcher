@@ -23,6 +23,7 @@ struct TrayGeometryTests {
     #expect(sizes.map(\.width) == Array(repeating: TrayGeometry.width, count: 5))
     #expect(sizes[0].height == TrayGeometry.compactHeight)
     #expect(sizes[1].height == TrayGeometry.singleProfileHeight)
+    #expect(sizes[0] == sizes[1])
     #expect(sizes[2].height == TrayGeometry.twoProfileHeight)
     #expect(sizes[3].height == TrayGeometry.maximumHeight)
     #expect(sizes[4].height == TrayGeometry.maximumHeight)

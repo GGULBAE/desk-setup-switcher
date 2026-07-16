@@ -2,10 +2,11 @@ import AppKit
 import SwiftUI
 import Testing
 
+@testable import DeskSetupCore
 @testable import DeskSetupSwitcher
 
 #if DEBUG
-  @Suite("Detached tray evidence rendering", .serialized)
+  @Suite("Attached offscreen UI evidence rendering", .serialized)
   @MainActor
   struct TrayOffscreenEvidenceTests {
     struct Fixture {
@@ -27,12 +28,25 @@ import Testing
       let size: CGSize
     }
 
+    struct ApplyPreviewFixture {
+      let name: String
+      let languageCode: String
+      let reviewReason: ApplyPreviewReviewReason
+      let mode: ApplyMode
+      let size: CGSize
+      let largeText: Bool
+    }
+
     @Test("all tray states render offscreen with readable accessibility structure")
     func rendersSyntheticMatrix() throws {
-      let fixtures = [
+      let allFixtures = [
         Fixture(
           name: "01-empty-en-light", variant: .trayEmpty, languageCode: "en", colorScheme: .light,
           largeText: false, reduceTransparency: false, increasedContrast: false),
+        Fixture(
+          name: "01b-empty-ko-light", variant: .trayEmpty, languageCode: "ko",
+          colorScheme: .light, largeText: false, reduceTransparency: false,
+          increasedContrast: false),
         Fixture(
           name: "02-single-en-light", variant: .traySingle, languageCode: "en", colorScheme: .light,
           largeText: false, reduceTransparency: false, increasedContrast: false),
@@ -70,6 +84,14 @@ import Testing
           name: "12-overflow-ko-large-text", variant: .trayOverflow, languageCode: "ko",
           colorScheme: .light, largeText: true, reduceTransparency: true, increasedContrast: false),
       ]
+      let selectedFixture = ProcessInfo.processInfo.environment[
+        "DESK_SETUP_TRAY_EVIDENCE_FIXTURE"
+      ]
+      let fixtures =
+        selectedFixture.map { selected in
+          allFixtures.filter { $0.name == selected }
+        } ?? allFixtures
+      #expect(selectedFixture == nil || fixtures.count == 1)
 
       let outputDirectory = evidenceOutputDirectory
       if let outputDirectory {
@@ -114,7 +136,7 @@ import Testing
           languageCode: "en",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 980, height: 720)
+          size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
           name: "14-audio-ko-light",
@@ -122,7 +144,7 @@ import Testing
           languageCode: "ko",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 980, height: 720)
+          size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
           name: "15-network-en-dark",
@@ -130,7 +152,7 @@ import Testing
           languageCode: "en",
           colorScheme: .dark,
           displayMode: .standard,
-          size: CGSize(width: 980, height: 720)
+          size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
           name: "16-profile-ko-minimum",
@@ -146,7 +168,7 @@ import Testing
           languageCode: "en",
           colorScheme: .light,
           displayMode: .largeText,
-          size: CGSize(width: 980, height: 720)
+          size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
           name: "18-display-color-en-dark",
@@ -154,7 +176,7 @@ import Testing
           languageCode: "en",
           colorScheme: .dark,
           displayMode: .standard,
-          size: CGSize(width: 980, height: 720)
+          size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
           name: "19-audio-unsupported-en-light",
@@ -162,7 +184,7 @@ import Testing
           languageCode: "en",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 980, height: 720)
+          size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
           name: "20-ethernet-dhcp-en-light",
@@ -170,7 +192,7 @@ import Testing
           languageCode: "en",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 980, height: 720)
+          size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
           name: "21-wifi-dhcp-ko-light",
@@ -178,7 +200,7 @@ import Testing
           languageCode: "ko",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 980, height: 720)
+          size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
           name: "22-wifi-manual-en-dark",
@@ -186,7 +208,7 @@ import Testing
           languageCode: "en",
           colorScheme: .dark,
           displayMode: .standard,
-          size: CGSize(width: 980, height: 720)
+          size: CGSize(width: 900, height: 568)
         ),
       ]
       let selectedFixture = ProcessInfo.processInfo.environment[
@@ -212,6 +234,65 @@ import Testing
 
         #expect(rendered.png.count > 10_000)
         #expect(rendered.accessibility.contains("synthetic-settings-host=true"))
+        #expect(!rendered.accessibility.contains("/Users/"))
+        #expect(!rendered.accessibility.localizedCaseInsensitiveContains("password"))
+        if let outputDirectory {
+          try rendered.png.write(
+            to: outputDirectory.appendingPathComponent("\(fixture.name).png"),
+            options: .atomic
+          )
+          try rendered.accessibility.write(
+            to: outputDirectory.appendingPathComponent("\(fixture.name).ax.txt"),
+            atomically: true,
+            encoding: .utf8
+          )
+        }
+      }
+    }
+
+    @Test("apply previews render from the top at default and minimum large-text canvases")
+    func rendersApplyPreviewStates() throws {
+      let fixtures = [
+        ApplyPreviewFixture(
+          name: "23-apply-preview-en-initial",
+          languageCode: "en",
+          reviewReason: .initial,
+          mode: .normal,
+          size: CGSize(width: 620, height: 500),
+          largeText: false
+        ),
+        ApplyPreviewFixture(
+          name: "24-apply-preview-ko-refreshed",
+          languageCode: "ko",
+          reviewReason: .refreshedSystemState,
+          mode: .normal,
+          size: CGSize(width: 620, height: 500),
+          largeText: false
+        ),
+        ApplyPreviewFixture(
+          name: "25-apply-preview-ko-minimum-large-text",
+          languageCode: "ko",
+          reviewReason: .refreshedSystemState,
+          mode: .force,
+          size: CGSize(width: 520, height: 360),
+          largeText: true
+        ),
+      ]
+      let outputDirectory = workflowEvidenceOutputDirectory
+      if let outputDirectory {
+        try FileManager.default.createDirectory(
+          at: outputDirectory,
+          withIntermediateDirectories: true
+        )
+      }
+
+      for fixture in fixtures {
+        setenv("DESK_SETUP_UI_AUDIT_LANGUAGE", fixture.languageCode, 1)
+        let rendered = try renderApplyPreview(fixture)
+        unsetenv("DESK_SETUP_UI_AUDIT_LANGUAGE")
+
+        #expect(rendered.png.count > 10_000)
+        #expect(rendered.accessibility.contains("synthetic-apply-preview=true"))
         #expect(!rendered.accessibility.contains("/Users/"))
         #expect(!rendered.accessibility.localizedCaseInsensitiveContains("password"))
         if let outputDirectory {
@@ -291,6 +372,119 @@ import Testing
       return URL(fileURLWithPath: path, isDirectory: true)
     }
 
+    private var workflowEvidenceOutputDirectory: URL? {
+      guard ProcessInfo.processInfo.environment["DESK_SETUP_WRITE_WORKFLOW_EVIDENCE"] == "1",
+        let path = ProcessInfo.processInfo.environment["DESK_SETUP_WORKFLOW_EVIDENCE_DIR"]
+      else { return nil }
+      return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    private func renderApplyPreview(
+      _ fixture: ApplyPreviewFixture
+    ) throws -> (png: Data, accessibility: String) {
+      let configuration = UIAuditConfiguration(
+        isEnabled: true,
+        variant: .editorDisplay,
+        displayMode: fixture.largeText ? .largeText : .standard,
+        showsStatusPopover: false
+      )
+      let model = UIAuditFixtures.makeModel(configuration: configuration)
+      let profile = try #require(model.profiles.first)
+      let operations = [
+        PlannedOperation(
+          group: .audio,
+          key: "inputVolume",
+          summary: "Change input volume",
+          risk: .low,
+          preview: OperationPreview(previousValue: "50%", desiredValue: "5%")
+        ),
+        PlannedOperation(
+          group: .audio,
+          key: "outputVolume",
+          summary: "Change output volume",
+          risk: .low,
+          preview: OperationPreview(previousValue: "68%", desiredValue: "4%")
+        ),
+        PlannedOperation(
+          group: .display,
+          key: "displayConfiguration",
+          summary: "Apply the complete display configuration",
+          risk: .high,
+          preview: OperationPreview(
+            previousValue: "Built-in Display · 1512×982 @ 120 Hz",
+            desiredValue: "Built-in Display · 3024×1964 @ 48 Hz"
+          )
+        ),
+      ]
+      let preparation = ApplyPreparation(
+        profileID: profile.id,
+        mode: fixture.mode,
+        preparedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        includedGroups: [.display, .audio],
+        capabilities: [],
+        snapshots: [],
+        validationIssues: [],
+        operations: operations,
+        omissions: [],
+        readiness: ReadinessEvaluation(
+          status: .ready,
+          applicableGroups: [.display, .audio],
+          unavailableGroups: [],
+          reasons: []
+        ),
+        rejectionReasons: []
+      )
+      let request = PendingApplyRequest(
+        profile: profile,
+        preparation: preparation,
+        reviewReason: fixture.reviewReason
+      )
+      let size = fixture.size
+      let root = ApplyPreviewView(request: request, onConfirm: {})
+        .environmentObject(model)
+        .environment(\.locale, Locale(identifier: fixture.languageCode))
+        .dynamicTypeSize(fixture.largeText ? .accessibility3 : .large)
+        .uiAuditEnvironment(configuration)
+        .frame(width: size.width, height: size.height)
+        .background(Color.white)
+      let host = NSHostingView(rootView: root)
+      host.frame = NSRect(origin: .zero, size: size)
+      host.appearance = NSAppearance(named: .aqua)
+      let window = NSWindow(
+        contentRect: NSRect(origin: .zero, size: size),
+        styleMask: .borderless,
+        backing: .buffered,
+        defer: false
+      )
+      window.contentView = host
+      window.setContentSize(size)
+      host.layoutSubtreeIfNeeded()
+      host.displayIfNeeded()
+      RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+      host.needsLayout = true
+      host.needsDisplay = true
+      host.layoutSubtreeIfNeeded()
+      host.displayIfNeeded()
+
+      let representation = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+      host.cacheDisplay(in: host.bounds, to: representation)
+      let png = try #require(representation.representation(using: .png, properties: [:]))
+      var lines = [
+        "source=ApplyPreviewView in attached offscreen NSWindow",
+        "synthetic-apply-preview=true",
+        "fixture=\(fixture.name)",
+        "language=\(fixture.languageCode)",
+        "viewport=\(Int(size.width))x\(Int(size.height))",
+        "review-reason=\(String(describing: fixture.reviewReason))",
+        "mode=\(String(describing: fixture.mode))",
+        "large-text=\(fixture.largeText)",
+        "live-display-audio-network-mutations=false",
+      ]
+      var visited: Set<ObjectIdentifier> = []
+      appendAccessibility(host, depth: 0, lines: &lines, visited: &visited)
+      return (png, lines.joined(separator: "\n") + "\n")
+    }
+
     private func renderSettings(
       _ fixture: SettingsFixture
     ) throws -> (png: Data, accessibility: String) {
@@ -307,25 +501,38 @@ import Testing
       )
       let editor = ProfileEditorModel()
       let size = fixture.size
-      let root = ProfilesSettingsView()
-        .environmentObject(model)
-        .environmentObject(locationPermission)
-        .environmentObject(editor)
-        .environment(\.locale, Locale(identifier: fixture.languageCode))
-        .uiAuditEnvironment(configuration)
-        .preferredColorScheme(fixture.colorScheme)
-        .frame(width: size.width, height: size.height)
-        .background(fixture.colorScheme == .dark ? Color.black : Color.white)
+      let navigation = SettingsNavigationModel(selectedTab: .profiles)
+      navigation.beginPresentation()
+      let root = RuntimeSettingsRoot(
+        navigation: navigation,
+        uiAuditConfiguration: configuration
+      )
+      .environmentObject(model)
+      .environmentObject(locationPermission)
+      .environmentObject(editor)
+      .environment(\.locale, Locale(identifier: fixture.languageCode))
+      .uiAuditEnvironment(configuration)
+      .preferredColorScheme(fixture.colorScheme)
+      .frame(width: size.width, height: size.height)
+      .background(fixture.colorScheme == .dark ? Color.black : Color.white)
 
       let host = NSHostingView(rootView: root)
       host.frame = NSRect(origin: .zero, size: size)
       host.appearance = NSAppearance(
         named: fixture.colorScheme == .dark ? .darkAqua : .aqua
       )
+      let window = NSWindow(
+        contentRect: NSRect(origin: .zero, size: size),
+        styleMask: .borderless,
+        backing: .buffered,
+        defer: false
+      )
+      window.contentView = host
+      window.setContentSize(size)
       host.layoutSubtreeIfNeeded()
       host.displayIfNeeded()
       // Profile initialization and locale propagation publish once from
-      // onAppear. Drain that detached-host update before caching pixels.
+      // onAppear. Drain that offscreen-host update before caching pixels.
       RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.25))
       host.needsLayout = true
       host.needsDisplay = true
@@ -338,7 +545,7 @@ import Testing
         representation.representation(using: .png, properties: [:])
       )
       var lines = [
-        "source=detached NSHostingView with synthetic profile and snapshot",
+        "source=full RuntimeSettingsRoot in attached offscreen NSWindow with synthetic profile and snapshot",
         "synthetic-settings-host=true",
         "fixture=\(fixture.name)",
         "language=\(fixture.languageCode)",
@@ -346,7 +553,7 @@ import Testing
         "variant=\(fixture.variant.rawValue)",
         "display-mode=\(fixture.displayMode.rawValue)",
         "live-display-audio-network-mutations=false",
-        "detached-ax-limit=virtual SwiftUI children require an onscreen accessibility host",
+        "offscreen-ax-limit=virtual SwiftUI children require an onscreen accessibility host",
       ]
       var visited: Set<ObjectIdentifier> = []
       appendAccessibility(host, depth: 0, lines: &lines, visited: &visited)
@@ -425,6 +632,21 @@ import Testing
           fixture.colorScheme == .dark ? .darkAqua : .aqua
         }
       host.appearance = NSAppearance(named: appearanceName)
+      let window = NSWindow(
+        contentRect: NSRect(origin: .zero, size: viewport),
+        styleMask: .borderless,
+        backing: .buffered,
+        defer: false
+      )
+      window.contentView = host
+      window.setContentSize(viewport)
+      host.layoutSubtreeIfNeeded()
+      host.displayIfNeeded()
+      // Allow localized text and SF Symbol providers to settle once, then
+      // capture a stable frame from the same synthetic host.
+      RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.25))
+      host.needsLayout = true
+      host.needsDisplay = true
       host.layoutSubtreeIfNeeded()
       host.displayIfNeeded()
 
@@ -452,18 +674,18 @@ import Testing
       profileCount: Int
     ) -> String {
       var lines = [
-        "source=detached NSHostingView read-only accessibility attributes",
+        "source=TrayRootView in attached offscreen NSWindow read-only accessibility attributes",
         "fixture=\(fixture.name)",
         "language=\(fixture.languageCode)",
         "viewport=\(Int(viewport.width))x\(Int(viewport.height))",
         "profile-count=\(profileCount)",
         "requested-reduce-transparency=\(fixture.reduceTransparency)",
         "applied-reduce-transparency=false",
-        "reduce-transparency-limit=SwiftUI exposes this environment value as read-only in a detached host",
+        "reduce-transparency-limit=SwiftUI exposes this environment value as read-only in an offscreen host",
         "applied-increased-contrast=\(fixture.increasedContrast)",
         "swiftui-full-surface-background-layers=\(TraySurfaceStylePolicy.swiftUIFullSurfaceBackgroundLayerCount)",
         "declared-icon-labels=Capture Current Settings | Settings | Quit Desk Setup Switcher",
-        "detached-ax-limit=virtual SwiftUI children require an onscreen accessibility host and remain pending",
+        "offscreen-ax-limit=virtual SwiftUI children may remain pending without ordering the window front",
       ]
       var visited: Set<ObjectIdentifier> = []
       appendAccessibility(root, depth: 0, lines: &lines, visited: &visited)

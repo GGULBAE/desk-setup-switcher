@@ -167,12 +167,11 @@ import Testing
       #expect(state.pendingProfileID == nil)
     }
 
-    @Test("settings layout changes only at the documented breakpoint")
-    func responsiveSettingsBreakpoint() {
-      #expect(ProfileWorkspaceLayoutMode(width: 759.9) == .compact)
-      #expect(ProfileWorkspaceLayoutMode(width: 760) == .regular)
-      #expect(ProfileWorkspaceLayoutMode(width: 980) == .regular)
-      #expect(ProfileWorkspaceLayoutMode(width: 680) == .compact)
+    @Test("settings workspace and invalid-save handoff remain structurally stable")
+    func stableSettingsWorkspacePolicy() {
+      #expect(ProfileWorkspaceLayoutPolicy.sidebarWidth == 210)
+      #expect(ProfileWorkspaceLayoutPolicy.minimumEditorWidth == 390)
+      #expect(ProfileWorkspaceLayoutPolicy.minimumContentWidth <= 640)
       #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio, .network])
       #expect(!ProfileEditorSurfacePolicy.visibleGroups.contains(.input))
       #expect(!ProfileEditorSurfacePolicy.showsActivationControl)
@@ -180,6 +179,78 @@ import Testing
       #expect(!ProfileEditorSurfacePolicy.showsDescription)
       #expect(!ProfileEditorSurfacePolicy.showsConditions)
       #expect(!ProfileEditorSurfacePolicy.showsCurrentSettingsDraftRefresh)
+      #expect(
+        ProfileEditorSavePolicy.canAttemptSave(
+          hasDraft: true,
+          isDirty: true,
+          isBusy: false
+        )
+      )
+      #expect(
+        !ProfileEditorSavePolicy.canAttemptSave(
+          hasDraft: true,
+          isDirty: true,
+          isBusy: true
+        )
+      )
+
+      var handoff = UnsavedPromptValidationHandoff()
+      #expect(
+        handoff.rejectInvalidSave(firstInvalidField: .profileName)
+          == .cancelDeferredActionAndDismiss
+      )
+      #expect(handoff.presentationChanged(isPresented: true) == .none)
+      #expect(
+        handoff.presentationChanged(isPresented: false)
+          == .focusAndShowValidationSummary(.profileName)
+      )
+      #expect(handoff.presentationChanged(isPresented: false) == .none)
+    }
+
+    @Test("settings catalog stays stable within a presentation and refreshes on reopen")
+    func settingsCatalogSessionLifetime() {
+      let first = UIAuditFixtures.fixture(.editorDisplay).snapshot
+      let refreshed = UIAuditFixtures.fixture(.editorAudioUnsupported).snapshot
+      var session = ProfileEditorCatalogSession()
+
+      session.beginPresentation(
+        generation: 1,
+        snapshot: first,
+        isRefreshInProgress: false
+      )
+      session.observe(snapshot: refreshed)
+      #expect(session.snapshot == first)
+
+      session.beginRefresh()
+      session.observe(snapshot: refreshed)
+      #expect(session.snapshot == refreshed)
+      #expect(session.hasConsumedRefresh)
+
+      session.beginRefresh()
+      #expect(!session.isAwaitingRefresh)
+      session.observe(snapshot: first)
+      #expect(session.snapshot == refreshed)
+
+      session.beginPresentation(
+        generation: 2,
+        snapshot: first,
+        isRefreshInProgress: true
+      )
+      #expect(session.snapshot == first)
+      #expect(session.isAwaitingRefresh)
+      session.observe(snapshot: refreshed)
+      #expect(session.snapshot == refreshed)
+      #expect(!session.isAwaitingRefresh)
+      #expect(session.hasConsumedRefresh)
+
+      session.beginPresentation(
+        generation: 3,
+        snapshot: first,
+        isRefreshInProgress: true
+      )
+      session.finishRefresh(snapshot: refreshed)
+      #expect(session.snapshot == refreshed)
+      #expect(session.hasConsumedRefresh)
     }
 
     @Test("runtime settings window exposes stable resizable geometry")
@@ -334,16 +405,19 @@ import Testing
       for _ in 0..<10 {
         #expect(
           await coordinator.present(.settings) == .presented(isVisible: true, isKeyOrActive: true))
+        presenter.close()
       }
       for _ in 0..<10 {
         #expect(
           await coordinator.present(.profileEditor(profile.id))
             == .presented(isVisible: true, isKeyOrActive: true)
         )
+        presenter.close()
       }
 
       #expect(presenter.presentationCount == 20)
       #expect(navigation.selectedTab == .profiles)
+      #expect(navigation.presentationGeneration == 20)
       #expect(editor.selectedProfileID == profile.id)
     }
 
@@ -396,19 +470,25 @@ import Testing
       #expect(await pending.value == .presented(isVisible: true, isKeyOrActive: true))
     }
 
-    @Test("application Settings command is independent of tray lifetime")
+    @Test("application Settings command preserves an already-visible presentation")
     func commandSettingsUsesPersistentPresenter() async {
       let navigation = SettingsNavigationModel(selectedTab: .system)
       let presenter = ReopenableSettingsPresenter()
 
-      let result = await presentApplicationSettings(
+      let firstResult = await presentApplicationSettings(
+        navigation: navigation,
+        presenter: presenter
+      )
+      let secondResult = await presentApplicationSettings(
         navigation: navigation,
         presenter: presenter
       )
 
-      #expect(result == .presented(isVisible: true, isKeyOrActive: true))
+      #expect(firstResult == .presented(isVisible: true, isKeyOrActive: true))
+      #expect(secondResult == .presented(isVisible: true, isKeyOrActive: true))
       #expect(navigation.selectedTab == .profiles)
-      #expect(presenter.presentationCount == 1)
+      #expect(navigation.presentationGeneration == 1)
+      #expect(presenter.presentationCount == 2)
     }
   }
 
@@ -446,10 +526,16 @@ import Testing
   @MainActor
   private final class ReopenableSettingsPresenter: RuntimeSettingsWindowPresenting {
     private(set) var presentationCount = 0
+    private(set) var isPresentationVisible = false
 
     func presentAndWaitUntilKey() async -> TrayDestinationPresentation {
       presentationCount += 1
+      isPresentationVisible = true
       return .presented(isVisible: true, isKeyOrActive: true)
+    }
+
+    func close() {
+      isPresentationVisible = false
     }
   }
 

@@ -37,51 +37,21 @@ struct ApplyPreviewView: View {
         Spacer()
         Text(request.profile.name)
           .foregroundStyle(.secondary)
-      }
-
-      if request.preparation.mode == .force {
-        Label(
-          "Only available operations will run. Review every skipped item before continuing.",
-          systemImage: "exclamationmark.triangle"
-        )
-        .padding(10)
-        .background(.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
-      }
-
-      switch request.reviewReason {
-      case .initial:
-        Label(
-          "This is a review. No setting changes until you press Apply Profile below.",
-          systemImage: "info.circle"
-        )
-        .padding(10)
-        .background(.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
-      case .refreshedSystemState:
-        Label(
-          "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press Apply Profile again.",
-          systemImage: "arrow.clockwise.circle"
-        )
-        .padding(10)
-        .background(.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
-      }
-
-      if request.preparation.operations.contains(where: { $0.risk == .high }) {
-        Label(
-          "High-risk display and network changes remain temporary and will be restored if the safety window closes, the app exits, or you do not confirm within 15 seconds.",
-          systemImage: "exclamationmark.shield"
-        )
-        .padding(10)
-        .background(.yellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .layoutPriority(0)
       }
 
       ScrollView {
         VStack(alignment: .leading, spacing: 14) {
+          applyNotices
+
           previewSection(
             appLocalized("Planned changes"),
             systemImage: "arrow.triangle.2.circlepath"
           ) {
             if request.preparation.operations.isEmpty {
-              Text("No setting needs to change.")
+              Text(appLocalized("No setting needs to change."))
                 .foregroundStyle(.secondary)
             } else {
               ForEach(request.preparation.operations) { operation in
@@ -146,6 +116,9 @@ struct ApplyPreviewView: View {
           }
         }
       }
+      .id(request.id)
+      .defaultScrollAnchor(.top)
+      .scrollBounceBehavior(.basedOnSize)
 
       Divider()
       HStack {
@@ -168,13 +141,51 @@ struct ApplyPreviewView: View {
       }
     }
     .padding(20)
-    .frame(
-      minWidth: 560,
-      idealWidth: 620,
-      minHeight: 320,
-      idealHeight: 420,
-      maxHeight: 620
-    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  @ViewBuilder
+  private var applyNotices: some View {
+    if request.preparation.mode == .force {
+      Label(
+        appLocalized(
+          "Only available operations will run. Review every skipped item before continuing."),
+        systemImage: "exclamationmark.triangle"
+      )
+      .padding(10)
+      .background(.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    switch request.reviewReason {
+    case .initial:
+      Label(
+        appLocalized(
+          "This is a review. No setting changes until you press Apply Profile below."),
+        systemImage: "info.circle"
+      )
+      .padding(10)
+      .background(.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+    case .refreshedSystemState:
+      Label(
+        appLocalized(
+          "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press Apply Profile again."
+        ),
+        systemImage: "arrow.clockwise.circle"
+      )
+      .padding(10)
+      .background(.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    if request.preparation.operations.contains(where: { $0.risk == .high }) {
+      Label(
+        appLocalized(
+          "High-risk display and network changes remain temporary and will be restored if the safety window closes, the app exits, or you do not confirm within 15 seconds."
+        ),
+        systemImage: "exclamationmark.shield"
+      )
+      .padding(10)
+      .background(.yellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+    }
   }
 
   @ViewBuilder
@@ -184,7 +195,7 @@ struct ApplyPreviewView: View {
   ) -> some View {
     Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
       GridRow {
-        Text("Current")
+        Text(appLocalized("Current"))
           .font(.caption.bold())
         Text(
           appOperationPreviewValue(
@@ -195,7 +206,7 @@ struct ApplyPreviewView: View {
         )
       }
       GridRow {
-        Text("After apply")
+        Text(appLocalized("After apply"))
           .font(.caption.bold())
         Text(
           appOperationPreviewValue(
@@ -363,7 +374,7 @@ struct ApplyResultDetailsView: View {
       }
     }
     .padding(20)
-    .frame(minWidth: 520, idealWidth: 600, minHeight: 380, idealHeight: 500)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   @ViewBuilder
@@ -507,26 +518,31 @@ struct SafetyConfirmationView: View {
         appLocalized(
           "The previous configuration will return in \(state.secondsRemaining) seconds.")
       )
+      .monospacedDigit()
       .multilineTextAlignment(.center)
       .accessibilityLabel(
         appLocalized("Automatic rollback in \(state.secondsRemaining) seconds"))
 
       if !state.changeSummaries.isEmpty {
-        VStack(alignment: .leading, spacing: 6) {
-          if !state.guardedGroups.isEmpty {
-            Text(state.guardedGroups.map(appSettingGroupTitle).joined(separator: " · "))
-              .font(.caption.bold())
+        ScrollView {
+          VStack(alignment: .leading, spacing: 6) {
+            if !state.guardedGroups.isEmpty {
+              Text(state.guardedGroups.map(appSettingGroupTitle).joined(separator: " · "))
+                .font(.caption.bold())
+            }
+            ForEach(Array(state.changeSummaries.enumerated()), id: \.offset) { _, summary in
+              Label(
+                appLocalizedRuntime(summary),
+                systemImage: "arrow.triangle.2.circlepath"
+              )
+              .font(.caption)
+            }
           }
-          ForEach(Array(state.changeSummaries.enumerated()), id: \.offset) { _, summary in
-            Label(
-              appLocalizedRuntime(summary),
-              systemImage: "arrow.triangle.2.circlepath"
-            )
-            .font(.caption)
-          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(10)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
+        .defaultScrollAnchor(.top)
+        .scrollBounceBehavior(.basedOnSize)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
       }
 
@@ -544,7 +560,7 @@ struct SafetyConfirmationView: View {
       }
     }
     .padding(20)
-    .frame(width: 340)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }
 
@@ -701,7 +717,7 @@ struct TrayWorkflowRootView: View {
       }
     }
     .padding(24)
-    .frame(minWidth: 520, idealWidth: 580, minHeight: 340, idealHeight: 420)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   @ViewBuilder
@@ -797,7 +813,7 @@ struct TrayWorkflowRootView: View {
         Text("Preparing and recording the protected apply workflow…")
           .foregroundStyle(.secondary)
       }
-      .frame(minWidth: 520, minHeight: 360)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityElement(children: .combine)
     } else if let summary = model.lastApplySummary,
       summary.profileID == profileID,
@@ -815,7 +831,7 @@ struct TrayWorkflowRootView: View {
         Text("Calculating a read-only change plan…")
           .foregroundStyle(.secondary)
       }
-      .frame(minWidth: 520, minHeight: 360)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityElement(children: .combine)
     }
   }
@@ -835,7 +851,7 @@ struct TrayWorkflowRootView: View {
           systemImage: "clock.arrow.circlepath",
           description: Text("Apply a profile to see itemized results.")
         )
-        .frame(minWidth: 520, minHeight: 360)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
   }
@@ -882,7 +898,7 @@ struct TrayWorkflowRootView: View {
       }
     }
     .padding(24)
-    .frame(minWidth: 560, minHeight: 360)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private func workflowError(_ message: String) -> some View {
@@ -902,7 +918,7 @@ struct TrayWorkflowRootView: View {
       }
     }
     .padding(24)
-    .frame(minWidth: 520, minHeight: 340)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private func permissionTitle(_ workflow: TrayPermissionWorkflow) -> String {
@@ -957,9 +973,12 @@ final class TrayDestinationCoordinator: TrayDestinationPresenting {
   func present(_ destination: TrayDestination) async -> TrayDestinationPresentation {
     switch destination {
     case .settings:
-      settingsNavigation.selectedTab = .profiles
       guard let settingsController else {
         return .failed(appLocalized("The Settings window is unavailable."))
+      }
+      settingsNavigation.selectedTab = .profiles
+      if !settingsController.isPresentationVisible {
+        settingsNavigation.beginPresentation()
       }
       return await settingsController.presentAndWaitUntilKey()
 
@@ -973,9 +992,12 @@ final class TrayDestinationCoordinator: TrayDestinationPresenting {
       case .requiresDecision, .unchanged:
         break
       }
-      settingsNavigation.selectedTab = .profiles
       guard let settingsController else {
         return .failed(appLocalized("The Settings window is unavailable."))
+      }
+      settingsNavigation.selectedTab = .profiles
+      if !settingsController.isPresentationVisible {
+        settingsNavigation.beginPresentation()
       }
       return await settingsController.presentAndWaitUntilKey()
 

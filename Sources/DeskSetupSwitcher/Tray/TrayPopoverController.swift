@@ -429,6 +429,8 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
   private var finalizedPresentationGeneration: UInt64?
   private var currentAnchorRect: CGRect = .zero
   private var currentScreenScale: CGFloat = 1
+  private var appliedStatusItemPresentation: TrayStatusItemPresentation?
+  private var deferredStatusItemPresentation: TrayStatusItemPresentation?
 
   private(set) var activeSessionGeneration: UInt64?
 
@@ -463,9 +465,9 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
       self?.handlePresentationStage(stage, generation: generation)
     }
     statusItem.configure(target: self, action: #selector(togglePopover(_:)))
-    statusItem.update(sessionState.statusItemPresentation)
+    applyStatusItemPresentation(sessionState.statusItemPresentation)
     sessionState.setStatusItemPresentationHandler { [weak self] presentation in
-      self?.statusItem.update(presentation)
+      self?.receiveStatusItemPresentation(presentation)
     }
   }
 
@@ -560,9 +562,13 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
 
   func requestClose(sessionGeneration: UInt64) {
     guard activeSessionGeneration == sessionGeneration else { return }
-    finishClosingCurrentSession()
     if popover.isShown {
       popover.performClose(nil)
+      if !popover.isShown {
+        finishClosingCurrentSession()
+      }
+    } else {
+      finishClosingCurrentSession()
     }
   }
 
@@ -573,6 +579,34 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     finalizedPresentationGeneration = nil
     sessionGeometry.close()
     sessionState.trayDidClose(sessionGeneration: generation)
+    applyDeferredStatusItemPresentation()
+  }
+
+  /// The status-item button is the popover anchor. Changing its title while the
+  /// popover is visible changes the anchor bounds and makes the tray jump. Keep
+  /// the latest presentation, then apply it once AppKit has closed the popover.
+  private func receiveStatusItemPresentation(_ presentation: TrayStatusItemPresentation) {
+    if presentation == appliedStatusItemPresentation {
+      deferredStatusItemPresentation = nil
+      return
+    }
+    if activeSessionGeneration != nil || popover.isShown {
+      deferredStatusItemPresentation = presentation
+      return
+    }
+    applyStatusItemPresentation(presentation)
+  }
+
+  private func applyDeferredStatusItemPresentation() {
+    guard let deferredStatusItemPresentation else { return }
+    self.deferredStatusItemPresentation = nil
+    applyStatusItemPresentation(deferredStatusItemPresentation)
+  }
+
+  private func applyStatusItemPresentation(_ presentation: TrayStatusItemPresentation) {
+    guard presentation != appliedStatusItemPresentation else { return }
+    appliedStatusItemPresentation = presentation
+    statusItem.update(presentation)
   }
 
   private func synchronizeViewport(_ viewport: CGSize) {

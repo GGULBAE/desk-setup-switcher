@@ -43,6 +43,7 @@ final class ApplicationWindowActivationCoordinator {
 
 @MainActor
 protocol RuntimeSettingsWindowPresenting: AnyObject {
+  var isPresentationVisible: Bool { get }
   func presentAndWaitUntilKey() async -> TrayDestinationPresentation
 }
 
@@ -52,6 +53,9 @@ func presentApplicationSettings(
   presenter: any RuntimeSettingsWindowPresenting
 ) async -> TrayDestinationPresentation {
   navigation.selectedTab = .profiles
+  if !presenter.isPresentationVisible {
+    navigation.beginPresentation()
+  }
   return await presenter.presentAndWaitUntilKey()
 }
 
@@ -61,6 +65,12 @@ final class RuntimeSettingsWindowController: NSWindowController,
 {
   private var presentationRequest: (id: UUID, task: Task<TrayDestinationPresentation, Never>)?
   private let activationCoordinator: ApplicationWindowActivationCoordinator?
+
+  // Treat the short key-window handoff as visible for generation ownership so
+  // repeated Cmd+, requests cannot recreate the editor subtree mid-present.
+  var isPresentationVisible: Bool {
+    window?.isVisible == true || presentationRequest != nil
+  }
 
   init<Content: View>(
     rootView: Content,
@@ -245,9 +255,14 @@ enum SettingsTab: Hashable {
 @MainActor
 final class SettingsNavigationModel: ObservableObject {
   @Published var selectedTab: SettingsTab
+  @Published private(set) var presentationGeneration: UInt64 = 0
 
   init(selectedTab: SettingsTab) {
     self.selectedTab = selectedTab
+  }
+
+  func beginPresentation() {
+    presentationGeneration &+= 1
   }
 }
 
@@ -256,26 +271,38 @@ struct RuntimeSettingsRoot: View {
   let uiAuditConfiguration: UIAuditConfiguration
 
   var body: some View {
-    SettingsView(selectedTab: $navigation.selectedTab)
-      .uiAuditEnvironment(uiAuditConfiguration)
-      .frame(
-        minWidth: 680,
-        idealWidth: 900,
-        maxWidth: .infinity,
-        minHeight: 480,
-        idealHeight: 568,
-        maxHeight: .infinity
-      )
+    SettingsView(
+      selectedTab: $navigation.selectedTab,
+      presentationGeneration: navigation.presentationGeneration
+    )
+    .uiAuditEnvironment(uiAuditConfiguration)
+    .frame(
+      minWidth: 680,
+      idealWidth: 900,
+      maxWidth: .infinity,
+      minHeight: 480,
+      idealHeight: 568,
+      maxHeight: .infinity
+    )
   }
 }
 
 struct SettingsView: View {
   @EnvironmentObject private var model: ApplicationModel
   @Binding var selectedTab: SettingsTab
+  let presentationGeneration: UInt64
+
+  init(
+    selectedTab: Binding<SettingsTab>,
+    presentationGeneration: UInt64 = 0
+  ) {
+    _selectedTab = selectedTab
+    self.presentationGeneration = presentationGeneration
+  }
 
   var body: some View {
     TabView(selection: $selectedTab) {
-      ProfilesSettingsView()
+      ProfilesSettingsView(presentationGeneration: presentationGeneration)
         .tabItem { Label("Profiles", systemImage: "rectangle.stack") }
         .tag(SettingsTab.profiles)
 
