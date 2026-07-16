@@ -178,7 +178,7 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] Protected display/network safety covers Keep, Revert, timeout, confirmation failure, safety-window close, and termination deferral/rollback with sanitized scope and change summaries.
 - [x] English/Korean localization parity, placeholders, new accessibility labels/hints, non-color status, 12 tray evidence pairs, and 10 current editor evidence pairs are recorded in [TRAY-SETTINGS-END-TO-END-AUDIT-2026-07-16.md](TRAY-SETTINGS-END-TO-END-AUDIT-2026-07-16.md).
 - [x] The final integrated non-live `make verify` passes 366 cases (134 XCTest + 232 Swift Testing, five opt-in skips), all build/Analyze/package stages, and mounted universal-DMG verification. SHA-256 `76bc6d9f1187ea30f68be16ee81ee4a334d877a4e26c2497f35a9ffc781678b3` is synchronized here.
-- [ ] The behavior-focused local commit and clean-worktree handoff are recorded. This row is checked only after the implementation commit succeeds.
+- [x] Behavior-focused local implementation commit `8bd70dd` is recorded; the final handoff confirms the documentation closure commit and clean worktree. Nothing was pushed or published.
 - [ ] Actual installed tray/window behavior, native bilingual rendering, keyboard traversal, and VoiceOver are manually verified.
 - [ ] Display/ColorSync, audio, and Ethernet/Wi‑Fi IPv4 hardware mutation plus independent rollback are verified. They remain explicitly unrun.
 - [ ] Push, CI, tag, Developer ID signing, notarization, or publication is performed. They remain outside this local goal.
