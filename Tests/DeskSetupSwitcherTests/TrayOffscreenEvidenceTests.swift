@@ -163,6 +163,14 @@ import Testing
           size: CGSize(width: 680, height: 480)
         ),
         SettingsFixture(
+          name: "16b-profile-ko-minimum-large-text",
+          variant: .editorDisplay,
+          languageCode: "ko",
+          colorScheme: .light,
+          displayMode: .largeText,
+          size: CGSize(width: 680, height: 480)
+        ),
+        SettingsFixture(
           name: "17-audio-en-large-text",
           variant: .editorAudio,
           languageCode: "en",
@@ -309,7 +317,7 @@ import Testing
       }
     }
 
-    @Test("empty content remains centered with an asymmetric native safe area")
+    @Test("filtered asymmetric safe area matches zero-inset empty rendering")
     func emptyContentIgnoresAsymmetricNativeSafeArea() throws {
       let configuration = UIAuditConfiguration(
         isEnabled: true,
@@ -342,20 +350,84 @@ import Testing
         .environmentObject(editor)
         .frame(width: viewport.width, height: viewport.height)
         .background(Color.white)
-      let host = AsymmetricSafeAreaHostingView(
-        rootView: root,
-        injectedSafeAreaInsets: NSEdgeInsets(top: 0, left: 24, bottom: 0, right: 0)
+      let baseline = try renderTraySafeAreaFixture(
+        root: root,
+        viewport: viewport,
+        nativeSafeAreaInsets: NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
       )
+      let asymmetric = try renderTraySafeAreaFixture(
+        root: root,
+        viewport: viewport,
+        nativeSafeAreaInsets: NSEdgeInsets(top: 0, left: 24, bottom: 0, right: 0)
+      )
+      let unfilteredControl = try renderTraySafeAreaFixture(
+        root: root,
+        viewport: viewport,
+        nativeSafeAreaInsets: NSEdgeInsets(top: 0, left: 24, bottom: 0, right: 0),
+        filtersHorizontalSafeArea: false
+      )
+
+      #expect(asymmetric.hostingSafeAreaInsets.top == 0)
+      #expect(asymmetric.hostingSafeAreaInsets.left == 0)
+      #expect(asymmetric.hostingSafeAreaInsets.bottom == 0)
+      #expect(asymmetric.hostingSafeAreaInsets.right == 0)
+
+      let baselineInkCenter = try #require(
+        horizontalEmptyStateInkCenter(in: baseline.representation)
+      )
+      let asymmetricInkCenter = try #require(
+        horizontalEmptyStateInkCenter(in: asymmetric.representation)
+      )
+      let unfilteredInkCenter = try #require(
+        horizontalEmptyStateInkCenter(in: unfilteredControl.representation)
+      )
+      #expect(abs(asymmetricInkCenter - baselineInkCenter) <= 4)
+      #expect(abs(unfilteredInkCenter - baselineInkCenter) > 4)
+    }
+
+    private func renderTraySafeAreaFixture<Content: View>(
+      root: Content,
+      viewport: CGSize,
+      nativeSafeAreaInsets: NSEdgeInsets,
+      filtersHorizontalSafeArea: Bool = true
+    ) throws -> (representation: NSBitmapImageRep, hostingSafeAreaInsets: NSEdgeInsets) {
+      let hostingController = NSHostingController(rootView: root)
+      hostingController.sizingOptions = []
+      let contentController: NSViewController =
+        filtersHorizontalSafeArea
+        ? TrayPopoverContentController(hostedController: hostingController)
+        : hostingController
+      let host = hostingController.view
       host.frame = NSRect(origin: .zero, size: viewport)
+      let boundaryView = contentController.view
+      boundaryView.frame = NSRect(origin: .zero, size: viewport)
+      let nativeContainer = AsymmetricSafeAreaContainerView(
+        frame: NSRect(origin: .zero, size: viewport),
+        injectedSafeAreaInsets: nativeSafeAreaInsets
+      )
+      let window = NSWindow(
+        contentRect: NSRect(origin: .zero, size: viewport),
+        styleMask: .borderless,
+        backing: .buffered,
+        defer: false
+      )
+      window.contentView = nativeContainer
+      boundaryView.autoresizingMask = [.width, .height]
+      nativeContainer.addSubview(boundaryView)
+      nativeContainer.layoutSubtreeIfNeeded()
+      RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+      nativeContainer.layoutSubtreeIfNeeded()
+      host.needsLayout = true
       host.layoutSubtreeIfNeeded()
       host.displayIfNeeded()
 
-      let representation = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+      let hostingSafeAreaInsets = host.safeAreaInsets
+      let representation = try #require(
+        host.bitmapImageRepForCachingDisplay(in: host.bounds)
+      )
       host.cacheDisplay(in: host.bounds, to: representation)
-      let inkCenter = try #require(horizontalEmptyStateInkCenter(in: representation))
-      let viewportCenter = CGFloat(representation.pixelsWide) / 2
-
-      #expect(abs(inkCenter - viewportCenter) <= 4)
+      withExtendedLifetime((window, contentController, hostingController)) {}
+      return (representation, hostingSafeAreaInsets)
     }
 
     private var evidenceOutputDirectory: URL? {
@@ -761,17 +833,12 @@ import Testing
   }
 
   @MainActor
-  private final class AsymmetricSafeAreaHostingView<Content: View>: NSHostingView<Content> {
+  private final class AsymmetricSafeAreaContainerView: NSView {
     private let injectedSafeAreaInsets: NSEdgeInsets
 
-    init(rootView: Content, injectedSafeAreaInsets: NSEdgeInsets) {
+    init(frame: NSRect, injectedSafeAreaInsets: NSEdgeInsets) {
       self.injectedSafeAreaInsets = injectedSafeAreaInsets
-      super.init(rootView: rootView)
-    }
-
-    @available(*, unavailable)
-    required init(rootView: Content) {
-      fatalError("Use init(rootView:injectedSafeAreaInsets:)")
+      super.init(frame: frame)
     }
 
     @available(*, unavailable)

@@ -42,7 +42,6 @@ struct TrayRootView: View {
     }
     .padding(TrayGeometry.outerPadding)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .ignoresSafeArea(.container, edges: .horizontal)
     .onExitCommand {
       presentation.requestEscape()
     }

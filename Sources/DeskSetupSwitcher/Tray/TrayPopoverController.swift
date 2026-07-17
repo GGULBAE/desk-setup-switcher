@@ -413,6 +413,45 @@ private final class AppKitTrayDismissalMonitor: TrayDismissalMonitoring {
 
 }
 
+/// Filters the native popover safe area before the hosted SwiftUI tree receives
+/// its attached layout proposal. Top/bottom chrome exclusions are preserved;
+/// asymmetric left/right values cannot shift the fixed tray root.
+@MainActor
+final class TrayPopoverHorizontalSafeAreaView: NSView {
+  override var safeAreaInsets: NSEdgeInsets {
+    let inherited = super.safeAreaInsets
+    return NSEdgeInsets(
+      top: inherited.top,
+      left: 0,
+      bottom: inherited.bottom,
+      right: 0
+    )
+  }
+}
+
+@MainActor
+final class TrayPopoverContentController: NSViewController {
+  let hostedController: NSViewController
+
+  init(hostedController: NSViewController) {
+    self.hostedController = hostedController
+    super.init(nibName: nil, bundle: nil)
+
+    let containerView = TrayPopoverHorizontalSafeAreaView()
+    view = containerView
+    addChild(hostedController)
+    let hostedView = hostedController.view
+    hostedView.frame = containerView.bounds
+    hostedView.autoresizingMask = [.width, .height]
+    containerView.addSubview(hostedView)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) is unavailable")
+  }
+}
+
 /// Owns the single status item, popover, hosting controller, anchor, monitor,
 /// and immutable geometry for each open generation.
 @MainActor
@@ -423,6 +462,7 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
   private let factory: any TraySurfaceFactory
   private let sessionState: any TraySessionStateUpdating
   private let hostingController: NSHostingController<AnyView>
+  private let popoverContentController: TrayPopoverContentController
   private let traceRecorder: any TrayGeometryTraceRecording
   private var sessionGeometry: TrayOpenSessionGeometry
   private var generationCounter: UInt64 = 0
@@ -446,18 +486,17 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     statusItem = factory.makeStatusItem()
     popover = factory.makePopover()
     dismissalMonitor = factory.makeDismissalMonitor()
-    hostingController = NSHostingController(
-      rootView: AnyView(
-        rootView.ignoresSafeArea(.container, edges: .horizontal)
-      )
-    )
+    hostingController = NSHostingController(rootView: AnyView(rootView))
     hostingController.sizingOptions = []
+    popoverContentController = TrayPopoverContentController(
+      hostedController: hostingController
+    )
     self.traceRecorder = traceRecorder
     sessionGeometry = TrayOpenSessionGeometry(policy: geometry)
     super.init()
 
     popover.behavior = .applicationDefined
-    popover.contentViewController = hostingController
+    popover.contentViewController = popoverContentController
     popover.setDidCloseHandler { [weak self] in
       self?.finishClosingCurrentSession()
     }
@@ -614,13 +653,24 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
       popover.contentSize = viewport
     }
     let bounds = NSRect(origin: .zero, size: viewport)
+    popoverContentController.view.frame = bounds
+    popoverContentController.view.bounds = bounds
+    popoverContentController.view.autoresizingMask = [.width, .height]
     hostingController.view.frame = bounds
     hostingController.view.bounds = bounds
     hostingController.view.autoresizingMask = [.width, .height]
+    layoutPopoverContent()
+  }
+
+  private func layoutPopoverContent() {
+    if let nativeContentView = popover.contentWindow?.contentView {
+      nativeContentView.needsLayout = true
+      nativeContentView.layoutSubtreeIfNeeded()
+    }
+    popoverContentController.view.needsLayout = true
+    popoverContentController.view.layoutSubtreeIfNeeded()
     hostingController.view.needsLayout = true
     hostingController.view.layoutSubtreeIfNeeded()
-    popover.contentWindow?.contentView?.needsLayout = true
-    popover.contentWindow?.contentView?.layoutSubtreeIfNeeded()
   }
 
   private func handlePresentationStage(

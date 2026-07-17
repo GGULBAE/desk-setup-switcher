@@ -204,25 +204,60 @@ struct TrayPopoverControllerTests {
     #expect(state.attachGenerations == [2])
   }
 
-  @Test("native asymmetric safe area does not add a second SwiftUI horizontal inset")
+  @Test("native asymmetric safe area is filtered horizontally at the AppKit hosting boundary")
   func safeAreaOwnershipIsSymmetric() {
     let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 2))
     let factory = SurfaceFactorySpy()
+    let contentProbe = HorizontalContentProbe()
+    let recorder = GeometryTraceRecorderSpy()
     factory.popover.installContentWindow(
       safeAreaInsets: NSEdgeInsets(top: 3, left: 11, bottom: 5, right: 2)
     )
     let controller = TrayPopoverController(
-      rootView: Color.clear,
+      rootView: HorizontalContentProbeView(probe: contentProbe)
+        .padding(TrayGeometry.outerPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading),
       sessionState: state,
-      factory: factory
+      factory: factory,
+      traceRecorder: recorder
     )
 
     controller.show()
 
+    #expect(controller.nativeContentViewSafeAreaInsets.top == 3)
     #expect(controller.nativeContentViewSafeAreaInsets.left == 11)
+    #expect(controller.nativeContentViewSafeAreaInsets.bottom == 5)
     #expect(controller.nativeContentViewSafeAreaInsets.right == 2)
+    // Only the inherited horizontal contribution is cancelled. SwiftUI still
+    // receives the native top/bottom exclusion from the popover chrome.
+    #expect(controller.hostingViewSafeAreaInsets.top == 3)
+    #expect(controller.hostingViewSafeAreaInsets.left == 0)
+    #expect(controller.hostingViewSafeAreaInsets.bottom == 5)
+    #expect(controller.hostingViewSafeAreaInsets.right == 0)
+    #expect(controller.hostingViewFrame == CGRect(origin: .zero, size: controller.contentSize))
+    #expect(controller.hostingViewBounds == CGRect(origin: .zero, size: controller.contentSize))
     #expect(controller.rootHorizontalInsets.leading == TrayGeometry.outerPadding)
     #expect(controller.rootHorizontalInsets.trailing == TrayGeometry.outerPadding)
+
+    let nativeContentView = factory.popover.contentWindow?.contentView
+    let contentView = contentProbe.view
+    #expect(nativeContentView != nil)
+    #expect(contentView != nil)
+    if let nativeContentView, let contentView {
+      let contentFrame = contentView.convert(contentView.bounds, to: nativeContentView)
+      #expect(contentFrame.minX == TrayGeometry.outerPadding)
+      #expect(contentFrame.maxX == controller.contentSize.width - TrayGeometry.outerPadding)
+      #expect(contentFrame.minY == 5 + TrayGeometry.outerPadding)
+      #expect(contentFrame.maxY == controller.contentSize.height - 3 - TrayGeometry.outerPadding)
+    }
+
+    let attachmentRecord = recorder.records.first(where: {
+      $0.stage == .contentWindowAttached
+    })
+    #expect(attachmentRecord?.hostingSafeArea.top == 3)
+    #expect(attachmentRecord?.hostingSafeArea.leading == 0)
+    #expect(attachmentRecord?.hostingSafeArea.bottom == 5)
+    #expect(attachmentRecord?.hostingSafeArea.trailing == 0)
   }
 
   @Test("state updates never resize an open session")
@@ -463,7 +498,13 @@ private final class PopoverSurfaceSpy: TrayPopoverSurface {
   var contentSize: NSSize = .zero {
     didSet { contentSizeAssignments.append(contentSize) }
   }
-  var contentViewController: NSViewController?
+  var contentViewController: NSViewController? {
+    didSet {
+      if isShown {
+        attachContentControllerView()
+      }
+    }
+  }
   private(set) var isShown = false
   var contentWindow: NSWindow?
   private var didClose: (@MainActor () -> Void)?
@@ -489,6 +530,7 @@ private final class PopoverSurfaceSpy: TrayPopoverSurface {
     presentationGeneration: UInt64
   ) {
     isShown = true
+    attachContentControllerView()
     if mutatesHostingOriginWhenShown {
       mutateHostingOrigin()
     }
@@ -505,7 +547,10 @@ private final class PopoverSurfaceSpy: TrayPopoverSurface {
   }
 
   func mutateHostingOrigin() {
-    guard let view = contentViewController?.view else { return }
+    guard let contentViewController else { return }
+    let view =
+      (contentViewController as? TrayPopoverContentController)?.hostedController.view
+      ?? contentViewController.view
     view.bounds.origin = CGPoint(x: 19, y: 23)
     view.frame.origin = CGPoint(x: 7, y: 11)
   }
@@ -526,6 +571,21 @@ private final class PopoverSurfaceSpy: TrayPopoverSurface {
       insets: safeAreaInsets
     )
     contentWindow = window
+    if isShown {
+      attachContentControllerView()
+    }
+  }
+
+  private func attachContentControllerView() {
+    guard let nativeContentView = contentWindow?.contentView,
+      let hostedView = contentViewController?.view
+    else { return }
+    hostedView.removeFromSuperview()
+    hostedView.frame = nativeContentView.bounds
+    hostedView.autoresizingMask = [.width, .height]
+    nativeContentView.addSubview(hostedView)
+    nativeContentView.needsLayout = true
+    nativeContentView.layoutSubtreeIfNeeded()
   }
 }
 
@@ -554,6 +614,23 @@ private final class SafeAreaContentView: NSView {
   override var safeAreaInsets: NSEdgeInsets {
     insets
   }
+}
+
+@MainActor
+private final class HorizontalContentProbe {
+  weak var view: NSView?
+}
+
+private struct HorizontalContentProbeView: NSViewRepresentable {
+  let probe: HorizontalContentProbe
+
+  func makeNSView(context: Context) -> NSView {
+    let view = NSView()
+    probe.view = view
+    return view
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 @MainActor

@@ -47,6 +47,80 @@ protocol RuntimeSettingsWindowPresenting: AnyObject {
   func presentAndWaitUntilKey() async -> TrayDestinationPresentation
 }
 
+/// One window presentation producer with independently cancellable consumers.
+/// Repeated commands can share the same AppKit presentation without allowing
+/// cancellation of one command to tear down the destination for the others.
+@MainActor
+final class WindowPresentationRequest {
+  let window: NSWindow
+  let waiter: WindowPresentationAwaiter
+  var producer: Task<Void, Never>?
+
+  private var result: TrayDestinationPresentation?
+  private var consumers: [UUID: CheckedContinuation<TrayDestinationPresentation, Never>] = [:]
+
+  init(window: NSWindow, waiter: WindowPresentationAwaiter) {
+    self.window = window
+    self.waiter = waiter
+  }
+
+  var consumerCount: Int { consumers.count }
+
+  func value(
+    onLastConsumerCancelled: @escaping @MainActor () -> Void
+  ) async -> TrayDestinationPresentation {
+    let consumerID = UUID()
+    return await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        if let result {
+          continuation.resume(returning: result)
+        } else if Task.isCancelled {
+          continuation.resume(returning: .cancelled)
+          if consumers.isEmpty {
+            onLastConsumerCancelled()
+          }
+        } else {
+          consumers[consumerID] = continuation
+        }
+      }
+    } onCancel: {
+      Task { @MainActor [weak self] in
+        self?.cancelConsumer(
+          id: consumerID,
+          onLastConsumerCancelled: onLastConsumerCancelled
+        )
+      }
+    }
+  }
+
+  func resolve(_ result: TrayDestinationPresentation) {
+    guard self.result == nil else { return }
+    self.result = result
+    let continuations = Array(consumers.values)
+    consumers.removeAll()
+    producer = nil
+    for continuation in continuations {
+      continuation.resume(returning: result)
+    }
+  }
+
+  func cancelProducer() {
+    waiter.cancel()
+    producer?.cancel()
+  }
+
+  private func cancelConsumer(
+    id: UUID,
+    onLastConsumerCancelled: @MainActor () -> Void
+  ) {
+    guard let continuation = consumers.removeValue(forKey: id) else { return }
+    continuation.resume(returning: .cancelled)
+    if consumers.isEmpty, result == nil {
+      onLastConsumerCancelled()
+    }
+  }
+}
+
 @MainActor
 func presentApplicationSettings(
   navigation: SettingsNavigationModel,
@@ -63,8 +137,12 @@ func presentApplicationSettings(
 final class RuntimeSettingsWindowController: NSWindowController,
   RuntimeSettingsWindowPresenting, NSWindowDelegate
 {
-  private var presentationRequest: (id: UUID, task: Task<TrayDestinationPresentation, Never>)?
+  typealias AwaiterFactory = @MainActor (NSWindow) -> WindowPresentationAwaiter
+
+  private var presentationRequest: WindowPresentationRequest?
   private let activationCoordinator: ApplicationWindowActivationCoordinator?
+  private let makePresentationAwaiter: AwaiterFactory
+  private let presentationAction: (@MainActor (NSWindow) -> Void)?
 
   // Treat the short key-window handoff as visible for generation ownership so
   // repeated Cmd+, requests cannot recreate the editor subtree mid-present.
@@ -72,11 +150,23 @@ final class RuntimeSettingsWindowController: NSWindowController,
     window?.isVisible == true || presentationRequest != nil
   }
 
+  #if DEBUG
+    var inFlightPresentationConsumerCount: Int {
+      presentationRequest?.consumerCount ?? 0
+    }
+  #endif
+
   init<Content: View>(
     rootView: Content,
-    activationCoordinator: ApplicationWindowActivationCoordinator? = nil
+    activationCoordinator: ApplicationWindowActivationCoordinator? = nil,
+    makePresentationAwaiter: @escaping AwaiterFactory = {
+      WindowPresentationAwaiter(window: $0)
+    },
+    presentationAction: (@MainActor (NSWindow) -> Void)? = nil
   ) {
     self.activationCoordinator = activationCoordinator
+    self.makePresentationAwaiter = makePresentationAwaiter
+    self.presentationAction = presentationAction
     let hostingController = NSHostingController(rootView: rootView)
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 900, height: 568),
@@ -101,52 +191,100 @@ final class RuntimeSettingsWindowController: NSWindowController,
 
   func showSettings() {
     prepareForPresentation()
-    if let window {
-      activationCoordinator?.windowWillPresent(window)
+    guard let window else { return }
+    activationCoordinator?.windowWillPresent(window)
+    if let presentationAction {
+      presentationAction(window)
+      return
     }
     NSApplication.shared.activate(ignoringOtherApps: true)
     showWindow(nil)
-    window?.makeKeyAndOrderFront(nil)
+    window.makeKeyAndOrderFront(nil)
   }
 
   func presentAndWaitUntilKey() async -> TrayDestinationPresentation {
-    if let presentationRequest {
-      return await presentationRequest.task.value
+    guard !Task.isCancelled else { return .cancelled }
+    if let request = presentationRequest {
+      return await awaitPresentation(request)
     }
-    let id = UUID()
-    let task = Task { @MainActor [weak self] in
-      guard let self, let window = self.window else {
-        return TrayDestinationPresentation.failed(
-          appLocalized("The Settings window is unavailable."))
+    guard let window else {
+      return TrayDestinationPresentation.failed(
+        appLocalized("The Settings window is unavailable."))
+    }
+    let waiter = makePresentationAwaiter(window)
+    let request = WindowPresentationRequest(window: window, waiter: waiter)
+    presentationRequest = request
+    request.producer = Task { @MainActor [weak self] in
+      guard let self else {
+        request.resolve(
+          .failed(appLocalized("The Settings window is unavailable.")))
+        return
       }
-      let waiter = WindowPresentationAwaiter(window: window)
-      return await waiter.present {
+      let result = await waiter.present {
         self.showSettings()
       }
+      self.completePresentation(request, result: result, window: window)
     }
-    presentationRequest = (id, task)
-    let result = await task.value
-    switch result {
-    case .presented:
-      break
-    case .failed, .cancelled:
-      if let window {
+    return await awaitPresentation(request)
+  }
+
+  private func completePresentation(
+    _ request: WindowPresentationRequest,
+    result: TrayDestinationPresentation,
+    window: NSWindow
+  ) {
+    let isCurrentRequest = presentationRequest === request
+    if isCurrentRequest {
+      switch result {
+      case .presented:
+        break
+      case .failed, .cancelled:
+        window.orderOut(nil)
         activationCoordinator?.windowDidHide(window)
       }
     }
-    if presentationRequest?.id == id {
+    request.resolve(result)
+    if isCurrentRequest {
       presentationRequest = nil
     }
-    return result
   }
 
   func windowShouldClose(_ sender: NSWindow) -> Bool {
     // Red-close hides this app-owned destination instead of invalidating the
     // controller/root view graph. The same window and app-lifetime draft can
     // therefore be made key again from the tray or Cmd+,.
+    cancelInFlightPresentation()
     sender.orderOut(nil)
     activationCoordinator?.windowDidHide(sender)
     return false
+  }
+
+  private func awaitPresentation(
+    _ request: WindowPresentationRequest
+  ) async -> TrayDestinationPresentation {
+    await request.value { [weak self, weak request] in
+      guard let self, let request else { return }
+      self.cancelProducerForLastConsumer(request)
+    }
+  }
+
+  private func cancelProducerForLastConsumer(_ request: WindowPresentationRequest) {
+    guard presentationRequest === request, request.consumerCount == 0 else { return }
+    request.cancelProducer()
+    request.window.orderOut(nil)
+    activationCoordinator?.windowDidHide(request.window)
+    if presentationRequest === request {
+      presentationRequest = nil
+    }
+  }
+
+  private func cancelInFlightPresentation() {
+    guard let request = presentationRequest else { return }
+    // Detach first so a same-turn reopen creates a fresh producer instead of
+    // joining the request that red-close just cancelled. The old producer's
+    // completion is identity-guarded and therefore cannot hide the new one.
+    presentationRequest = nil
+    request.cancelProducer()
   }
 
   func prepareForPresentation() {
@@ -161,67 +299,110 @@ final class RuntimeSettingsWindowController: NSWindowController,
   }
 }
 
-/// Completes only from concrete window state or didBecomeKey. There is no
-/// timing delay standing in for presentation completion.
+/// Completes from concrete window state, window notifications, cancellation,
+/// or a bounded liveness deadline. The deadline is only a final escape from a
+/// visible window that cannot become key; ordinary success is notification- or
+/// state-driven and never depends on waiting out the deadline.
 @MainActor
 final class WindowPresentationAwaiter {
+  typealias LivenessDeadlineScheduler =
+    @MainActor (@escaping @MainActor () -> Void) -> Task<Void, Never>?
+
   private weak var window: NSWindow?
   private var observers: [NSObjectProtocol] = []
+  private var livenessDeadlineTask: Task<Void, Never>?
   private var continuation: CheckedContinuation<TrayDestinationPresentation, Never>?
+  private var isCancellationRequested = false
   private var isFinished = false
   private let stateProvider: @MainActor () -> (isVisible: Bool, isKey: Bool)
+  private let scheduleLivenessDeadline: LivenessDeadlineScheduler
 
   init(window: NSWindow) {
     self.window = window
     stateProvider = { [weak window] in
       (window?.isVisible == true, window?.isKeyWindow == true)
     }
+    scheduleLivenessDeadline = { completion in
+      Task { @MainActor in
+        try? await Task.sleep(for: .seconds(2))
+        guard !Task.isCancelled else { return }
+        completion()
+      }
+    }
   }
 
   #if DEBUG
     init(
       window: NSWindow,
-      stateProvider: @escaping @MainActor () -> (isVisible: Bool, isKey: Bool)
+      stateProvider: @escaping @MainActor () -> (isVisible: Bool, isKey: Bool),
+      scheduleLivenessDeadline: @escaping LivenessDeadlineScheduler = { completion in
+        Task { @MainActor in
+          try? await Task.sleep(for: .seconds(2))
+          guard !Task.isCancelled else { return }
+          completion()
+        }
+      }
     ) {
       self.window = window
       self.stateProvider = stateProvider
+      self.scheduleLivenessDeadline = scheduleLivenessDeadline
     }
   #endif
 
   func present(_ action: @MainActor () -> Void) async -> TrayDestinationPresentation {
-    await withCheckedContinuation { continuation in
-      isFinished = false
-      self.continuation = continuation
-      guard let window else {
-        finish(.failed(appLocalized("The destination window is unavailable.")))
-        return
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        isFinished = false
+        self.continuation = continuation
+        guard let window else {
+          finish(.failed(appLocalized("The destination window is unavailable.")))
+          return
+        }
+        guard !isCancellationRequested, !Task.isCancelled else {
+          finish(.cancelled)
+          return
+        }
+        observers = [
+          NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: window,
+            queue: .main
+          ) { [weak self] _ in
+            MainActor.assumeIsolated {
+              self?.completeFromWindowState()
+            }
+          },
+          NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+          ) { [weak self] _ in
+            MainActor.assumeIsolated {
+              self?.finish(.cancelled)
+            }
+          },
+        ]
+        action()
+        completeFromWindowState()
+        guard !isFinished else { return }
+        if !stateProvider().isVisible {
+          finish(.failed(appLocalized("The destination window could not be shown.")))
+          return
+        }
+        livenessDeadlineTask = scheduleLivenessDeadline { [weak self] in
+          self?.completeAtLivenessDeadline()
+        }
       }
-      observers = [
-        NotificationCenter.default.addObserver(
-          forName: NSWindow.didBecomeKeyNotification,
-          object: window,
-          queue: .main
-        ) { [weak self] _ in
-          MainActor.assumeIsolated {
-            self?.completeFromWindowState()
-          }
-        },
-        NotificationCenter.default.addObserver(
-          forName: NSWindow.willCloseNotification,
-          object: window,
-          queue: .main
-        ) { [weak self] _ in
-          MainActor.assumeIsolated {
-            self?.finish(.cancelled)
-          }
-        },
-      ]
-      action()
-      completeFromWindowState()
-      if !stateProvider().isVisible {
-        finish(.failed(appLocalized("The destination window could not be shown.")))
+    } onCancel: {
+      Task { @MainActor [weak self] in
+        self?.cancel()
       }
     }
+  }
+
+  func cancel() {
+    isCancellationRequested = true
+    finish(.cancelled)
   }
 
   private func completeFromWindowState() {
@@ -234,6 +415,19 @@ final class WindowPresentationAwaiter {
     finish(.presented(isVisible: true, isKeyOrActive: true))
   }
 
+  private func completeAtLivenessDeadline() {
+    guard window != nil else {
+      finish(.failed(appLocalized("The destination window is unavailable.")))
+      return
+    }
+    let state = stateProvider()
+    guard state.isVisible else {
+      finish(.cancelled)
+      return
+    }
+    finish(.presented(isVisible: true, isKeyOrActive: state.isKey))
+  }
+
   private func finish(_ result: TrayDestinationPresentation) {
     guard !isFinished else { return }
     isFinished = true
@@ -241,6 +435,8 @@ final class WindowPresentationAwaiter {
       NotificationCenter.default.removeObserver(observer)
     }
     observers.removeAll()
+    livenessDeadlineTask?.cancel()
+    livenessDeadlineTask = nil
     continuation?.resume(returning: result)
     continuation = nil
   }

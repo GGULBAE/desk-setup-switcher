@@ -1186,3 +1186,11 @@
 "Choose the default input device" = "기본 입력 장치를 선택하세요";
 "Choose the default output device" = "기본 출력 장치를 선택하세요";
 "Set volume from 0 to 100 percent" = "음량을 0~100퍼센트로 설정하세요";
+
+/* 반응형 워크플로 화면 */
+"No system setting changes occur until you choose the next step." = "다음 단계를 선택하기 전에는 시스템 설정이 변경되지 않습니다.";
+"Calculating a read-only change plan…" = "읽기 전용 변경 계획을 계산하는 중…";
+"No Workflow" = "진행 중인 작업 없음";
+"Return to the tray and choose an action." = "트레이로 돌아가 작업을 선택하세요.";
+"Could Not Continue" = "계속 진행할 수 없음";
+"Try Again" = "다시 시도";

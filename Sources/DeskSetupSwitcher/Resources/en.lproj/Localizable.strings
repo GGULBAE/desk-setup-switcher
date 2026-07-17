@@ -1186,3 +1186,11 @@
 "Choose the default input device" = "Choose the default input device";
 "Choose the default output device" = "Choose the default output device";
 "Set volume from 0 to 100 percent" = "Set volume from 0 to 100 percent";
+
+/* Responsive workflow surfaces */
+"No system setting changes occur until you choose the next step." = "No system setting changes occur until you choose the next step.";
+"Calculating a read-only change plan…" = "Calculating a read-only change plan…";
+"No Workflow" = "No Workflow";
+"Return to the tray and choose an action." = "Return to the tray and choose an action.";
+"Could Not Continue" = "Could Not Continue";
+"Try Again" = "Try Again";

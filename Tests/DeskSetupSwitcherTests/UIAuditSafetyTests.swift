@@ -466,6 +466,58 @@ import Testing
       }
     }
 
+    @Test("settings red-close cancels an in-flight request and immediate reopen stays fresh")
+    func runtimeSettingsInFlightCloseIsDeterministic() async throws {
+      var policies: [NSApplication.ActivationPolicy] = []
+      let activation = ApplicationWindowActivationCoordinator { policy in
+        policies.append(policy)
+      }
+      var syntheticState = (isVisible: true, isKey: false)
+      var scheduledSettlement: (@MainActor () -> Void)?
+      var presentationActionCount = 0
+      let controller = RuntimeSettingsWindowController(
+        rootView: Color.clear,
+        activationCoordinator: activation,
+        makePresentationAwaiter: { window in
+          WindowPresentationAwaiter(
+            window: window,
+            stateProvider: { syntheticState },
+            scheduleLivenessDeadline: {
+              scheduledSettlement = $0
+              return nil
+            }
+          )
+        },
+        presentationAction: { _ in presentationActionCount += 1 }
+      )
+      let window = try #require(controller.window)
+      let pending = Task { @MainActor in
+        await controller.presentAndWaitUntilKey()
+      }
+
+      while presentationActionCount == 0 { await Task.yield() }
+      #expect(scheduledSettlement != nil)
+      #expect(activation.presentedWindowCount == 1)
+      #expect(policies == [.regular])
+
+      #expect(controller.windowShouldClose(window) == false)
+
+      syntheticState = (isVisible: true, isKey: true)
+      let reopenedResult = await controller.presentAndWaitUntilKey()
+
+      #expect(await pending.value == .cancelled)
+      #expect(
+        reopenedResult == .presented(isVisible: true, isKeyOrActive: true)
+      )
+      #expect(presentationActionCount == 2)
+      #expect(activation.presentedWindowCount == 1)
+      #expect(policies == [.regular, .accessory, .regular])
+
+      #expect(controller.windowShouldClose(window) == false)
+      #expect(activation.presentedWindowCount == 0)
+      #expect(policies == [.regular, .accessory, .regular, .accessory])
+    }
+
     @Test("workflow window is persistent and strongly retains its content window")
     func workflowWindowGeometry() throws {
       let controller = TrayWorkflowWindowController(rootView: Color.clear)
@@ -490,6 +542,62 @@ import Testing
       #expect(controller.windowShouldClose(window) == false)
       #expect(closeRequests == 1)
       #expect(!window.isReleasedWhenClosed)
+    }
+
+    @Test("workflow red-close cancels an in-flight request and immediate reopen stays fresh")
+    func workflowInFlightCloseIsDeterministic() async throws {
+      var policies: [NSApplication.ActivationPolicy] = []
+      let activation = ApplicationWindowActivationCoordinator { policy in
+        policies.append(policy)
+      }
+      var syntheticState = (isVisible: true, isKey: false)
+      var scheduledSettlement: (@MainActor () -> Void)?
+      var presentationActionCount = 0
+      var closeRequests = 0
+      let controller = TrayWorkflowWindowController(
+        rootView: Color.clear,
+        activationCoordinator: activation,
+        onWindowClose: { closeRequests += 1 },
+        makePresentationAwaiter: { window in
+          WindowPresentationAwaiter(
+            window: window,
+            stateProvider: { syntheticState },
+            scheduleLivenessDeadline: {
+              scheduledSettlement = $0
+              return nil
+            }
+          )
+        },
+        presentationAction: { _ in presentationActionCount += 1 }
+      )
+      let window = try #require(controller.window)
+      let pending = Task { @MainActor in
+        await controller.presentAndWaitUntilKey()
+      }
+
+      while presentationActionCount == 0 { await Task.yield() }
+      #expect(scheduledSettlement != nil)
+      #expect(activation.presentedWindowCount == 1)
+      #expect(policies == [.regular])
+
+      #expect(controller.windowShouldClose(window) == false)
+
+      syntheticState = (isVisible: true, isKey: true)
+      let reopenedResult = await controller.presentAndWaitUntilKey()
+
+      #expect(await pending.value == .cancelled)
+      #expect(
+        reopenedResult == .presented(isVisible: true, isKeyOrActive: true)
+      )
+      #expect(presentationActionCount == 2)
+      #expect(closeRequests == 1)
+      #expect(activation.presentedWindowCount == 1)
+      #expect(policies == [.regular, .accessory, .regular])
+
+      #expect(controller.windowShouldClose(window) == false)
+      #expect(closeRequests == 2)
+      #expect(activation.presentedWindowCount == 0)
+      #expect(policies == [.regular, .accessory, .regular, .accessory])
     }
 
     @Test("safety state records network scope and sanitized change summaries")
@@ -635,17 +743,222 @@ import Testing
       #expect(actionCount == 1)
 
       state = (isVisible: true, isKey: false)
-      waiter = WindowPresentationAwaiter(window: window, stateProvider: { state })
+      var scheduledSettlement: (@MainActor () -> Void)?
+      waiter = WindowPresentationAwaiter(
+        window: window,
+        stateProvider: { state },
+        scheduleLivenessDeadline: {
+          scheduledSettlement = $0
+          return nil
+        }
+      )
       var actionStarted = false
       let pending = Task { @MainActor in
         await waiter.present { actionStarted = true }
       }
       while !actionStarted { await Task.yield() }
+      #expect(scheduledSettlement != nil)
       state = (isVisible: true, isKey: true)
       NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
       NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
 
       #expect(await pending.value == .presented(isVisible: true, isKeyOrActive: true))
+    }
+
+    @Test("visible non-key destination resolves at the injected liveness deadline")
+    func visibleNonKeyDestinationSettles() async throws {
+      let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+        styleMask: [.titled, .closable],
+        backing: .buffered,
+        defer: false
+      )
+      let state = (isVisible: true, isKey: false)
+      var scheduledSettlement: (@MainActor () -> Void)?
+      var actionStarted = false
+      let waiter = WindowPresentationAwaiter(
+        window: window,
+        stateProvider: { state },
+        scheduleLivenessDeadline: {
+          scheduledSettlement = $0
+          return nil
+        }
+      )
+      let pending = Task { @MainActor in
+        await waiter.present { actionStarted = true }
+      }
+
+      while !actionStarted { await Task.yield() }
+      let settle = try #require(scheduledSettlement)
+      settle()
+
+      #expect(
+        await pending.value == .presented(isVisible: true, isKeyOrActive: false)
+      )
+    }
+
+    @Test("cancellation before waiter startup never performs the presentation action")
+    func preCancelledWaiterDoesNotPresent() async {
+      let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+        styleMask: [.titled, .closable],
+        backing: .buffered,
+        defer: false
+      )
+      let waiter = WindowPresentationAwaiter(
+        window: window,
+        stateProvider: { (isVisible: true, isKey: false) }
+      )
+      var presentationActionCount = 0
+      let pending = Task { @MainActor in
+        await waiter.present { presentationActionCount += 1 }
+      }
+
+      pending.cancel()
+
+      #expect(await pending.value == .cancelled)
+      #expect(presentationActionCount == 0)
+    }
+
+    @Test("pre-cancelled controller request never starts its waiter or activation")
+    func preCancelledControllerDoesNotPresent() async {
+      var policies: [NSApplication.ActivationPolicy] = []
+      let activation = ApplicationWindowActivationCoordinator { policy in
+        policies.append(policy)
+      }
+      var awaiterFactoryCount = 0
+      var presentationActionCount = 0
+      let controller = RuntimeSettingsWindowController(
+        rootView: Color.clear,
+        activationCoordinator: activation,
+        makePresentationAwaiter: { window in
+          awaiterFactoryCount += 1
+          return WindowPresentationAwaiter(
+            window: window,
+            stateProvider: { (isVisible: true, isKey: false) }
+          )
+        },
+        presentationAction: { _ in presentationActionCount += 1 }
+      )
+      let pending = Task { @MainActor in
+        await controller.presentAndWaitUntilKey()
+      }
+
+      pending.cancel()
+
+      #expect(await pending.value == .cancelled)
+      #expect(awaiterFactoryCount == 0)
+      #expect(presentationActionCount == 0)
+      #expect(activation.presentedWindowCount == 0)
+      #expect(policies.isEmpty)
+    }
+
+    @Test("cancelling a controller presentation task finishes and balances activation")
+    func controllerPresentationTaskCancellationIsDeterministic() async {
+      var policies: [NSApplication.ActivationPolicy] = []
+      let activation = ApplicationWindowActivationCoordinator { policy in
+        policies.append(policy)
+      }
+      let state = (isVisible: true, isKey: false)
+      var scheduledSettlement: (@MainActor () -> Void)?
+      var actionStarted = false
+      let controller = RuntimeSettingsWindowController(
+        rootView: Color.clear,
+        activationCoordinator: activation,
+        makePresentationAwaiter: { window in
+          WindowPresentationAwaiter(
+            window: window,
+            stateProvider: { state },
+            scheduleLivenessDeadline: {
+              scheduledSettlement = $0
+              return nil
+            }
+          )
+        },
+        presentationAction: { _ in actionStarted = true }
+      )
+      let pending = Task { @MainActor in
+        await controller.presentAndWaitUntilKey()
+      }
+
+      while !actionStarted { await Task.yield() }
+      #expect(scheduledSettlement != nil)
+      #expect(activation.presentedWindowCount == 1)
+      pending.cancel()
+
+      #expect(await pending.value == .cancelled)
+      #expect(activation.presentedWindowCount == 0)
+      #expect(policies == [.regular, .accessory])
+      #expect(!controller.isPresentationVisible)
+    }
+
+    @Test("cancelling one coalesced caller preserves the shared presentation")
+    func coalescedCallerCancellationIsConsumerLocal() async throws {
+      var policies: [NSApplication.ActivationPolicy] = []
+      let activation = ApplicationWindowActivationCoordinator { policy in
+        policies.append(policy)
+      }
+      var state = (isVisible: true, isKey: false)
+      var scheduledDeadline: (@MainActor () -> Void)?
+      var presentationActionCount = 0
+      let controller = RuntimeSettingsWindowController(
+        rootView: Color.clear,
+        activationCoordinator: activation,
+        makePresentationAwaiter: { window in
+          WindowPresentationAwaiter(
+            window: window,
+            stateProvider: { state },
+            scheduleLivenessDeadline: {
+              scheduledDeadline = $0
+              return nil
+            }
+          )
+        },
+        presentationAction: { _ in presentationActionCount += 1 }
+      )
+      let window = try #require(controller.window)
+      let first = Task { @MainActor in
+        await controller.presentAndWaitUntilKey()
+      }
+
+      while controller.inFlightPresentationConsumerCount != 1
+        || presentationActionCount != 1
+        || scheduledDeadline == nil
+      {
+        await Task.yield()
+      }
+      #expect(presentationActionCount == 1)
+      #expect(scheduledDeadline != nil)
+
+      let second = Task { @MainActor in
+        await controller.presentAndWaitUntilKey()
+      }
+      while controller.inFlightPresentationConsumerCount != 2 {
+        await Task.yield()
+      }
+
+      second.cancel()
+
+      #expect(await second.value == .cancelled)
+      #expect(controller.inFlightPresentationConsumerCount == 1)
+      #expect(presentationActionCount == 1)
+      #expect(activation.presentedWindowCount == 1)
+      #expect(policies == [.regular])
+
+      state = (isVisible: true, isKey: true)
+      NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+
+      #expect(
+        await first.value == .presented(isVisible: true, isKeyOrActive: true)
+      )
+      #expect(controller.inFlightPresentationConsumerCount == 0)
+      #expect(presentationActionCount == 1)
+      #expect(activation.presentedWindowCount == 1)
+      #expect(policies == [.regular])
+
+      #expect(controller.windowShouldClose(window) == false)
+      #expect(activation.presentedWindowCount == 0)
+      #expect(policies == [.regular, .accessory])
     }
 
     @Test("application Settings command preserves an already-visible presentation")

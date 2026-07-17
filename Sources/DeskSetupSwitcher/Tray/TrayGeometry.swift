@@ -67,8 +67,8 @@ struct TrayGeometry: Equatable, Sendable {
   static let headerHeight: CGFloat = 32
   static let footerHeight: CGFloat = 0
 
-  /// Native popover chrome owns any AppKit safe-area insets. The SwiftUI root
-  /// therefore applies exactly one symmetric content inset of its own.
+  /// The AppKit hosting boundary neutralizes native horizontal safe-area insets.
+  /// The SwiftUI root therefore applies exactly one symmetric content inset.
   func rootHorizontalInsets(nativeSafeArea _: TraySafeAreaInsets) -> TrayHorizontalInsets {
     TrayHorizontalInsets(leading: Self.outerPadding, trailing: Self.outerPadding)
   }

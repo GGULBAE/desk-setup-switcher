@@ -79,8 +79,267 @@ enum ApplyResultCountPresentation {
   }
 }
 
+private enum WorkflowFooterShortcut {
+  case none
+  case cancel
+  case defaultAction
+}
+
+private struct WorkflowFooterAction: Identifiable {
+  let id: String
+  let title: String
+  var accessibilityLabel: String?
+  var accessibilityHint: String?
+  var role: ButtonRole?
+  var shortcut: WorkflowFooterShortcut
+  var isDisabled: Bool
+  var isProminent: Bool
+  let perform: () -> Void
+
+  init(
+    id: String,
+    title: String,
+    accessibilityLabel: String? = nil,
+    accessibilityHint: String? = nil,
+    role: ButtonRole? = nil,
+    shortcut: WorkflowFooterShortcut = .none,
+    isDisabled: Bool = false,
+    isProminent: Bool = false,
+    perform: @escaping () -> Void
+  ) {
+    self.id = id
+    self.title = title
+    self.accessibilityLabel = accessibilityLabel
+    self.accessibilityHint = accessibilityHint
+    self.role = role
+    self.shortcut = shortcut
+    self.isDisabled = isDisabled
+    self.isProminent = isProminent
+    self.perform = perform
+  }
+}
+
+enum WorkflowActionBarLayoutPolicy {
+  static let horizontalItemSpacing: CGFloat = 8
+  static let horizontalSectionSpacing: CGFloat = 12
+  static let verticalSpacing: CGFloat = 8
+
+  static func requiresStackedLayout(for dynamicTypeSize: DynamicTypeSize) -> Bool {
+    dynamicTypeSize.isAccessibilitySize
+  }
+
+  static func requiresStackedLayout(
+    forceStacked: Bool,
+    availableWidth: CGFloat,
+    idealItemWidths: [CGFloat]
+  ) -> Bool {
+    forceStacked || horizontalWidth(for: idealItemWidths) > availableWidth
+  }
+
+  static func frames(
+    in bounds: CGRect,
+    itemSizes: [CGSize],
+    isStacked: Bool
+  ) -> [CGRect] {
+    guard !itemSizes.isEmpty else { return [] }
+    if isStacked {
+      var y = bounds.minY
+      return itemSizes.enumerated().map { index, size in
+        let constrainedSize = CGSize(width: min(size.width, bounds.width), height: size.height)
+        let x = index == 0 ? bounds.minX : bounds.maxX - constrainedSize.width
+        defer { y += constrainedSize.height + verticalSpacing }
+        return CGRect(origin: CGPoint(x: x, y: y), size: constrainedSize)
+      }
+    }
+
+    let firstSize = itemSizes[0]
+    var result = [
+      CGRect(
+        x: bounds.minX,
+        y: bounds.midY - firstSize.height / 2,
+        width: firstSize.width,
+        height: firstSize.height
+      )
+    ]
+    guard itemSizes.count > 1 else { return result }
+    let trailingWidth =
+      itemSizes.dropFirst().reduce(0) { $0 + $1.width }
+      + horizontalItemSpacing * CGFloat(max(0, itemSizes.count - 2))
+    var x = bounds.maxX - trailingWidth
+    for size in itemSizes.dropFirst() {
+      result.append(
+        CGRect(
+          x: x,
+          y: bounds.midY - size.height / 2,
+          width: size.width,
+          height: size.height
+        ))
+      x += size.width + horizontalItemSpacing
+    }
+    return result
+  }
+
+  static func horizontalWidth(for itemWidths: [CGFloat]) -> CGFloat {
+    guard let first = itemWidths.first else { return 0 }
+    guard itemWidths.count > 1 else { return first }
+    return first + horizontalSectionSpacing + itemWidths.dropFirst().reduce(0, +)
+      + horizontalItemSpacing * CGFloat(max(0, itemWidths.count - 2))
+  }
+}
+
+enum WorkflowKeyboardFocusPolicy {
+  static func initialActionID(
+    cancelActionID: String,
+    isCancelActionDisabled: Bool
+  ) -> String? {
+    isCancelActionDisabled ? nil : cancelActionID
+  }
+}
+
+private struct AdaptiveWorkflowActionLayout: Layout {
+  struct Cache {
+    var sizes: [CGSize] = []
+    var isStacked = false
+  }
+
+  let forceStacked: Bool
+
+  func makeCache(subviews: Subviews) -> Cache {
+    Cache()
+  }
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout Cache
+  ) -> CGSize {
+    guard !subviews.isEmpty else { return .zero }
+    let idealSizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    let idealHorizontalWidth = WorkflowActionBarLayoutPolicy.horizontalWidth(
+      for: idealSizes.map(\.width)
+    )
+    let proposedWidth = proposal.width ?? idealHorizontalWidth
+    let availableWidth = proposedWidth.isFinite ? proposedWidth : idealHorizontalWidth
+    cache.isStacked = WorkflowActionBarLayoutPolicy.requiresStackedLayout(
+      forceStacked: forceStacked,
+      availableWidth: availableWidth,
+      idealItemWidths: idealSizes.map(\.width)
+    )
+    cache.sizes =
+      cache.isStacked
+      ? subviews.map {
+        $0.sizeThatFits(ProposedViewSize(width: availableWidth, height: nil))
+      }
+      : idealSizes
+
+    let height =
+      if cache.isStacked {
+        cache.sizes.reduce(0) { $0 + $1.height }
+          + WorkflowActionBarLayoutPolicy.verticalSpacing
+          * CGFloat(max(0, cache.sizes.count - 1))
+      } else {
+        cache.sizes.map(\.height).max() ?? 0
+      }
+    return CGSize(width: availableWidth, height: height)
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout Cache
+  ) {
+    guard !subviews.isEmpty, cache.sizes.count == subviews.count else { return }
+    let frames = WorkflowActionBarLayoutPolicy.frames(
+      in: bounds,
+      itemSizes: cache.sizes,
+      isStacked: cache.isStacked
+    )
+    for index in subviews.indices {
+      let frame = frames[index]
+      subviews[index].place(
+        at: frame.origin,
+        anchor: .topLeading,
+        proposal: ProposedViewSize(frame.size)
+      )
+    }
+  }
+}
+
+private struct AdaptiveWorkflowActionBar: View {
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @FocusState private var keyboardFocusedActionID: String?
+  let cancelAction: WorkflowFooterAction
+  let trailingActions: [WorkflowFooterAction]
+  let focusRequestID: String
+
+  var body: some View {
+    AdaptiveWorkflowActionLayout(
+      forceStacked: WorkflowActionBarLayoutPolicy.requiresStackedLayout(for: dynamicTypeSize)
+    ) {
+      actionButton(cancelAction)
+      ForEach(trailingActions) { action in
+        actionButton(action)
+      }
+    }
+    .focusSection()
+    .task(id: focusRequestID) {
+      await Task.yield()
+      keyboardFocusedActionID = WorkflowKeyboardFocusPolicy.initialActionID(
+        cancelActionID: cancelAction.id,
+        isCancelActionDisabled: cancelAction.isDisabled
+      )
+    }
+    .onChange(of: cancelAction.isDisabled) { _, isDisabled in
+      if isDisabled, keyboardFocusedActionID == cancelAction.id {
+        keyboardFocusedActionID = nil
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func actionButton(_ action: WorkflowFooterAction) -> some View {
+    let labeledButton = Button(role: action.role, action: action.perform) {
+      Text(action.title)
+        .multilineTextAlignment(.center)
+        .lineLimit(3)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .disabled(action.isDisabled)
+    .accessibilityLabel(action.accessibilityLabel ?? action.title)
+    .focused($keyboardFocusedActionID, equals: action.id)
+
+    let button = Group {
+      if let hint = action.accessibilityHint {
+        labeledButton.accessibilityHint(hint)
+      } else {
+        labeledButton
+      }
+    }
+
+    let shortcutButton = Group {
+      switch action.shortcut {
+      case .none:
+        button
+      case .cancel:
+        button.keyboardShortcut(.cancelAction)
+      case .defaultAction:
+        button.keyboardShortcut(.defaultAction)
+      }
+    }
+
+    if action.isProminent {
+      shortcutButton.buttonStyle(.borderedProminent)
+    } else {
+      shortcutButton
+    }
+  }
+}
+
 struct ApplyPreviewView: View {
   @EnvironmentObject private var model: ApplicationModel
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @AccessibilityFocusState private var isHeadingAccessibilityFocused: Bool
   let request: PendingApplyRequest
   let onCancel: () -> Void
   let onConfirm: () -> Void
@@ -97,21 +356,7 @@ struct ApplyPreviewView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
-      HStack {
-        Label(
-          request.preparation.mode == .force
-            ? appLocalized("Available Settings Preview") : appLocalized("Apply Preview"),
-          systemImage: request.preparation.mode == .force
-            ? "exclamationmark.shield" : "list.bullet.clipboard"
-        )
-        .font(.title2.bold())
-        Spacer()
-        Text(request.profile.name)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .truncationMode(.tail)
-          .layoutPriority(0)
-      }
+      previewHeader
 
       ScrollView {
         VStack(alignment: .leading, spacing: 14) {
@@ -126,32 +371,7 @@ struct ApplyPreviewView: View {
                 .foregroundStyle(.secondary)
             } else {
               ForEach(request.preparation.operations) { operation in
-                VStack(alignment: .leading, spacing: 5) {
-                  HStack(alignment: .firstTextBaseline) {
-                    Text(appSettingGroupTitle(operation.group))
-                      .font(.caption.bold())
-                      .frame(width: 70, alignment: .leading)
-                    Text(appLocalizedRuntime(operation.summary))
-                    Spacer()
-                    if operation.risk != .low {
-                      Text(riskTitle(operation.risk))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                    }
-                  }
-                  if let preview = presentationBuilder.operationPreview(for: operation) {
-                    operationPreview(preview, operation: operation)
-                      .padding(.leading, 80)
-                  }
-                }
-                .padding(.vertical, 3)
-                .accessibilityElement(children: .combine)
-                .accessibilityCustomContent(
-                  Text(verbatim: appLocalized("Change risk")),
-                  Text(verbatim: riskTitle(operation.risk)),
-                  importance: operation.risk == .high ? .high : .default
-                )
+                operationRow(operation)
               }
             }
           }
@@ -195,27 +415,142 @@ struct ApplyPreviewView: View {
       .scrollBounceBehavior(.basedOnSize)
 
       Divider()
-      HStack {
-        Button("Cancel") {
-          onCancel()
-        }
-        .keyboardShortcut(.cancelAction)
-        Spacer()
-        Button(
-          request.preparation.mode == .force
-            ? appLocalized("Apply Available Settings") : appLocalized("Apply Profile")
-        ) {
-          onConfirm()
-        }
-        .keyboardShortcut(.defaultAction)
-        .buttonStyle(.borderedProminent)
-        .disabled(!request.preparation.canExecute || model.isProfileMutationLocked)
-        .accessibilityHint(
-          appLocalized("Executes the reviewed operations and then shows itemized results."))
-      }
+      AdaptiveWorkflowActionBar(
+        cancelAction: WorkflowFooterAction(
+          id: "cancel",
+          title: appLocalized("Cancel"),
+          role: .cancel,
+          shortcut: .cancel,
+          perform: onCancel
+        ),
+        trailingActions: [
+          WorkflowFooterAction(
+            id: "apply",
+            title: request.preparation.mode == .force
+              ? appLocalized("Apply Available Settings") : appLocalized("Apply Profile"),
+            accessibilityHint: appLocalized(
+              "Executes the reviewed operations and then shows itemized results."),
+            shortcut: .defaultAction,
+            isDisabled: !request.preparation.canExecute || model.isProfileMutationLocked,
+            isProminent: true,
+            perform: onConfirm
+          )
+        ],
+        focusRequestID: request.id.uuidString
+      )
     }
     .padding(20)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .task(id: request.id) {
+      await Task.yield()
+      isHeadingAccessibilityFocused = true
+    }
+  }
+
+  @ViewBuilder
+  private var previewHeader: some View {
+    if dynamicTypeSize.isAccessibilitySize {
+      stackedPreviewHeader
+    } else {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 12) {
+          previewTitle
+            .fixedSize(horizontal: true, vertical: false)
+          Spacer(minLength: 0)
+          Text(request.profile.name)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        stackedPreviewHeader
+      }
+    }
+  }
+
+  private var stackedPreviewHeader: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      previewTitle
+      Text(request.profile.name)
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+        .truncationMode(.tail)
+    }
+  }
+
+  private var previewTitle: some View {
+    Label(
+      request.preparation.mode == .force
+        ? appLocalized("Available Settings Preview") : appLocalized("Apply Preview"),
+      systemImage: request.preparation.mode == .force
+        ? "exclamationmark.shield" : "list.bullet.clipboard"
+    )
+    .font(.title2.bold())
+    .accessibilityAddTraits(.isHeader)
+    .accessibilityFocused($isHeadingAccessibilityFocused)
+  }
+
+  @ViewBuilder
+  private func operationRow(_ operation: PlannedOperation) -> some View {
+    Group {
+      if dynamicTypeSize.isAccessibilitySize {
+        VStack(alignment: .leading, spacing: 5) {
+          Text(appSettingGroupTitle(operation.group))
+            .font(.caption.bold())
+          operationDetails(operation)
+        }
+      } else {
+        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
+          GridRow(alignment: .top) {
+            Text(appSettingGroupTitle(operation.group))
+              .font(.caption.bold())
+              .fixedSize(horizontal: true, vertical: false)
+              .gridColumnAlignment(.leading)
+            operationDetails(operation)
+              .gridColumnAlignment(.leading)
+          }
+        }
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.vertical, 3)
+    .accessibilityElement(children: .combine)
+    .accessibilityCustomContent(
+      Text(verbatim: appLocalized("Change risk")),
+      Text(verbatim: riskTitle(operation.risk)),
+      importance: operation.risk == .high ? .high : .default
+    )
+  }
+
+  private func operationDetails(_ operation: PlannedOperation) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+          Text(appLocalizedRuntime(operation.summary))
+          Spacer(minLength: 4)
+          if operation.risk != .low {
+            riskLabel(operation.risk)
+              .fixedSize(horizontal: true, vertical: false)
+          }
+        }
+        VStack(alignment: .leading, spacing: 3) {
+          Text(appLocalizedRuntime(operation.summary))
+          if operation.risk != .low {
+            riskLabel(operation.risk)
+          }
+        }
+      }
+      if let preview = presentationBuilder.operationPreview(for: operation) {
+        operationPreview(preview, operation: operation)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func riskLabel(_ risk: OperationRisk) -> some View {
+    Text(riskTitle(risk))
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      .accessibilityHidden(true)
   }
 
   @ViewBuilder
@@ -267,28 +602,51 @@ struct ApplyPreviewView: View {
     _ preview: FriendlyOperationPreview,
     operation: PlannedOperation
   ) -> some View {
-    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
-      GridRow {
-        Text(appLocalized("Current"))
-          .font(.caption.bold())
-        Text(
-          appOperationPreviewValue(
-            preview.previousValue.compactText,
-            operation: operation,
-            isPreviousValue: true
+    Group {
+      if dynamicTypeSize.isAccessibilitySize {
+        VStack(alignment: .leading, spacing: 5) {
+          operationPreviewValue(
+            title: appLocalized("Current"),
+            value: appOperationPreviewValue(
+              preview.previousValue.compactText,
+              operation: operation,
+              isPreviousValue: true
+            )
           )
-        )
-      }
-      GridRow {
-        Text(appLocalized("After apply"))
-          .font(.caption.bold())
-        Text(
-          appOperationPreviewValue(
-            preview.desiredValue.compactText,
-            operation: operation,
-            isPreviousValue: false
+          operationPreviewValue(
+            title: appLocalized("After apply"),
+            value: appOperationPreviewValue(
+              preview.desiredValue.compactText,
+              operation: operation,
+              isPreviousValue: false
+            )
           )
-        )
+        }
+      } else {
+        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
+          GridRow {
+            Text(appLocalized("Current"))
+              .font(.caption.bold())
+            Text(
+              appOperationPreviewValue(
+                preview.previousValue.compactText,
+                operation: operation,
+                isPreviousValue: true
+              )
+            )
+          }
+          GridRow {
+            Text(appLocalized("After apply"))
+              .font(.caption.bold())
+            Text(
+              appOperationPreviewValue(
+                preview.desiredValue.compactText,
+                operation: operation,
+                isPreviousValue: false
+              )
+            )
+          }
+        }
       }
     }
     .font(.caption)
@@ -319,6 +677,14 @@ struct ApplyPreviewView: View {
         }
       }
       .font(.caption)
+    }
+  }
+
+  private func operationPreviewValue(title: String, value: String) -> some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text(title)
+        .font(.caption.bold())
+      Text(value)
     }
   }
 
@@ -367,6 +733,9 @@ struct ApplyPreviewView: View {
 }
 
 struct ApplyResultDetailsView: View {
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @AccessibilityFocusState private var isHeadingAccessibilityFocused: Bool
+  @FocusState private var isCloseKeyboardFocused: Bool
   let summary: ApplyResultSummary
   let result: ApplyExecutionResult
   let verification: PostApplyVerificationResult?
@@ -386,14 +755,7 @@ struct ApplyResultDetailsView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
-      HStack(alignment: .firstTextBaseline) {
-        Label(statusTitle, systemImage: statusSymbol)
-          .font(.title2.bold())
-        Spacer()
-        Text(summary.profileName)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-      }
+      resultHeader
 
       Text(recoveryGuidance)
         .font(.callout)
@@ -445,17 +807,70 @@ struct ApplyResultDetailsView: View {
       }
 
       Divider()
-      HStack {
-        Text(summary.appliedAt.formatted())
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        Spacer()
-        Button("Close") { onClose() }
-          .keyboardShortcut(.cancelAction)
+      HStack(spacing: 12) {
+        appliedAtText
+        Spacer(minLength: 0)
+        closeButton
+          .fixedSize(horizontal: true, vertical: false)
       }
+      .focusSection()
     }
     .padding(20)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .task(id: summary.appliedAt) {
+      await Task.yield()
+      isHeadingAccessibilityFocused = true
+      isCloseKeyboardFocused = true
+    }
+  }
+
+  @ViewBuilder
+  private var resultHeader: some View {
+    if dynamicTypeSize.isAccessibilitySize {
+      stackedResultHeader
+    } else {
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+          statusLabel
+            .fixedSize(horizontal: true, vertical: false)
+          Spacer(minLength: 0)
+          Text(summary.profileName)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        stackedResultHeader
+      }
+    }
+  }
+
+  private var stackedResultHeader: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      statusLabel
+      Text(summary.profileName)
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+        .truncationMode(.tail)
+    }
+  }
+
+  private var statusLabel: some View {
+    Label(statusTitle, systemImage: statusSymbol)
+      .font(.title2.bold())
+      .accessibilityAddTraits(.isHeader)
+      .accessibilityFocused($isHeadingAccessibilityFocused)
+  }
+
+  private var appliedAtText: some View {
+    Text(summary.appliedAt.formatted())
+      .font(.caption)
+      .foregroundStyle(.secondary)
+  }
+
+  private var closeButton: some View {
+    Button("Close") { onClose() }
+      .keyboardShortcut(.cancelAction)
+      .focused($isCloseKeyboardFocused)
   }
 
   @ViewBuilder
@@ -496,17 +911,17 @@ struct ApplyResultDetailsView: View {
       && !rollbackOperationIDs.contains(item.id)
       && verificationFailure != nil
     return VStack(alignment: .leading, spacing: 3) {
-      HStack(alignment: .firstTextBaseline) {
-        Text(appSettingGroupTitle(item.group))
-          .font(.caption.bold())
-        Text(appApplicationItemTitle(item.key))
-        Spacer()
-        Label(
-          isNotVerified
-            ? appLocalized("Not Verified") : appApplicationItemStatusTitle(item.status),
-          systemImage: isNotVerified ? "questionmark.circle" : itemStatusSymbol(item.status)
-        )
-        .font(.caption.bold())
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+          resultItemTitle(item)
+          Spacer(minLength: 4)
+          resultItemStatus(item, isNotVerified: isNotVerified)
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        VStack(alignment: .leading, spacing: 3) {
+          resultItemTitle(item)
+          resultItemStatus(item, isNotVerified: isNotVerified)
+        }
       }
       Text(
         isNotVerified
@@ -522,6 +937,26 @@ struct ApplyResultDetailsView: View {
     }
     .padding(.vertical, 3)
     .accessibilityElement(children: .combine)
+  }
+
+  private func resultItemTitle(_ item: ApplicationItemSummary) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 6) {
+      Text(appSettingGroupTitle(item.group))
+        .font(.caption.bold())
+      Text(appApplicationItemTitle(item.key))
+    }
+  }
+
+  private func resultItemStatus(
+    _ item: ApplicationItemSummary,
+    isNotVerified: Bool
+  ) -> some View {
+    Label(
+      isNotVerified
+        ? appLocalized("Not Verified") : appApplicationItemStatusTitle(item.status),
+      systemImage: isNotVerified ? "questionmark.circle" : itemStatusSymbol(item.status)
+    )
+    .font(.caption.bold())
   }
 
   private var statusTitle: String {
@@ -586,6 +1021,7 @@ struct ApplyResultDetailsView: View {
 
 struct SafetyConfirmationView: View {
   @EnvironmentObject private var model: ApplicationModel
+  @AccessibilityFocusState private var isHeadingAccessibilityFocused: Bool
   let state: SafetyConfirmationState
 
   var body: some View {
@@ -595,14 +1031,15 @@ struct SafetyConfirmationView: View {
         .accessibilityHidden(true)
       Text("Keep these protected settings?")
         .font(.headline)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityFocused($isHeadingAccessibilityFocused)
       Text(
         appLocalized(
           "The previous configuration will return in \(state.secondsRemaining) seconds.")
       )
       .monospacedDigit()
       .multilineTextAlignment(.center)
-      .accessibilityLabel(
-        appLocalized("Automatic rollback in \(state.secondsRemaining) seconds"))
+      .accessibilityHidden(true)
 
       if !state.changeSummaries.isEmpty {
         ScrollView {
@@ -631,17 +1068,32 @@ struct SafetyConfirmationView: View {
         .accessibilityLabel("Protected change confirmation time remaining")
         .accessibilityValue(appLocalized("\(state.secondsRemaining) seconds remaining"))
 
-      HStack {
-        Button("Revert Now") { model.revertHighRiskChanges() }
-          .keyboardShortcut(.cancelAction)
-          .disabled(model.isApplyTransactionInProgress)
-        Button("Keep Changes") { model.confirmHighRiskChanges() }
-          .keyboardShortcut(.defaultAction)
-          .disabled(model.isApplyTransactionInProgress)
-      }
+      AdaptiveWorkflowActionBar(
+        cancelAction: WorkflowFooterAction(
+          id: "revert",
+          title: appLocalized("Revert Now"),
+          shortcut: .cancel,
+          isDisabled: model.isApplyTransactionInProgress,
+          perform: { model.revertHighRiskChanges() }
+        ),
+        trailingActions: [
+          WorkflowFooterAction(
+            id: "keep",
+            title: appLocalized("Keep Changes"),
+            shortcut: .defaultAction,
+            isDisabled: model.isApplyTransactionInProgress,
+            perform: { model.confirmHighRiskChanges() }
+          )
+        ],
+        focusRequestID: state.id.uuidString
+      )
     }
     .padding(20)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .task(id: state.id) {
+      await Task.yield()
+      isHeadingAccessibilityFocused = true
+    }
   }
 }
 
@@ -654,17 +1106,33 @@ protocol TrayWorkflowWindowPresenting: AnyObject {
 final class TrayWorkflowWindowController: NSWindowController,
   TrayWorkflowWindowPresenting, NSWindowDelegate
 {
-  private var presentationRequest: (id: UUID, task: Task<TrayDestinationPresentation, Never>)?
+  typealias AwaiterFactory = @MainActor (NSWindow) -> WindowPresentationAwaiter
+
+  private var presentationRequest: WindowPresentationRequest?
   private let activationCoordinator: ApplicationWindowActivationCoordinator?
   private let onWindowClose: @MainActor () -> Void
+  private let makePresentationAwaiter: AwaiterFactory
+  private let presentationAction: (@MainActor (NSWindow) -> Void)?
+
+  #if DEBUG
+    var inFlightPresentationConsumerCount: Int {
+      presentationRequest?.consumerCount ?? 0
+    }
+  #endif
 
   init<Content: View>(
     rootView: Content,
     activationCoordinator: ApplicationWindowActivationCoordinator? = nil,
-    onWindowClose: @escaping @MainActor () -> Void = {}
+    onWindowClose: @escaping @MainActor () -> Void = {},
+    makePresentationAwaiter: @escaping AwaiterFactory = {
+      WindowPresentationAwaiter(window: $0)
+    },
+    presentationAction: (@MainActor (NSWindow) -> Void)? = nil
   ) {
     self.activationCoordinator = activationCoordinator
     self.onWindowClose = onWindowClose
+    self.makePresentationAwaiter = makePresentationAwaiter
+    self.presentationAction = presentationAction
     let hostingController = NSHostingController(rootView: rootView)
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 620, height: 500),
@@ -684,38 +1152,58 @@ final class TrayWorkflowWindowController: NSWindowController,
   }
 
   func presentAndWaitUntilKey() async -> TrayDestinationPresentation {
-    if let presentationRequest {
-      return await presentationRequest.task.value
+    guard !Task.isCancelled else { return .cancelled }
+    if let request = presentationRequest {
+      return await awaitPresentation(request)
     }
-    let id = UUID()
-    let task = Task { @MainActor [weak self] in
-      guard let self, let window = self.window else {
-        return TrayDestinationPresentation.failed(
-          appLocalized("The workflow window is unavailable."))
+    guard let window else {
+      return TrayDestinationPresentation.failed(
+        appLocalized("The workflow window is unavailable."))
+    }
+    let waiter = makePresentationAwaiter(window)
+    let request = WindowPresentationRequest(window: window, waiter: waiter)
+    presentationRequest = request
+    request.producer = Task { @MainActor [weak self] in
+      guard let self else {
+        request.resolve(
+          .failed(appLocalized("The workflow window is unavailable.")))
+        return
       }
-      let waiter = WindowPresentationAwaiter(window: window)
-      return await waiter.present {
+      let result = await waiter.present {
         self.prepareForPresentation()
         self.activationCoordinator?.windowWillPresent(window)
+        if let presentationAction = self.presentationAction {
+          presentationAction(window)
+          return
+        }
         NSApplication.shared.activate(ignoringOtherApps: true)
         self.showWindow(nil)
         window.makeKeyAndOrderFront(nil)
       }
+      self.completePresentation(request, result: result, window: window)
     }
-    presentationRequest = (id, task)
-    let result = await task.value
-    switch result {
-    case .presented:
-      break
-    case .failed, .cancelled:
-      if let window {
+    return await awaitPresentation(request)
+  }
+
+  private func completePresentation(
+    _ request: WindowPresentationRequest,
+    result: TrayDestinationPresentation,
+    window: NSWindow
+  ) {
+    let isCurrentRequest = presentationRequest === request
+    if isCurrentRequest {
+      switch result {
+      case .presented:
+        break
+      case .failed, .cancelled:
+        window.orderOut(nil)
         activationCoordinator?.windowDidHide(window)
       }
     }
-    if presentationRequest?.id == id {
+    request.resolve(result)
+    if isCurrentRequest {
       presentationRequest = nil
     }
-    return result
   }
 
   func closeWorkflow() {
@@ -724,9 +1212,38 @@ final class TrayWorkflowWindowController: NSWindowController,
 
   func windowShouldClose(_ sender: NSWindow) -> Bool {
     onWindowClose()
+    cancelInFlightPresentation()
     sender.orderOut(nil)
     activationCoordinator?.windowDidHide(sender)
     return false
+  }
+
+  private func awaitPresentation(
+    _ request: WindowPresentationRequest
+  ) async -> TrayDestinationPresentation {
+    await request.value { [weak self, weak request] in
+      guard let self, let request else { return }
+      self.cancelProducerForLastConsumer(request)
+    }
+  }
+
+  private func cancelProducerForLastConsumer(_ request: WindowPresentationRequest) {
+    guard presentationRequest === request, request.consumerCount == 0 else { return }
+    request.cancelProducer()
+    request.window.orderOut(nil)
+    activationCoordinator?.windowDidHide(request.window)
+    if presentationRequest === request {
+      presentationRequest = nil
+    }
+  }
+
+  private func cancelInFlightPresentation() {
+    guard let request = presentationRequest else { return }
+    // A red-close and immediate reopen can share one MainActor turn. Detach
+    // the cancelled request first so the reopen owns a fresh producer; stale
+    // completion is already guarded by request identity.
+    presentationRequest = nil
+    request.cancelProducer()
   }
 
   func prepareForPresentation() {
@@ -750,9 +1267,26 @@ final class TrayWorkflowCloseRelay {
   }
 }
 
+private enum WorkflowRootAccessibilityFocusTarget: Hashable {
+  case permission(TrayPermissionWorkflow)
+  case dirtyApply(UUID)
+  case preparing(UUID)
+  case calculating(UUID)
+  case error(String)
+  case noResult
+  case noWorkflow
+}
+
+private enum WorkflowRootKeyboardFocusTarget: Hashable {
+  case closeError(String)
+}
+
 struct TrayWorkflowRootView: View {
   @EnvironmentObject private var model: ApplicationModel
   @ObservedObject var presentation: TrayPresentationModel
+  @AccessibilityFocusState private var accessibilityFocusTarget:
+    WorkflowRootAccessibilityFocusTarget?
+  @FocusState private var keyboardFocusTarget: WorkflowRootKeyboardFocusTarget?
   let onClose: @MainActor () -> Void
 
   var body: some View {
@@ -770,77 +1304,126 @@ struct TrayWorkflowRootView: View {
           systemImage: "rectangle.on.rectangle.slash",
           description: Text("Return to the tray and choose an action.")
         )
+        .accessibilityFocused($accessibilityFocusTarget, equals: .noWorkflow)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .task(id: requestedAccessibilityFocusTarget) {
+      guard let target = requestedAccessibilityFocusTarget else {
+        accessibilityFocusTarget = nil
+        return
+      }
+      await Task.yield()
+      accessibilityFocusTarget = target
+    }
+    .task(id: requestedKeyboardFocusTarget) {
+      guard let target = requestedKeyboardFocusTarget else {
+        keyboardFocusTarget = nil
+        return
+      }
+      await Task.yield()
+      keyboardFocusTarget = target
+    }
   }
 
   private func permissionWorkflow(_ workflow: TrayPermissionWorkflow) -> some View {
     VStack(alignment: .leading, spacing: 16) {
-      Label(permissionTitle(workflow), systemImage: "hand.raised")
-        .font(.title2.bold())
-        .accessibilityAddTraits(.isHeader)
-      Text(permissionMessage(workflow))
-        .foregroundStyle(.secondary)
+      ScrollView {
+        VStack(alignment: .leading, spacing: 16) {
+          Label(permissionTitle(workflow), systemImage: "hand.raised")
+            .font(.title2.bold())
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityFocused(
+              $accessibilityFocusTarget,
+              equals: .permission(workflow)
+            )
+          Text(permissionMessage(workflow))
+            .foregroundStyle(.secondary)
 
-      capturePhaseStatus
-
-      Spacer(minLength: 8)
-      Divider()
-      HStack {
-        Button("Cancel", role: .cancel) {
-          presentation.cancelPermissionWorkflow()
-          onClose()
+          capturePhaseStatus
         }
-        .keyboardShortcut(.cancelAction)
-        Spacer()
-        permissionActions(workflow)
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
+      .defaultScrollAnchor(.top)
+      .scrollBounceBehavior(.basedOnSize)
+
+      Divider()
+      AdaptiveWorkflowActionBar(
+        cancelAction: WorkflowFooterAction(
+          id: "cancel",
+          title: appLocalized("Cancel"),
+          role: .cancel,
+          shortcut: .cancel,
+          perform: {
+            presentation.cancelPermissionWorkflow()
+            onClose()
+          }
+        ),
+        trailingActions: permissionActions(workflow),
+        focusRequestID: "permission-\(String(describing: workflow))"
+      )
     }
     .padding(24)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .id(workflow)
   }
 
-  @ViewBuilder
-  private func permissionActions(_ workflow: TrayPermissionWorkflow) -> some View {
+  private func permissionActions(_ workflow: TrayPermissionWorkflow) -> [WorkflowFooterAction] {
     switch workflow {
     case .captureDirtyDraft:
-      Button("Discard Changes and Capture", role: .destructive) {
-        presentation.discardDraftThenCapture()
-      }
-      Button("Save and Capture") {
-        presentation.saveDraftThenCapture()
-      }
-      .keyboardShortcut(.defaultAction)
-      .disabled(!presentation.openDraftIsValid)
+      [
+        WorkflowFooterAction(
+          id: "discard-capture",
+          title: appLocalized("Discard Changes and Capture"),
+          role: .destructive,
+          perform: { presentation.discardDraftThenCapture() }
+        ),
+        WorkflowFooterAction(
+          id: "save-capture",
+          title: appLocalized("Save and Capture"),
+          shortcut: .defaultAction,
+          isDisabled: !presentation.openDraftIsValid,
+          perform: { presentation.saveDraftThenCapture() }
+        ),
+      ]
 
     case .captureExplanation:
-      Button("Capture Without Wi-Fi") {
-        presentation.startCapture()
-      }
-      Button("Continue") {
-        presentation.requestLocationAccessAndCapture()
-      }
-      .keyboardShortcut(.defaultAction)
+      [
+        WorkflowFooterAction(
+          id: "capture-without-wifi",
+          title: appLocalized("Capture Without Wi-Fi"),
+          perform: { presentation.startCapture() }
+        ),
+        WorkflowFooterAction(
+          id: "continue",
+          title: appLocalized("Continue"),
+          shortcut: .defaultAction,
+          perform: { presentation.requestLocationAccessAndCapture() }
+        ),
+      ]
 
     case .captureDenied:
-      Button("Capture Without Wi-Fi") {
-        presentation.startCapture()
-      }
-      Button("Open macOS System Settings") {
-        presentation.openLocationSystemSettings()
-      }
-      .keyboardShortcut(.defaultAction)
+      permissionDeniedActions
 
     case .systemSettings:
-      Button("Capture Without Wi-Fi") {
-        presentation.startCapture()
-      }
-      Button("Open macOS System Settings") {
-        presentation.openLocationSystemSettings()
-      }
-      .keyboardShortcut(.defaultAction)
+      permissionDeniedActions
     }
+  }
+
+  private var permissionDeniedActions: [WorkflowFooterAction] {
+    [
+      WorkflowFooterAction(
+        id: "capture-without-wifi",
+        title: appLocalized("Capture Without Wi-Fi"),
+        perform: { presentation.startCapture() }
+      ),
+      WorkflowFooterAction(
+        id: "open-system-settings",
+        title: appLocalized("Open macOS System Settings"),
+        shortcut: .defaultAction,
+        perform: { presentation.openLocationSystemSettings() }
+      ),
+    ]
   }
 
   @ViewBuilder
@@ -848,7 +1431,7 @@ struct TrayWorkflowRootView: View {
     switch presentation.capturePhase {
     case .idle:
       Label(
-        "No system setting changes occur until you choose the next step.",
+        appLocalized("No system setting changes occur until you choose the next step."),
         systemImage: "info.circle"
       )
       .font(.caption)
@@ -896,6 +1479,7 @@ struct TrayWorkflowRootView: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityElement(children: .combine)
+      .accessibilityFocused($accessibilityFocusTarget, equals: .preparing(profileID))
     } else if let summary = model.lastApplySummary,
       summary.profileID == profileID,
       let result = model.lastApplyResult
@@ -914,6 +1498,7 @@ struct TrayWorkflowRootView: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityElement(children: .combine)
+      .accessibilityFocused($accessibilityFocusTarget, equals: .calculating(profileID))
     }
   }
 
@@ -933,64 +1518,102 @@ struct TrayWorkflowRootView: View {
           description: Text("Apply a profile to see itemized results.")
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityFocused($accessibilityFocusTarget, equals: .noResult)
       }
     }
   }
 
   private func dirtyApplyPrompt(_ prompt: TrayApplyDraftPrompt) -> some View {
     VStack(alignment: .leading, spacing: 16) {
-      Label(presentation.applyDraftTitle, systemImage: "square.and.pencil")
-        .font(.title2.bold())
-      Text(presentation.applyDraftMessage)
-        .foregroundStyle(.secondary)
-      Spacer()
-      Divider()
-      HStack {
-        Button("Cancel", role: .cancel) {
-          presentation.cancelApplyDraftPrompt()
-          onClose()
+      ScrollView {
+        VStack(alignment: .leading, spacing: 16) {
+          Label(presentation.applyDraftTitle, systemImage: "square.and.pencil")
+            .font(.title2.bold())
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityFocused(
+              $accessibilityFocusTarget,
+              equals: .dirtyApply(prompt.id)
+            )
+          Text(presentation.applyDraftMessage)
+            .foregroundStyle(.secondary)
         }
-        .keyboardShortcut(.cancelAction)
-        Spacer()
-        switch prompt.kind {
-        case .targetDraft:
-          Button("Save and Apply") {
-            presentation.saveDraftThenApply(prompt)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .defaultScrollAnchor(.top)
+      .scrollBounceBehavior(.basedOnSize)
+
+      Divider()
+      AdaptiveWorkflowActionBar(
+        cancelAction: WorkflowFooterAction(
+          id: "cancel",
+          title: appLocalized("Cancel"),
+          role: .cancel,
+          shortcut: .cancel,
+          perform: {
+            presentation.cancelApplyDraftPrompt()
+            onClose()
           }
-          .keyboardShortcut(.defaultAction)
-          .disabled(!presentation.openDraftIsValid)
-        case .otherDraft(let openProfileID, let openProfileName):
-          Button(
-            appLocalized(
-              "Discard Changes to \(openProfileName) and Apply \(prompt.targetProfileName)"),
-            role: .destructive
-          ) {
+        ),
+        trailingActions: dirtyApplyActions(prompt),
+        focusRequestID: "dirty-apply-\(prompt.id.uuidString)"
+      )
+    }
+    .padding(24)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  private func dirtyApplyActions(_ prompt: TrayApplyDraftPrompt) -> [WorkflowFooterAction] {
+    switch prompt.kind {
+    case .targetDraft:
+      [
+        WorkflowFooterAction(
+          id: "save-apply",
+          title: appLocalized("Save and Apply"),
+          shortcut: .defaultAction,
+          isDisabled: !presentation.openDraftIsValid,
+          perform: { presentation.saveDraftThenApply(prompt) }
+        )
+      ]
+    case .otherDraft(let openProfileID, let openProfileName):
+      [
+        WorkflowFooterAction(
+          id: "discard-apply",
+          title: appLocalized("Discard Changes"),
+          accessibilityLabel: appLocalized(
+            "Discard Changes to \(openProfileName) and Apply \(prompt.targetProfileName)"),
+          role: .destructive,
+          perform: {
             presentation.discardDraftThenApply(
               prompt,
               expectedOpenProfileID: openProfileID
             )
           }
-          Button(appLocalized("Save \(openProfileName) and Apply \(prompt.targetProfileName)")) {
-            presentation.saveDraftThenApply(prompt)
-          }
-          .keyboardShortcut(.defaultAction)
-          .disabled(!presentation.openDraftIsValid)
-        }
-      }
+        ),
+        WorkflowFooterAction(
+          id: "save-apply",
+          title: appLocalized("Save and Apply"),
+          accessibilityLabel: appLocalized(
+            "Save \(openProfileName) and Apply \(prompt.targetProfileName)"),
+          shortcut: .defaultAction,
+          isDisabled: !presentation.openDraftIsValid,
+          perform: { presentation.saveDraftThenApply(prompt) }
+        ),
+      ]
     }
-    .padding(24)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private func workflowError(_ message: String) -> some View {
     VStack(alignment: .leading, spacing: 16) {
       Label("Could Not Continue", systemImage: "exclamationmark.triangle")
         .font(.title2.bold())
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityFocused($accessibilityFocusTarget, equals: .error(message))
       Text(message)
       Spacer()
       HStack {
         Button("Close") { onClose() }
           .keyboardShortcut(.cancelAction)
+          .focused($keyboardFocusTarget, equals: .closeError(message))
         Spacer()
         Button("Try Again") {
           presentation.dismissApplyDraftError()
@@ -1000,6 +1623,40 @@ struct TrayWorkflowRootView: View {
     }
     .padding(24)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  private var requestedAccessibilityFocusTarget: WorkflowRootAccessibilityFocusTarget? {
+    switch presentation.workflowDestination {
+    case .permission(let workflow):
+      .permission(workflow)
+    case .applyPreview(let profileID, _):
+      if let error = presentation.applyDraftError {
+        .error(error)
+      } else if let prompt = presentation.applyDraftPrompt {
+        .dirtyApply(prompt.id)
+      } else if model.safetyConfirmation != nil || model.pendingApply?.profile.id == profileID {
+        nil
+      } else if model.isApplyTransactionInProgress
+        || model.profiles.first(where: { $0.id == profileID }).map(model.isPreparingApply) == true
+      {
+        .preparing(profileID)
+      } else if model.lastApplySummary?.profileID == profileID, model.lastApplyResult != nil {
+        nil
+      } else {
+        .calculating(profileID)
+      }
+    case .resultDetails:
+      model.lastApplySummary != nil && model.lastApplyResult != nil ? nil : .noResult
+    case .settings, .profileEditor, .none:
+      .noWorkflow
+    }
+  }
+
+  private var requestedKeyboardFocusTarget: WorkflowRootKeyboardFocusTarget? {
+    guard case .applyPreview? = presentation.workflowDestination,
+      let error = presentation.applyDraftError
+    else { return nil }
+    return .closeError(error)
   }
 
   private func permissionTitle(_ workflow: TrayPermissionWorkflow) -> String {

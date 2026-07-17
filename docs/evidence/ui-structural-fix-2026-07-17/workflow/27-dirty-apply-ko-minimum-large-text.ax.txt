@@ -1,0 +1,14 @@
+source=TrayWorkflowRootView in attached offscreen NSWindow
+synthetic-workflow-root=true
+fixture=27-dirty-apply-ko-minimum-large-text
+state=dirty-apply
+language=ko
+viewport=520x360
+dynamic-type=accessibility3
+expected-action-layout=stacked
+image-format=jpeg
+image-has-alpha=false
+opaque-background-pixel-assertion=true
+live-display-audio-network-mutations=false
+offscreen-ax-limit=virtual SwiftUI children require an onscreen accessibility host
+role=AXGroup identifier=
