@@ -7,6 +7,12 @@ import SwiftUI
   import DeskSetupPresentation
 #endif
 
+enum TrayDeletionProgressCopy {
+  static let title = "Deleting Profile…"
+  static let detail =
+    "Saving the deletion to local storage. It cannot be cancelled after it starts."
+}
+
 struct TrayProfileListView: View {
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var profileEditor: ProfileEditorModel
@@ -100,6 +106,7 @@ struct TrayProfileListView: View {
       .disabled(
         model.isProfileMutationLocked || profileEditor.activity.isBusy
           || profileEditor.session.pendingSelection != nil
+          || presentation.deletionInFlightProfileID != nil
       )
       .focused(focusedControl, equals: .delete(profile.id))
       .accessibilityLabel(appLocalized("Delete \(profile.name)"))
@@ -108,20 +115,41 @@ struct TrayProfileListView: View {
   }
 
   private func deletionConfirmation(_ profile: DeskProfile) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    let isDeleting = presentation.isDeletionInFlight(profileID: profile.id)
+
+    return VStack(alignment: .leading, spacing: 8) {
       Divider()
-      Label(appLocalized("Delete this profile?"), systemImage: "trash")
-        .font(.caption.bold())
-        .foregroundStyle(.red)
-      Text(deletionMessage(profile))
-        .font(.caption2)
-        .foregroundStyle(.secondary)
+      if isDeleting {
+        HStack(spacing: 8) {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityHidden(true)
+          Label(
+            appLocalizedRuntime(TrayDeletionProgressCopy.title),
+            systemImage: "hourglass"
+          )
+          .font(.caption.bold())
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(appLocalizedRuntime(TrayDeletionProgressCopy.title))
+        Text(appLocalizedRuntime(TrayDeletionProgressCopy.detail))
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      } else {
+        Label(appLocalized("Delete this profile?"), systemImage: "trash")
+          .font(.caption.bold())
+          .foregroundStyle(.red)
+        Text(deletionMessage(profile))
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
 
       HStack {
         Button(appLocalized("Cancel"), role: .cancel) {
           route(.cancelDelete(profile.id))
         }
         .keyboardShortcut(.cancelAction)
+        .disabled(isDeleting)
         .focused(focusedControl, equals: .cancelDelete(profile.id))
 
         Spacer()
@@ -131,21 +159,23 @@ struct TrayProfileListView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(.red)
+        .disabled(isDeleting)
         .accessibilityLabel(appLocalized("Delete \(profile.name)"))
-        .help(appLocalized("Delete \(profile.name)"))
+        .help(
+          isDeleting
+            ? appLocalizedRuntime(TrayDeletionProgressCopy.detail)
+            : appLocalized("Delete \(profile.name)")
+        )
       }
     }
     .accessibilityElement(children: .contain)
   }
 
   private func deletionMessage(_ profile: DeskProfile) -> String {
-    if profileEditor.isDirty, profileEditor.selectedProfileID == profile.id {
-      return appLocalized(
-        "This permanently removes \(profile.name) and discards its unsaved changes. This action cannot be undone."
-      )
-    }
-    return appLocalized(
-      "This removes \(profile.name) from local profile storage. This action cannot be undone."
+    ProfileDeletionConfirmationCopy.message(
+      profileName: profile.name,
+      discardsUnsavedChanges:
+        profileEditor.isDirty && profileEditor.selectedProfileID == profile.id
     )
   }
 

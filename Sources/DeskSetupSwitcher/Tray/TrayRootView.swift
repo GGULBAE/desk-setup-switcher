@@ -21,7 +21,51 @@ enum TraySurfaceStylePolicy {
   static let swiftUIFullSurfaceBackgroundLayerCount = 0
 }
 
+enum TrayHeaderIconPolicy {
+  /// A close glyph suggests dismissing the popover, while this action quits the app.
+  static let quitSystemImage = "power"
+}
+
+enum TrayCaptureStatusPresentationPolicy {
+  static func showsStatusBanner(
+    for phase: TrayCapturePhase,
+    hasCaptureSummary: Bool
+  ) -> Bool {
+    switch phase {
+    case .idle:
+      false
+    case .running, .success:
+      true
+    case .partial, .failure:
+      !hasCaptureSummary
+    }
+  }
+}
+
+enum TrayBodyPresentationPolicy {
+  static func usesStaticEmptyBody(
+    profileCount: Int,
+    hasCaptureSummary: Bool,
+    hasApplySummary: Bool,
+    hasHandoffError: Bool,
+    capturePhase: TrayCapturePhase,
+    usesAccessibilityTextSize: Bool
+  ) -> Bool {
+    guard profileCount == 0,
+      !hasCaptureSummary,
+      !hasApplySummary,
+      !hasHandoffError,
+      !usesAccessibilityTextSize
+    else { return false }
+    if case .idle = capturePhase {
+      return true
+    }
+    return false
+  }
+}
+
 struct TrayRootView: View {
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var profileEditor: ProfileEditorModel
   @ObservedObject var presentation: TrayPresentationModel
@@ -90,7 +134,7 @@ struct TrayRootView: View {
         help: model.isProfileMutationLocked
           ? "Quit becomes available after the current apply transaction is safely recorded."
           : TrayAccessibilityCopy.quitHelp,
-        systemImage: "xmark",
+        systemImage: TrayHeaderIconPolicy.quitSystemImage,
         isDisabled: model.isProfileMutationLocked
       )
       .keyboardShortcut("q")
@@ -99,15 +143,14 @@ struct TrayRootView: View {
   }
 
   private var usesStaticEmptyBody: Bool {
-    guard model.profiles.isEmpty,
-      model.lastCaptureSummary == nil,
-      model.lastApplySummary == nil,
-      presentation.handoffError == nil
-    else { return false }
-    if case .idle = presentation.capturePhase {
-      return true
-    }
-    return false
+    TrayBodyPresentationPolicy.usesStaticEmptyBody(
+      profileCount: model.profiles.count,
+      hasCaptureSummary: model.lastCaptureSummary != nil,
+      hasApplySummary: model.lastApplySummary != nil,
+      hasHandoffError: presentation.handoffError != nil,
+      capturePhase: presentation.capturePhase,
+      usesAccessibilityTextSize: dynamicTypeSize.isAccessibilitySize
+    )
   }
 
   private var scrollableBody: some View {
@@ -174,22 +217,27 @@ struct TrayRootView: View {
 
   @ViewBuilder
   private var captureStatus: some View {
-    switch presentation.capturePhase {
-    case .idle:
-      EmptyView()
-    case .running:
-      statusBanner(
-        appLocalized("Reading current settings without changing them…"),
-        systemImage: "camera.metering.center.weighted",
-        tint: .blue,
-        includesProgress: true
-      )
-    case .success(let message):
-      statusBanner(message, systemImage: "checkmark.circle", tint: .green)
-    case .partial(let message):
-      statusBanner(message, systemImage: "exclamationmark.circle", tint: .orange)
-    case .failure(let message):
-      statusBanner(message, systemImage: "xmark.octagon", tint: .red)
+    if TrayCaptureStatusPresentationPolicy.showsStatusBanner(
+      for: presentation.capturePhase,
+      hasCaptureSummary: model.lastCaptureSummary != nil
+    ) {
+      switch presentation.capturePhase {
+      case .idle:
+        EmptyView()
+      case .running:
+        statusBanner(
+          appLocalized("Reading current settings without changing them…"),
+          systemImage: "camera.metering.center.weighted",
+          tint: .blue,
+          includesProgress: true
+        )
+      case .success(let message):
+        statusBanner(message, systemImage: "checkmark.circle", tint: .green)
+      case .partial(let message):
+        statusBanner(message, systemImage: "exclamationmark.circle", tint: .orange)
+      case .failure(let message):
+        statusBanner(message, systemImage: "xmark.octagon", tint: .red)
+      }
     }
   }
 

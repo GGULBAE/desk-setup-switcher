@@ -227,6 +227,14 @@ public struct LatestPreparationRequestTracker: Equatable, Sendable {
     latestRequestID = requestID
   }
 
+  /// Invalidates the single preview slot without attempting to cancel the
+  /// underlying read-only preparation. A late result may still finish its
+  /// local work, but it can no longer replace presentation state after the
+  /// user closes or cancels the preview.
+  public mutating func invalidate() {
+    latestRequestID = nil
+  }
+
   public func shouldPresent(requestID: UUID) -> Bool {
     latestRequestID == requestID
   }

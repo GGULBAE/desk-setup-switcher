@@ -116,6 +116,34 @@ enum ProfileEditorSurfacePolicy {
   static let showsCurrentSettingsDraftRefresh = false
 }
 
+enum ProfileEditorEmptyStateCopy {
+  static let noProfilesDescription =
+    "Capture from the tray, or choose + to create a blank profile."
+  static let noSelectionDescription =
+    "Select a profile, or choose + to create one."
+}
+
+enum ProfileDeletionConfirmationCopy {
+  static let standardFormat =
+    "This removes %@ from local profile storage. This action cannot be undone."
+  static let unsavedChangesFormat =
+    "This permanently removes %@ and discards its unsaved changes. This action cannot be undone."
+
+  static func format(discardsUnsavedChanges: Bool) -> String {
+    discardsUnsavedChanges ? unsavedChangesFormat : standardFormat
+  }
+
+  static func message(
+    profileName: String,
+    discardsUnsavedChanges: Bool
+  ) -> String {
+    String.localizedStringWithFormat(
+      appLocalizedRuntime(format(discardsUnsavedChanges: discardsUnsavedChanges)),
+      profileName
+    )
+  }
+}
+
 struct ProfileEditorAudioVolumeCapability: Equatable, Sendable {
   let isWritable: Bool
   let suggestedValue: Double?
@@ -315,16 +343,19 @@ struct ProfilesSettingsView: View {
       presenting: profilePendingDeletion
     ) { profile in
       Button(appLocalized("Delete \(profile.name)"), role: .destructive) {
-        model.deleteProfile(id: profile.id)
-        profilePendingDeletion = nil
+        Task { await deleteConfirmedProfile(profile) }
       }
       Button("Cancel", role: .cancel) {
         profilePendingDeletion = nil
       }
     } message: { profile in
       Text(
-        appLocalized(
-          "This removes \(profile.name) from local profile storage. This action cannot be undone."))
+        ProfileDeletionConfirmationCopy.message(
+          profileName: profile.name,
+          discardsUnsavedChanges:
+            profileEditor.isDirty && profileEditor.selectedProfileID == profile.id
+        )
+      )
     }
     .alert(
       "Replace all local profiles?",
@@ -388,7 +419,9 @@ struct ProfilesSettingsView: View {
           ContentUnavailableView(
             "No Profiles",
             systemImage: "rectangle.stack.badge.plus",
-            description: Text("Create a blank profile, then update it from a safe system snapshot.")
+            description: Text(
+              appLocalizedRuntime(ProfileEditorEmptyStateCopy.noProfilesDescription)
+            )
           )
         }
       }
@@ -474,7 +507,9 @@ struct ProfilesSettingsView: View {
         ContentUnavailableView(
           "Select a Profile",
           systemImage: "sidebar.left",
-          description: Text("Choose a profile in the sidebar or create a new one.")
+          description: Text(
+            appLocalizedRuntime(ProfileEditorEmptyStateCopy.noSelectionDescription)
+          )
         )
       }
     }
@@ -643,6 +678,12 @@ struct ProfilesSettingsView: View {
   }
 
   private func requestDeferredAction(_ action: DeferredProfileAction) {
+    if case .delete = action {
+      // Deleting the profile also deletes its unsaved draft. Keep that draft
+      // intact until the final confirmation has persisted successfully.
+      performDeferredAction(action)
+      return
+    }
     guard profileEditor.isDirty else {
       performDeferredAction(action)
       return
@@ -777,6 +818,21 @@ struct ProfilesSettingsView: View {
       profilePendingDeletion = model.profiles.first(where: { $0.id == profile.id }) ?? profile
     case .importProfiles:
       model.importProfiles()
+    }
+  }
+
+  private func deleteConfirmedProfile(_ profile: DeskProfile) async {
+    switch await model.deleteProfile(id: profile.id) {
+    case .deleted:
+      if profileEditor.selectedProfileID == profile.id {
+        profileEditor.revertDraft()
+      }
+      profilePendingDeletion = nil
+      synchronizeEditor()
+
+    case .rejected(let message):
+      profilePendingDeletion = nil
+      profileEditor.finishWithError(message)
     }
   }
 }

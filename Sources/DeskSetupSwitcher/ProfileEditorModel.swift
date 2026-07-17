@@ -159,6 +159,15 @@ final class ProfileEditorModel: ObservableObject {
     setActivity(.saving)
   }
 
+  /// Ends only the window-scoped saving presentation. The draft is retained
+  /// because a persistence operation that ignored task cancellation may still
+  /// have completed; a later synchronization or explicit save reconciles it
+  /// without resurrecting the closed workflow.
+  func cancelWorkflowSavingPresentation() {
+    guard activity == .saving else { return }
+    refreshIdleActivity(force: true)
+  }
+
   func beginCapture() {
     setActivity(.capturing)
   }

@@ -213,9 +213,7 @@ struct DeskSetupSwitcherApp: App {
       rootView: workflowRoot,
       activationCoordinator: windowActivationCoordinator,
       onWindowClose: {
-        if model.safetyConfirmation != nil {
-          model.revertHighRiskChanges()
-        }
+        presentation.handleWorkflowWindowClose()
       }
     )
     workflowCloseRelay.controller = workflowController

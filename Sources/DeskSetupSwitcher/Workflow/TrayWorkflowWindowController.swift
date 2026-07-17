@@ -196,6 +196,239 @@ enum WorkflowKeyboardFocusPolicy {
   }
 }
 
+enum PermissionWorkflowActionKind: String, Equatable, Hashable, Sendable {
+  case cancel
+  case close
+  case closeWhileCaptureContinues
+  case done
+  case discardChangesAndCapture
+  case saveAndCapture
+  case captureWithoutWiFi
+  case continueWithLocationAccess
+  case openSystemSettings
+  case captureCurrentSettings
+
+  var startsCapture: Bool {
+    switch self {
+    case .discardChangesAndCapture, .saveAndCapture, .captureWithoutWiFi,
+      .continueWithLocationAccess, .captureCurrentSettings:
+      true
+    case .cancel, .close, .closeWhileCaptureContinues, .done, .openSystemSettings:
+      false
+    }
+  }
+}
+
+struct PermissionWorkflowActionSet: Equatable, Sendable {
+  let leading: PermissionWorkflowActionKind
+  let trailing: [PermissionWorkflowActionKind]
+
+  var all: [PermissionWorkflowActionKind] {
+    [leading] + trailing
+  }
+}
+
+enum PermissionWorkflowActionPolicy {
+  static func actions(
+    workflow: TrayPermissionWorkflow,
+    capturePhase: TrayCapturePhase,
+    isLocationAuthorized: Bool,
+    hasWorkflowError: Bool = false,
+    isWorkflowTaskInFlight: Bool = false
+  ) -> PermissionWorkflowActionSet {
+    switch capturePhase {
+    case .running:
+      return PermissionWorkflowActionSet(leading: .closeWhileCaptureContinues, trailing: [])
+    case .success, .partial:
+      return PermissionWorkflowActionSet(leading: .done, trailing: [])
+    case .failure:
+      return PermissionWorkflowActionSet(leading: .close, trailing: [])
+    case .idle:
+      break
+    }
+    if isWorkflowTaskInFlight {
+      return PermissionWorkflowActionSet(leading: .close, trailing: [])
+    }
+
+    let trailing: [PermissionWorkflowActionKind]
+    switch workflow {
+    case .captureDirtyDraft:
+      trailing = [.discardChangesAndCapture, .saveAndCapture]
+    case .captureExplanation:
+      trailing =
+        isLocationAuthorized
+        ? [.captureCurrentSettings]
+        : [.captureWithoutWiFi, .continueWithLocationAccess]
+    case .captureDenied, .systemSettings:
+      trailing =
+        isLocationAuthorized
+        ? [.captureCurrentSettings]
+        : [.captureWithoutWiFi, .openSystemSettings]
+    }
+    return PermissionWorkflowActionSet(
+      leading: hasWorkflowError ? .close : .cancel,
+      trailing: trailing
+    )
+  }
+
+  static func statusSymbol(for capturePhase: TrayCapturePhase) -> String? {
+    switch capturePhase {
+    case .idle: "info.circle"
+    case .running: nil
+    case .success: "checkmark.circle"
+    case .partial: "exclamationmark.triangle"
+    case .failure: "xmark.octagon"
+    }
+  }
+}
+
+enum PermissionWorkflowFeedbackCopy {
+  static let recoveryGuidanceKey =
+    "Close this window, or choose one of the available actions below."
+  static let savingCloseGuidanceKey =
+    "Closing this window prevents capture from starting, even if the profile save finishes."
+
+  static func errorTitle(languageCode: String? = nil) -> String {
+    localized("Could Not Continue", languageCode: languageCode)
+  }
+
+  static func recoveryGuidance(languageCode: String? = nil) -> String {
+    localized(recoveryGuidanceKey, languageCode: languageCode)
+  }
+
+  static func savingTitle(languageCode: String? = nil) -> String {
+    localized("Saving profile…", languageCode: languageCode)
+  }
+
+  static func savingCloseGuidance(languageCode: String? = nil) -> String {
+    localized(savingCloseGuidanceKey, languageCode: languageCode)
+  }
+
+  private static func localized(_ key: String, languageCode: String?) -> String {
+    if let languageCode {
+      return appLocalizedRuntime(key, languageCode: languageCode)
+    }
+    return appLocalizedRuntime(key)
+  }
+}
+
+enum PermissionWorkflowActionCopy {
+  static func title(
+    for action: PermissionWorkflowActionKind,
+    languageCode: String? = nil
+  ) -> String {
+    let key =
+      switch action {
+      case .cancel: "Cancel"
+      case .close, .closeWhileCaptureContinues: "Close"
+      case .done: "Done"
+      case .discardChangesAndCapture: "Discard Changes and Capture"
+      case .saveAndCapture: "Save and Capture"
+      case .captureWithoutWiFi: "Capture Without Wi-Fi"
+      case .continueWithLocationAccess: "Allow Location and Capture"
+      case .openSystemSettings: "Open macOS System Settings"
+      case .captureCurrentSettings: "Capture Current Settings"
+      }
+    if let languageCode {
+      return appLocalizedRuntime(key, languageCode: languageCode)
+    }
+    return appLocalizedRuntime(key)
+  }
+}
+
+enum PermissionWorkflowCopy {
+  static func title(
+    for workflow: TrayPermissionWorkflow,
+    isLocationAuthorized: Bool,
+    languageCode: String? = nil
+  ) -> String {
+    let key =
+      switch workflow {
+      case .captureDirtyDraft:
+        "Save changes before capturing a new profile?"
+      case .captureExplanation:
+        isLocationAuthorized ? "Location Access Is Ready" : "Allow Location Access?"
+      case .captureDenied, .systemSettings:
+        isLocationAuthorized ? "Location Access Is Ready" : "Location Access Is Off"
+      }
+    return localized(key, languageCode: languageCode)
+  }
+
+  static func message(
+    for workflow: TrayPermissionWorkflow,
+    isLocationAuthorized: Bool,
+    languageCode: String? = nil
+  ) -> String {
+    let key =
+      switch workflow {
+      case .captureDirtyDraft:
+        "The open profile has changes that have not been saved."
+      case .captureExplanation:
+        isLocationAuthorized
+          ? "Location access is enabled. Capture the current settings to include the current Wi-Fi network."
+          : "Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere."
+      case .captureDenied, .systemSettings:
+        isLocationAuthorized
+          ? "Location access is enabled. Capture the current settings to include the current Wi-Fi network."
+          : "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi."
+      }
+    return localized(key, languageCode: languageCode)
+  }
+
+  private static func localized(_ key: String, languageCode: String?) -> String {
+    if let languageCode {
+      return appLocalizedRuntime(key, languageCode: languageCode)
+    }
+    return appLocalizedRuntime(key)
+  }
+}
+
+enum WorkflowErrorActionKind: String, Equatable, Hashable, Sendable {
+  case close
+}
+
+enum WorkflowErrorActionPolicy {
+  // Apply-draft errors currently expose no operation that retries the failed
+  // work. Keep the footer truthful until a real retry transition exists.
+  static let actions: [WorkflowErrorActionKind] = [.close]
+}
+
+enum ApplyPreviewActionCopy {
+  static func actionTitle(
+    for mode: ApplyMode,
+    languageCode: String? = nil
+  ) -> String {
+    localized(
+      mode == .force ? "Apply Available Settings" : "Apply Profile",
+      languageCode: languageCode
+    )
+  }
+
+  static func reviewNotice(
+    for reason: ApplyPreviewReviewReason,
+    actionTitle: String,
+    languageCode: String? = nil
+  ) -> String {
+    let key =
+      switch reason {
+      case .initial:
+        "This is a review. No setting changes until you press %@ below."
+      case .refreshedSystemState:
+        "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press %@ again."
+      }
+    let format = localized(key, languageCode: languageCode)
+    let locale = languageCode.map(Locale.init(identifier:)) ?? .current
+    return String(format: format, locale: locale, actionTitle)
+  }
+
+  private static func localized(_ key: String, languageCode: String?) -> String {
+    if let languageCode {
+      return appLocalizedRuntime(key, languageCode: languageCode)
+    }
+    return appLocalizedRuntime(key)
+  }
+}
+
 private struct AdaptiveWorkflowActionLayout: Layout {
   struct Cache {
     var sizes: [CGSize] = []
@@ -354,6 +587,10 @@ struct ApplyPreviewView: View {
     self.onConfirm = onConfirm
   }
 
+  private var applyActionTitle: String {
+    ApplyPreviewActionCopy.actionTitle(for: request.preparation.mode)
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       previewHeader
@@ -426,8 +663,7 @@ struct ApplyPreviewView: View {
         trailingActions: [
           WorkflowFooterAction(
             id: "apply",
-            title: request.preparation.mode == .force
-              ? appLocalized("Apply Available Settings") : appLocalized("Apply Profile"),
+            title: applyActionTitle,
             accessibilityHint: appLocalized(
               "Executes the reviewed operations and then shows itemized results."),
             shortcut: .defaultAction,
@@ -568,16 +804,19 @@ struct ApplyPreviewView: View {
     switch request.reviewReason {
     case .initial:
       Label(
-        appLocalized(
-          "This is a review. No setting changes until you press Apply Profile below."),
+        ApplyPreviewActionCopy.reviewNotice(
+          for: request.reviewReason,
+          actionTitle: applyActionTitle
+        ),
         systemImage: "info.circle"
       )
       .padding(10)
       .background(.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
     case .refreshedSystemState:
       Label(
-        appLocalized(
-          "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press Apply Profile again."
+        ApplyPreviewActionCopy.reviewNotice(
+          for: request.reviewReason,
+          actionTitle: applyActionTitle
         ),
         systemImage: "arrow.clockwise.circle"
       )
@@ -1108,6 +1347,9 @@ final class TrayWorkflowWindowController: NSWindowController,
 {
   typealias AwaiterFactory = @MainActor (NSWindow) -> WindowPresentationAwaiter
 
+  private static let initialContentSize = CGSize(width: 620, height: 500)
+  private static let minimumContentSize = CGSize(width: 520, height: 360)
+
   private var presentationRequest: WindowPresentationRequest?
   private let activationCoordinator: ApplicationWindowActivationCoordinator?
   private let onWindowClose: @MainActor () -> Void
@@ -1134,8 +1376,12 @@ final class TrayWorkflowWindowController: NSWindowController,
     self.makePresentationAwaiter = makePresentationAwaiter
     self.presentationAction = presentationAction
     let hostingController = NSHostingController(rootView: rootView)
+    // Workflow state replaces the hosted subtree after this controller is
+    // created. Keep those intrinsic-size changes inside the window's content
+    // viewport instead of allowing NSHostingController to resize NSWindow.
+    hostingController.sizingOptions = []
     let window = NSWindow(
-      contentRect: NSRect(x: 0, y: 0, width: 620, height: 500),
+      contentRect: NSRect(origin: .zero, size: Self.initialContentSize),
       styleMask: [.titled, .closable, .miniaturizable, .resizable],
       backing: .buffered,
       defer: false
@@ -1144,7 +1390,11 @@ final class TrayWorkflowWindowController: NSWindowController,
     window.title = appLocalized("Desk Setup Switcher Workflow")
     window.isReleasedWhenClosed = false
     window.tabbingMode = .disallowed
-    window.contentMinSize = CGSize(width: 520, height: 360)
+    window.contentMinSize = Self.minimumContentSize
+    // Assigning an NSHostingController can replace the requested content size
+    // with its tiny intrinsic fitting size. Restore the intended viewport only
+    // after AppKit has attached the controller.
+    window.setContentSize(Self.initialContentSize)
     window.collectionBehavior = [.managed, .participatesInCycle]
     window.center()
     super.init(window: window)
@@ -1218,6 +1468,16 @@ final class TrayWorkflowWindowController: NSWindowController,
     return false
   }
 
+  func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+    let minimumFrameSize = sender.frameRect(
+      forContentRect: NSRect(origin: .zero, size: Self.minimumContentSize)
+    ).size
+    return NSSize(
+      width: max(frameSize.width, minimumFrameSize.width),
+      height: max(frameSize.height, minimumFrameSize.height)
+    )
+  }
+
   private func awaitPresentation(
     _ request: WindowPresentationRequest
   ) async -> TrayDestinationPresentation {
@@ -1247,9 +1507,27 @@ final class TrayWorkflowWindowController: NSWindowController,
   }
 
   func prepareForPresentation() {
-    if window?.isMiniaturized == true {
-      window?.deminiaturize(nil)
+    guard let window else { return }
+    // Hosted root transitions can recompute native constraints. Reassert the
+    // app-owned minimum each time before repairing a legacy undersized frame.
+    window.contentMinSize = Self.minimumContentSize
+    restoreMinimumContentSizeIfNeeded(window)
+    if window.isMiniaturized {
+      window.deminiaturize(nil)
     }
+  }
+
+  private func restoreMinimumContentSizeIfNeeded(_ window: NSWindow) {
+    let currentSize = window.contentRect(forFrameRect: window.frame).size
+    let minimumSize = Self.minimumContentSize
+    guard currentSize.width < minimumSize.width || currentSize.height < minimumSize.height else {
+      return
+    }
+    window.setContentSize(
+      CGSize(
+        width: max(currentSize.width, minimumSize.width),
+        height: max(currentSize.height, minimumSize.height)
+      ))
   }
 
   @available(*, unavailable)
@@ -1283,6 +1561,7 @@ private enum WorkflowRootKeyboardFocusTarget: Hashable {
 
 struct TrayWorkflowRootView: View {
   @EnvironmentObject private var model: ApplicationModel
+  @EnvironmentObject private var locationPermission: LocationPermissionController
   @ObservedObject var presentation: TrayPresentationModel
   @AccessibilityFocusState private var accessibilityFocusTarget:
     WorkflowRootAccessibilityFocusTarget?
@@ -1327,7 +1606,14 @@ struct TrayWorkflowRootView: View {
   }
 
   private func permissionWorkflow(_ workflow: TrayPermissionWorkflow) -> some View {
-    VStack(alignment: .leading, spacing: 16) {
+    let actionSet = PermissionWorkflowActionPolicy.actions(
+      workflow: workflow,
+      capturePhase: presentation.capturePhase,
+      isLocationAuthorized: locationPermission.isAuthorized,
+      hasWorkflowError: presentation.permissionWorkflowError != nil,
+      isWorkflowTaskInFlight: presentation.hasWorkflowTask
+    )
+    return VStack(alignment: .leading, spacing: 16) {
       ScrollView {
         VStack(alignment: .leading, spacing: 16) {
           Label(permissionTitle(workflow), systemImage: "hand.raised")
@@ -1349,18 +1635,10 @@ struct TrayWorkflowRootView: View {
 
       Divider()
       AdaptiveWorkflowActionBar(
-        cancelAction: WorkflowFooterAction(
-          id: "cancel",
-          title: appLocalized("Cancel"),
-          role: .cancel,
-          shortcut: .cancel,
-          perform: {
-            presentation.cancelPermissionWorkflow()
-            onClose()
-          }
-        ),
-        trailingActions: permissionActions(workflow),
-        focusRequestID: "permission-\(String(describing: workflow))"
+        cancelAction: permissionAction(actionSet.leading),
+        trailingActions: actionSet.trailing.map(permissionAction),
+        focusRequestID:
+          "permission-\(String(describing: workflow))-\(actionSet.leading.rawValue)"
       )
     }
     .padding(24)
@@ -1368,83 +1646,175 @@ struct TrayWorkflowRootView: View {
     .id(workflow)
   }
 
-  private func permissionActions(_ workflow: TrayPermissionWorkflow) -> [WorkflowFooterAction] {
-    switch workflow {
-    case .captureDirtyDraft:
-      [
-        WorkflowFooterAction(
-          id: "discard-capture",
-          title: appLocalized("Discard Changes and Capture"),
-          role: .destructive,
-          perform: { presentation.discardDraftThenCapture() }
-        ),
-        WorkflowFooterAction(
-          id: "save-capture",
-          title: appLocalized("Save and Capture"),
-          shortcut: .defaultAction,
-          isDisabled: !presentation.openDraftIsValid,
-          perform: { presentation.saveDraftThenCapture() }
-        ),
-      ]
+  private func permissionAction(_ kind: PermissionWorkflowActionKind) -> WorkflowFooterAction {
+    switch kind {
+    case .cancel:
+      WorkflowFooterAction(
+        id: kind.rawValue,
+        title: PermissionWorkflowActionCopy.title(for: kind),
+        role: .cancel,
+        shortcut: .cancel,
+        perform: {
+          presentation.handleWorkflowWindowClose()
+          onClose()
+        }
+      )
 
-    case .captureExplanation:
-      [
-        WorkflowFooterAction(
-          id: "capture-without-wifi",
-          title: appLocalized("Capture Without Wi-Fi"),
-          perform: { presentation.startCapture() }
-        ),
-        WorkflowFooterAction(
-          id: "continue",
-          title: appLocalized("Continue"),
-          shortcut: .defaultAction,
-          perform: { presentation.requestLocationAccessAndCapture() }
-        ),
-      ]
+    case .close:
+      WorkflowFooterAction(
+        id: kind.rawValue,
+        title: PermissionWorkflowActionCopy.title(for: kind),
+        shortcut: .cancel,
+        perform: {
+          presentation.handleWorkflowWindowClose()
+          onClose()
+        }
+      )
 
-    case .captureDenied:
-      permissionDeniedActions
+    case .closeWhileCaptureContinues:
+      WorkflowFooterAction(
+        id: kind.rawValue,
+        title: PermissionWorkflowActionCopy.title(for: kind),
+        accessibilityHint: appLocalized(
+          "Capture continues safely after this window closes."),
+        shortcut: .cancel,
+        perform: {
+          presentation.handleWorkflowWindowClose()
+          onClose()
+        }
+      )
 
-    case .systemSettings:
-      permissionDeniedActions
-    }
-  }
+    case .done:
+      WorkflowFooterAction(
+        id: kind.rawValue,
+        title: PermissionWorkflowActionCopy.title(for: kind),
+        shortcut: .cancel,
+        perform: {
+          presentation.handleWorkflowWindowClose()
+          onClose()
+        }
+      )
 
-  private var permissionDeniedActions: [WorkflowFooterAction] {
-    [
+    case .discardChangesAndCapture:
+      WorkflowFooterAction(
+        id: "discard-capture",
+        title: PermissionWorkflowActionCopy.title(for: kind),
+        role: .destructive,
+        perform: { presentation.discardDraftThenCapture() }
+      )
+
+    case .saveAndCapture:
+      WorkflowFooterAction(
+        id: "save-capture",
+        title: PermissionWorkflowActionCopy.title(for: kind),
+        shortcut: .defaultAction,
+        isDisabled: !presentation.openDraftIsValid,
+        perform: { presentation.saveDraftThenCapture() }
+      )
+
+    case .captureWithoutWiFi:
       WorkflowFooterAction(
         id: "capture-without-wifi",
-        title: appLocalized("Capture Without Wi-Fi"),
+        title: PermissionWorkflowActionCopy.title(for: kind),
         perform: { presentation.startCapture() }
-      ),
+      )
+
+    case .continueWithLocationAccess:
+      WorkflowFooterAction(
+        id: "continue",
+        title: PermissionWorkflowActionCopy.title(for: kind),
+        shortcut: .defaultAction,
+        perform: { presentation.requestLocationAccessAndCapture() }
+      )
+
+    case .openSystemSettings:
       WorkflowFooterAction(
         id: "open-system-settings",
-        title: appLocalized("Open macOS System Settings"),
+        title: PermissionWorkflowActionCopy.title(for: kind),
         shortcut: .defaultAction,
         perform: { presentation.openLocationSystemSettings() }
-      ),
-    ]
+      )
+
+    case .captureCurrentSettings:
+      WorkflowFooterAction(
+        id: "capture-current-settings",
+        title: PermissionWorkflowActionCopy.title(for: kind),
+        shortcut: .defaultAction,
+        perform: { presentation.startCapture() }
+      )
+    }
   }
 
   @ViewBuilder
   private var capturePhaseStatus: some View {
     switch presentation.capturePhase {
     case .idle:
-      Label(
-        appLocalized("No system setting changes occur until you choose the next step."),
-        systemImage: "info.circle"
-      )
-      .font(.caption)
+      if presentation.hasWorkflowTask {
+        VStack(alignment: .leading, spacing: 6) {
+          HStack(spacing: 8) {
+            ProgressView()
+              .controlSize(.small)
+              .accessibilityHidden(true)
+            Text(PermissionWorkflowFeedbackCopy.savingTitle())
+              .font(.caption.bold())
+          }
+          .accessibilityElement(children: .combine)
+          Text(PermissionWorkflowFeedbackCopy.savingCloseGuidance())
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+      } else if let error = presentation.permissionWorkflowError {
+        VStack(alignment: .leading, spacing: 6) {
+          Label(
+            PermissionWorkflowFeedbackCopy.errorTitle(),
+            systemImage: "exclamationmark.triangle"
+          )
+          .font(.caption.bold())
+          Text(error)
+            .font(.caption)
+          Text(PermissionWorkflowFeedbackCopy.recoveryGuidance())
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .contain)
+      } else if let notice = presentation.permissionWorkflowNotice {
+        Label(notice, systemImage: "location.slash")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      } else {
+        Label(
+          appLocalized("No system setting changes occur until you choose the next step."),
+          systemImage: "info.circle"
+        )
+        .font(.caption)
+      }
     case .running:
       HStack {
         ProgressView()
         Text("Reading current settings without changing them…")
       }
       .accessibilityElement(children: .combine)
-    case .success(let message), .partial(let message):
-      Label(message, systemImage: "checkmark.circle")
+    case .success(let message):
+      Label(
+        message,
+        systemImage: PermissionWorkflowActionPolicy.statusSymbol(
+          for: presentation.capturePhase) ?? "checkmark.circle"
+      )
+    case .partial(let message):
+      Label(
+        message,
+        systemImage: PermissionWorkflowActionPolicy.statusSymbol(
+          for: presentation.capturePhase) ?? "exclamationmark.triangle"
+      )
     case .failure(let message):
-      Label(message, systemImage: "xmark.octagon")
+      Label(
+        message,
+        systemImage: PermissionWorkflowActionPolicy.statusSymbol(
+          for: presentation.capturePhase) ?? "xmark.octagon"
+      )
     }
   }
 
@@ -1611,14 +1981,18 @@ struct TrayWorkflowRootView: View {
       Text(message)
       Spacer()
       HStack {
-        Button("Close") { onClose() }
-          .keyboardShortcut(.cancelAction)
-          .focused($keyboardFocusTarget, equals: .closeError(message))
         Spacer()
-        Button("Try Again") {
-          presentation.dismissApplyDraftError()
+        ForEach(WorkflowErrorActionPolicy.actions, id: \.self) { action in
+          switch action {
+          case .close:
+            Button("Close") {
+              presentation.closeApplyWorkflowAfterError()
+              onClose()
+            }
+            .keyboardShortcut(.cancelAction)
+            .focused($keyboardFocusTarget, equals: .closeError(message))
+          }
         }
-        .keyboardShortcut(.defaultAction)
       }
     }
     .padding(24)
@@ -1660,26 +2034,17 @@ struct TrayWorkflowRootView: View {
   }
 
   private func permissionTitle(_ workflow: TrayPermissionWorkflow) -> String {
-    switch workflow {
-    case .captureDirtyDraft: appLocalized("Save changes before capturing a new profile?")
-    case .captureExplanation: appLocalized("Allow Location Access?")
-    case .captureDenied, .systemSettings: appLocalized("Location Access Is Off")
-    }
+    PermissionWorkflowCopy.title(
+      for: workflow,
+      isLocationAuthorized: locationPermission.isAuthorized
+    )
   }
 
   private func permissionMessage(_ workflow: TrayPermissionWorkflow) -> String {
-    switch workflow {
-    case .captureDirtyDraft:
-      appLocalized("The open profile has changes that have not been saved.")
-    case .captureExplanation:
-      appLocalized(
-        "Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere."
-      )
-    case .captureDenied, .systemSettings:
-      appLocalized(
-        "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi."
-      )
-    }
+    PermissionWorkflowCopy.message(
+      for: workflow,
+      isLocationAuthorized: locationPermission.isAuthorized
+    )
   }
 }
 
@@ -1739,8 +2104,8 @@ final class TrayDestinationCoordinator: TrayDestinationPresenting {
       }
       return await settingsController.presentAndWaitUntilKey()
 
-    case .permission:
-      presentation.setWorkflowDestination(destination)
+    case .permission(let workflow):
+      presentation.beginPermissionWorkflow(workflow)
       guard let workflowController else {
         return .failed(appLocalized("The permission workflow window is unavailable."))
       }

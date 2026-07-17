@@ -3,6 +3,7 @@ import SwiftUI
 import Testing
 
 @testable import DeskSetupCore
+@testable import DeskSetupPresentation
 @testable import DeskSetupSwitcher
 
 #if DEBUG
@@ -46,6 +47,10 @@ import Testing
         Fixture(
           name: "01b-empty-ko-light", variant: .trayEmpty, languageCode: "ko",
           colorScheme: .light, largeText: false, reduceTransparency: false,
+          increasedContrast: false),
+        Fixture(
+          name: "01c-empty-ko-accessibility3", variant: .trayEmpty, languageCode: "ko",
+          colorScheme: .light, largeText: true, reduceTransparency: false,
           increasedContrast: false),
         Fixture(
           name: "02-single-en-light", variant: .traySingle, languageCode: "en", colorScheme: .light,
@@ -640,6 +645,23 @@ import Testing
         showsStatusPopover: false
       )
       let model = UIAuditFixtures.makeModel(configuration: configuration)
+      if fixture.variant == .trayCaptureFailure {
+        let state = UIAuditFixtures.fixture(.trayCaptureFailure)
+        model.configureForUIAudit(
+          UIAuditFixtureState(
+            profiles: state.profiles,
+            selectedProfileID: state.selectedProfileID,
+            snapshot: state.snapshot,
+            readinessByProfile: state.readinessByProfile,
+            operationCountByProfile: state.operationCountByProfile,
+            availableOperationCountByProfile: state.availableOperationCountByProfile,
+            captureSummary: ProfileCaptureSummary(items: [
+              .init(group: .display, key: "display", disposition: .unreadable)
+            ]),
+            applySummary: state.applySummary
+          )
+        )
+      }
       let locationPermission = LocationPermissionController(
         allowsSystemRequests: false,
         syntheticAuthorizationStatus: .denied

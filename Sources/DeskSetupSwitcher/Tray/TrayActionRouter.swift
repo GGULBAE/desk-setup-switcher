@@ -105,6 +105,7 @@ final class TrayActionRouter {
   private let terminateApplication: @MainActor () -> Void
   private let eventSink: @MainActor (TrayRoutingEvent) -> Void
   private var actionsInFlight: Set<TrayAction> = []
+  private var isDestinationHandoffInFlight = false
 
   init(
     executor: any TrayActionExecuting,
@@ -131,6 +132,13 @@ final class TrayActionRouter {
       await executor?.executeStayOpen(action)
 
     case .handoff(let destination):
+      // All destinations share one native window handoff slot. Per-action
+      // deduplication is insufficient because two different profile actions
+      // can otherwise join the same window presentation and both mutate the
+      // workflow after it becomes key.
+      guard !isDestinationHandoffInFlight else { return }
+      isDestinationHandoffInFlight = true
+      defer { isDestinationHandoffInFlight = false }
       guard let destinationPresenter else {
         executor?.reportHandoffFailure(appLocalized("The destination could not be opened."))
         return

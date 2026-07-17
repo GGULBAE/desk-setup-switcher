@@ -135,6 +135,38 @@ struct TrayActionRouterTests {
     #expect(surface.closeRequests == [12])
   }
 
+  @Test("different destinations cannot join one in-flight native handoff")
+  func differentDestinationHandoffsAreSerialized() async {
+    let gate = PresentationGate()
+    let executor = ActionExecutorSpy()
+    let presenter = DestinationPresenterSpy(gate: gate)
+    let surface = TraySurfaceSpy(generation: 13, isVisible: true)
+    let router = TrayActionRouter(
+      executor: executor,
+      destinationPresenter: presenter,
+      surface: surface
+    )
+    let firstID = UUID()
+    let secondID = UUID()
+
+    let first = Task {
+      await router.route(.openApplyPreview(firstID, .normal), sessionGeneration: 13)
+    }
+    await gate.waitUntilEntered()
+    let second = Task {
+      await router.route(.openApplyPreview(secondID, .force), sessionGeneration: 13)
+    }
+    await second.value
+
+    #expect(presenter.presentations == [.applyPreview(firstID, .normal)])
+    #expect(surface.closeRequests.isEmpty)
+
+    await gate.release()
+    await first.value
+    #expect(presenter.presentations == [.applyPreview(firstID, .normal)])
+    #expect(surface.closeRequests == [13])
+  }
+
   @Test("completion from an older open session cannot close a reopened tray")
   func staleCompletionIsIgnored() async {
     let gate = PresentationGate()

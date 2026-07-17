@@ -20,6 +20,7 @@ struct ApplicationModelApplyTests {
     #expect(
       await waitUntil {
         model.profiles.count == 1 && !model.isProfileMutationLocked
+          && !model.isReadinessRefreshInProgress
       }
     )
     let profile = try #require(model.profiles.first)
@@ -48,6 +49,7 @@ struct ApplicationModelApplyTests {
     #expect(
       await waitUntil {
         model.profiles.count == 1 && !model.isProfileMutationLocked
+          && !model.isReadinessRefreshInProgress
       }
     )
     let profile = try #require(model.profiles.first)
@@ -63,6 +65,93 @@ struct ApplicationModelApplyTests {
 
     #expect(await fixture.adapter.applyCount == 0)
     #expect(model.lastApplyResult == nil)
+  }
+
+  @Test("closing a window invalidates a late read-only preview preparation")
+  func windowCloseInvalidatesLatePreparation() async throws {
+    let fixture = try await makeFixture(planBehavior: .stable)
+    defer { fixture.cleanup() }
+    let model = fixture.model
+
+    model.start()
+    #expect(
+      await waitUntil {
+        model.profiles.count == 1 && !model.isProfileMutationLocked
+          && !model.isReadinessRefreshInProgress
+      }
+    )
+    let profile = try #require(model.profiles.first)
+    let editor = ProfileEditorModel()
+    editor.initialize(profiles: model.profiles, preferredProfileID: profile.id)
+    let presentation = TrayPresentationModel(
+      model: model,
+      locationPermission: LocationPermissionController(
+        allowsSystemRequests: false,
+        syntheticAuthorizationStatus: .authorized
+      ),
+      profileEditor: editor
+    )
+
+    await fixture.adapter.blockNextPlan()
+    presentation.setWorkflowDestination(.applyPreview(profile.id, .normal))
+    presentation.beginApplyWorkflow(profileID: profile.id, mode: .normal)
+    await fixture.adapter.waitUntilPlanIsBlocked()
+    #expect(model.isPreparingApply(for: profile))
+    #expect(model.pendingApply == nil)
+
+    presentation.handleWorkflowWindowClose()
+    #expect(presentation.workflowDestination == nil)
+    #expect(model.pendingApply == nil)
+
+    await fixture.adapter.releaseBlockedPlan()
+    #expect(await waitUntil { !model.isPreparingApply(for: profile) })
+    #expect(model.pendingApply == nil)
+  }
+
+  @Test("closing and immediately reopening the same profile starts a fresh preview")
+  func immediateSameProfileReopenStartsFreshPreparation() async throws {
+    let fixture = try await makeFixture(planBehavior: .stable)
+    defer { fixture.cleanup() }
+    let model = fixture.model
+
+    model.start()
+    #expect(
+      await waitUntil {
+        model.profiles.count == 1 && !model.isProfileMutationLocked
+          && !model.isReadinessRefreshInProgress
+      }
+    )
+    let profile = try #require(model.profiles.first)
+    let editor = ProfileEditorModel()
+    editor.initialize(profiles: model.profiles, preferredProfileID: profile.id)
+    let presentation = TrayPresentationModel(
+      model: model,
+      locationPermission: LocationPermissionController(
+        allowsSystemRequests: false,
+        syntheticAuthorizationStatus: .authorized
+      ),
+      profileEditor: editor
+    )
+
+    await fixture.adapter.blockNextPlan()
+    presentation.setWorkflowDestination(.applyPreview(profile.id, .normal))
+    presentation.beginApplyWorkflow(profileID: profile.id, mode: .normal)
+    await fixture.adapter.waitUntilPlanIsBlocked()
+    #expect(model.isPreparingApply(for: profile))
+
+    presentation.handleWorkflowWindowClose()
+    #expect(!model.isPreparingApply(for: profile))
+    presentation.setWorkflowDestination(.applyPreview(profile.id, .normal))
+    presentation.beginApplyWorkflow(profileID: profile.id, mode: .normal)
+
+    #expect(await waitUntil { model.pendingApply?.profile.id == profile.id })
+    #expect(presentation.workflowDestination == .applyPreview(profile.id, .normal))
+
+    await fixture.adapter.releaseBlockedPlan()
+    for _ in 0..<20 {
+      await Task.yield()
+    }
+    #expect(model.pendingApply?.profile.id == profile.id)
   }
 
   private func makeFixture(planBehavior: SequencedApplyAdapter.PlanBehavior) async throws
@@ -146,9 +235,30 @@ private actor SequencedApplyAdapter: SystemSettingsAdapter {
   private let planBehavior: PlanBehavior
   private var planCount = 0
   private(set) var applyCount = 0
+  private var shouldBlockNextPlan = false
+  private var isPlanBlocked = false
+  private var blockedPlanWaiters: [CheckedContinuation<Void, Never>] = []
+  private var planReleaseWaiters: [CheckedContinuation<Void, Never>] = []
 
   init(planBehavior: PlanBehavior) {
     self.planBehavior = planBehavior
+  }
+
+  func blockNextPlan() {
+    shouldBlockNextPlan = true
+  }
+
+  func waitUntilPlanIsBlocked() async {
+    guard !isPlanBlocked else { return }
+    await withCheckedContinuation { blockedPlanWaiters.append($0) }
+  }
+
+  func releaseBlockedPlan() {
+    let waiters = planReleaseWaiters
+    planReleaseWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume()
+    }
   }
 
   func capability() async -> AdapterCapability {
@@ -180,6 +290,17 @@ private actor SequencedApplyAdapter: SystemSettingsAdapter {
     from snapshot: AdapterSnapshot,
     mode: ApplyMode
   ) async throws -> AdapterPlan {
+    if shouldBlockNextPlan {
+      shouldBlockNextPlan = false
+      isPlanBlocked = true
+      let waiters = blockedPlanWaiters
+      blockedPlanWaiters.removeAll()
+      for waiter in waiters {
+        waiter.resume()
+      }
+      await withCheckedContinuation { planReleaseWaiters.append($0) }
+      isPlanBlocked = false
+    }
     planCount += 1
     let usesChangedRollback =
       planBehavior == .changesOnExecutionPreflight && planCount >= 3

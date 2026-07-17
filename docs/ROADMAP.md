@@ -125,7 +125,7 @@ Remaining: user-driven installed status-item/popover interaction, complete keybo
 - The stable permission-handoff follow-up `make verify` produced and mounted its then-current universal package, verified `x86_64 arm64`, resources, checksum, and ad-hoc/no-Developer-ID signature status; SHA-256 is `150d1e0bb620fba52c2ec2a6a78345b5b74f44ca10c9d5375178f6ab16ea370d`. The installed-interaction package SHA-256 `df674b37e2a2fe9a94d37435313265069e27f6130ae05ad02b8ae822ac00e8b6`, pre-stable-handoff capture SHA-256 `ed52b253159e6abc8fe35e606aed56cc269693a53b76986dae20a04ffb2bd4fc`, pre-live-test-adjustment capture SHA-256 `8760d68754f3bc1eebca37319bd0d2bfc29b6b3d90832532e0a64cd072506a9b`, preceding tray/editor SHA-256 `f3d24ae95709d0db9de13ba6032eb63a1d19a5be89af15aa68244da9019afbde`, and layout-correction SHA-256 `ae940ce1cffb969f309b8ffa8f6ffcd0637fd0845ee21bf24fa59129ea530ef7` are historical
 - The measured-height tray/responsive-settings follow-up `make verify` produced and mounted historical universal package SHA-256 `8bf4d547fae0df3cbe999db84e7be169b33d495b3993cf7c37f46ba37d6ea71d`; its executable matched the then-installed app byte-for-byte. The pre-correction package SHA-256 `8422b042b793bf0845ac56e2dcbd9808075a0467226d79ee65408440736648d8`, stable permission-handoff, and earlier checksums above are historical.
 - Tray Surface v2 supersedes that package. Its non-live gate produced and mounted universal SHA-256 `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`; installation, launch, push, and CI were not performed.
-- The 2026-07-17 native UI structural follow-up passed 412-case integrated non-live `make verify` (144 XCTest + 268 Swift Testing across 35 suites) and produced a mounted universal package with SHA-256 `84bcdeac1f44de6381f93c8b9650132e26c4e9126c3d7137276db9c43274bb86`; installation, launch, push, and CI were not performed.
+- The 2026-07-17 native UI structural follow-up's final integrated gate passed 446 checks (144 XCTest + 301 Swift Testing across 38 suites + one separately executed native `NSPopover` regression) and produced a mounted universal package with SHA-256 `82b05e6a3b1b20978c85c4d82d0976237a731c76c07bcd7d1729a84e3e0b6f21`. The package was later reinstalled to `/Applications` for the separately authorized non-mutating UI geometry follow-up; push and CI were not performed.
 
 Remaining:
 
@@ -208,20 +208,28 @@ No installed-app launch, live hardware mutation, TCC action, Keychain write, UI 
 ## M4.10 — native UI structural reliability follow-up
 
 - Replace duplicate/dynamic horizontal safe-area ignores with one public AppKit parent boundary that preserves the native popover's top/bottom chrome exclusion while filtering left/right to zero before SwiftUI's first attached proposal.
+- Preserve AppKit ownership of the attached popover wrapper's nonzero origin and synchronize only the hosted SwiftUI child to local bounds; prove the boundary with an isolated genuine `NSPopover.show(...)` regression.
 - Prove native `T3/L11/B5/R2` becomes hosted `T3/L0/B5/R0`, the content occupies `x16…352/y21…297`, the filtered asymmetric raster matches a zero-inset baseline, and an intentionally unfiltered control moves.
 - Give persistent Settings/workflow presentation a bounded non-key deadline, independently cancellable coalesced consumers, balanced activation accounting, red-close detach-before-cancel, and stale-completion identity checks. Cover same-MainActor-turn close→reopen directly.
 - Replace fixed workflow columns and horizontal-only footers with measured grid/stack content and adaptive actions at the 520×360 minimum and simulated accessibility text. Preserve full profile-specific accessibility labels while selecting safe keyboard and heading/status accessibility focus targets.
-- Record the [native UI structural reliability audit](UI-STRUCTURAL-RELIABILITY-AUDIT-2026-07-17.md), including 680×480 Settings and 520×360 permission/dirty-Apply Korean accessibility-text evidence, focused regressions, and the remaining installed/VoiceOver boundary.
-- Integrated non-live `make verify` passes 412 default cases (144 XCTest with five opt-in skips + 268 Swift Testing across 35 suites with two default-disabled opt-in cases), all build/Analyze stages, and universal mounted-DMG verification. SHA-256 is `84bcdeac1f44de6381f93c8b9650132e26c4e9126c3d7137276db9c43274bb86`; the package was not installed or launched.
+- Record the current [UI/UX simplification and installed-app audit](UI-UX-SIMPLIFICATION-INSTALLED-AUDIT-2026-07-17.md), including the final attached-wrapper root cause, installed screenshots/geometry, persistent-window clamps, async-generation ownership, package/safety evidence, and manual-accessibility boundary. Retain the [native UI structural reliability audit](UI-STRUCTURAL-RELIABILITY-AUDIT-2026-07-17.md) as preceding selective-safe-area, window-liveness, responsive-layout, and synthetic evidence.
+- The final integrated gate passes 446 checks: 144 XCTest cases, 301 Swift Testing cases across 38 suites, and one separately executed native `NSPopover` regression. All build/Analyze/package/mount stages pass for `x86_64 arm64`; DMG SHA-256 is `82b05e6a3b1b20978c85c4d82d0976237a731c76c07bcd7d1729a84e3e0b6f21`.
+- A separately authorized follow-up reinstalls the package to `/Applications` and verifies executable SHA-256 `40876bd671dd4286fa4684192097f6dbd702df899bccf8efb588b244c3d27305`. Twenty measured popover opens have exact center delta `0`; Settings clamps `500×300` to `680×480` and retains `900×568` across ten normal opens; workflow clamps `500×300` to `520×392`, initially frames at `620×532` with `620×500` content, and closes with Escape.
 
-No installed-app launch, live hardware mutation, TCC action, Keychain write, login-item mutation, UI automation, push, tag, notarization, or publication is part of M4.10.
+The installed follow-up invoked no Apply, Capture, TCC, login-item, or system-setting mutation. Full VoiceOver use, focused-control AX observation, push, CI, tag, notarization, and publication remain outside the completed evidence.
 
-## Current next task — installed native UI confirmation
+## Current next task — bounded P2 UI follow-up
 
-With separate user authorization, install or launch the current package and perform a non-mutating native UI smoke pass: inspect the very first and 20 repeated tray opens for symmetric content and intact arrow/chrome spacing; red-close and immediately reopen Settings and each workflow; traverse Cancel/Revert/Close and the remaining controls using only the keyboard; and record VoiceOver's initial heading/action focus in English and Korean at the minimum window sizes. Do not confirm Apply Profile, change TCC/login state, or invoke any display, ColorSync, audio, network, mouse, or keyboard setting mutation.
+Keep the next pass to these P2 items only:
 
-After this native UI gate, resume profile-store path boundary hardening: constrain the public `ProfileStore` file name to one non-reserved leaf, reject collision with `profiles.backup.json`, and add explicit no-follow checks for the managed directory plus primary, backup, staging, and quarantine paths.
+- Improve the empty-tray Capture call to action.
+- Settle the Duplicate/Reorder/Import/Export hierarchy and define Export behavior when the selected profile has a dirty draft.
+- Remove ambiguity from Included toggles.
+- Verify `DisclosureGroup` behavior with VoiceOver; do not treat focus intent or synthetic AX metadata as a completed assistive-technology walkthrough.
+- Reconcile Advanced Diagnostics' 700-point minimum with Settings' 680-point minimum.
+- Add minimum-size and accessibility fixtures for About, protected-change safety, and result states.
+- Verify `⌘,` tab forcing and increase generic storage-error prominence.
 
-TCC, login approval/retry/reboot, Gatekeeper, physical Intel, and any ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 mutation remain separate gates. Every hardware mutation still requires explicit approval, a preflight snapshot, and independently verified rollback.
+Do not expand this P2 pass into Apply, Capture execution, TCC, login approval/retry/reboot, Gatekeeper, physical Intel, profile-store path hardening, or any ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 mutation. Full VoiceOver use and focused-control AX observation remain separate manual evidence.
 
 Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

@@ -139,9 +139,44 @@ import Testing
       #expect(TrayAccessibilityCopy.quitLabel == "Quit Desk Setup Switcher")
     }
 
+    @Test("late cancelled capture cannot clear an immediate replacement task")
+    func captureTaskOwnershipSurvivesImmediateRestart() async {
+      let gate = SequencedCaptureGate()
+      let model = UIAuditFixtures.makeModel(configuration: .disabled)
+      let presentation = makePresentation(model: model) {
+        await gate.capture()
+      }
+
+      presentation.startCapture()
+      await gate.waitUntilEntryCount(1)
+      #expect(presentation.hasCaptureTask)
+      #expect(presentation.capturePhase == .running)
+
+      presentation.cancelCapture()
+      presentation.startCapture()
+      await gate.waitUntilEntryCount(2)
+      #expect(presentation.hasCaptureTask)
+      #expect(presentation.capturePhase == .running)
+
+      await gate.release(index: 1, message: "Stale first failure")
+      for _ in 0..<20 {
+        await Task.yield()
+      }
+      #expect(presentation.hasCaptureTask)
+      #expect(presentation.capturePhase == .running)
+
+      await gate.release(index: 2, message: "Current second failure")
+      for _ in 0..<100 where presentation.hasCaptureTask {
+        await Task.yield()
+      }
+      #expect(!presentation.hasCaptureTask)
+      #expect(presentation.capturePhase == .failure("Current second failure"))
+    }
+
     private func makePresentation(
       model: ApplicationModel,
-      capture: TrayPresentationModel.CaptureOperation? = nil
+      capture: TrayPresentationModel.CaptureOperation? = nil,
+      delete: TrayPresentationModel.DeleteOperation? = { _ in .deleted }
     ) -> TrayPresentationModel {
       TrayPresentationModel(
         model: model,
@@ -150,7 +185,8 @@ import Testing
           syntheticAuthorizationStatus: .authorized
         ),
         profileEditor: ProfileEditorModel(),
-        captureOperation: capture
+        captureOperation: capture,
+        deleteOperation: delete
       )
     }
   }
@@ -186,6 +222,36 @@ import Testing
       for waiter in waiters {
         waiter.resume()
       }
+    }
+  }
+
+  private actor SequencedCaptureGate {
+    private var entryCount = 0
+    private var entryWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var resultWaiters: [Int: CheckedContinuation<ProfileCreationCaptureResult, Never>] =
+      [:]
+
+    func capture() async -> ProfileCreationCaptureResult {
+      entryCount += 1
+      let index = entryCount
+      let ready = entryWaiters.filter { $0.count <= entryCount }
+      entryWaiters.removeAll { $0.count <= entryCount }
+      for waiter in ready {
+        waiter.continuation.resume()
+      }
+      return await withCheckedContinuation { resultWaiters[index] = $0 }
+    }
+
+    func waitUntilEntryCount(_ expected: Int) async {
+      guard entryCount < expected else { return }
+      await withCheckedContinuation {
+        entryWaiters.append((count: expected, continuation: $0))
+      }
+    }
+
+    func release(index: Int, message: String) {
+      guard let continuation = resultWaiters.removeValue(forKey: index) else { return }
+      continuation.resume(returning: .rejected(message: message))
     }
   }
 #endif

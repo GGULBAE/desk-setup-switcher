@@ -50,7 +50,7 @@ import Testing
       model.refreshReadinessFacts()
       model.createProfile()
       model.duplicateProfile(id: selected.id)
-      model.deleteProfile(id: selected.id)
+      let deleteResult = await model.deleteProfile(id: selected.id)
       model.moveProfile(id: selected.id, by: 1)
       model.setLaunchAtLogin(false)
       model.retryLaunchAtLoginRegistration()
@@ -68,6 +68,11 @@ import Testing
 
       #expect(
         saveResult
+          == .rejected(
+            message: appLocalized("System access is disabled for this synthetic review."))
+      )
+      #expect(
+        deleteResult
           == .rejected(
             message: appLocalized("System access is disabled for this synthetic review."))
       )
@@ -440,6 +445,17 @@ import Testing
       #expect(window.contentMinSize == CGSize(width: 680, height: 480))
       #expect(window.contentView?.bounds.width == 900)
       #expect(window.contentView?.bounds.height == 568)
+      let minimumFrameSize = window.frameRect(
+        forContentRect: NSRect(origin: .zero, size: window.contentMinSize)
+      ).size
+      #expect(
+        controller.windowWillResize(window, to: CGSize(width: 500, height: 300))
+          == minimumFrameSize
+      )
+      #expect(
+        controller.windowWillResize(window, to: CGSize(width: 760, height: 520))
+          == CGSize(width: 760, height: 520)
+      )
       #expect(!window.isReleasedWhenClosed)
       #expect(window.collectionBehavior.contains(.managed))
       #expect(window.collectionBehavior.contains(.participatesInCycle))
@@ -522,12 +538,148 @@ import Testing
     func workflowWindowGeometry() throws {
       let controller = TrayWorkflowWindowController(rootView: Color.clear)
       let window = try #require(controller.window)
+      let expectedContentSize = CGSize(width: 620, height: 500)
+      let expectedFrameSize = window.frameRect(
+        forContentRect: NSRect(origin: .zero, size: expectedContentSize)
+      ).size
 
       #expect(window.styleMask.contains(.resizable))
       #expect(window.contentMinSize == CGSize(width: 520, height: 360))
+      #expect(window.contentRect(forFrameRect: window.frame).size == expectedContentSize)
+      #expect(window.contentView?.bounds.size == expectedContentSize)
+      #expect(window.frame.size == expectedFrameSize)
+      let minimumFrameSize = window.frameRect(
+        forContentRect: NSRect(origin: .zero, size: window.contentMinSize)
+      ).size
+      #expect(
+        controller.windowWillResize(window, to: CGSize(width: 112, height: 248))
+          == minimumFrameSize
+      )
+      #expect(
+        controller.windowWillResize(window, to: expectedFrameSize) == expectedFrameSize
+      )
       #expect(!window.isReleasedWhenClosed)
       #expect(window.collectionBehavior.contains(.managed))
       #expect(window.collectionBehavior.contains(.participatesInCycle))
+    }
+
+    @Test("workflow root transitions preserve default and user-owned window geometry")
+    func workflowDynamicRootDoesNotResizeWindow() throws {
+      let probe = DynamicWindowGeometryProbe()
+      let controller = TrayWorkflowWindowController(
+        rootView: DynamicWindowGeometryProbeView(probe: probe)
+      )
+      let window = try #require(controller.window)
+      let hostingController = try #require(
+        window.contentViewController
+          as? NSHostingController<DynamicWindowGeometryProbeView>
+      )
+      let initialFrame = window.frame
+
+      #expect(hostingController.sizingOptions.isEmpty)
+      #expect(
+        window.contentRect(forFrameRect: initialFrame).size
+          == CGSize(width: 620, height: 500)
+      )
+
+      probe.phase = .workflow
+      settleDynamicHostingLayout(window)
+      #expect(window.frame == initialFrame)
+      #expect(window.contentView?.bounds.size == CGSize(width: 620, height: 500))
+
+      let userContentSize = CGSize(width: 570, height: 420)
+      window.setContentSize(userContentSize)
+      let userFrame = window.frame
+      probe.phase = .alternateWorkflow
+      settleDynamicHostingLayout(window)
+      #expect(window.frame == userFrame)
+      #expect(window.contentView?.bounds.size == userContentSize)
+    }
+
+    @Test("workflow presentation repairs only an undersized content window")
+    func workflowPresentationClampsUndersizedWindow() throws {
+      let controller = TrayWorkflowWindowController(rootView: Color.clear)
+      let window = try #require(controller.window)
+      let minimumContentSize = CGSize(width: 520, height: 360)
+
+      window.contentMinSize = .zero
+      window.setContentSize(CGSize(width: 112, height: 248))
+      #expect(window.contentMinSize == .zero)
+      #expect(
+        window.contentRect(forFrameRect: window.frame).size == CGSize(width: 112, height: 248))
+
+      controller.prepareForPresentation()
+      #expect(window.contentMinSize == minimumContentSize)
+      #expect(window.contentRect(forFrameRect: window.frame).size == minimumContentSize)
+      #expect(window.contentView?.bounds.size == minimumContentSize)
+
+      let validUserContentSize = CGSize(width: 570, height: 420)
+      window.setContentSize(validUserContentSize)
+      let validUserFrame = window.frame
+
+      controller.prepareForPresentation()
+      #expect(window.contentRect(forFrameRect: window.frame).size == validUserContentSize)
+      #expect(window.frame == validUserFrame)
+    }
+
+    @Test("settings root transitions preserve default and user-owned window geometry")
+    func settingsDynamicRootDoesNotResizeWindow() throws {
+      let probe = DynamicWindowGeometryProbe()
+      let controller = RuntimeSettingsWindowController(
+        rootView: DynamicWindowGeometryProbeView(probe: probe)
+      )
+      let window = try #require(controller.window)
+      let hostingController = try #require(
+        window.contentViewController
+          as? NSHostingController<DynamicWindowGeometryProbeView>
+      )
+      let initialFrame = window.frame
+
+      #expect(hostingController.sizingOptions.isEmpty)
+      #expect(
+        window.contentRect(forFrameRect: initialFrame).size
+          == CGSize(width: 900, height: 568)
+      )
+
+      probe.phase = .workflow
+      settleDynamicHostingLayout(window)
+      #expect(window.frame == initialFrame)
+      #expect(window.contentView?.bounds.size == CGSize(width: 900, height: 568))
+
+      let userContentSize = CGSize(width: 760, height: 520)
+      window.setContentSize(userContentSize)
+      let userFrame = window.frame
+      probe.phase = .alternateWorkflow
+      settleDynamicHostingLayout(window)
+      #expect(window.frame == userFrame)
+      #expect(window.contentView?.bounds.size == userContentSize)
+    }
+
+    @Test("settings presentation repairs only an undersized content window")
+    func settingsPresentationClampsUndersizedWindow() throws {
+      let controller = RuntimeSettingsWindowController(rootView: Color.clear)
+      let window = try #require(controller.window)
+      let minimumContentSize = CGSize(width: 680, height: 480)
+
+      window.contentMinSize = .zero
+      window.setContentSize(CGSize(width: 500, height: 300))
+      #expect(window.contentMinSize == .zero)
+      #expect(
+        window.contentRect(forFrameRect: window.frame).size == CGSize(width: 500, height: 300)
+      )
+
+      controller.prepareForPresentation()
+      #expect(window.contentMinSize == minimumContentSize)
+      #expect(window.contentRect(forFrameRect: window.frame).size == minimumContentSize)
+      #expect(window.contentView?.bounds.size == minimumContentSize)
+
+      let validUserContentSize = CGSize(width: 760, height: 520)
+      window.setContentSize(validUserContentSize)
+      let validUserFrame = window.frame
+
+      controller.prepareForPresentation()
+      #expect(window.contentRect(forFrameRect: window.frame).size == validUserContentSize)
+      #expect(window.frame == validUserFrame)
     }
 
     @Test("closing the persistent safety host invokes its rollback hook")
@@ -1086,6 +1238,56 @@ import Testing
     func openSystemSettings() -> Bool {
       invocations.append("settings")
       return true
+    }
+  }
+
+  private enum DynamicWindowGeometryPhase {
+    case noWorkflow
+    case workflow
+    case alternateWorkflow
+  }
+
+  @MainActor
+  private final class DynamicWindowGeometryProbe: ObservableObject {
+    @Published var phase: DynamicWindowGeometryPhase = .noWorkflow
+  }
+
+  private struct DynamicWindowGeometryProbeView: View {
+    @ObservedObject var probe: DynamicWindowGeometryProbe
+
+    var body: some View {
+      Group {
+        switch probe.phase {
+        case .noWorkflow:
+          Text("No Workflow")
+        case .workflow:
+          VStack {
+            ForEach(0..<18, id: \.self) { index in
+              Text("Workflow row \(index)")
+            }
+          }
+          .frame(width: 311, height: 277)
+        case .alternateWorkflow:
+          HStack {
+            ForEach(0..<8, id: \.self) { index in
+              Text("\(index)")
+            }
+          }
+          .frame(width: 419, height: 193)
+        }
+      }
+    }
+  }
+
+  @MainActor
+  private func settleDynamicHostingLayout(_ window: NSWindow) {
+    // Pump actual AppKit/SwiftUI layout turns. Without explicit sizing
+    // ownership, these intrinsic-size transitions resize NSWindow here and
+    // reproduce the installed first-open regression.
+    for _ in 0..<12 {
+      window.contentView?.needsLayout = true
+      window.contentView?.layoutSubtreeIfNeeded()
+      RunLoop.main.run(until: Date().addingTimeInterval(0.005))
     }
   }
 #endif

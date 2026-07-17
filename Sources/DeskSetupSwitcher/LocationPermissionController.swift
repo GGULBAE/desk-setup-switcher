@@ -72,6 +72,15 @@ final class LocationPermissionController: NSObject, ObservableObject, CLLocation
     }
   }
 
+  #if DEBUG
+    /// Deterministic authorization transition for offscreen UI/state tests.
+    /// It never calls Core Location or opens System Settings.
+    func configureForUIAudit(authorizationStatus: CLAuthorizationStatus) {
+      self.authorizationStatus = authorizationStatus
+      lastError = nil
+    }
+  #endif
+
   func requestAccess() {
     lastError = nil
     guard allowsSystemRequests else {

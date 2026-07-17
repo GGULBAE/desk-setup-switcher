@@ -122,10 +122,16 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   TraySessionStateUpdating
 {
   typealias CaptureOperation = @MainActor () async -> ProfileCreationCaptureResult
+  typealias DeleteOperation = @MainActor (UUID) async -> ProfileDeleteResult
+  typealias SaveOperation = @MainActor (DeskProfile) async -> ProfileSaveResult
 
   @Published private(set) var deletion = MenuProfileDeletionState()
+  @Published private(set) var deletionInFlightProfileID: UUID?
   @Published private(set) var focusTarget: TrayFocusTarget?
   @Published private(set) var capturePhase: TrayCapturePhase = .idle
+  @Published private(set) var permissionWorkflowNotice: String?
+  @Published private(set) var permissionWorkflowError: String?
+  @Published private(set) var isWorkflowTaskInFlight = false
   @Published private(set) var handoffError: String?
   @Published private(set) var activeSessionGeneration: UInt64?
   @Published private(set) var scrollResetRequest: TrayScrollResetRequest?
@@ -140,25 +146,37 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   let profileEditor: ProfileEditorModel
 
   private let captureOperation: CaptureOperation
+  private let deleteOperation: DeleteOperation
+  private let saveOperation: SaveOperation
+  private let successMessageDismissalDelay: Duration
   private var captureTask: Task<Void, Never>?
+  private var captureTaskID: UUID?
   private var transientMessageTask: Task<Void, Never>?
   private var permissionTask: Task<Void, Never>?
+  private var permissionTaskID: UUID?
   private var workflowTask: Task<Void, Never>?
+  private var workflowTaskGeneration: UInt64 = 0
+  private var inFlightApplyDraftPrompt: TrayApplyDraftPrompt?
   private var applyDraftRetryAfterError: TrayApplyDraftPrompt?
   private var surfaceDismissRequest: (@MainActor (UInt64) -> Void)?
   private var statusItemPresentationHandler: (@MainActor (TrayStatusItemPresentation) -> Void)?
   private var modelStatusObservation: AnyCancellable?
+  private var locationAuthorizationObservation: AnyCancellable?
 
   init(
     model: ApplicationModel,
     locationPermission: LocationPermissionController,
     profileEditor: ProfileEditorModel,
     initialDeletionProfileID: UUID? = nil,
-    captureOperation: CaptureOperation? = nil
+    captureOperation: CaptureOperation? = nil,
+    deleteOperation: DeleteOperation? = nil,
+    saveOperation: SaveOperation? = nil,
+    successMessageDismissalDelay: Duration = .seconds(3)
   ) {
     self.model = model
     self.locationPermission = locationPermission
     self.profileEditor = profileEditor
+    self.successMessageDismissalDelay = successMessageDismissalDelay
     deletion = MenuProfileDeletionState(pendingProfileID: initialDeletionProfileID)
     self.captureOperation =
       captureOperation ?? { [weak model] in
@@ -167,11 +185,34 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
         }
         return await model.createProfileFromCurrentSettings()
       }
+    self.deleteOperation =
+      deleteOperation ?? { [weak model] profileID in
+        guard let model else {
+          return .rejected(
+            message: appLocalized("A local profile storage operation failed."))
+        }
+        return await model.deleteProfile(id: profileID)
+      }
+    self.saveOperation =
+      saveOperation ?? { [weak model] profile in
+        guard let model else {
+          return .rejected(message: appLocalized("A local profile storage operation failed."))
+        }
+        return await model.updateProfile(profile)
+      }
     modelStatusObservation = model.objectWillChange.sink { [weak self] in
       DispatchQueue.main.async { [weak self] in
         self?.publishStatusItemPresentation()
       }
     }
+    locationAuthorizationObservation = locationPermission.$authorizationStatus
+      .dropFirst()
+      .sink { [weak self] status in
+        guard status == .authorized || status == .authorizedAlways else { return }
+        self?.permissionWorkflowNotice = nil
+        self?.permissionWorkflowError = nil
+        self?.handoffError = nil
+      }
   }
 
   var geometryContext: TrayGeometryContext {
@@ -185,6 +226,18 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
 
   var hasCaptureTask: Bool {
     captureTask != nil
+  }
+
+  var hasPermissionTask: Bool {
+    permissionTask != nil
+  }
+
+  var hasWorkflowTask: Bool {
+    isWorkflowTaskInFlight
+  }
+
+  func isDeletionInFlight(profileID: UUID) -> Bool {
+    deletionInFlightProfileID == profileID
   }
 
   var statusItemPresentation: TrayStatusItemPresentation {
@@ -299,6 +352,11 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
 
   func requestEscape() {
     if let profileID = deletion.pendingProfileID {
+      if isDeletionInFlight(profileID: profileID) {
+        guard let activeSessionGeneration else { return }
+        surfaceDismissRequest?(activeSessionGeneration)
+        return
+      }
       cancelDeletion(profileID: profileID)
       return
     }
@@ -309,6 +367,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   func executeStayOpen(_ action: TrayAction) async {
     switch action {
     case .requestDelete(let profileID):
+      guard deletionInFlightProfileID == nil else { return }
       deletion.request(profileID: profileID)
       focusTarget = .cancelDelete(profileID)
 
@@ -316,7 +375,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
       cancelDeletion(profileID: profileID)
 
     case .confirmDelete(let profileID):
-      confirmDeletion(profileID: profileID)
+      await confirmDeletion(profileID: profileID)
 
     case .capture:
       startCapture()
@@ -358,7 +417,21 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     if destination == nil {
       applyDraftPrompt = nil
       applyDraftError = nil
+      permissionWorkflowNotice = nil
+      permissionWorkflowError = nil
     }
+  }
+
+  /// Starts a new permission workflow from the tray. A result from an earlier
+  /// capture belongs to that completed session and must not replace the new
+  /// session's actionable permission choices. In-session SwiftUI re-renders do
+  /// not call this method, so their running or terminal result remains stable.
+  func beginPermissionWorkflow(_ workflow: TrayPermissionWorkflow) {
+    consumeTerminalCapturePhase()
+    permissionWorkflowNotice = nil
+    permissionWorkflowError = nil
+    handoffError = nil
+    setWorkflowDestination(.permission(workflow))
   }
 
   func beginApplyWorkflow(profileID: UUID, mode: ApplyMode) {
@@ -387,11 +460,45 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   }
 
   func cancelApplyWorkflow() {
+    cancelInFlightWorkflowTask()
     model.cancelPendingApply()
-    cancelApplyDraftPrompt()
+    abandonApplyDraftDecision()
+  }
+
+  /// Closes an errored apply workflow without pretending to retry it. A saved
+  /// retry prompt is intentionally discarded; choosing Apply again rebuilds a
+  /// fresh decision from the authoritative profile and current editor state.
+  func closeApplyWorkflowAfterError() {
+    cancelApplyWorkflow()
+    setWorkflowDestination(nil)
+  }
+
+  /// Gives every native workflow-window close path the same domain cleanup as
+  /// its visible Cancel, Close, or Done action. Capture work that has already
+  /// started remains app-lifetime work; only the window-scoped permission wait
+  /// and terminal presentation state are consumed.
+  func handleWorkflowWindowClose() {
+    cancelInFlightWorkflowTask()
+    switch workflowDestination {
+    case .permission:
+      cancelPermissionWorkflow()
+      consumeTerminalCapturePhase()
+
+    case .applyPreview:
+      if model.safetyConfirmation != nil {
+        model.revertHighRiskChanges()
+      } else if !model.isApplyTransactionInProgress {
+        cancelApplyWorkflow()
+      }
+
+    case .resultDetails, .settings, .profileEditor, .none:
+      break
+    }
+    setWorkflowDestination(nil)
   }
 
   func saveDraftThenApply(_ prompt: TrayApplyDraftPrompt) {
+    guard workflowTask == nil else { return }
     let candidate: DeskProfile
     let expectsSelectionChange: Bool
     switch prompt.kind {
@@ -429,16 +536,18 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     }
 
     applyDraftPrompt = nil
+    inFlightApplyDraftPrompt = prompt
     profileEditor.beginSaving()
-    workflowTask?.cancel()
+    let generation = beginWorkflowTaskGeneration()
     workflowTask = Task { @MainActor [weak self] in
       guard let self else { return }
       await persistDraftAndApply(
         candidate,
         prompt: prompt,
-        expectsSelectionChange: expectsSelectionChange
+        expectsSelectionChange: expectsSelectionChange,
+        workflowGeneration: generation
       )
-      workflowTask = nil
+      finishWorkflowTask(generation: generation)
     }
   }
 
@@ -446,6 +555,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     _ prompt: TrayApplyDraftPrompt,
     expectedOpenProfileID: UUID
   ) {
+    guard workflowTask == nil else { return }
     guard profileEditor.selectedProfileID == expectedOpenProfileID,
       case .selected(let target) = profileEditor.resolvePendingSelection(.discard),
       target.profileID == prompt.targetProfileID
@@ -455,18 +565,21 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
       return
     }
     applyDraftPrompt = nil
-    workflowTask?.cancel()
+    let generation = beginWorkflowTaskGeneration()
     workflowTask = Task { @MainActor [weak self] in
       guard let self else { return }
-      guard await model.selectProfileAndWait(id: prompt.targetProfileID),
+      guard isCurrentWorkflowTask(generation: generation) else { return }
+      let selected = await model.selectProfileAndWait(id: prompt.targetProfileID)
+      guard isCurrentWorkflowTask(generation: generation) else { return }
+      guard selected,
         let targetProfile = model.profiles.first(where: { $0.id == prompt.targetProfileID })
       else {
         applyDraftError = appLocalized("The target profile is no longer available to apply.")
-        workflowTask = nil
+        finishWorkflowTask(generation: generation)
         return
       }
       model.prepareApply(profile: targetProfile, mode: prompt.mode)
-      workflowTask = nil
+      finishWorkflowTask(generation: generation)
     }
   }
 
@@ -485,121 +598,212 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     }
   }
 
+  private func abandonApplyDraftDecision() {
+    let hasOtherDraftDecision = {
+      if case .otherDraft? = applyDraftPrompt?.kind {
+        return true
+      }
+      if case .otherDraft? = applyDraftRetryAfterError?.kind {
+        return true
+      }
+      if case .otherDraft? = inFlightApplyDraftPrompt?.kind {
+        return true
+      }
+      return false
+    }()
+    if hasOtherDraftDecision {
+      _ = profileEditor.resolvePendingSelection(.cancel)
+    }
+    applyDraftPrompt = nil
+    applyDraftRetryAfterError = nil
+    inFlightApplyDraftPrompt = nil
+    applyDraftError = nil
+  }
+
   func saveDraftThenCapture() {
     guard workflowTask == nil else { return }
+    permissionWorkflowError = nil
+    handoffError = nil
+    let generation = beginWorkflowTaskGeneration()
     workflowTask = Task { @MainActor [weak self] in
       guard let self else { return }
+      guard isCurrentWorkflowTask(generation: generation) else { return }
       guard profileEditor.session.pendingSelection == nil,
         let candidate = profileEditor.session.saveCandidate()
       else {
-        workflowTask = nil
+        finishWorkflowTask(generation: generation)
         return
       }
       if let validationError = appProfileDraftValidationError(candidate) {
-        reportHandoffFailure(validationError)
-        workflowTask = nil
+        reportPermissionWorkflowError(validationError)
+        finishWorkflowTask(generation: generation)
         return
       }
       profileEditor.beginSaving()
-      switch await model.updateProfile(candidate) {
+      let result = await saveOperation(candidate)
+      guard isCurrentWorkflowTask(generation: generation) else { return }
+      switch result {
       case .saved(let persisted):
         guard case .saved = profileEditor.completeSave(with: persisted) else {
-          reportHandoffFailure(appLocalized("The saved profile did not match the active draft."))
-          workflowTask = nil
+          reportPermissionWorkflowError(
+            appLocalized("The saved profile did not match the active draft."))
+          finishWorkflowTask(generation: generation)
           return
         }
         startCapture()
       case .rejected(let message):
         profileEditor.finishWithError(message)
-        reportHandoffFailure(message)
+        reportPermissionWorkflowError(message)
       }
-      workflowTask = nil
+      finishWorkflowTask(generation: generation)
     }
   }
 
   func discardDraftThenCapture() {
+    guard workflowTask == nil else { return }
     profileEditor.revertDraft()
     startCapture()
   }
 
   func requestLocationAccessAndCapture() {
     guard permissionTask == nil else { return }
+    permissionWorkflowNotice = nil
+    permissionWorkflowError = nil
+    handoffError = nil
+    let taskID = UUID()
+    permissionTaskID = taskID
     permissionTask = Task { @MainActor [weak self] in
       guard let self else { return }
+      guard ownsPermissionTask(taskID), !Task.isCancelled else { return }
       locationPermission.requestAccess()
-      guard locationPermission.lastError == nil else {
-        reportHandoffFailure(
-          locationPermission.lastError ?? appLocalized("Location access was not granted."))
-        permissionTask = nil
+      if let error = locationPermission.lastError {
+        guard ownsPermissionTask(taskID), !Task.isCancelled else { return }
+        if locationPermission.authorizationStatus == .denied
+          || locationPermission.authorizationStatus == .restricted
+        {
+          transitionToDeniedLocationWorkflow()
+        } else {
+          reportPermissionWorkflowError(error)
+        }
+        finishPermissionTask(taskID)
         return
       }
       for await status in locationPermission.$authorizationStatus.values {
-        guard !Task.isCancelled else { break }
-        guard status != .notDetermined else { continue }
-        startCapture()
-        break
+        guard ownsPermissionTask(taskID), !Task.isCancelled else { break }
+        switch status {
+        case .notDetermined:
+          continue
+        case .authorizedAlways, .authorized:
+          startCapture()
+          finishPermissionTask(taskID)
+          return
+        case .denied, .restricted:
+          transitionToDeniedLocationWorkflow()
+          finishPermissionTask(taskID)
+          return
+        @unknown default:
+          let message = appLocalized(
+            "The location permission state is unknown. Choose Capture Without Wi-Fi or open System Settings."
+          )
+          permissionWorkflowNotice = message
+          setWorkflowDestination(.permission(.captureDenied))
+          AccessibilityNotification.Announcement(message).post()
+          finishPermissionTask(taskID)
+          return
+        }
       }
-      permissionTask = nil
+      finishPermissionTask(taskID)
     }
   }
 
   func openLocationSystemSettings() {
+    permissionWorkflowError = nil
+    handoffError = nil
     locationPermission.openSystemSettings()
     if let error = locationPermission.lastError {
-      reportHandoffFailure(error)
+      reportPermissionWorkflowError(error)
     }
   }
 
   func cancelPermissionWorkflow() {
     permissionTask?.cancel()
     permissionTask = nil
+    permissionTaskID = nil
   }
 
   func startCapture() {
     guard captureTask == nil else { return }
+    permissionWorkflowNotice = nil
+    permissionWorkflowError = nil
+    handoffError = nil
     transientMessageTask?.cancel()
     transientMessageTask = nil
     capturePhase = .running
+    let taskID = UUID()
+    captureTaskID = taskID
     captureTask = Task { @MainActor [weak self] in
       guard let self else { return }
       let result = await captureOperation()
-      guard !Task.isCancelled else {
-        captureTask = nil
+      guard ownsCaptureTask(taskID), !Task.isCancelled else {
+        finishCaptureTask(taskID)
         return
       }
       finishCapture(result)
-      captureTask = nil
+      finishCaptureTask(taskID)
     }
   }
 
   func cancelCapture() {
     captureTask?.cancel()
     captureTask = nil
+    captureTaskID = nil
     capturePhase = .idle
   }
 
   private func cancelDeletion(profileID: UUID) {
     guard deletion.isPending(profileID: profileID) else { return }
+    guard !isDeletionInFlight(profileID: profileID) else { return }
     deletion.cancel()
     focusTarget = .delete(profileID)
   }
 
-  private func confirmDeletion(profileID: UUID) {
+  private func confirmDeletion(profileID: UUID) async {
     let profiles = model.profiles
     guard let index = profiles.firstIndex(where: { $0.id == profileID }),
-      deletion.confirm(profileID: profileID)
+      deletion.isPending(profileID: profileID),
+      deletionInFlightProfileID == nil
     else { return }
 
-    if profileEditor.isDirty, profileEditor.selectedProfileID == profileID {
-      profileEditor.revertDraft()
+    deletionInFlightProfileID = profileID
+    defer {
+      if deletionInFlightProfileID == profileID {
+        deletionInFlightProfileID = nil
+      }
     }
-    let remaining = profiles.filter { $0.id != profileID }
-    if remaining.isEmpty {
-      focusTarget = .emptyState
-    } else {
-      focusTarget = .profile(remaining[min(index, remaining.count - 1)].id)
+
+    switch await deleteOperation(profileID) {
+    case .deleted:
+      guard deletion.confirm(profileID: profileID) else { return }
+      if profileEditor.selectedProfileID == profileID {
+        if profileEditor.isDirty {
+          profileEditor.revertDraft()
+        }
+        profileEditor.synchronize(
+          profiles: model.profiles,
+          preferredProfileID: model.selectedProfileID
+        )
+      }
+      let remaining = profiles.filter { $0.id != profileID }
+      if remaining.isEmpty {
+        focusTarget = .emptyState
+      } else {
+        focusTarget = .profile(remaining[min(index, remaining.count - 1)].id)
+      }
+      handoffError = nil
+
+    case .rejected(let message):
+      reportHandoffFailure(message)
     }
-    model.deleteProfile(id: profileID)
   }
 
   private func finishCapture(_ result: ProfileCreationCaptureResult) {
@@ -609,7 +813,12 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
       if summary.status == .complete {
         message = appLocalized("Captured current settings without changing the Mac.")
         capturePhase = .success(message)
-        scheduleSuccessMessageDismissal()
+        if case .permission? = workflowDestination {
+          transientMessageTask?.cancel()
+          transientMessageTask = nil
+        } else {
+          scheduleSuccessMessageDismissal()
+        }
       } else if summary.permissionRequiredCount > 0 {
         message = appLocalized(
           "Captured \(summary.applicableCount) applicable settings. Location access is needed to include the current Wi-Fi network."
@@ -633,14 +842,93 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
 
   private func scheduleSuccessMessageDismissal() {
     transientMessageTask?.cancel()
+    let delay = successMessageDismissalDelay
     transientMessageTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .seconds(3))
+      try? await Task.sleep(for: delay)
       guard let self, !Task.isCancelled else { return }
+      if case .permission? = workflowDestination {
+        transientMessageTask = nil
+        return
+      }
       if case .success = capturePhase {
         capturePhase = .idle
       }
       transientMessageTask = nil
     }
+  }
+
+  private func consumeTerminalCapturePhase() {
+    switch capturePhase {
+    case .success, .partial, .failure:
+      transientMessageTask?.cancel()
+      transientMessageTask = nil
+      capturePhase = .idle
+    case .idle, .running:
+      break
+    }
+  }
+
+  private func transitionToDeniedLocationWorkflow() {
+    let message = appLocalized(
+      "Location access was not granted. Choose Capture Without Wi-Fi or open System Settings."
+    )
+    handoffError = nil
+    permissionWorkflowNotice = message
+    permissionWorkflowError = nil
+    setWorkflowDestination(.permission(.captureDenied))
+    AccessibilityNotification.Announcement(message).post()
+  }
+
+  private func reportPermissionWorkflowError(_ message: String) {
+    permissionWorkflowNotice = nil
+    permissionWorkflowError = message
+    reportHandoffFailure(message)
+  }
+
+  private func ownsPermissionTask(_ taskID: UUID) -> Bool {
+    permissionTaskID == taskID
+  }
+
+  private func finishPermissionTask(_ taskID: UUID) {
+    guard ownsPermissionTask(taskID) else { return }
+    permissionTask = nil
+    permissionTaskID = nil
+  }
+
+  private func ownsCaptureTask(_ taskID: UUID) -> Bool {
+    captureTaskID == taskID
+  }
+
+  private func finishCaptureTask(_ taskID: UUID) {
+    guard ownsCaptureTask(taskID) else { return }
+    captureTask = nil
+    captureTaskID = nil
+  }
+
+  private func beginWorkflowTaskGeneration() -> UInt64 {
+    workflowTaskGeneration &+= 1
+    isWorkflowTaskInFlight = true
+    return workflowTaskGeneration
+  }
+
+  private func isCurrentWorkflowTask(generation: UInt64) -> Bool {
+    workflowTaskGeneration == generation && workflowTask != nil && !Task.isCancelled
+  }
+
+  private func finishWorkflowTask(generation: UInt64) {
+    guard workflowTaskGeneration == generation else { return }
+    workflowTask = nil
+    isWorkflowTaskInFlight = false
+    inFlightApplyDraftPrompt = nil
+  }
+
+  private func cancelInFlightWorkflowTask() {
+    guard let workflowTask else { return }
+    workflowTaskGeneration &+= 1
+    workflowTask.cancel()
+    self.workflowTask = nil
+    isWorkflowTaskInFlight = false
+    profileEditor.cancelWorkflowSavingPresentation()
   }
 
   private func requestApply(_ profile: DeskProfile, mode: ApplyMode) {
@@ -685,7 +973,8 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   private func persistDraftAndApply(
     _ candidate: DeskProfile,
     prompt: TrayApplyDraftPrompt,
-    expectsSelectionChange: Bool
+    expectsSelectionChange: Bool,
+    workflowGeneration: UInt64
   ) async {
     var coordinator = DirtyApplySaveCoordinator(
       targetProfileID: prompt.targetProfileID,
@@ -694,14 +983,18 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
         ? .selectedTarget(profileID: prompt.targetProfileID)
         : .persistedTarget
     )
-    switch await model.updateProfile(candidate) {
+    let result = await saveOperation(candidate)
+    guard isCurrentWorkflowTask(generation: workflowGeneration) else { return }
+    switch result {
     case .saved(let persisted):
       let completion = profileEditor.completeSave(with: persisted)
       switch coordinator.handle(.saveSucceeded(profile: persisted, completion: completion)) {
       case .prepare(let profile, let mode):
         model.prepareApply(profile: profile, mode: mode)
       case .selectAndPrepare(let profileID, let mode):
-        guard await model.selectProfileAndWait(id: profileID),
+        let selected = await model.selectProfileAndWait(id: profileID)
+        guard isCurrentWorkflowTask(generation: workflowGeneration) else { return }
+        guard selected,
           let targetProfile = model.profiles.first(where: { $0.id == profileID })
         else {
           applyDraftError = appLocalized(

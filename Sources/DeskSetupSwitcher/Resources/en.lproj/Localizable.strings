@@ -49,8 +49,8 @@
 "Close" = "Close";
 "Apply Available Settings" = "Apply Available Settings";
 "Apply Profile" = "Apply Profile";
-"This is a review. No setting changes until you press Apply Profile below." = "This is a review. No setting changes until you press Apply Profile below.";
-"The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press Apply Profile again." = "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press Apply Profile again.";
+"This is a review. No setting changes until you press %@ below." = "This is a review. No setting changes until you press %@ below.";
+"The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press %@ again." = "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press %@ again.";
 "Executes the reviewed operations and then shows itemized results." = "Executes the reviewed operations and then shows itemized results.";
 "The apply preview is no longer current. Reopen it and try again." = "The apply preview is no longer current. Reopen it and try again.";
 "Another profile or protected-change operation is still in progress." = "Another profile or protected-change operation is still in progress.";
@@ -161,12 +161,14 @@
 "Delete this profile?" = "Delete this profile?";
 "Delete %@" = "Delete %@";
 "This removes %@ from local profile storage. This action cannot be undone." = "This removes %@ from local profile storage. This action cannot be undone.";
+"Deleting Profile…" = "Deleting Profile…";
+"Saving the deletion to local storage. It cannot be cancelled after it starts." = "Saving the deletion to local storage. It cannot be cancelled after it starts.";
 "Enabled" = "Enabled";
 "Disabled" = "Disabled";
 "enabled" = "enabled";
 "disabled" = "disabled";
 "%@, %@" = "%@, %@";
-"Create a blank profile, then update it from a safe system snapshot." = "Create a blank profile, then update it from a safe system snapshot.";
+"Capture from the tray, or choose + to create a blank profile." = "Capture from the tray, or choose + to create a blank profile.";
 "New Profile" = "New Profile";
 "Create profile" = "Create profile";
 "Duplicate Profile" = "Duplicate Profile";
@@ -178,7 +180,7 @@
 "Move Down" = "Move Down";
 "Move selected profile down" = "Move selected profile down";
 "Select a Profile" = "Select a Profile";
-"Choose a profile in the sidebar or create a new one." = "Choose a profile in the sidebar or create a new one.";
+"Select a profile, or choose + to create one." = "Select a profile, or choose + to create one.";
 
 /* Profile editor */
 "Profile" = "Profile";
@@ -1067,8 +1069,13 @@
 
 /* Capture permission and actionable results */
 "Capture Without Wi-Fi" = "Capture Without Wi-Fi";
+"Allow Location and Capture" = "Allow Location and Capture";
 "Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere." = "Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere.";
 "Location Access Is Off" = "Location Access Is Off";
+"Location Access Is Ready" = "Location Access Is Ready";
+"Location access is enabled. Capture the current settings to include the current Wi-Fi network." = "Location access is enabled. Capture the current settings to include the current Wi-Fi network.";
+"Location access was not granted. Choose Capture Without Wi-Fi or open System Settings." = "Location access was not granted. Choose Capture Without Wi-Fi or open System Settings.";
+"The location permission state is unknown. Choose Capture Without Wi-Fi or open System Settings." = "The location permission state is unknown. Choose Capture Without Wi-Fi or open System Settings.";
 "Open macOS System Settings" = "Open macOS System Settings";
 "Opens macOS System Settings to change Location access" = "Opens macOS System Settings to change Location access";
 "Refreshes the current location used by readiness checks" = "Refreshes the current location used by readiness checks";
@@ -1189,8 +1196,10 @@
 
 /* Responsive workflow surfaces */
 "No system setting changes occur until you choose the next step." = "No system setting changes occur until you choose the next step.";
+"Capture continues safely after this window closes." = "Capture continues safely after this window closes.";
 "Calculating a read-only change plan…" = "Calculating a read-only change plan…";
 "No Workflow" = "No Workflow";
 "Return to the tray and choose an action." = "Return to the tray and choose an action.";
 "Could Not Continue" = "Could Not Continue";
-"Try Again" = "Try Again";
+"Close this window, or choose one of the available actions below." = "Close this window, or choose one of the available actions below.";
+"Closing this window prevents capture from starting, even if the profile save finishes." = "Closing this window prevents capture from starting, even if the profile save finishes.";

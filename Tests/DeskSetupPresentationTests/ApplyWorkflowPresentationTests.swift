@@ -118,6 +118,11 @@ struct ApplyWorkflowPresentationTests {
 
     #expect(!tracker.shouldPresent(requestID: firstID))
     #expect(tracker.shouldPresent(requestID: latestID))
+
+    tracker.invalidate()
+    #expect(!tracker.shouldPresent(requestID: firstID))
+    #expect(!tracker.shouldPresent(requestID: latestID))
+    #expect(tracker.latestRequestID == nil)
   }
 
   @Test("force preview keeps a display operation beside a DNS omission")

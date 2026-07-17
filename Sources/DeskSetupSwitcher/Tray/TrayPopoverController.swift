@@ -438,12 +438,23 @@ final class TrayPopoverContentController: NSViewController {
     super.init(nibName: nil, bundle: nil)
 
     let containerView = TrayPopoverHorizontalSafeAreaView()
+    containerView.autoresizingMask = [.width, .height]
     view = containerView
     addChild(hostedController)
     let hostedView = hostedController.view
     hostedView.frame = containerView.bounds
     hostedView.autoresizingMask = [.width, .height]
     containerView.addSubview(hostedView)
+  }
+
+  /// Keeps the SwiftUI host in the wrapper's local coordinate space without
+  /// changing the wrapper geometry that `NSPopover` owns after attachment.
+  func synchronizeHostedViewToContainerBounds() {
+    let containerBounds = view.bounds
+    let hostedView = hostedController.view
+    hostedView.frame = containerBounds
+    hostedView.bounds = NSRect(origin: .zero, size: containerBounds.size)
+    hostedView.autoresizingMask = [.width, .height]
   }
 
   @available(*, unavailable)
@@ -652,13 +663,11 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     if popover.contentSize != viewport {
       popover.contentSize = viewport
     }
-    let bounds = NSRect(origin: .zero, size: viewport)
-    popoverContentController.view.frame = bounds
-    popoverContentController.view.bounds = bounds
-    popoverContentController.view.autoresizingMask = [.width, .height]
-    hostingController.view.frame = bounds
-    hostingController.view.bounds = bounds
-    hostingController.view.autoresizingMask = [.width, .height]
+    // Once attached, NSPopover positions this wrapper inside its asymmetric
+    // arrow/chrome shell. Rewriting the wrapper frame origin to zero shifts the
+    // complete SwiftUI tree left relative to that shell. AppKit owns the
+    // wrapper geometry; this controller owns only the hosted child geometry.
+    popoverContentController.synchronizeHostedViewToContainerBounds()
     layoutPopoverContent()
   }
 

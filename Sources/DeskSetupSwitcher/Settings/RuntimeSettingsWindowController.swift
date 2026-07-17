@@ -139,6 +139,9 @@ final class RuntimeSettingsWindowController: NSWindowController,
 {
   typealias AwaiterFactory = @MainActor (NSWindow) -> WindowPresentationAwaiter
 
+  private static let initialContentSize = CGSize(width: 900, height: 568)
+  private static let minimumContentSize = CGSize(width: 680, height: 480)
+
   private var presentationRequest: WindowPresentationRequest?
   private let activationCoordinator: ApplicationWindowActivationCoordinator?
   private let makePresentationAwaiter: AwaiterFactory
@@ -168,8 +171,12 @@ final class RuntimeSettingsWindowController: NSWindowController,
     self.makePresentationAwaiter = makePresentationAwaiter
     self.presentationAction = presentationAction
     let hostingController = NSHostingController(rootView: rootView)
+    // This persistent native window owns its frame. The default SwiftUI
+    // sizing options otherwise rewrite the NSWindow whenever a tab or model
+    // transition changes the root view's intrinsic size.
+    hostingController.sizingOptions = []
     let window = NSWindow(
-      contentRect: NSRect(x: 0, y: 0, width: 900, height: 568),
+      contentRect: NSRect(origin: .zero, size: Self.initialContentSize),
       styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
       backing: .buffered,
       defer: false
@@ -182,8 +189,8 @@ final class RuntimeSettingsWindowController: NSWindowController,
     window.isReleasedWhenClosed = false
     window.tabbingMode = .disallowed
     window.collectionBehavior = [.managed, .participatesInCycle]
-    window.contentMinSize = CGSize(width: 680, height: 480)
-    window.setContentSize(CGSize(width: 900, height: 568))
+    window.contentMinSize = Self.minimumContentSize
+    window.setContentSize(Self.initialContentSize)
     window.center()
     super.init(window: window)
     window.delegate = self
@@ -259,6 +266,16 @@ final class RuntimeSettingsWindowController: NSWindowController,
     return false
   }
 
+  func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+    let minimumFrameSize = sender.frameRect(
+      forContentRect: NSRect(origin: .zero, size: Self.minimumContentSize)
+    ).size
+    return NSSize(
+      width: max(frameSize.width, minimumFrameSize.width),
+      height: max(frameSize.height, minimumFrameSize.height)
+    )
+  }
+
   private func awaitPresentation(
     _ request: WindowPresentationRequest
   ) async -> TrayDestinationPresentation {
@@ -288,9 +305,28 @@ final class RuntimeSettingsWindowController: NSWindowController,
   }
 
   func prepareForPresentation() {
-    if window?.isMiniaturized == true {
-      window?.deminiaturize(nil)
+    guard let window else { return }
+    // SwiftUI/AppKit may recompute a hosted window's resizing constraints
+    // after the controller is attached. Reassert the app-owned minimum on
+    // every presentation before repairing any legacy undersized frame.
+    window.contentMinSize = Self.minimumContentSize
+    restoreMinimumContentSizeIfNeeded(window)
+    if window.isMiniaturized {
+      window.deminiaturize(nil)
     }
+  }
+
+  private func restoreMinimumContentSizeIfNeeded(_ window: NSWindow) {
+    let currentSize = window.contentRect(forFrameRect: window.frame).size
+    let minimumSize = Self.minimumContentSize
+    guard currentSize.width < minimumSize.width || currentSize.height < minimumSize.height else {
+      return
+    }
+    window.setContentSize(
+      CGSize(
+        width: max(currentSize.width, minimumSize.width),
+        height: max(currentSize.height, minimumSize.height)
+      ))
   }
 
   @available(*, unavailable)

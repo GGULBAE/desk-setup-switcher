@@ -220,6 +220,7 @@ import Testing
           .ignoresSafeArea()
         TrayWorkflowRootView(presentation: presentation, onClose: {})
           .environmentObject(model)
+          .environmentObject(permission)
       }
       .environment(\.locale, Locale(identifier: "ko"))
       .environment(\.colorScheme, .light)

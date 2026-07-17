@@ -181,6 +181,11 @@ enum ProfileSaveResult: Equatable, Sendable {
   case rejected(message: String)
 }
 
+enum ProfileDeleteResult: Equatable, Sendable {
+  case deleted
+  case rejected(message: String)
+}
+
 enum ProfileSettingsCaptureResult: Equatable, Sendable {
   case captured(snapshot: SystemSnapshotResult, summary: ProfileCaptureSummary)
   case rejected(message: String, summary: ProfileCaptureSummary? = nil)
@@ -277,6 +282,8 @@ final class ApplicationModel: ObservableObject {
   private var terminationRequestIsDeferred = false
   private var preparationGate = ProfilePreparationGate()
   private var preparationRequestTracker = LatestPreparationRequestTracker()
+  private var preparationTasks: [UUID: Task<Void, Never>] = [:]
+  private var preparationRequestIDsByProfile: [UUID: UUID] = [:]
   private var suppressesLiveSystemAccess = false
 
   var isProfileMutationLocked: Bool {
@@ -522,17 +529,24 @@ final class ApplicationModel: ObservableObject {
     }
   }
 
-  func deleteProfile(id: UUID) {
-    guard !suppressesLiveSystemAccess else { return }
-    guard beginProfileStoreMutation() else { return }
-    Task {
-      defer { finishProfileStoreMutation() }
-      do {
-        try await profileStore.deleteProfile(id: id)
-        await refreshProfiles(message: appLocalized("Deleted the profile."))
-      } catch {
-        reportStorageError(error)
-      }
+  func deleteProfile(id: UUID) async -> ProfileDeleteResult {
+    if suppressesLiveSystemAccess {
+      return .rejected(
+        message: appLocalized("System access is disabled for this synthetic review."))
+    }
+    guard beginProfileStoreMutation() else {
+      return .rejected(message: profileEditingLockedMessage)
+    }
+    defer { finishProfileStoreMutation() }
+
+    do {
+      try await profileStore.deleteProfile(id: id)
+      await refreshProfiles(message: appLocalized("Deleted the profile."))
+      return .deleted
+    } catch {
+      let message = profileStorageUserMessage(for: error)
+      reportProfileEditorFailure(code: "delete-failed", message: message)
+      return .rejected(message: message)
     }
   }
 
@@ -789,20 +803,24 @@ final class ApplicationModel: ObservableObject {
     guard !isProfileMutationLocked, preparationGate.begin(profileID: profile.id) else { return }
     let requestID = UUID()
     preparationRequestTracker.begin(requestID: requestID)
+    preparationRequestIDsByProfile[profile.id] = requestID
     preparingProfileIDs = preparationGate.activeProfileIDs
     operationalStatusByProfile[profile.id] = nil
     lastMessage = appLocalized("Calculating a read-only change plan for \(profile.name)…")
-    Task {
+    preparationTasks[profile.id] = Task { @MainActor [weak self] in
+      guard let self else { return }
       defer {
-        preparationGate.end(profileID: profile.id)
-        preparingProfileIDs = preparationGate.activeProfileIDs
+        finishPreparationTask(profileID: profile.id, requestID: requestID)
       }
       let preparation = await applyEngine.prepare(
         profile: profile,
         mode: mode,
         conditionsSatisfied: true
       )
-      guard preparationRequestTracker.shouldPresent(requestID: requestID) else { return }
+      guard !Task.isCancelled,
+        preparationRequestTracker.shouldPresent(requestID: requestID),
+        preparationRequestIDsByProfile[profile.id] == requestID
+      else { return }
       pendingApply = PendingApplyRequest(
         profile: profile,
         preparation: preparation
@@ -826,7 +844,23 @@ final class ApplicationModel: ObservableObject {
   }
 
   func cancelPendingApply() {
+    preparationRequestTracker.invalidate()
+    for task in preparationTasks.values {
+      task.cancel()
+    }
+    preparationTasks.removeAll()
+    preparationRequestIDsByProfile.removeAll()
+    preparationGate = ProfilePreparationGate()
+    preparingProfileIDs = []
     pendingApply = nil
+  }
+
+  private func finishPreparationTask(profileID: UUID, requestID: UUID) {
+    guard preparationRequestIDsByProfile[profileID] == requestID else { return }
+    preparationRequestIDsByProfile[profileID] = nil
+    preparationTasks[profileID] = nil
+    preparationGate.end(profileID: profileID)
+    preparingProfileIDs = preparationGate.activeProfileIDs
   }
 
   @discardableResult
