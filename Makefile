@@ -15,6 +15,7 @@ analyze:
 	./scripts/analyze.sh
 
 audit-public-release:
+	./scripts/test-audit-public-release.sh
 	./scripts/audit-public-release.sh
 
 verify-public-assets:
