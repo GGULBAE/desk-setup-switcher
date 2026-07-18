@@ -20,13 +20,14 @@ make test
 make lint
 make analyze
 make audit-public-release
+make verify-public-surface
 make package
 make verify-package
 make verify
 make clean
 ```
 
-`make verify` is the required local gate. It runs source-policy and formatting checks, the default unit/mock suite, Swift and universal Xcode Debug/Release builds with warnings as errors, Xcode Analyze, no-Developer-ID DMG packaging, SHA-256 validation, and mounted-image inspection. `make audit-public-release` separately scans the complete Git history and image metadata for high-confidence credential and personal-path patterns while suppressing matched values; run it from a full, non-shallow checkout before preparing anything public.
+`make verify` is the required app gate. It runs source-policy and formatting checks, the default unit/mock suite, Swift and universal Xcode Debug/Release builds with warnings as errors, Xcode Analyze, no-Developer-ID DMG packaging, SHA-256 validation, and mounted-image inspection. `make audit-public-release` separately scans the complete Git history and image metadata for high-confidence credential and personal-path patterns while suppressing matched values; run it from a full, non-shallow checkout before preparing anything public. Changes to `site/`, public media, or their provenance must also run `make verify-public-surface` after installing the lockfile-pinned site dependencies with lifecycle scripts disabled.
 
 The read-only live discovery tests require an explicit opt-in and still do not change settings:
 

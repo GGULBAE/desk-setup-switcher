@@ -1,4 +1,4 @@
-.PHONY: build test lint analyze audit-public-release verify-public-assets package verify-package \
+.PHONY: build test lint analyze audit-public-release verify-public-assets verify-public-surface package verify-package \
 	test-release-tooling release-preflight release-candidate verify-release-candidate \
 	verify-downloaded-release verify-remote-controls verify clean
 
@@ -19,6 +19,9 @@ audit-public-release:
 
 verify-public-assets:
 	./scripts/verify-public-assets.sh
+
+verify-public-surface:
+	./scripts/verify-public-surface.sh
 
 package:
 	./scripts/package.sh

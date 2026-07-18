@@ -14,6 +14,12 @@ npm run dev
 npm run verify
 ```
 
+From the repository root, `make verify-public-surface` runs the site build,
+lint, rendered-output/privacy tests, and the complete public/source asset gate.
+CI installs only the lockfile-pinned dependency graph with lifecycle scripts
+disabled, checks the registry advisory feed, then runs that same command in a
+dedicated public-surface job.
+
 Copy `.env.example` to the gitignored `.env.local` and replace its placeholder
 `NEXT_PUBLIC_SITE_URL` with the final HTTPS origin before an approved
 deployment. The build loads that file without evaluating it as shell code.
