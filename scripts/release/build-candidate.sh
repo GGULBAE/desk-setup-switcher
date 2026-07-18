@@ -1,18 +1,28 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
 set +x
+set +a
+
+unset notary_api_key_base64
+notary_api_key_base64="${APPLE_NOTARY_API_KEY_BASE64:-}"
+unset APPLE_NOTARY_API_KEY_BASE64
+
+set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
 release_require_execution_context
+[[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]] || {
+    release_die "Release candidates are restricted to GitHub-hosted runners."
+}
 "$RELEASE_SCRIPTS_DIR/preflight.sh"
 
 release_require_single_line DEVELOPER_ID_APPLICATION
 release_require_single_line APPLE_TEAM_ID
 release_require_single_line APPLE_NOTARY_KEY_ID
 release_require_single_line APPLE_NOTARY_ISSUER_ID
-release_require_env APPLE_NOTARY_API_KEY_BASE64
+[[ -n "$notary_api_key_base64" ]] || release_die "Required release input is missing: APPLE_NOTARY_API_KEY_BASE64"
 release_require_env RELEASE_SIGNING_KEYCHAIN
+release_require_env RELEASE_SIGNING_CERTIFICATE_PATH
 release_require_env GITHUB_RUN_ATTEMPT
 release_require_env GITHUB_SERVER_URL
 
@@ -25,13 +35,42 @@ release_require_env GITHUB_SERVER_URL
     release_die "APPLE_NOTARY_ISSUER_ID must be a UUID."
 }
 release_require_path_within "$RELEASE_SIGNING_KEYCHAIN" "$RUNNER_TEMP"
-[[ -f "$RELEASE_SIGNING_KEYCHAIN" ]] || release_die "Ephemeral release Keychain is missing."
+release_require_path_within "$RELEASE_SIGNING_CERTIFICATE_PATH" "$RUNNER_TEMP"
+signing_directory="$(dirname "$RELEASE_SIGNING_KEYCHAIN")"
+[[ "$signing_directory" == "$(dirname "$RELEASE_SIGNING_CERTIFICATE_PATH")" ]] || {
+    release_die "Release signing paths must share one private temporary directory."
+}
+[[ "$(basename "$signing_directory")" =~ ^desk-setup-release-signing\.[[:alnum:]]{6}$ ]] || {
+    release_die "Unexpected release signing directory."
+}
+[[ "$(basename "$RELEASE_SIGNING_KEYCHAIN")" == signing.keychain-db ]] || {
+    release_die "Unexpected release Keychain filename."
+}
+[[ "$(basename "$RELEASE_SIGNING_CERTIFICATE_PATH")" =~ ^developer-id\.p12\.[[:alnum:]]{6}$ ]] || {
+    release_die "Unexpected release certificate filename."
+}
+[[ -d "$signing_directory" && ! -L "$signing_directory" ]] || {
+    release_die "Release signing directory is missing or unsafe."
+}
+[[ -f "$RELEASE_SIGNING_KEYCHAIN" && ! -L "$RELEASE_SIGNING_KEYCHAIN" ]] || {
+    release_die "Ephemeral release Keychain is missing or unsafe."
+}
+[[ ! -e "$RELEASE_SIGNING_CERTIFICATE_PATH" && ! -L "$RELEASE_SIGNING_CERTIFICATE_PATH" ]] || {
+    release_die "The imported Developer ID certificate was not deleted immediately."
+}
 
-for command in codesign ditto file hdiutil lipo openssl plutil ruby security shasum spctl swift xcodebuild xcrun; do
+for command in codesign ditto file hdiutil lipo openssl plutil ruby security shasum sleep spctl stat swift xcodebuild xcrun; do
     release_require_command "$command"
 done
+[[ "$(stat -f %Lp "$signing_directory")" == 700 ]] || {
+    release_die "Release signing directory must use mode 0700."
+}
+[[ "$(stat -f %Lp "$RELEASE_SIGNING_KEYCHAIN")" == 600 ]] || {
+    release_die "Ephemeral release Keychain must use mode 0600."
+}
 
 cd "$ROOT_DIR"
+umask 077
 ruby scripts/generate-xcode-project.rb --check
 plutil -lint Config/ReleaseEntitlements.plist >/dev/null
 ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-entitlements \
@@ -47,18 +86,57 @@ dmg_root="$staging_root/dmg-root"
 output_directory="$staging_root/output"
 mount_point="$staging_root/mount"
 pre_notary_dmg="$staging_root/pre-notary.dmg"
-notary_key="$RUNNER_TEMP/desk-setup-notary-api-key.p8"
+notary_directory=""
+notary_key=""
 attached=false
 
 cleanup() {
-    unset APPLE_NOTARY_API_KEY_BASE64 || true
-    if [[ "$attached" == true ]]; then
-        hdiutil detach -quiet "$mount_point" >/dev/null 2>&1 || true
+    local exit_status=$?
+    local cleanup_failed=false
+    trap - EXIT
+    trap '' INT TERM
+    set +e
+
+    if ! release_stop_active_child; then
+        printf 'Release tooling error: a tracked release child did not terminate.\n' >&2
+        cleanup_failed=true
     fi
-    rm -f "$notary_key"
-    rm -rf "$staging_root"
+    notary_api_key_base64=""
+    if [[ "$attached" == true ]]; then
+        if ! hdiutil detach -quiet "$mount_point" >/dev/null 2>&1; then
+            printf 'Release tooling error: the temporary DMG mount could not be detached.\n' >&2
+            cleanup_failed=true
+        fi
+        attached=false
+    fi
+    if [[ -n "$notary_key" ]]; then
+        rm -f -- "$notary_key"
+        if [[ -e "$notary_key" || -L "$notary_key" ]]; then
+            printf 'Release tooling error: the plaintext notary key remains after cleanup.\n' >&2
+            cleanup_failed=true
+        fi
+        notary_key=""
+    fi
+    if [[ -n "$notary_directory" ]]; then
+        if ! rmdir "$notary_directory" >/dev/null 2>&1 \
+            || [[ -e "$notary_directory" || -L "$notary_directory" ]]; then
+            printf 'Release tooling error: the private notary directory remains after cleanup.\n' >&2
+            cleanup_failed=true
+        fi
+        notary_directory=""
+    fi
+    rm -rf -- "$staging_root"
+    if [[ -e "$staging_root" || -L "$staging_root" ]]; then
+        printf 'Release tooling error: the signed release staging directory remains after cleanup.\n' >&2
+        cleanup_failed=true
+    fi
+    if [[ "$exit_status" == 0 && "$cleanup_failed" == true ]]; then
+        exit_status=1
+    fi
+    exit "$exit_status"
 }
 trap cleanup EXIT
+release_install_exit_signal_traps
 
 mkdir -p "$(dirname "$signed_app")" "$dmg_root" "$output_directory" "$mount_point"
 
@@ -168,7 +246,7 @@ ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-codesign \
     --team-id "$APPLE_TEAM_ID" \
     --identifier "$dmg_identifier" \
     --kind dmg
-"$RELEASE_SCRIPTS_DIR/cleanup-signing-keychain.sh"
+"$RELEASE_SCRIPTS_DIR/cleanup-signing-keychain.sh" --preserve-directory
 
 hdiutil attach -quiet -nobrowse -readonly -mountpoint "$mount_point" "$dmg_path"
 attached=true
@@ -180,16 +258,27 @@ attached=false
 
 cp "$dmg_path" "$pre_notary_dmg"
 
-umask 077
-release_require_absent_path "$notary_key"
-printf '%s' "$APPLE_NOTARY_API_KEY_BASE64" | openssl base64 -d -A -out "$notary_key"
-unset APPLE_NOTARY_API_KEY_BASE64
+notary_directory="$(mktemp -d "$RUNNER_TEMP/desk-setup-release-notary.XXXXXX")"
+release_require_path_within "$notary_directory" "$RUNNER_TEMP"
+[[ -d "$notary_directory" && ! -L "$notary_directory" && "$(stat -f %Lp "$notary_directory")" == 700 ]] || {
+    release_die "Notary API key directory is unsafe."
+}
+notary_key="$(mktemp "$notary_directory/api-key.p8.XXXXXX")"
+release_require_path_within "$notary_key" "$notary_directory"
+[[ -f "$notary_key" && ! -L "$notary_key" && "$(stat -f %Lp "$notary_key")" == 600 ]] || {
+    release_die "Notary API key staging file is unsafe."
+}
+if ! printf '%s' "$notary_api_key_base64" | openssl base64 -d -A -out "$notary_key"; then
+    notary_api_key_base64=""
+    release_die "Notary API key could not be decoded."
+fi
+notary_api_key_base64=""
 [[ -s "$notary_key" ]] || release_die "Notary API key could not be decoded."
 grep -q '^-----BEGIN PRIVATE KEY-----$' "$notary_key" || release_die "Notary API key has an invalid PEM format."
 
 raw_notary_result="$staging_root/notary-result.raw.json"
 raw_notary_log="$staging_root/notary-log.raw.json"
-xcrun notarytool submit "$dmg_path" \
+release_run_tracked xcrun notarytool submit "$dmg_path" \
     --key "$notary_key" \
     --key-id "$APPLE_NOTARY_KEY_ID" \
     --issuer "$APPLE_NOTARY_ISSUER_ID" \
@@ -197,13 +286,20 @@ xcrun notarytool submit "$dmg_path" \
     --timeout 45m \
     --no-progress \
     --output-format json >"$raw_notary_result"
-ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-notary --json "$raw_notary_result"
-submission_id="$(ruby -rjson -e 'puts JSON.parse(File.read(ARGV.fetch(0))).fetch("id")' "$raw_notary_result")"
-xcrun notarytool log "$submission_id" "$raw_notary_log" \
+submission_id="$(ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-notary \
+    --json "$raw_notary_result" \
+    --print-id)"
+release_run_tracked xcrun notarytool log "$submission_id" "$raw_notary_log" \
     --key "$notary_key" \
     --key-id "$APPLE_NOTARY_KEY_ID" \
     --issuer "$APPLE_NOTARY_ISSUER_ID"
-rm -f "$notary_key"
+rm -f -- "$notary_key"
+[[ ! -e "$notary_key" && ! -L "$notary_key" ]] || {
+    release_die "Decoded notary API key still exists after deletion."
+}
+notary_key=""
+rmdir "$notary_directory"
+notary_directory=""
 
 release_sanitize_json "$raw_notary_result" "$notary_result_path"
 release_sanitize_json "$raw_notary_log" "$notary_log_path"
@@ -320,6 +416,7 @@ ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" generate-release-manifest \
     --toolchain "macos=$runner_macos" \
     --toolchain "sdk=$sdk_version" \
     --toolchain "runner-architecture=$runner_architecture" \
+    --toolchain "runner-environment=$RUNNER_ENVIRONMENT" \
     --toolchain "minimum-system-version=$MINIMUM_SYSTEM_VERSION" \
     --app "$signed_app" \
     --build-number "$BUILD_NUMBER" \

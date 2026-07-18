@@ -73,13 +73,19 @@ The release app is built once. Signing, packaging, notarization, and stapling ma
 | Release-tag restriction | `<not recorded>` |
 | Protected `release-candidate` environment | `<not recorded>` |
 | Required reviewer and bypass policy | `<not recorded>` |
+| GitHub-hosted runner enforcement and runner image | `<not recorded>` |
 | Environment-scoped signing/notary credentials present | `<not recorded; never record values>` |
+| Secret child-environment isolation and direct-exec consumer checks | `<not recorded; result only>` |
+| Ephemeral certificate/Keychain/notary-key cleanup result | `<not recorded; record result only, never paths or values>` |
+| Catchable cancellation/tracked-child cleanup result | `<not recorded; result only>` |
 | Private vulnerability reporting enabled/tested | `<not recorded>` |
 | Immutable releases enabled | `<not recorded>` |
 | Protected workflow run and artifact ID | `<not recorded>` |
 | Protected draft Release URL/ID | `<not recorded>` |
 
 - [ ] A read-only query proves the effective remote workflow cannot publish an unsigned artifact or bypass approval.
+- [ ] The release manifest records `runner-environment=github-hosted`; each secret had one direct-exec consumer and was absent from unrelated child environments.
+- [ ] Normal completion and one catchable-cancellation probe confirm no decoded release credential or tracked notarization child remains. Do not claim shell cleanup for `SIGKILL` or host loss.
 - [ ] The protected draft contains exactly the nine assets below. Curated English/Korean notes are the Release body, not a tenth asset.
 - [ ] All nine assets were downloaded again byte-for-byte; hashes and signatures match this record, and all three attestation bundles verify their exact subjects.
 - [ ] Immutable releases are enabled before publication.

@@ -73,32 +73,81 @@ release_require_absent_path() {
     }
 }
 
+release_active_child_pid=""
+
+release_process_tree_alive() {
+    local child_pid="$1"
+    kill -0 -- "-$child_pid" >/dev/null 2>&1 \
+        || kill -0 "$child_pid" >/dev/null 2>&1
+}
+
+release_signal_process_tree() {
+    local signal_name="$1"
+    local child_pid="$2"
+    kill -"$signal_name" -- "-$child_pid" >/dev/null 2>&1 \
+        || kill -"$signal_name" "$child_pid" >/dev/null 2>&1 \
+        || true
+}
+
+release_stop_active_child() {
+    local child_pid="${release_active_child_pid:-}"
+    local _attempt
+    [[ -n "$child_pid" ]] || return 0
+
+    release_signal_process_tree TERM "$child_pid"
+    for _attempt in {1..20}; do
+        release_process_tree_alive "$child_pid" || break
+        sleep 0.05
+    done
+    if release_process_tree_alive "$child_pid"; then
+        release_signal_process_tree KILL "$child_pid"
+    fi
+    wait "$child_pid" >/dev/null 2>&1 || true
+    for _attempt in {1..20}; do
+        release_process_tree_alive "$child_pid" || break
+        sleep 0.05
+    done
+    if release_process_tree_alive "$child_pid"; then
+        return 1
+    fi
+    release_active_child_pid=""
+}
+
+release_terminate_with_child() {
+    local exit_status="$1"
+    trap - INT TERM
+    release_stop_active_child || true
+    exit "$exit_status"
+}
+
+release_install_exit_signal_traps() {
+    trap 'release_terminate_with_child 130' INT
+    trap 'release_terminate_with_child 143' TERM
+}
+
+release_run_tracked() {
+    local child_status child_pid
+    ruby -e 'Process.setsid; exec(*ARGV)' "$@" &
+    child_pid=$!
+    release_active_child_pid="$child_pid"
+    if wait "$child_pid"; then
+        child_status=0
+    else
+        child_status=$?
+    fi
+    release_active_child_pid=""
+    return "$child_status"
+}
+
 release_sanitize_json() {
     local input="$1"
     local output="$2"
-    ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-json --json "$input" >/dev/null || return 1
-    ruby -rjson -e '
-      input, output, root, home, runner_temp = ARGV
-      value = JSON.parse(File.read(input))
-      replacements = [
-        [root, "$REPOSITORY"],
-        [home, "$HOME"],
-        [runner_temp, "$RUNNER_TEMP"],
-      ].reject { |from, _| from.nil? || from.empty? }
-      sanitize = lambda do |item|
-        case item
-        when Hash
-          item.to_h { |key, child| [key, sanitize.call(child)] }
-        when Array
-          item.map { |child| sanitize.call(child) }
-        when String
-          replacements.reduce(item) { |text, (from, to)| text.gsub(from, to) }
-        else
-          item
-        end
-      end
-      File.write(output, JSON.pretty_generate(sanitize.call(value)) + "\n", mode: "w", perm: 0o644)
-    ' "$input" "$output" "$ROOT_DIR" "${HOME:-}" "${RUNNER_TEMP:-}"
+    ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" sanitize-json \
+        --json "$input" \
+        --output "$output" \
+        --repository "$ROOT_DIR" \
+        --home "${HOME:-}" \
+        --runner-temp "${RUNNER_TEMP:-}" >/dev/null
 }
 
 release_sanitize_text() {
@@ -107,7 +156,12 @@ release_sanitize_text() {
     ruby -e '
       input, output, root, home, runner_temp = ARGV
       text = File.read(input)
-      [[root, "$REPOSITORY"], [home, "$HOME"], [runner_temp, "$RUNNER_TEMP"]].each do |from, to|
+      replacements = [[root, "$REPOSITORY"], [home, "$HOME"], [runner_temp, "$RUNNER_TEMP"]]
+        .select { |from, _to| !from.nil? && !from.empty? }
+        .each_with_index
+        .sort_by { |((from, _to), index)| [-from.bytesize, index] }
+        .map(&:first)
+      replacements.each do |from, to|
         text = text.gsub(from, to) unless from.nil? || from.empty?
       end
       File.write(output, text.end_with?("\n") ? text : text + "\n", mode: "w", perm: 0o644)

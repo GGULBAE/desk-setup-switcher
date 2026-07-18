@@ -18,9 +18,9 @@ An ad-hoc signature is never promoted by changing its description. A public arti
 
 ## Current development baseline
 
-The current 2026-07-18 public-surface candidate's no-Developer-ID path passed 839 deterministic checks/assertions: 501 app checks (178 XCTest cases, 322 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 338 release-tooling assertions (310 Ruby policy and 28 shell guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed. The release-tooling evidence is simulated and structural, not a credentialed signing or notarization result. The package was not installed or launched.
+The current 2026-07-18 public-surface candidate's no-Developer-ID path passed 908 deterministic checks/assertions: 501 app checks (178 XCTest cases, 322 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 407 release-tooling assertions (328 Ruby policy and 79 shell guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed. The release-tooling evidence is simulated and structural, not a credentialed signing or notarization result. The package was not installed or launched.
 
-- Current development-only DMG SHA-256: `d693985760aaf81c4f6bc19ecf6b2c252d72c84cfa052257b3f7d4d2d35ee632`
+- Current development-only DMG SHA-256: `c1b406b4a29571ed721c0c0255c9d2220bdefb601a8c6639e0f136c41820c503`
 - Authoritative current record: [Completion criteria and evidence ledger](COMPLETION-CRITERIA.md)
 - Historical 496-check baseline and DMG SHA-256 `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`: [Open-source release baseline audit](OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md)
 
@@ -81,11 +81,15 @@ The local workspace now proposes a separate signed-candidate workflow:
 
 1. it runs only through manual `workflow_dispatch` on the existing `v0.1.0` tag ref and requires the exact expected commit plus a typed confirmation;
 2. it references the protected environment named `release-candidate`, with job-scoped contents/identity/attestation permissions and protected signing/notarization values;
-3. it reruns preflight, `make verify`, and the public-history audit from a complete tag checkout, then builds once, signs, notarizes, staples, assesses, checksums, and records the candidate;
+3. it reruns preflight, `make verify`, and the public-history audit from a complete tag checkout on a GitHub-hosted runner, then builds once, signs, notarizes, staples, assesses, checksums, and records the candidate;
 4. it creates an SBOM plus separate DMG-provenance, DMG-SBOM, and release-manifest-provenance attestations; creates only a draft prerelease with curated English/Korean notes and the exact nine-asset set; downloads all nine assets again; and verifies identity and all three bundles; and
 5. it retains the same final candidate as a workflow artifact for the browser-download external beta path and contains no public-release publication command.
 
 This workflow and its release scripts are unproven local tooling. They have not run with Developer ID/notarization credentials, have not produced a signed candidate, and have not been pushed. A draft/prerelease is not a public release, and source inspection cannot substitute for protected environment configuration or an actual accepted run.
+
+The release scripts fail closed on self-hosted runners. Each protected secret is scoped to its one consuming workflow step, which directly replaces the runner shell with `/bin/bash`; the script copies the value into a non-exported variable and unsets the original before `source`, `dirname`, or any other child process can run. The certificate, ephemeral Keychain, and notary key use private randomized paths below `RUNNER_TEMP`; only their non-secret path names cross steps through GitHub's `GITHUB_ENV` file. The decoded certificate is deleted immediately after import, the Keychain as soon as app and DMG signing finish, and the notary key immediately after the accepted submission log is fetched, with absence checked after every normal deletion. Catchable `INT`/`TERM` targets the tracked notarization process group, grants a short `TERM` window, then escalates to `KILL` before status-preserving cleanup; `SIGKILL` delivered to the runner shell itself, host loss, and power loss cannot be handled by a shell trap and therefore retain the GitHub-hosted ephemeral runner and `RUNNER_TEMP` teardown as the last boundary. Apple's `security import` still requires the certificate passphrase as a quoted `-P` process argument for that brief isolated command; it is never logged or inherited through the child environment.
+
+Strict duplicate-key-free JSON validation emits the normalized submission ID from the same verified in-memory snapshot rather than reopening the raw result. JSON and text sanitization replace the longest, most-specific repository/home/runner path first, then the sanitized result and log are semantically rebound to the submission, archive, and hashes. The always-cleanup path is idempotent, never follows a signing-path symlink, and refuses malformed, escaped, or unexpected signing paths. Deterministic mock lifecycle tests exercise successful and failed import, `GITHUB_ENV` handoff, idempotent follow-up cleanup, symlink refusal, secret-environment isolation, and prompt process-group cleanup even when the child ignores `TERM`; this remains simulated evidence, not a credentialed signing/notarization run.
 
 The effective remote workflow on `origin/master` is older and unsafe for a release tag. A read-only inspection on 2026-07-18 found that it triggers on `v*`, receives `contents: write`, builds an unsigned DMG, and calls `gh release create` without `--draft`, `--prerelease`, or an environment. The current local protection changes have not been pushed. Therefore **no `v*` tag may be pushed** until the safe workflow is merged, remote protections are configured, and a read-only check proves that the unsafe path is no longer effective.
 
@@ -254,5 +258,7 @@ Do not include personal device identifiers, real SSIDs, exact locations, IP host
 - [Apple: Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
 - [Apple: Hardened Runtime](https://developer.apple.com/documentation/security/hardened-runtime)
 - [GitHub: Deployments and environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
+- [GitHub: Variables reference](https://docs.github.com/en/actions/reference/workflows-and-actions/variables)
+- [GitHub: Workflow commands and `GITHUB_ENV`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands)
 - [GitHub: Using artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations)
 - [Homebrew: Cask Cookbook](https://docs.brew.sh/Cask-Cookbook)

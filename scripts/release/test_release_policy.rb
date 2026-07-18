@@ -7,6 +7,7 @@ require "json"
 require "open3"
 require "rbconfig"
 require "tmpdir"
+require_relative "release_policy"
 
 class ReleasePolicyTestSuite
   SCRIPT = File.expand_path("release_policy.rb", __dir__)
@@ -197,6 +198,16 @@ class ReleasePolicyTestSuite
   def test_notary
     run("notary accepts an Accepted result with a valid UUID") do
       assert_success("verify-notary", "--json", fixture("notary-accepted.json"))
+      stdout, stderr, status = cli(
+        "verify-notary", "--json", fixture("notary-accepted.json"), "--print-id"
+      )
+      assert(status.success?, "verified notary ID extraction failed")
+      assert(stderr.empty?, "verified notary ID extraction wrote to stderr")
+      assert_equal(
+        "123e4567-e89b-42d3-a456-426614174000\n",
+        stdout,
+        "verified notary ID extraction was not normalized"
+      )
     end
     run("notary rejects a non-Accepted status") do
       Dir.mktmpdir do |directory|
@@ -216,6 +227,38 @@ class ReleasePolicyTestSuite
         assert_failure("verify-notary", "--json", path)
       end
     end
+
+    run("notary ID extraction uses its verified snapshot after the input path is replaced") do
+      Dir.mktmpdir do |directory|
+        original_id = "123e4567-e89b-42d3-a456-426614174000"
+        replacement_id = "223e4567-e89b-42d3-a456-426614174000"
+        path = write(
+          File.join(directory, "notary.json"),
+          JSON.generate("id" => original_id, "status" => "Accepted") + "\n"
+        )
+        original_read_utf8 = ReleasePolicy.method(:read_utf8)
+        read_count = 0
+        singleton = class << ReleasePolicy; self; end
+        singleton.send(:define_method, :read_utf8) do |input_path, label, max_bytes:|
+          read_count += 1
+          source = original_read_utf8.call(input_path, label, max_bytes: max_bytes)
+          File.binwrite(
+            input_path,
+            JSON.generate("id" => replacement_id, "status" => "Accepted") + "\n"
+          )
+          source
+        end
+
+        begin
+          result = ReleasePolicy.verify_notary(path)
+        ensure
+          singleton.send(:define_method, :read_utf8, original_read_utf8)
+        end
+
+        assert_equal(1, read_count, "notary verification reopened the verified input path")
+        assert_equal(original_id, result.fetch("id"), "notary verification did not use its verified snapshot")
+      end
+    end
   end
 
   def test_strict_json
@@ -229,6 +272,105 @@ class ReleasePolicyTestSuite
           %q({"😀":1,"\uD83D\uDE00":2}) + "\n"
         )
         assert_failure("verify-json", "--json", duplicate)
+      end
+    end
+
+    run("JSON sanitization rejects decoded-equivalent duplicate keys without changing output") do
+      Dir.mktmpdir do |directory|
+        input = write(
+          File.join(directory, "duplicate.json"),
+          %q({"😀":"/repo/first","\uD83D\uDE00":"/repo/second"}) + "\n"
+        )
+        output = write(File.join(directory, "sanitized.json"), "existing-output\n", mode: 0o600)
+        assert_failure(
+          "sanitize-json",
+          "--json", input,
+          "--output", output,
+          "--repository", "/repo"
+        )
+        assert_equal("existing-output\n", File.binread(output), "failed sanitization changed the output")
+        assert_equal(0o600, File.stat(output).mode & 0o777, "failed sanitization changed the output mode")
+      end
+    end
+
+    run("JSON sanitization is exact, recursive, newline-terminated, and mode 0644") do
+      Dir.mktmpdir do |directory|
+        home = "/Users/release-runner"
+        repository = "#{home}/work/desk-setup-switcher"
+        runner_temp = "#{home}/work/_temp"
+        input = write(
+          File.join(directory, "input.json"),
+          JSON.generate(
+            "repository" => "#{repository}/artifacts/candidate.dmg",
+            "nested" => [
+              { "home" => "#{home}/Library/Logs/notary.log" },
+              "#{runner_temp}/notary-result.json",
+              "#{repository}:#{home}:#{runner_temp}"
+            ],
+            "unchanged" => 7
+          )
+        )
+        output = File.join(directory, "sanitized.json")
+        assert_success(
+          "sanitize-json",
+          "--json", input,
+          "--output", output,
+          "--repository", repository,
+          "--home", home,
+          "--runner-temp", runner_temp
+        )
+        expected = <<~JSON
+          {
+            "repository": "$REPOSITORY/artifacts/candidate.dmg",
+            "nested": [
+              {
+                "home": "$HOME/Library/Logs/notary.log"
+              },
+              "$RUNNER_TEMP/notary-result.json",
+              "$REPOSITORY:$HOME:$RUNNER_TEMP"
+            ],
+            "unchanged": 7
+          }
+        JSON
+        assert_equal(expected, File.binread(output), "sanitized JSON bytes were not exact")
+        assert_equal(0o644, File.stat(output).mode & 0o777, "sanitized JSON mode was not 0644")
+      end
+    end
+
+    run("JSON sanitization uses its verified in-memory snapshot after the input path is replaced") do
+      Dir.mktmpdir do |directory|
+        repository = "/private/work/desk-setup-switcher"
+        input = write(
+          File.join(directory, "input.json"),
+          JSON.generate("path" => "#{repository}/verified") + "\n"
+        )
+        output = File.join(directory, "sanitized.json")
+        original_read_utf8 = ReleasePolicy.method(:read_utf8)
+        read_count = 0
+        singleton = class << ReleasePolicy; self; end
+        singleton.send(:define_method, :read_utf8) do |path, label, max_bytes:|
+          read_count += 1
+          source = original_read_utf8.call(path, label, max_bytes: max_bytes)
+          File.binwrite(path, JSON.generate("path" => "#{repository}/replacement") + "\n")
+          source
+        end
+
+        begin
+          ReleasePolicy.sanitize_json(
+            input_path: input,
+            output_path: output,
+            repository_path: repository
+          )
+        ensure
+          singleton.send(:define_method, :read_utf8, original_read_utf8)
+        end
+
+        assert_equal(1, read_count, "sanitization reopened the verified input path")
+        assert_equal(<<~JSON, File.binread(output), "sanitization did not use the verified snapshot")
+          {
+            "path": "$REPOSITORY/verified"
+          }
+        JSON
       end
     end
   end
@@ -776,6 +918,7 @@ class ReleasePolicyTestSuite
       stdout, stderr = assert_success("--help")
       %w[
         verify-json
+        sanitize-json
         verify-codesign
         verify-entitlements
         verify-notary

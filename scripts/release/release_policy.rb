@@ -145,6 +145,33 @@ module ReleasePolicy
     ]
   end
 
+  def sanitize_json_value(value, replacements)
+    case value
+    when Hash
+      value.to_h { |key, child| [key, sanitize_json_value(child, replacements)] }
+    when Array
+      value.map { |child| sanitize_json_value(child, replacements) }
+    when String
+      replacements.reduce(value) { |text, (from, to)| text.gsub(from, to) }
+    else
+      value
+    end
+  end
+
+  def sanitize_json(input_path:, output_path:, repository_path:, home_path: nil, runner_temp_path: nil)
+    value = strict_json(input_path, "JSON evidence")
+    replacements = [
+      [repository_path, "$REPOSITORY"],
+      [home_path, "$HOME"],
+      [runner_temp_path, "$RUNNER_TEMP"]
+    ].select { |from, _to| from.is_a?(String) && !from.empty? }
+    replacements = replacements.each_with_index
+                               .sort_by { |(entry, index)| [-entry.fetch(0).bytesize, index] }
+                               .map(&:first)
+    sanitized = sanitize_json_value(value, replacements)
+    atomic_write(output_path, canonical_json(sanitized), "sanitized JSON")
+  end
+
   def ensure_single_line(value, label, max_bytes: 1024)
     unless value.is_a?(String) && !value.empty? && value.bytesize <= max_bytes &&
            value.encoding == Encoding::UTF_8 && value.valid_encoding? &&
@@ -1305,6 +1332,24 @@ module ReleasePolicy
       required!(options, :json)
       strict_json(options[:json], "JSON evidence")
       puts "OK json"
+    when "sanitize-json"
+      options = {}
+      parser = option_parser("Usage: release_policy.rb sanitize-json --json FILE --output FILE --repository PATH [--home PATH] [--runner-temp PATH]")
+      parser.on("--json FILE") { |value| options[:json] = value }
+      parser.on("--output FILE") { |value| options[:output] = value }
+      parser.on("--repository PATH") { |value| options[:repository] = value }
+      parser.on("--home PATH") { |value| options[:home] = value }
+      parser.on("--runner-temp PATH") { |value| options[:runner_temp] = value }
+      parse_exact!(parser, argv)
+      required!(options, :json, :output, :repository)
+      sanitize_json(
+        input_path: options[:json],
+        output_path: options[:output],
+        repository_path: options[:repository],
+        home_path: options[:home],
+        runner_temp_path: options[:runner_temp]
+      )
+      puts "OK sanitized-json"
     when "verify-codesign"
       options = {}
       parser = option_parser("Usage: release_policy.rb verify-codesign --report FILE --authority VALUE --team-id ID --identifier ID --kind app|dmg [--architecture arm64|x86_64]")
@@ -1334,13 +1379,14 @@ module ReleasePolicy
       verify_entitlements(absent: options[:absent], plist_path: options[:plist])
       puts "OK entitlements"
     when "verify-notary"
-      options = {}
-      parser = option_parser("Usage: release_policy.rb verify-notary --json FILE")
+      options = { print_id: false }
+      parser = option_parser("Usage: release_policy.rb verify-notary --json FILE [--print-id]")
       parser.on("--json FILE") { |value| options[:json] = value }
+      parser.on("--print-id") { options[:print_id] = true }
       parse_exact!(parser, argv)
       required!(options, :json)
-      verify_notary(options[:json])
-      puts "OK notary"
+      result = verify_notary(options[:json])
+      puts(options[:print_id] ? result.fetch("id") : "OK notary")
     when "generate-sbom"
       options = {}
       parser = option_parser("Usage: release_policy.rb generate-sbom --dmg FILE --sha256 DIGEST --size BYTES --version VERSION --tag TAG --commit SHA --namespace URI --created RFC3339Z --package-dump FILE --output FILE")
@@ -1481,14 +1527,15 @@ module ReleasePolicy
         Commands:
         verify-codesign
         verify-json
+        sanitize-json
         verify-entitlements
-          verify-notary
-          generate-sbom
-          verify-sbom
-          generate-bundle-manifest
-          generate-release-manifest
-          verify-release-manifest
-          verify-mounted-app
+        verify-notary
+        generate-sbom
+        verify-sbom
+        generate-bundle-manifest
+        generate-release-manifest
+        verify-release-manifest
+        verify-mounted-app
 
         Run `release_policy.rb COMMAND --help` for command options.
       USAGE
