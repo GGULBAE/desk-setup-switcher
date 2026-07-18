@@ -104,7 +104,7 @@ Never attach, link, or rename the current ad-hoc DMG in a holding post.
 
 ## Publish-only launch drafts
 
-The drafts in this section are locked until `APPROVED_RELEASE_URL`, `APPROVED_SITE_URL`, and `FINAL_DMG_SHA256` have been replaced from the protected approval record. Never substitute the current unsigned-development hash. Remove all instruction lines and unused capability variants before posting.
+The drafts in this section are locked until `APPROVED_RELEASE_URL`, `APPROVED_SITE_URL`, and `FINAL_DMG_SHA256` have been replaced from the protected approval record. Never substitute the current unsigned-development hash. Remove all instruction lines and unused capability variants before posting. The workflow-ready version-specific English/Korean copy lives in the [`v0.1.0` Release notes](releases/v0.1.0.md); it contains no completion evidence and does not claim that signing or publication passed.
 
 ### GitHub Release notes
 
@@ -126,7 +126,7 @@ Body:
 >
 > **Initial support:** Apple Silicon, macOS 14 Sonoma or later. Intel is not currently supported.
 >
-> Download the Developer ID-signed and notarized DMG from this release's Assets. Verify SHA-256: `FINAL_DMG_SHA256`.
+> Download the immutable Developer ID-signed, notarized, and stapled DMG from this release's Assets. Verify SHA-256: `FINAL_DMG_SHA256`.
 >
 > Read the installation guide, support matrix, privacy policy, and security reporting instructions before applying a profile.
 
@@ -204,8 +204,12 @@ Do not add analytics, cookies, pixels, fingerprinting, campaign IDs, URL shorten
 
 Do not apply metadata or publish copy until every applicable box has recorded evidence.
 
-- [ ] The protected `v0.1.0` candidate is Developer ID signed, hardened, timestamped, notarized, stapled, Gatekeeper assessed, checksummed, and bound to its tag/commit/SBOM/attestation.
-- [ ] Clean-quarantine installation and three external Apple Silicon beta results pass with no unresolved P0/P1 issue.
+- [ ] The unsafe effective remote unsigned-publication workflow is gone; branch/tag protections, the protected `release-candidate` environment/reviewer, private vulnerability reporting, and immutable releases are configured and confirmed read-only.
+- [ ] The protected `v0.1.0` candidate is Developer ID signed, hardened, timestamped, notarized, stapled, Gatekeeper assessed, checksummed, and bound to its tag/commit/build/SBOM plus all three subject-specific attestation bundles without an app rebuild or identity/resource change.
+- [ ] Browser download and the extracted DMG preserve a real quarantine attribute; checksum and final-DMG provenance match, and Gatekeeper opens the official candidate without Open Anyway.
+- [ ] Exact-candidate first launch and launch-at-login default-off, upgrade, schema 0→1 migration, backup recovery, import/export, diagnostics, uninstall, and optional app-owned data removal each have separate passing evidence.
+- [ ] Three external Apple Silicon reports use browser-downloaded protected workflow artifacts and the identical final DMG SHA-256/final-DMG provenance attestation.
+- [ ] A public read-only query and maintainer decision show zero unresolved P0/P1 issues, and the security responder records only a yes/no no-confidential-blocker sign-off.
 - [ ] The final support matrix states the exact Display/Audio/Network hardware-mutation evidence or preserves the explicit mock-verified limitation.
 - [ ] The canonical [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases) contains the approved immutable assets and curated English/Korean notes.
 - [ ] The bilingual site is deployed at its final HTTPS origin, passes its no-cookie/no-tracking checks, and any download link points only to the canonical release.
@@ -215,6 +219,7 @@ Do not apply metadata or publish copy until every applicable box has recorded ev
 - [ ] The maintainer explicitly approves the description, topics, Homepage URL, social preview, Release publication, site publication, and each external post.
 - [ ] After applying metadata, a read-only GitHub query confirms the exact description/topics/Homepage and shows no stale mouse/keyboard, Intel, Homebrew, accessibility-certification, hardware-verification, or unsigned-download claim.
 - [ ] After publication, every release/site/download link is opened from a clean browser session and the downloaded asset identity is reverified.
+- [ ] Homebrew remains “not offered” at publication; after the canonical Release exists, the project-owned tap passes `install`, `upgrade`, `uninstall`, and `zap` against the exact final SHA-256 before it is advertised.
 - [ ] Only the public aggregate signals above are recorded; no analytics or telemetry is introduced.
 
 Actual remote mutation, deployment, Release publication, and promotional posting remain separate maintainer-approved actions.
@@ -228,4 +233,8 @@ Actual remote mutation, deployment, Release publication, and promotional posting
 - [Privacy policy](PRIVACY.md)
 - [Support matrix](SUPPORT-MATRIX.md)
 - [Distribution gate](DISTRIBUTION.md)
+- [Release evidence template](RELEASE-EVIDENCE-TEMPLATE.md)
+- [External beta report template](EXTERNAL-BETA-REPORT-TEMPLATE.md)
+- [`v0.1.0` curated Release notes](releases/v0.1.0.md)
+- [Release incident runbook](RELEASE-INCIDENT-RUNBOOK.md)
 - [Governance and release approval](../GOVERNANCE.md)

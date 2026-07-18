@@ -9,8 +9,8 @@ Desk Setup Switcher has no public release. The repository can currently build an
 | Class | Purpose | May be public/canonical? |
 | --- | --- | --- |
 | Local or CI ad-hoc DMG | Contributor testing, deterministic package inspection, and historical evidence | No |
-| GitHub unsigned draft prerelease | A protected review record for the current verification pipeline | No |
-| Developer ID + notarized release candidate | Clean-install beta testing after all trust checks pass | Only inside a protected draft until final approval |
+| Ad-hoc workflow artifact or unsigned draft | Contributor inspection only; never external-beta or release evidence | No |
+| Developer ID + notarized release candidate | Clean-install beta testing after all trust checks pass | Protected workflow artifact and protected draft only; never a canonical download |
 | Approved `v0.1.0` GitHub Release | Canonical public-beta download with checksum, provenance, SBOM, and release evidence | Yes |
 | Homebrew cask | Convenience installation after the canonical notarized release is proven | Only after the GitHub Release; own tap first |
 
@@ -18,10 +18,11 @@ An ad-hoc signature is never promoted by changing its description. A public arti
 
 ## Current development baseline
 
-The 2026-07-18 open-source baseline's no-Developer-ID path passed 496 checks: 173 XCTest checks, 322 Swift Testing checks across 40 suites, and one isolated native `NSPopover` regression. Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed. The package was not installed or launched.
+The current 2026-07-18 public-surface candidate's no-Developer-ID path passed 839 deterministic checks/assertions: 501 app checks (178 XCTest cases, 322 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 338 release-tooling assertions (310 Ruby policy and 28 shell guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed. The release-tooling evidence is simulated and structural, not a credentialed signing or notarization result. The package was not installed or launched.
 
-- Development-only DMG SHA-256: `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`
-- Authoritative record: [Open-source release baseline audit](OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md)
+- Current development-only DMG SHA-256: `d693985760aaf81c4f6bc19ecf6b2c252d72c84cfa052257b3f7d4d2d35ee632`
+- Authoritative current record: [Completion criteria and evidence ledger](COMPLETION-CRITERIA.md)
+- Historical 496-check baseline and DMG SHA-256 `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`: [Open-source release baseline audit](OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md)
 
 This hash is local development evidence only. It must not appear as the checksum of a signed public candidate.
 
@@ -72,24 +73,27 @@ shasum -a 256 -c Desk-Setup-Switcher-0.1.0-unsigned.dmg.sha256
 
 macOS may require an explicit **Open Anyway** decision for this development artifact. Never disable Gatekeeper globally or remove quarantine recursively. End-user documentation, the demo site, and promotional material must not link to this artifact or instruct ordinary users to bypass Gatekeeper.
 
-## Current GitHub Actions candidate path
+## Proposed local workflow and effective remote path
 
-The CI workflow uses a complete checkout, runs `make verify` and `make audit-public-release`, and uploads the ad-hoc DMG/checksum for 14 days. It does not receive signing or notarization secrets.
+The local workspace's proposed CI workflow uses a complete checkout, runs `make verify` and `make audit-public-release`, and uploads the ad-hoc DMG/checksum for 14 days. It does not receive signing or notarization secrets.
 
-The tag workflow currently:
+The local workspace now proposes a separate signed-candidate workflow:
 
-1. triggers for `v*` tags and requires the tag to equal `v` plus `CFBundleShortVersionString`;
-2. references the GitHub environment named `release`;
-3. reruns `make verify` and `make audit-public-release` from a complete checkout; and
-4. calls `gh release create` with `--draft --prerelease`, an **unsigned candidate** title, and only the ad-hoc DMG/checksum.
+1. it runs only through manual `workflow_dispatch` on the existing `v0.1.0` tag ref and requires the exact expected commit plus a typed confirmation;
+2. it references the protected environment named `release-candidate`, with job-scoped contents/identity/attestation permissions and protected signing/notarization values;
+3. it reruns preflight, `make verify`, and the public-history audit from a complete tag checkout, then builds once, signs, notarizes, staples, assesses, checksums, and records the candidate;
+4. it creates an SBOM plus separate DMG-provenance, DMG-SBOM, and release-manifest-provenance attestations; creates only a draft prerelease with curated English/Korean notes and the exact nine-asset set; downloads all nine assets again; and verifies identity and all three bundles; and
+5. it retains the same final candidate as a workflow artifact for the browser-download external beta path and contains no public-release publication command.
 
-It does not use Developer ID, hardened runtime, secure timestamping, notarization, stapling, SBOM generation, artifact attestation, clean-install verification, or an automatic publish command. A draft/prerelease is not a public release, and the current workflow must never be described as the official distribution path.
+This workflow and its release scripts are unproven local tooling. They have not run with Developer ID/notarization credentials, have not produced a signed candidate, and have not been pushed. A draft/prerelease is not a public release, and source inspection cannot substitute for protected environment configuration or an actual accepted run.
 
-Do not push the final `v0.1.0` tag until the release-only signed path exists and the release environment is actually protected. The workflow name `environment: release` does not configure protection by itself. A read-only GitHub API check on 2026-07-18 found zero configured environments and no protection on `master`.
+The effective remote workflow on `origin/master` is older and unsafe for a release tag. A read-only inspection on 2026-07-18 found that it triggers on `v*`, receives `contents: write`, builds an unsigned DMG, and calls `gh release create` without `--draft`, `--prerelease`, or an environment. The current local protection changes have not been pushed. Therefore **no `v*` tag may be pushed** until the safe workflow is merged, remote protections are configured, and a read-only check proves that the unsafe path is no longer effective.
+
+Do not push the final `v0.1.0` tag until the release-only signed path is merged and the `release-candidate` environment is actually protected. Referencing an environment in workflow YAML does not configure protection by itself. A read-only GitHub API check on 2026-07-18 found zero configured environments and no protection on `master`.
 
 Before any release tag is allowed, a repository administrator must:
 
-- create the `release` environment;
+- create the `release-candidate` environment;
 - restrict it to intended release tags;
 - configure the real required reviewer and decide whether self-review and administrator bypass are prohibited;
 - store signing/notarization credentials only in that protected environment;
@@ -100,7 +104,9 @@ See [GOVERNANCE.md](../GOVERNANCE.md) for current roles and approval authority. 
 
 ## Required public-beta trust path
 
-This path is mandatory for `v0.1.0` and is not implemented yet. The operator must use one release build as the candidate through signing, packaging, notarization, stapling, and approval. A retry after any source, resource, entitlement, or executable change is a new candidate and must restart the gate.
+This path is mandatory for `v0.1.0`. Proposed local workflow and helper tooling now implement its shape, but they are unpushed, unconfigured, and unproven with release credentials; no signed candidate exists yet. The operator must use one release build as the candidate through signing, packaging, notarization, stapling, external beta, and approval. A retry after any source, resource, entitlement, or executable change is a new candidate and must restart the gate.
+
+“Same candidate” means the source commit, tag, app version, build number, signed executable bytes, architecture-labelled `arm64` and `x86_64` CodeDirectory hashes, designated requirement, entitlements, resources, and supported architecture set do not change after the release build. Packaging, notarization, and stapling legitimately change the DMG bytes, so the evidence record must retain the pre-notarization DMG hash and the final post-staple DMG hash rather than claiming those two containers are byte-identical. The app mounted from the final DMG must match the recorded signed app identity and resource manifest. All tester reports, the final checksum, SBOM, three attestation bundles, draft assets, and re-downloaded public asset must bind to their exact recorded subjects and the final post-staple DMG SHA-256 where applicable. Any rebuild or app-bundle change creates a new build number and invalidates earlier lifecycle and beta reports.
 
 ### 1. Freeze and audit the candidate
 
@@ -120,14 +126,15 @@ codesign --force --sign "$DEVELOPER_ID_APPLICATION" \
   --timestamp \
   "Desk Setup Switcher.app"
 
-codesign --verify --deep --strict --verbose=2 "Desk Setup Switcher.app"
-codesign --display --verbose=4 "Desk Setup Switcher.app"
+codesign --verify --all-architectures --deep --strict --verbose=2 "Desk Setup Switcher.app"
+codesign --display --architecture arm64 --verbose=4 "Desk Setup Switcher.app"
+codesign --display --architecture x86_64 --verbose=4 "Desk Setup Switcher.app"
 codesign --display --entitlements - "Desk Setup Switcher.app"
 ```
 
 If the audited app needs entitlements, the implemented script must add `--entitlements` with the reviewed release plist; it must not reuse debug entitlements implicitly. The release script must supply `--options runtime` and `--timestamp` when signing. It must inspect the authority chain and fail if the identity, Team ID, hardened-runtime flag, secure timestamp, or reviewed entitlement set differs from policy. Ad-hoc signing, Apple Development, and Mac App Distribution identities are not substitutes for Developer ID Application.
 
-Package that exact signed app without rebuilding it. Sign the final DMG with the reviewed Developer ID identity and a secure timestamp, then verify the app extracted from the DMG is byte-identical to the signed app that entered packaging:
+Package that exact signed app without rebuilding it. Sign the final DMG with the reviewed Developer ID identity and a secure timestamp, then verify that the mounted app preserves the signed executable hash, both architecture-labelled CodeDirectory hashes, designated requirement, entitlements, and recorded resource manifest of the app that entered packaging:
 
 ```sh
 codesign --force --sign "$DEVELOPER_ID_APPLICATION" \
@@ -167,23 +174,38 @@ After stapling, compute the final SHA-256 and verify:
 - deployment target, `arm64` support, resources, localization, bundle ID, app/build versions, and login-item opt-in behavior;
 - checksum file syntax and recomputation;
 - an SBOM for the exact candidate;
-- GitHub artifact provenance/attestation bound to the exact final asset; and
+- three separate GitHub attestation bundles: final-DMG provenance, final-DMG SPDX 2.3 SBOM, and release-manifest provenance, each bound to its exact subject; and
 - tag, commit, workflow run, source tree, and artifact identity.
 
-Attach the signed/stapled DMG, checksum, SBOM, provenance/attestation, curated English/Korean notes, and sanitized evidence to a protected draft. The repository currently has no SBOM, attestation, or signed-release implementation, so none may be claimed yet.
+Attach exactly nine assets to the protected draft: the signed/stapled DMG, checksum, SPDX JSON, release manifest, sanitized notary result, sanitized notary log, DMG provenance bundle, DMG SBOM bundle, and release-manifest provenance bundle. Curated English/Korean notes are the Release body, not an asset. The local workspace contains proposed SBOM, attestation, and signed-release tooling, but it has not run with protected credentials or produced an accepted candidate; none of those outputs may be claimed yet.
 
-Download every proposed asset back through GitHub, recompute its hash, verify its signature and attestation, and compare it with the approved local candidate. Enable immutable-release behavior when available and compatible with the repository plan. Approval must be recorded before publication; no workflow may silently turn the current unsigned draft into a public release.
+Download all nine assets back through GitHub, require that no extra or missing asset exists, compare each byte-for-byte with the approved local candidate, recompute hashes, verify signatures, and verify all three attestation bundles. GitHub immutable releases are available to this repository and must be enabled before publication; the approval record must include a read-only confirmation of that setting. Approval must be recorded before publication, and no workflow may turn an unsigned artifact or a protected draft into a public release without that recorded approval.
 
 ## Clean-download public-beta gate
 
-Test the exact downloaded and quarantined candidate on a clean account or Mac without deleting quarantine metadata:
+Test the exact downloaded and quarantined candidate on a clean account or Mac without deleting or manufacturing quarantine metadata. Use [the release evidence template](RELEASE-EVIDENCE-TEMPLATE.md) for the lifecycle record and [the external beta template](EXTERNAL-BETA-REPORT-TEMPLATE.md) for each tester.
+
+The three external testers must obtain the final stapled DMG from the protected workflow artifact produced by the approved run. They must download the artifact archive through a normal browser, extract the DMG through the normal macOS path, and record the actual `com.apple.quarantine` value on the extracted DMG before opening it. A report does not count when that attribute is absent, was manually added, or was deleted. Testers need read access to the public repository and artifact, not push, release, environment, or secret access. Each report must verify the identical final DMG SHA-256 and the final-DMG provenance attestation bound to the protected workflow run.
+
+The lifecycle gate is itemized; one successful first launch cannot stand in for the other rows:
 
 1. Verify the published checksum before mounting.
 2. Confirm Gatekeeper identifies the Developer ID publisher and opens the app without an **Open Anyway** workaround.
-3. Verify first launch, menu-bar-only behavior, Capture → Edit → Review & Apply explanation, permissions, and login-at-launch default-off/explicit opt-in.
-4. Verify upgrade, schema migration, last-known-good backup recovery, import/export, diagnostics, uninstall, and optional local-data removal.
-5. Record Apple Silicon results. Do not advertise Intel until the physical Intel matrix passes.
-6. Collect at least three external clean-install beta results and resolve every P0/P1 issue before public approval.
+3. Verify first launch, menu-bar-only behavior, Capture → Edit → Review & Apply explanation, permissions, and launch-at-login default-off/explicit opt-in.
+4. Verify an upgrade from the recorded predecessor build preserves current schema-1 profiles, settings, selection, backups, and the login-item consent boundary. Record both build numbers and hashes.
+5. Verify a synthetic schema-0 document migrates to schema 1, remains semantically valid, and preserves a recoverable last-known-good backup without applying a system setting.
+6. With the app closed and only synthetic data present, exercise primary-file corruption and verify last-known-good backup recovery, quarantine behavior, and a clean relaunch. Do not upload raw profiles or diagnostics.
+7. Verify import replacement/no-overwrite export, diagnostics browse/refresh/clear, and denial isolation with redacted or synthetic values.
+8. Verify uninstall after disabling the optional login item, then separately verify optional removal of the app-owned Application Support data and preferences. Confirm exported files outside app storage are not silently deleted.
+9. Record Apple Silicon and macOS results. Do not advertise Intel until the physical Intel matrix passes.
+10. Collect at least three external clean-install beta results for the identical candidate and obtain the release-blocker sign-offs below before public approval.
+
+### Severity and zero-blocker sign-off
+
+- **P0 — stop/withdraw:** a credible security or privacy compromise, credential exposure, data loss, release-integrity failure, unsafe persistent system mutation, or failure that leaves the Mac without the documented recovery route. A P0 stops testing and publication immediately.
+- **P1 — release blocker:** the official candidate cannot install, upgrade, launch, migrate/recover profiles, uninstall safely, or complete the supported Capture → Edit → Review flow on supported Apple Silicon/macOS without a safe documented workaround; or rollback/safety state is materially misleading. A P1 blocks publication.
+
+The triager proposes severity from sanitized evidence. The maintainer owns the public product-severity decision; the security responder owns confidential security severity. The release approver must record both (a) a read-only query showing zero open public P0/P1 issues for the candidate and (b) a security-responder yes/no sign-off that no confidential P0/P1 release blocker remains. Do not publish private-report counts, titles, reporter identities, or details. Every P0/P1 must be closed by a new candidate or an explicitly verified non-code resolution before approval; re-labelling alone does not resolve it.
 
 No live display, audio, or network mutation is authorized by this distribution procedure. Hardware mutation evidence requires its own explicit approval, preflight snapshot, interactive action, and rollback procedure from the [support matrix](SUPPORT-MATRIX.md). Features without that evidence remain labelled mock verified, live-read verified, experimental, or unverified.
 
@@ -200,15 +222,15 @@ After that release:
 3. Verify clean `install`, `upgrade`, `uninstall`, and `zap` on supported macOS/Apple Silicon using the downloaded notarized artifact.
 4. Keep the official Homebrew Cask submission as a later milestone after the self-hosted tap and patch-release process are proven.
 
-Homebrew must not become a runtime dependency, and the app must not gain an updater or outbound network path.
+Homebrew must not become a runtime dependency, and the app must not gain an updater or outbound network path. `v0.1.0` publication may continue to say “Homebrew not offered”; however, the overall open-source release goal remains incomplete until the post-release own-tap `install`, `upgrade`, `uninstall`, and `zap` record passes against the canonical final SHA-256. Official Homebrew Cask submission remains a later non-goal.
 
 ## Release failure and support policy
 
-Never replace a published asset or move/reuse its tag to hide a problem. Mark the affected release as discontinued or affected, stop promotion/download links, and publish a corrected patch version through the full gate. The latest beta is supported; the immediately preceding beta may receive critical fixes for up to 30 days when practical. The stable support window is the latest and immediately preceding stable minor lines, as defined in [Compatibility and versioning](COMPATIBILITY.md).
+Never replace a published asset or move/reuse its tag to hide a problem. Mark the affected release as discontinued or affected, stop promotion/download links, and publish a corrected patch version through the full gate. Follow the [release incident runbook](RELEASE-INCIDENT-RUNBOOK.md), preserving the affected tag, all nine assets, hashes, and all three attestation bundles as evidence. The latest non-affected beta is the support target; the immediately preceding beta may receive critical fixes for up to 30 days when practical. The stable support window is the latest and immediately preceding stable minor lines, as defined in [Compatibility and versioning](COMPATIBILITY.md).
 
 ## Final release evidence checklist
 
-For each public release, record:
+For each public release, complete [the release evidence template](RELEASE-EVIDENCE-TEMPLATE.md) as the protected approval record and keep the curated English/Korean notes under [`docs/releases/`](releases/). Release notes are not evidence. At minimum, record:
 
 - tag, commit, app version, build number, clean-worktree status, and protected approval;
 - Xcode, Swift, SDK, runner macOS, supported CPU, and deployment target;
@@ -216,12 +238,14 @@ For each public release, record:
 - exact build/sign/package candidate lineage with no rebuild between stages;
 - Developer ID authority/Team ID, hardened runtime, secure timestamps, and reviewed entitlements;
 - notary submission ID, accepted status, redacted log, stapling, and app/DMG Gatekeeper assessments;
-- mounted package resources, checksum, SBOM, provenance/attestation, and re-downloaded asset identity;
-- clean-quarantine first launch, upgrade, migration/backup recovery, import/export, diagnostics, uninstall, and local-data removal;
-- external beta results and zero unresolved P0/P1 issues;
+- mounted package resources, checksum, SBOM, the three subject-specific attestation bundles, and exact nine-asset re-download identity;
+- browser-download and extracted-DMG quarantine evidence, clean first launch, login default-off, upgrade, schema migration, backup recovery, import/export, diagnostics, uninstall, and optional local-data removal as separate results;
+- three external beta reports bound to the identical final DMG SHA-256 and final-DMG provenance attestation, zero public P0/P1 issues, and confidential security-responder zero-blocker sign-off;
 - capability claims matched to the support matrix, with no Intel, hardware-mutation, or VoiceOver certification overclaim;
 - GitHub Release URL plus synchronized site, README, English/Korean notes, and support/security documents; and
-- Homebrew status, explicitly “not offered” until post-notarization verification.
+- immutable releases enabled before publication;
+- Homebrew status, explicitly “not offered” until the post-release own-tap `install`/`upgrade`/`uninstall`/`zap` record passes; and
+- explicit maintainer approval for the final artifact, tag, release notes, site, and each promotional post.
 
 Do not include personal device identifiers, real SSIDs, exact locations, IP host addresses, credentials, or unredacted diagnostics in release evidence.
 

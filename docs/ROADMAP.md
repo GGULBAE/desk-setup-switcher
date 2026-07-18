@@ -65,7 +65,7 @@ Remaining optional/manual evidence after the implementation milestone:
 - Perform a current-tree non-mutating English/Korean layout and keyboard walkthrough with synthetic data if a safe evidence path is available
 - Manually verify approval-required and failure/retry login-item states plus actual login-at-boot after a reboot
 - Complete the full English/Korean walkthrough
-- Run full VoiceOver, keyboard-only, focus, contrast, text-size, destructive-action, and permission-denial audits
+- Run keyboard-only, focused-control AX, contrast, text-size, destructive-action, and permission-denial audits. Full VoiceOver certification is excluded and unclaimed
 - Manually verify import/export replacement/no-overwrite and diagnostics clearing
 - Decide whether diagnostic export belongs in 0.1.0
 
@@ -97,7 +97,7 @@ Historical evidence: integrated non-live `make verify` passed on 2026-07-14 with
 
 Evidence: the [manual UI audit](MANUAL-UI-AUDIT-2026-07-14.md) records 16 PNGs and 16 nonempty read-only AX logs. The four current-source additions cover complete bilingual inline deletion/capture feedback and regular/minimum editor feedback layouts. Deterministic tests cover delete state/height, the responsive breakpoint, owned-window resizability/geometry, permission ordering, and synthetic system-access suppression. The [installed deletion/resize log](evidence/manual-ui-audit-2026-07-15/18-installed-delete-resize.txt) proves Esc/Cancel/Confirm, tray persistence, 980→680→980 selected/draft/disclosure/focus preservation, package replacement, and full store rollback. The earlier [permission-handoff log](evidence/manual-ui-audit-2026-07-14/13-installed-permission-handoff.txt) proves the status item, Capture explanation, and stable app System window. macOS resolved Location as already allowed, so the exact permission-result-card action and denied/granted TCC matrix remain pending.
 
-Full keyboard-only traversal, VoiceOver, real macOS text-size, TCC, login approval/retry/reboot, Keychain, Gatekeeper, physical Intel, import/export, and mutation/rollback evidence remains pending.
+Full keyboard-only traversal, focused-control AX observation, real macOS text-size, TCC, login approval/retry/reboot, Keychain, Gatekeeper, physical Intel, import/export, and mutation/rollback evidence remain pending. VoiceOver was unrun at that milestone; full VoiceOver certification is now excluded and unclaimed rather than tracked as pending work.
 
 ## M4.3 — Tray Surface Architecture v2 (locally verified; installed interaction pending)
 
@@ -109,7 +109,7 @@ Full keyboard-only traversal, VoiceOver, real macOS text-size, TCC, login approv
 
 Evidence: non-live `make verify` passed 326 default cases (130 XCTest + 196 Swift Testing, six opt-in skips), Swift Debug/Release, universal Xcode Debug/Release, Analyze, and mounted DMG verification. SHA-256 is `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`. The [Tray Surface v2 audit](TRAY-SURFACE-AUDIT-2026-07-15.md) records 12 detached-host PNGs and 12 read-only metadata files. It proves contained SwiftUI layout, localization, simulated large text, one high-contrast appearance, and privacy review; the detached host cannot prove actual popover chrome, arrow, anchor, material, ghost-frame absence, native dismissal timing, first responder, or full VoiceOver tree. The v2 package was not installed or launched, and earlier `MenuBarExtra` installed evidence is not reused.
 
-Remaining: user-driven installed status-item/popover interaction, complete keyboard/VoiceOver and real accessibility-setting walkthroughs, TCC, login approval/retry/reboot, Gatekeeper, physical Intel, import/export, Keychain, and every hardware mutation/rollback procedure.
+Remaining at that milestone: user-driven installed status-item/popover interaction, complete keyboard/focused-control AX and real accessibility-setting walkthroughs, TCC, login approval/retry/reboot, Gatekeeper, physical Intel, import/export, Keychain, and every hardware mutation/rollback procedure. Full VoiceOver certification is now excluded and unclaimed.
 
 ## M5 — Packaging and CI (P2 local package verified; historical CI green)
 
@@ -118,7 +118,7 @@ Remaining: user-driven installed status-item/popover interaction, complete keybo
 - Local post-fix DMG SHA-256 is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`
 - CI artifact ID `8249295840` verified CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`; the DMGs are not byte-for-byte reproducible
 - The artifact is correctly classified as no Developer ID and not notarized
-- CI and tag-triggered release workflows are implemented; CI passed for repair commit `4e45328`
+- CI passed for repair commit `4e45328`. The effective remote tag workflow remains an unsafe historical unsigned-publication path; the safer local signed-candidate draft/prerelease proposal is unpushed and neither path has produced public-beta distribution evidence
 - The historical header/editor follow-up `make verify` produced and verified a universal local DMG with SHA-256 `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`
 - UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967); unsigned artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`
 - The 2026-07-14 apply-reliability `make verify` produced and mounted its then-current universal package with SHA-256 `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`; this is historical package evidence
@@ -126,11 +126,11 @@ Remaining: user-driven installed status-item/popover interaction, complete keybo
 - The measured-height tray/responsive-settings follow-up `make verify` produced and mounted historical universal package SHA-256 `8bf4d547fae0df3cbe999db84e7be169b33d495b3993cf7c37f46ba37d6ea71d`; its executable matched the then-installed app byte-for-byte. The pre-correction package SHA-256 `8422b042b793bf0845ac56e2dcbd9808075a0467226d79ee65408440736648d8`, stable permission-handoff, and earlier checksums above are historical.
 - Tray Surface v2 supersedes that package. Its non-live gate produced and mounted universal SHA-256 `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`; installation, launch, push, and CI were not performed.
 - The 2026-07-17 native UI structural follow-up's integrated gate passed 446 checks (144 XCTest + 301 Swift Testing across 38 suites + one separately executed native `NSPopover` regression) and produced a mounted universal package with SHA-256 `82b05e6a3b1b20978c85c4d82d0976237a731c76c07bcd7d1729a84e3e0b6f21`. That package was reinstalled to `/Applications` for the separately authorized non-mutating UI geometry follow-up; it is now preceding evidence.
-- The P2 UI refinement final local gate passed 461 checks: 144 XCTest, 316 Swift Testing across 39 suites, and one isolated native popover regression. Its universal no-Developer-ID DMG SHA-256 is `342d804d8bbff51209af4bccefb405ee76499050c1e640a011d41e2f78792031`; the reinstalled ad-hoc-signed `/Applications` executable SHA-256 is `fb35352fb6a9588c0c50269975ccd3d7b73e52010de10de132bf45d60236f719`. The app launched with `x86_64 arm64`, and profile primary/backup/defaults remained unchanged. Preceding hashes must not be reused. Push and CI were not requested by the local P2 goal.
+- The P2 UI refinement final local gate passed 461 checks: 144 XCTest, 316 Swift Testing across 39 suites, and one isolated native popover regression. Its universal no-Developer-ID DMG SHA-256 is `342d804d8bbff51209af4bccefb405ee76499050c1e640a011d41e2f78792031`; the reinstalled ad-hoc-signed `/Applications` executable SHA-256 is `fb35352fb6a9588c0c50269975ccd3d7b73e52010de10de132bf45d60236f719`. The app launched on Apple Silicon, the installed executable contained `x86_64 arm64`, the x86_64 slice was not run, and profile primary/backup/defaults remained unchanged. Preceding hashes must not be reused. Push and CI were not requested by the local P2 goal.
 
 Remaining:
 
-- Perform a quarantined Gatekeeper/Open Anyway install on a clean user account or Mac
+- Perform an exact downloaded/quarantined Gatekeeper install on a clean user account or Mac; an official candidate must open without **Open Anyway**
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
@@ -217,7 +217,7 @@ No installed-app launch, live hardware mutation, TCC action, Keychain write, UI 
 - The final integrated gate passes 446 checks: 144 XCTest cases, 301 Swift Testing cases across 38 suites, and one separately executed native `NSPopover` regression. All build/Analyze/package/mount stages pass for `x86_64 arm64`; DMG SHA-256 is `82b05e6a3b1b20978c85c4d82d0976237a731c76c07bcd7d1729a84e3e0b6f21`.
 - A separately authorized follow-up reinstalls the package to `/Applications` and verifies executable SHA-256 `40876bd671dd4286fa4684192097f6dbd702df899bccf8efb588b244c3d27305`. Twenty measured popover opens have exact center delta `0`; Settings clamps `500×300` to `680×480` and retains `900×568` across ten normal opens; workflow clamps `500×300` to `520×392`, initially frames at `620×532` with `620×500` content, and closes with Escape.
 
-The installed follow-up invoked no Apply, Capture, TCC, login-item, or system-setting mutation. Full VoiceOver use, focused-control AX observation, push, CI, tag, notarization, and publication remain outside the completed evidence.
+The installed follow-up invoked no Apply, Capture, TCC, login-item, or system-setting mutation. Focused-control AX observation, push, CI, tag, notarization, and publication remain outside the completed evidence. VoiceOver was not run; full VoiceOver certification is excluded and unclaimed.
 
 ## M4.11 — bounded P2 UI refinement (completed locally)
 
@@ -232,7 +232,7 @@ The installed follow-up invoked no Apply, Capture, TCC, login-item, or system-se
 
 The P2 pass does not include profile-store path hardening, Apply/Capture execution, TCC, login approval/retry/reboot, Gatekeeper, physical Intel, diagnostics clearing, import/export interaction, or ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 mutation. Complete keyboard traversal and focused-control AX observation remain separate nonblocking manual evidence; full-app VoiceOver certification is excluded and unclaimed.
 
-Release publication, push, Gatekeeper, physical Intel, optional full VoiceOver evidence, required TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+Release publication, push, Gatekeeper, physical Intel, required TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md). Full VoiceOver certification is excluded and unclaimed, not a deferred release task.
 
 ## M6 — Open-source public beta release (public surface locally verified; publication pending)
 
@@ -242,22 +242,25 @@ Baseline completed locally:
 
 - Harden profile storage and import against traversal, symlinks, non-regular files, wrong ownership, oversized inputs, source replacement, and tested file-identity/TOCTOU races. Descriptor-bound reads, identity-bound quarantine/permission repair, and durable staging preserve fail-closed behavior without turning unrelated permission denial into an application-wide failure.
 - Make launch at login explicitly opt-in. Reset the unverifiable pre-release automatic-registration state, remove stale registration, and preserve subsequent user choices with a versioned consent marker.
-- Add a full-history public-release audit for credential patterns, concrete personal home paths, current-tree placeholders, and historical PNG/JPEG/ICNS metadata; run it from full-history CI.
+- Add a full-history public-release audit for credential patterns, concrete personal home paths, current-tree placeholders, and historical PNG/JPEG/ICNS metadata; configure the unpushed local CI definition to run it from a full-history checkout.
 - Freeze the public-beta compatibility boundary in policy documentation: bundle and Keychain identities, SemVer/build/schema behavior, macOS baseline, initial Apple Silicon support, and internal/unstable Swift library products.
-- Add support, governance, compatibility, security, privacy, contribution, and distribution guidance. The tag workflow is limited to an unsigned **draft prerelease candidate** and cannot publish a public release.
+- Add support, governance, compatibility, security, privacy, contribution, and distribution guidance. The local proposed manual signed-candidate workflow is limited to a Developer ID/notarized/stapled **draft prerelease**, attestations, draft redownload verification, and a workflow artifact; it is unpushed and unproven with credentials. The effective remote workflow remains unsafe for any release tag and must be replaced before release work begins.
 - Fail closed on missing/non-integral profile schema versions, nil included ColorSync values, and snapshot capability-group mismatches without blocking unrelated snapshot groups. Preserve only the explicit schema 0→1 migration.
 - Remove runtime coordinate collection/cache and its Settings refresh surface. Location authorization now exists only to read the current Wi-Fi SSID during an explicit Capture; imported location conditions remain dormant schema data.
 - Prepare the user-facing public surface locally: rewritten README, English/Korean user guides, profile-schema and adapter-contract references, launch copy, synthetic screenshots, silent captioned demo, deterministic social preview, asset provenance, and the bilingual static site.
 - Verify the site's privacy boundary locally: no project analytics, client tracking, project-set cookies, account, database, object storage, service binding, or download; disclose hosting-provider aggregate operations and the two pinned tab-scoped vinext router guards instead of claiming that no provider processing exists.
-- Pass integrated non-live `make verify` on 2026-07-18 with 501 checks: 178 XCTest, 322 default Swift Testing cases across 39 suites, and one isolated native popover case in a 40th Swift Testing suite. The unsigned development-evidence DMG SHA-256 is `b4492821a3734d343e14b227999783df8966cb7412bb7511062dd3d52f2a674b`.
+- Pass integrated non-live `make verify` on 2026-07-18 with 839 deterministic checks/assertions: 501 app checks (178 XCTest, 322 default Swift Testing cases across 39 suites, and one isolated native popover case in a 40th Swift Testing suite) plus 338 release-tooling assertions (310 Ruby policy and 28 shell guard assertions). The unsigned development-evidence DMG SHA-256 is `d693985760aaf81c4f6bc19ecf6b2c252d72c84cfa052257b3f7d4d2d35ee632`; the release assertions do not prove a real credentialed signing/notarization run.
 - Pass the local site build/lint/rendered-HTML tests, pinned dependency audit, public-asset checksum/metadata/video/caption checks, complete-history public-release audit, and integrated diff checks. No site, tag, release, or promotional post was published.
+- Add an itemized [release evidence template](RELEASE-EVIDENCE-TEMPLATE.md), [external beta report](EXTERNAL-BETA-REPORT-TEMPLATE.md), curated English/Korean [`v0.1.0` notes](releases/v0.1.0.md), and immutable [incident/patch runbook](RELEASE-INCIDENT-RUNBOOK.md). The templates define required proof, while the notes contain copy only; neither makes a pending gate pass.
 
 Mandatory gates before public v0.1.0:
 
-- Produce one canonical Developer ID/hardened-runtime build, signed DMG, accepted notarization log, stapled artifact, app-and-DMG Gatekeeper validation, checksum, SBOM, attestation/provenance, and redownload verification.
-- Protect the remote release environment and default branch, enable the intended vulnerability-reporting/support settings, and verify that no workflow can bypass human publication approval.
+- Produce one canonical Developer ID/hardened-runtime build with unchanged signed-app identity through packaging, signed DMG, accepted notarization log, stapled artifact, app-and-DMG Gatekeeper validation, checksum, SBOM, attestation/provenance, and redownload verification.
+- Replace the effective remote unsigned-publication workflow, protect the release environment/default branch/release tags, enable immutable releases and private vulnerability reporting, and verify that no workflow can bypass human publication approval.
 - Merge the locally reviewed guides, support/security routes, and provenance-reviewed media before deploying the bilingual site; set approved canonical HTTPS/release URLs, complete a bounded manual browser and final bilingual-copy pass, then verify every public link from a clean session.
-- Complete clean quarantined installation evidence and three external Apple Silicon beta passes with no open P0/P1 issue. Intel remains unclaimed until physical verification exists.
+- Complete separate exact-candidate evidence for browser download and real extracted-DMG quarantine, Gatekeeper without Open Anyway, first launch/login default-off, upgrade, schema 0→1 migration, backup recovery, import/export, diagnostics, uninstall, and optional app-owned data removal.
+- Complete three external Apple Silicon beta reports downloaded from the protected workflow artifact, all bound to the identical final DMG SHA-256 and final-DMG provenance attestation, with zero public P0/P1 issues and a confidential security-responder zero-blocker sign-off. Intel remains unclaimed until physical verification exists.
 - Obtain the user's explicit approval for the final artifact, tag, release notes, site publication, and promotional posts. Until then, this milestone is **not a public release**.
+- After the canonical GitHub Release exists, pass project-owned Homebrew tap `install`, `upgrade`, `uninstall`, and `zap` against its exact final SHA-256. Official Homebrew Cask submission remains a later milestone.
 
 Full VoiceOver certification is intentionally excluded from this release goal and is not claimed. The bounded accessibility contract remains localized keyboard behavior, accessible names/values/help where implemented, and non-color state cues; full VoiceOver/rotor evidence may be pursued independently without blocking v0.1.0.

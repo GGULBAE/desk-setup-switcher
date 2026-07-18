@@ -73,13 +73,16 @@ byte identity.
 
 The local surface passed:
 
-- repository-wide non-live `make verify`: 501 checks—178 XCTest, 322 default
-  Swift Testing cases across 39 suites, and one isolated native popover case in
-  a 40th Swift Testing suite—plus lint/localization policy, Swift and universal
-  Xcode Debug/Release, Analyze, DMG/checksum, mounted resources/architectures,
-  and ad-hoc/no-Developer-ID classification;
+- repository-wide non-live `make verify`: 839 deterministic checks/assertions—
+  501 app checks (178 XCTest, 322 default Swift Testing cases across 39 suites,
+  and one isolated native popover case in a 40th Swift Testing suite) plus 338
+  release-tooling assertions (310 Ruby policy and 28 shell guard assertions)—
+  plus lint/localization policy, Swift and universal Xcode Debug/Release,
+  Analyze, DMG/checksum, mounted resources/architectures, and
+  ad-hoc/no-Developer-ID classification; the release assertions are simulated
+  and do not prove a credentialed signing/notarization run;
 - unsigned development-package verification at SHA-256
-  `b4492821a3734d343e14b227999783df8966cb7412bb7511062dd3d52f2a674b`;
+  `d693985760aaf81c4f6bc19ecf6b2c252d72c84cfa052257b3f7d4d2d35ee632`;
 - `npm run verify` in `site/`: static build, lint, server-rendered HTML tests,
   no-cookie assertion, application-source tracking/storage scan, a built-client
   gate that allows only vinext's two named navigation/reload guards, disabled

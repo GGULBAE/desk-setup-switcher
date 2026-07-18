@@ -1,0 +1,30 @@
+{
+  "name": "DeskSetupSwitcher",
+  "dependencies": [
+    {
+      "sourceControl": [
+        {
+          "identity": "synthetic-third-party",
+          "location": {
+            "remote": [
+              {
+                "urlString": "https://example.invalid/synthetic-third-party.git"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "products": [
+    {
+      "name": "DeskSetupSwitcher"
+    }
+  ],
+  "targets": [
+    {
+      "name": "DeskSetupSwitcher",
+      "dependencies": []
+    }
+  ]
+}

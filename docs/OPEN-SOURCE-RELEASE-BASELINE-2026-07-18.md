@@ -2,6 +2,8 @@
 
 Date: 2026-07-18
 
+> **Superseded audit snapshot:** This document preserves the first local baseline at its audit point; it is not the current release-status ledger. In particular, the CI/release-workflow bullets below describe an unpushed local proposal, while the workflow effective on `origin/master` still exposes an unsigned public-release path for `v*` tags. Use [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [DISTRIBUTION.md](DISTRIBUTION.md) for the current mandatory boundary. No release tag may be pushed until the remote path and protections are replaced and verified.
+
 ## Outcome
 
 The first local open-source release baseline is complete. This pass hardened profile storage and import boundaries, changed launch at login to explicit opt-in, added complete-history and image-metadata auditing, and made the repository's support, security, compatibility, governance, and distribution claims internally consistent.
@@ -66,8 +68,8 @@ Accepted P2 boundaries are intentionally recorded rather than hidden:
 ### Repository and release controls
 
 - `make audit-public-release` now requires complete Git history and inspects historical source paths plus PNG, JPEG, and icon metadata for high-confidence credential and personal-path patterns without printing matched secret values.
-- CI fetches full history and runs the public-release audit.
-- The current tag workflow is constrained to an unsigned **draft prerelease candidate** in the named `release` environment. It cannot create a supported or canonical release.
+- The local CI proposal fetches full history and runs the public-release audit; it was not yet effective on the remote default branch at this snapshot.
+- The then-local tag-workflow proposal was constrained to an unsigned **draft prerelease candidate** in the named `release` environment. It was not the effective remote workflow and could not establish a supported or canonical release. The effective `origin/master` workflow, inspected read-only on 2026-07-18, can publish an unsigned Release from a `v*` tag and remains a publication blocker.
 - Support, security, privacy, governance, compatibility, contribution, and distribution documents now state the same public-beta boundary.
 
 The 2026-07-18 read-only repository-settings review found that the actual `release` environment, default-branch protection, and private vulnerability reporting are not configured. Workflow YAML does not substitute for those controls. They remain publication blockers.

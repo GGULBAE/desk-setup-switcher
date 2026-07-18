@@ -1,0 +1,12 @@
+Executable=/synthetic/Desk Setup Switcher.app/Contents/MacOS/DeskSetupSwitcher
+Identifier=com.example.DeskSetupSwitcher
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20500 size=1246 flags=0x10000(runtime) hashes=28+7 location=embedded
+Signature size=9046
+Authority=Developer ID Application: Synthetic Maintainer (ABCDE12345)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+Timestamp=Jul 18, 2026 at 12:00:00 PM
+Info.plist entries=24
+TeamIdentifier=ABCDE12345
+CDHash=0123456789abcdef0123456789abcdef01234567

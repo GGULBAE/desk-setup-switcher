@@ -2,7 +2,7 @@
 
 Desk Setup Switcher is a local-only macOS menu-bar app for saving selected display, audio, and network settings as profiles. Capture what is connected, keep only the settings you want, review the exact plan, and apply it only when you choose.
 
-> **Release status:** there is no supported public download yet. The repository and CI produce development-only, ad-hoc-signed artifacts. The first supported download will be a signed and notarized DMG published on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after the public-beta gates pass.
+> **Release status:** there is no supported public download yet. Contributor builds and ordinary CI produce development-only, ad-hoc-signed artifacts. The release-only signed-candidate path is not operational until its protected environment, credentials, repository protections, and credentialed verification are configured and recorded. Do not create a `v*` tag before the [completion ledger](docs/COMPLETION-CRITERIA.md) closes that gate. The first supported download will be a signed and notarized DMG published on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after every public-beta gate passes.
 
 [English user guide](docs/guides/USER-GUIDE.md) · [한국어 사용자 가이드](docs/guides/USER-GUIDE.ko.md) · [Support matrix](docs/SUPPORT-MATRIX.md)
 

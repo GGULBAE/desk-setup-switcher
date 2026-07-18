@@ -1,0 +1,15 @@
+{
+  "name": "DeskSetupSwitcher",
+  "dependencies": [],
+  "products": [
+    {
+      "name": "DeskSetupSwitcher"
+    }
+  ],
+  "targets": [
+    {
+      "name": "DeskSetupSwitcher",
+      "dependencies": []
+    }
+  ]
+}

@@ -1,40 +1,144 @@
-name: Release
+name: Signed release candidate
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag (v0.1.0)"
+        required: true
+        type: string
+      expected_commit:
+        description: "Exact lowercase 40-character commit SHA referenced by the tag"
+        required: true
+        type: string
+      confirmation:
+        description: "Type exactly: prepare signed draft v0.1.0"
+        required: true
+        type: string
 
-permissions:
-  contents: write
+# Every token capability is granted only to the protected candidate job below.
+permissions: {}
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: signed-release-candidate-${{ inputs.tag }}
   cancel-in-progress: false
 
 jobs:
-  unsigned-candidate:
-    name: Verify unsigned release candidate
+  signed-draft:
+    name: Build and verify signed draft
     runs-on: macos-15
-    timeout-minutes: 45
-    environment: release
+    timeout-minutes: 90
+    environment: release-candidate
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+      RELEASE_PROTECTED_ENVIRONMENT: release-candidate
+      DESK_SETUP_RELEASE_MUTATIONS: "1"
+      RELEASE_NOTES_PATH: docs/releases/v0.1.0.md
+      RELEASE_SOURCE_DIR: artifacts/release
+      RELEASE_DOWNLOAD_DIR: .build/release-download
+      RELEASE_DMG_PATH: artifacts/release/Desk-Setup-Switcher-0.1.0.dmg
+      RELEASE_CHECKSUM_PATH: artifacts/release/Desk-Setup-Switcher-0.1.0.dmg.sha256
+      RELEASE_SBOM_PATH: artifacts/release/Desk-Setup-Switcher-0.1.0.spdx.json
+      RELEASE_MANIFEST_PATH: artifacts/release/release-manifest.json
+      RELEASE_NOTARY_RESULT_PATH: artifacts/release/notary-result.json
+      RELEASE_NOTARY_LOG_PATH: artifacts/release/notary-log.json
+      RELEASE_PROVENANCE_BUNDLE_PATH: artifacts/release/Desk-Setup-Switcher-0.1.0.provenance.sigstore.json
+      RELEASE_SBOM_BUNDLE_PATH: artifacts/release/Desk-Setup-Switcher-0.1.0.sbom.sigstore.json
+      RELEASE_MANIFEST_BUNDLE_PATH: artifacts/release/release-manifest.provenance.sigstore.json
+      RELEASE_SIGNING_KEYCHAIN: ${{ runner.temp }}/desk-setup-release.keychain-db
+
     steps:
-      - name: Check out repository
+      - name: Validate manual tag dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$RELEASE_CONFIRMATION" != "prepare signed draft $RELEASE_TAG" ]]; then
+            echo "::error::The signed-draft confirmation phrase does not match." >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_TAG" != "v0.1.0" ]]; then
+            echo "::error::This workflow is pinned to release tag v0.1.0." >&2
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::expected_commit must be an exact lowercase 40-character commit SHA." >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF_TYPE" != "tag" || "$GITHUB_REF" != "refs/tags/$RELEASE_TAG" || "$GITHUB_REF_NAME" != "$RELEASE_TAG" ]]; then
+            echo "::error::Run this workflow from the existing $RELEASE_TAG tag ref, not from a branch." >&2
+            exit 1
+          fi
+
+      - name: Check out the existing release tag
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          ref: ${{ inputs.tag }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Show toolchain
+      - name: Bind tag, checkout, and expected commit
+        shell: bash
         run: |
-          uname -m
-          swift --version
-          xcodebuild -version
+          set -euo pipefail
 
-      - name: Check tag matches bundle version
+          git check-ref-format --allow-onelevel "$RELEASE_TAG" >/dev/null
+          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
+          tag_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          checkout_commit="$(git rev-parse HEAD)"
+          if [[ "$tag_commit" != "$EXPECTED_COMMIT" || "$checkout_commit" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::The tag, checked-out commit, and expected_commit input do not identify the same commit." >&2
+            exit 1
+          fi
+          if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+            echo "::error::The release checkout is not clean." >&2
+            exit 1
+          fi
+
+      - name: Require protected release configuration
+        shell: bash
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_NOTARY_KEY_ID: ${{ vars.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ vars.APPLE_NOTARY_ISSUER_ID }}
+          DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          APPLE_NOTARY_API_KEY_BASE64: ${{ secrets.APPLE_NOTARY_API_KEY_BASE64 }}
         run: |
-          source scripts/lib/common.sh
-          test "$GITHUB_REF_NAME" = "v$VERSION"
+          set -euo pipefail
+
+          required_names=(
+            DEVELOPER_ID_APPLICATION
+            APPLE_TEAM_ID
+            APPLE_NOTARY_KEY_ID
+            APPLE_NOTARY_ISSUER_ID
+            DEVELOPER_ID_CERTIFICATE_BASE64
+            DEVELOPER_ID_CERTIFICATE_PASSWORD
+            APPLE_NOTARY_API_KEY_BASE64
+          )
+          for name in "${required_names[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Required protected release value $name is not configured." >&2
+              exit 1
+            fi
+          done
+
+      - name: Run release preflight
+        shell: bash
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_NOTARY_KEY_ID: ${{ vars.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ vars.APPLE_NOTARY_ISSUER_ID }}
+        run: make release-preflight
 
       - name: Run complete verification
         run: make verify
@@ -42,15 +146,229 @@ jobs:
       - name: Audit public release history and assets
         run: make audit-public-release
 
-      - name: Create draft GitHub release candidate
+      - name: Import Developer ID signing certificate
+        shell: bash
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: scripts/release/import-signing-certificate.sh
+
+      - name: Build, sign, notarize, and staple the release candidate
+        shell: bash
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_NOTARY_KEY_ID: ${{ vars.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ vars.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_API_KEY_BASE64: ${{ secrets.APPLE_NOTARY_API_KEY_BASE64 }}
+        run: make release-candidate
+
+      - name: Remove the signing identity immediately
+        shell: bash
+        run: scripts/release/cleanup-signing-keychain.sh
+
+      - name: Require the exact signed candidate outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! -s "$RELEASE_NOTES_PATH" || -L "$RELEASE_NOTES_PATH" ]] \
+            || [[ "$(git ls-files -- "$RELEASE_NOTES_PATH")" != "$RELEASE_NOTES_PATH" ]]; then
+            echo "::error::Curated release notes must be one nonempty tracked regular file." >&2
+            exit 1
+          fi
+          required_files=(
+            "$RELEASE_DMG_PATH"
+            "$RELEASE_CHECKSUM_PATH"
+            "$RELEASE_SBOM_PATH"
+            "$RELEASE_MANIFEST_PATH"
+            "$RELEASE_NOTARY_RESULT_PATH"
+            "$RELEASE_NOTARY_LOG_PATH"
+          )
+          for path in "${required_files[@]}"; do
+            if [[ ! -f "$path" || -L "$path" ]]; then
+              echo "::error::Required regular release file is missing: $path" >&2
+              exit 1
+            fi
+          done
+          if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+            echo "::error::Release tooling changed the source checkout." >&2
+            exit 1
+          fi
+
+      - name: Attest exact DMG build provenance
+        id: provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: ${{ env.RELEASE_DMG_PATH }}
+
+      - name: Attest exact DMG SBOM
+        id: sbom-attestation
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: ${{ env.RELEASE_DMG_PATH }}
+          sbom-path: ${{ env.RELEASE_SBOM_PATH }}
+
+      - name: Attest the exact release evidence manifest
+        id: manifest-attestation
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: ${{ env.RELEASE_MANIFEST_PATH }}
+
+      - name: Preserve attestation bundles as exact assets
+        shell: bash
+        env:
+          PROVENANCE_BUNDLE_SOURCE: ${{ steps.provenance.outputs.bundle-path }}
+          SBOM_BUNDLE_SOURCE: ${{ steps.sbom-attestation.outputs.bundle-path }}
+          MANIFEST_BUNDLE_SOURCE: ${{ steps.manifest-attestation.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+
+          for source in "$PROVENANCE_BUNDLE_SOURCE" "$SBOM_BUNDLE_SOURCE" "$MANIFEST_BUNDLE_SOURCE"; do
+            if [[ ! -f "$source" || -L "$source" ]]; then
+              echo "::error::An attestation action did not return one regular bundle file." >&2
+              exit 1
+            fi
+          done
+          cp -- "$PROVENANCE_BUNDLE_SOURCE" "$RELEASE_PROVENANCE_BUNDLE_PATH"
+          cp -- "$SBOM_BUNDLE_SOURCE" "$RELEASE_SBOM_BUNDLE_PATH"
+          cp -- "$MANIFEST_BUNDLE_SOURCE" "$RELEASE_MANIFEST_BUNDLE_PATH"
+          chmod 0644 \
+            "$RELEASE_PROVENANCE_BUNDLE_PATH" \
+            "$RELEASE_SBOM_BUNDLE_PATH" \
+            "$RELEASE_MANIFEST_BUNDLE_PATH"
+
+      - name: Create draft prerelease with the exact asset set
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            artifacts/*.dmg \
-            artifacts/*.sha256 \
+          set -euo pipefail
+
+          require_remote_tag_commit() {
+            local tag_ref remote_refs peeled direct remote_commit
+            tag_ref="refs/tags/$RELEASE_TAG"
+            remote_refs="$(git ls-remote --exit-code --tags origin "$tag_ref" "$tag_ref^{}")" || {
+              echo "::error::The existing release tag could not be read from origin." >&2
+              exit 1
+            }
+            peeled="$(printf '%s\n' "$remote_refs" | awk -v ref="$tag_ref^{}" '$2 == ref { print $1 }')"
+            direct="$(printf '%s\n' "$remote_refs" | awk -v ref="$tag_ref" '$2 == ref { print $1 }')"
+            remote_commit="${peeled:-$direct}"
+            if [[ ! "$remote_commit" =~ ^[0-9a-f]{40}$ || "$remote_commit" != "$EXPECTED_COMMIT" ]]; then
+              echo "::error::The remote release tag does not resolve uniquely to EXPECTED_COMMIT." >&2
+              exit 1
+            fi
+          }
+
+          require_remote_tag_commit
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::A GitHub Release already exists for $RELEASE_TAG; refusing to replace or mutate it." >&2
+            exit 1
+          fi
+
+          release_assets=(
+            "$RELEASE_DMG_PATH"
+            "$RELEASE_CHECKSUM_PATH"
+            "$RELEASE_SBOM_PATH"
+            "$RELEASE_MANIFEST_PATH"
+            "$RELEASE_NOTARY_RESULT_PATH"
+            "$RELEASE_NOTARY_LOG_PATH"
+            "$RELEASE_PROVENANCE_BUNDLE_PATH"
+            "$RELEASE_SBOM_BUNDLE_PATH"
+            "$RELEASE_MANIFEST_BUNDLE_PATH"
+          )
+          for path in "${release_assets[@]}"; do
+            if [[ ! -f "$path" || -L "$path" ]]; then
+              echo "::error::Exact release asset is missing or is not a regular file: $path" >&2
+              exit 1
+            fi
+          done
+
+          gh release create "$RELEASE_TAG" \
+            "${release_assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
             --draft \
             --prerelease \
-            --generate-notes \
             --verify-tag \
-            --title "Desk Setup Switcher $GITHUB_REF_NAME (unsigned candidate)"
+            --notes-file "$RELEASE_NOTES_PATH" \
+            --title "Desk Setup Switcher $RELEASE_TAG signed candidate"
+
+          release_state="$(gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json tagName,isDraft,isPrerelease \
+            --jq '[.tagName, (.isDraft | tostring), (.isPrerelease | tostring)] | @tsv')"
+          if [[ "$release_state" != "$RELEASE_TAG"$'\t'true$'\t'true ]]; then
+            echo "::error::The created release is not the expected draft prerelease." >&2
+            exit 1
+          fi
+          require_remote_tag_commit
+
+      - name: Redownload and verify the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          rm -rf -- "$RELEASE_DOWNLOAD_DIR"
+          mkdir -p "$RELEASE_DOWNLOAD_DIR"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$RELEASE_DOWNLOAD_DIR"
+
+          expected_assets="$RUNNER_TEMP/expected-release-assets.txt"
+          actual_assets="$RUNNER_TEMP/actual-release-assets.txt"
+          printf '%s\n' \
+            "$(basename "$RELEASE_DMG_PATH")" \
+            "$(basename "$RELEASE_CHECKSUM_PATH")" \
+            "$(basename "$RELEASE_SBOM_PATH")" \
+            "$(basename "$RELEASE_MANIFEST_PATH")" \
+            "$(basename "$RELEASE_NOTARY_RESULT_PATH")" \
+            "$(basename "$RELEASE_NOTARY_LOG_PATH")" \
+            "$(basename "$RELEASE_PROVENANCE_BUNDLE_PATH")" \
+            "$(basename "$RELEASE_SBOM_BUNDLE_PATH")" \
+            "$(basename "$RELEASE_MANIFEST_BUNDLE_PATH")" \
+            | LC_ALL=C sort >"$expected_assets"
+          find "$RELEASE_DOWNLOAD_DIR" -mindepth 1 -maxdepth 1 -type f -exec basename {} \; \
+            | LC_ALL=C sort >"$actual_assets"
+          if ! cmp -s "$expected_assets" "$actual_assets"; then
+            echo "::error::Downloaded draft assets do not match the exact candidate asset list." >&2
+            exit 1
+          fi
+
+          make verify-downloaded-release
+
+      - name: Retain the verified signed candidate bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desk-setup-switcher-v0.1.0-signed-candidate
+          path: |
+            artifacts/release/Desk-Setup-Switcher-0.1.0.dmg
+            artifacts/release/Desk-Setup-Switcher-0.1.0.dmg.sha256
+            artifacts/release/Desk-Setup-Switcher-0.1.0.spdx.json
+            artifacts/release/release-manifest.json
+            artifacts/release/notary-result.json
+            artifacts/release/notary-log.json
+            artifacts/release/Desk-Setup-Switcher-0.1.0.provenance.sigstore.json
+            artifacts/release/Desk-Setup-Switcher-0.1.0.sbom.sigstore.json
+            artifacts/release/release-manifest.provenance.sigstore.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Clean release credentials and temporary state
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -x scripts/release/cleanup-signing-keychain.sh ]]; then
+            scripts/release/cleanup-signing-keychain.sh
+          fi
+          if [[ -d "$RELEASE_DOWNLOAD_DIR" ]]; then
+            rm -rf -- "$RELEASE_DOWNLOAD_DIR"
+          fi

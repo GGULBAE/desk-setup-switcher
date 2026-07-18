@@ -5,7 +5,7 @@ source "$(dirname "$0")/lib/common.sh"
 
 cd "$ROOT_DIR"
 
-for script in scripts/*.sh scripts/lib/*.sh; do
+for script in scripts/*.sh scripts/lib/*.sh scripts/release/*.sh; do
     bash -n "$script"
     [[ -x "$script" ]] || {
         echo "Script is not executable: $script" >&2
@@ -17,6 +17,13 @@ ruby -c scripts/generate-xcode-project.rb >/dev/null
     echo "Script is not executable: scripts/generate-xcode-project.rb" >&2
     exit 1
 }
+for ruby_script in scripts/release/*.rb; do
+    ruby -c "$ruby_script" >/dev/null
+    [[ -x "$ruby_script" ]] || {
+        echo "Script is not executable: $ruby_script" >&2
+        exit 1
+    }
+done
 
 swift format lint --recursive --strict Sources Tests Package.swift
 swift package dump-package | ruby -rjson -e '
@@ -29,6 +36,7 @@ swift package dump-package | ruby -rjson -e '
 ' "$MINIMUM_SYSTEM_VERSION" "$EXECUTABLE_NAME"
 ruby scripts/generate-xcode-project.rb --check
 plutil -lint Config/Info.plist
+plutil -lint Config/ReleaseEntitlements.plist
 for strings_file in Sources/DeskSetupSwitcher/Resources/{en,ko}.lproj/{InfoPlist,Localizable}.strings; do
     plutil -lint "$strings_file"
 done
