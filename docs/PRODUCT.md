@@ -2,7 +2,7 @@
 
 ## Status
 
-Desk Setup Switcher is a pre-release 0.1.0 implementation candidate. The current settings-lifecycle and UI-declutter refactor passed integrated non-live `make verify` on 2026-07-16 with 401 default cases (144 XCTest plus 257 Swift Testing), zero failures, lint, Swift and universal Xcode Debug/Release, Analyze, and mounted package/checksum verification. The current DMG SHA-256 is `f3aa610026179161208dec2cb2ef6185768843becd8e0e56bccc9f8abab37f2b`; it is universal and ad-hoc signed without Developer ID and was not installed or launched. This is not a public release or mutation proof: actual corrected click-through, live setting mutation, physical Intel, live Keychain write, full VoiceOver/TCC audit, and quarantined Gatekeeper remain unverified. See [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+Desk Setup Switcher is an unreleased `0.1.0` open-source public-beta candidate. The 2026-07-18 baseline passed integrated non-live `make verify` with 496 checks (173 XCTest, 322 Swift Testing across 40 suites, and one isolated native popover regression), plus lint, Swift and universal Xcode Debug/Release, Analyze, project-generation, and mounted package/checksum verification. The current development-only DMG SHA-256 is `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`; it is universal and ad-hoc signed without Developer ID and was not installed or launched. This is not a public release or mutation proof. Signing/notarization, quarantined Gatekeeper, clean external beta, physical Intel, live setting mutation, live Keychain write, and the permission matrix remain unverified. Full-app VoiceOver certification is excluded from the release goal and is not claimed. See [OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md](OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md), [COMPLETION-CRITERIA.md](COMPLETION-CRITERIA.md), and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
 ## Product promise
 
@@ -25,12 +25,12 @@ The current visible surface covers displays, audio, and service-specific network
 
 ### First launch
 
-1. The app launches as an accessory app, shows only a menu-bar item, and attempts to enable its `SMAppService` login item.
+1. The app launches as an accessory app, shows only a menu-bar item, and leaves its `SMAppService` login item disabled until the user explicitly enables it in Settings.
 2. It performs a read-only capability and system snapshot.
 3. If there are no profiles, it offers to create one from that snapshot.
 4. Permission-dependent values are explained before a prompt and appear as unavailable when permission is declined.
 
-The fresh final-DMG install launched background-only/menu-bar-only. Default-on `SMAppService` registration succeeded; UI opt-out disabled it and re-enable restored enabled status, followed by a final opted-out cleanup. Approval-required and failure/retry states plus actual login-at-boot after a reboot remain unverified.
+A historical pre-release DMG launched background-only/menu-bar-only, and its then-default-on registration was manually disabled during cleanup. That behavior is superseded: the current baseline resets unproven pre-release registration state to off and preserves only settings recorded after explicit consent. Fresh-off, opt-in, opt-out, consent migration, and approval states are mock verified; no live login-item change or login-at-boot test ran in this pass.
 
 ### Create and manage a profile
 
@@ -96,13 +96,13 @@ The schema can decode and round-trip display, audio input/output, USB/hardware p
 
 The menu and settings window provide VoiceOver labels, keyboard shortcuts, non-color status cues, actionable error copy, and confirmation for destructive or risky actions. Current source includes distinct labels/values for inclusion versus target state, field identifiers and invalid-state descriptions, save/apply/result announcements, text-and-symbol status, an Escape revert and default keep action for display safety, and a remaining-seconds accessibility value. English is the development language and Korean is shipped through localizable resources; lint checks catalog parity, duplicate keys, placeholders, and statically discoverable UI keys.
 
-The 2026-07-14/15 synthetic audit records eight English and eight Korean PNGs plus sixteen read-only AX logs covering overview, current inline deletion/capture feedback, editor/save feedback, 680×480 minimum, simulated large text, validation, System, and diagnostics. User-authorized installed interactions verified deletion Esc/Cancel/Confirm, a resizable Settings window preserving selection/draft/disclosure/focus across 980→680→980, Settings reopen, and the Capture privacy explanation's stable handoff to the app System window. They did not change TCC or prove the full denied/granted matrix. No full VoiceOver/keyboard-order/contrast/real-text-size audit has run. Structural localization and deterministic accessibility metadata checks do not prove translation quality or complete assistive-technology behavior; this section remains the acceptance target, not a completed claim.
+The 2026-07-14/15 synthetic audit records eight English and eight Korean PNGs plus sixteen read-only AX logs covering overview, current inline deletion/capture feedback, editor/save feedback, 680×480 minimum, simulated large text, validation, System, and diagnostics. User-authorized installed interactions verified deletion Esc/Cancel/Confirm, a resizable Settings window preserving selection/draft/disclosure/focus across 980→680→980, Settings reopen, and the Capture privacy explanation's stable handoff to the app System window. They did not change TCC or prove the full denied/granted matrix. Complete keyboard order, real contrast/text-size/transparency settings, and focused-control behavior remain bounded follow-ups. Full-app VoiceOver certification is neither a release gate nor a product claim; structural metadata does not prove complete assistive-technology behavior.
 
 ## Distribution
 
-The minimum deployment target is macOS 14 Sonoma. Release builds target both Apple Silicon and Intel. The project produces a no-Developer-ID DMG with an ad-hoc-signed app, Applications link, versioned filename, and SHA-256 checksum. Developer ID signing and notarization are optional. See [DISTRIBUTION.md](DISTRIBUTION.md).
+The minimum deployment target is macOS 14 Sonoma. Development gates cross-build Apple Silicon and Intel slices, but the initial public-beta support claim remains Apple Silicon only until physical Intel verification passes. Contributor and CI builds may use the no-Developer-ID DMG with an ad-hoc-signed app, Applications link, versioned filename, and SHA-256 checksum; that artifact is development evidence and is not publishable. Developer ID Application signing, hardened runtime, secure timestamping, notarization, stapling, and Gatekeeper verification are mandatory for the canonical public beta. See [DISTRIBUTION.md](DISTRIBUTION.md).
 
-The current local DMG SHA-256 is `f3aa610026179161208dec2cb2ef6185768843becd8e0e56bccc9f8abab37f2b`; its mounted universal `x86_64 arm64` app and ad-hoc/no-Developer-ID status passed verification. It was not installed or launched. Earlier local and installed-interaction checksums remain historical in the completion ledger. Historical UI-hardening artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. The DMGs are not byte-for-byte reproducible. Download quarantine/Gatekeeper, a tagged release, publication, and physical Intel remain unverified. The ad-hoc signature supplies integrity, not publisher identity or notarization.
+The current local DMG SHA-256 is `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`; its mounted universal `x86_64 arm64` app and ad-hoc/no-Developer-ID status passed verification. It was not installed or launched. Earlier local and installed-interaction checksums remain historical in the completion ledger. Historical UI-hardening artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. The DMGs are not byte-for-byte reproducible. Download quarantine/Gatekeeper, a tagged release, publication, and physical Intel remain unverified. The ad-hoc signature supplies integrity, not publisher identity or notarization.
 
 ## Non-goals
 
@@ -113,3 +113,4 @@ The current local DMG SHA-256 is `f3aa610026179161208dec2cb2ef6185768843becd8e0e
 - Plaintext Wi-Fi credentials
 - Private APIs on the core application path
 - Pretending hardware-specific behavior was verified without the relevant hardware
+- Full-app VoiceOver certification as a release requirement or marketing claim

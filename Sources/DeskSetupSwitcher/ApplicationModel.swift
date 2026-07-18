@@ -290,6 +290,8 @@ final class ApplicationModel: ObservableObject {
   private let loginItemService: any LoginItemServicing
   private let launchAtLoginPreferenceKey = "launchAtLoginEnabled"
   private let launchAtLoginPreferenceCreatedKey = "launchAtLoginPreferenceCreated"
+  private let launchAtLoginConsentVersionKey = "launchAtLoginConsentVersion"
+  private let currentLaunchAtLoginConsentVersion = 1
   private let highRiskSafetyConfirmationKey = "high-risk-safety-confirmation"
   private var hasStarted = false
   private var safetyCountdownTask: Task<Void, Never>?
@@ -407,7 +409,7 @@ final class ApplicationModel: ObservableObject {
     guard !hasStarted else { return }
     hasStarted = true
 
-    configureDefaultLaunchPreferenceIfNeeded()
+    initializeLaunchAtLoginPreferenceIfNeeded()
     launchAtLoginDesired = defaults.bool(forKey: launchAtLoginPreferenceKey)
     reconcileLoginItemRegistrationAtStartup()
 
@@ -424,6 +426,8 @@ final class ApplicationModel: ObservableObject {
     guard !suppressesLiveSystemAccess else { return }
     launchAtLoginDesired = enabled
     defaults.set(enabled, forKey: launchAtLoginPreferenceKey)
+    defaults.set(true, forKey: launchAtLoginPreferenceCreatedKey)
+    defaults.set(currentLaunchAtLoginConsentVersion, forKey: launchAtLoginConsentVersionKey)
     loginItemOperationFailure = nil
 
     updateLoginItemRegistration(enabled: enabled)
@@ -1752,6 +1756,11 @@ final class ApplicationModel: ObservableObject {
       return appLocalized("A profile with the same identifier already exists.")
     case .invalidReorderIndex:
       return appLocalized("The profile order changed before this move could be saved.")
+    case .invalidStoreFileName,
+      .unsafeFilesystemObject,
+      .unexpectedFileOwner,
+      .fileChangedDuringRead:
+      return sanitizedProfileStorageFailureMessage
     case .destinationExists:
       return appLocalized("The export destination already exists. Choose a new file name.")
     case .importSourceOverwrite:
@@ -1803,9 +1812,20 @@ final class ApplicationModel: ObservableObject {
     )
   }
 
-  private func configureDefaultLaunchPreferenceIfNeeded() {
-    guard !defaults.bool(forKey: launchAtLoginPreferenceCreatedKey) else { return }
-    defaults.set(true, forKey: launchAtLoginPreferenceKey)
+  private func initializeLaunchAtLoginPreferenceIfNeeded() {
+    let consentVersion = defaults.integer(forKey: launchAtLoginConsentVersionKey)
+    if consentVersion < currentLaunchAtLoginConsentVersion {
+      // Pre-release builds enabled this preference automatically, so their
+      // stored value cannot prove consent. Reset it once and require a new,
+      // explicit opt-in under the versioned consent policy.
+      defaults.set(false, forKey: launchAtLoginPreferenceKey)
+      defaults.set(
+        currentLaunchAtLoginConsentVersion,
+        forKey: launchAtLoginConsentVersionKey
+      )
+    } else if defaults.object(forKey: launchAtLoginPreferenceKey) == nil {
+      defaults.set(false, forKey: launchAtLoginPreferenceKey)
+    }
     defaults.set(true, forKey: launchAtLoginPreferenceCreatedKey)
   }
 

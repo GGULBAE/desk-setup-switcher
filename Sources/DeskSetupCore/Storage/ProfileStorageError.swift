@@ -9,6 +9,10 @@ public enum ProfileStorageError: Error, Equatable, Sendable {
   case profileNotFound(UUID)
   case profileAlreadyExists(UUID)
   case invalidReorderIndex(Int)
+  case invalidStoreFileName
+  case unsafeFilesystemObject
+  case unexpectedFileOwner
+  case fileChangedDuringRead
   case destinationExists(URL)
   case importSourceOverwrite(URL)
   case io
@@ -32,6 +36,10 @@ public enum ProfileStorageError: Error, Equatable, Sendable {
       .profileNotFound,
       .profileAlreadyExists,
       .invalidReorderIndex,
+      .invalidStoreFileName,
+      .unsafeFilesystemObject,
+      .unexpectedFileOwner,
+      .fileChangedDuringRead,
       .destinationExists,
       .importSourceOverwrite,
       .io:
@@ -59,6 +67,14 @@ extension ProfileStorageError: LocalizedError {
       "A profile already exists with identifier \(id.uuidString)."
     case .invalidReorderIndex(let index):
       "Profile reorder index \(index) is out of bounds."
+    case .invalidStoreFileName:
+      "The profile store file name must be one non-reserved file name."
+    case .unsafeFilesystemObject:
+      "The selected profile path is not a safe regular file or managed directory."
+    case .unexpectedFileOwner:
+      "The profile path is not owned by the current user."
+    case .fileChangedDuringRead:
+      "The profile document changed while it was being read."
     case .destinationExists(let url):
       "Export destination already exists: \(url.lastPathComponent)."
     case .importSourceOverwrite(let url):

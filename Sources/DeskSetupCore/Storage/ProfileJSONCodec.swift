@@ -19,6 +19,7 @@ public struct ProfileJSONCodec: Sendable {
   private let validator: ProfileDocumentValidator
   private let migrator: ProfileDocumentMigrator
   private let normalizer: ProfileApplicabilityNormalizer
+  private let snapshotReader: SecureFileSnapshotReader
 
   public init(
     limits: ProfileValidationLimits = .standard,
@@ -29,6 +30,20 @@ public struct ProfileJSONCodec: Sendable {
     self.validator = ProfileDocumentValidator(limits: limits)
     self.migrator = migrator
     self.normalizer = normalizer
+    self.snapshotReader = SecureFileSnapshotReader()
+  }
+
+  init(
+    limits: ProfileValidationLimits = .standard,
+    migrator: ProfileDocumentMigrator = .init(),
+    normalizer: ProfileApplicabilityNormalizer = .init(),
+    snapshotReader: SecureFileSnapshotReader
+  ) {
+    self.limits = limits
+    self.validator = ProfileDocumentValidator(limits: limits)
+    self.migrator = migrator
+    self.normalizer = normalizer
+    self.snapshotReader = snapshotReader
   }
 
   public func encode(_ document: ProfileDocument) throws -> Data {
@@ -82,14 +97,9 @@ public struct ProfileJSONCodec: Sendable {
 
   public func decode(contentsOf url: URL) throws -> DecodedProfileDocument {
     do {
-      let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
-      guard values.isRegularFile == true else {
-        throw ProfileStorageError.invalidJSON("selected path is not a regular file")
-      }
-      if let fileSize = values.fileSize {
-        try validateSize(fileSize)
-      }
-      return try decode(Data(contentsOf: url, options: [.mappedIfSafe]))
+      return try decode(readSnapshot(contentsOf: url).data)
+    } catch let failure as SecureFileSnapshotReadFailure {
+      throw failure.storageError
     } catch let error as ProfileStorageError {
       throw error
     } catch let error as ProfileValidationError {
@@ -97,6 +107,13 @@ public struct ProfileJSONCodec: Sendable {
     } catch {
       throw ProfileStorageError.io(String(describing: error))
     }
+  }
+
+  func readSnapshot(contentsOf url: URL) throws -> SecureFileSnapshot {
+    try snapshotReader.readSnapshot(
+      from: url,
+      maximumBytes: limits.maximumDocumentBytes
+    )
   }
 
   private func validateSize(_ count: Int) throws {

@@ -1,0 +1,63 @@
+name: Support question
+description: Ask about installation, use, permissions, recovery, or removal
+title: "[Support]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue will be public. Remove passwords, serial numbers, real SSIDs, exact locations, IP host portions, device UIDs, home-directory paths, and unredacted diagnostics.
+
+        Do not report a vulnerability, unsafe system mutation, privacy leak, exposed secret, or rollback failure here. Follow SECURITY.md instead.
+  - type: input
+    id: version
+    attributes:
+      label: Version, release URL, or commit
+      description: State where the app came from. There is no supported public release until v0.1.0 is published.
+      placeholder: v0.1.0 from GitHub Releases, or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: macOS version and Mac architecture
+      placeholder: macOS 14.x, Apple Silicon
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Install or first launch
+        - Capture
+        - Edit profile
+        - Review & Apply
+        - Permissions
+        - Import or export
+        - Diagnostics or recovery
+        - Remove app or local data
+        - Contributing or building
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Question or problem
+      description: Describe the exact step, expected result, actual result, and whether a real setting changed. Use synthetic names.
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you already tried?
+      description: Include any recovery step and its result. Paste only redacted diagnostics.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Public issue safety
+      options:
+        - label: I removed credentials and personally identifying device, network, location, and path data.
+          required: true
+        - label: This is not a vulnerability, unsafe mutation, privacy leak, exposed secret, or rollback failure that requires private reporting.
+          required: true

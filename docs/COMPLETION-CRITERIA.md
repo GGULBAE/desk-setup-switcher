@@ -1,6 +1,6 @@
 # Completion criteria and evidence ledger
 
-This ledger separates current implementation/test/local-commit gates from historical package/CI evidence and optional or unapproved manual hardware/release work. Tray Surface v2 is the current production source. User-provided installed screenshots exposed a persistent asymmetric popover layout; the resulting full UI audit also found destination-window cancellation/liveness races and minimum-workflow compression risks. The current structural fix is deterministic mock/attached-offscreen verified and completed a separately authorized `/Applications` reinstall plus bounded non-mutating geometry check. Full VoiceOver, focused-control AX observation, and hardware-setting behavior remain unverified. All `MenuBarExtra` evidence is historical. Hardware-dependent rows may have mock/read-back evidence while remaining explicitly “not hardware-verified.”
+This ledger separates the current open-source public-beta baseline from historical package/CI evidence and still-pending publication or manual hardware work. The baseline adds explicit launch-at-login consent, hardened local profile/import file access, a complete-history/asset public-release audit, and mandatory protected signing/notarization policy. It passed 496 non-live checks and produced an unsigned development-evidence package; it has not been published. Initial beta support is Apple Silicon only, while the x86_64 convenience slice remains physically unverified. Full VoiceOver certification is explicitly excluded and is neither claimed nor a release gate; keyboard behavior, accessibility names/values, and non-color cues remain required. Hardware-dependent rows may have mock/read-back evidence while remaining explicitly “not hardware-verified.”
 
 ## Evidence snapshot — historical baselines and current follow-up
 
@@ -11,10 +11,14 @@ This ledger separates current implementation/test/local-commit gates from histor
 | CI repair milestone | Commit `4e45328` pushed to `origin/master` |
 | UI-hardening implementation milestone | Commit `5f0cabc` pushed to `origin/master` |
 | Toolchain | Xcode 26.6, Swift 6.3.3, macOS 26.5.2, Apple M5; process-local `DEVELOPER_DIR` fallback |
-| Current P2 UI refinement audit | [P2 UI refinement audit](P2-UI-REFINEMENT-AUDIT-2026-07-17.md) records the completed P2 source, 39-fixture/79-artifact synthetic review, 461-check gate, final package/install hashes, `⌘,` routing, installed disclosure Return/Space and AX state, and explicitly unrun/nonclaimed VoiceOver boundary |
+| Historical P2 UI refinement audit | [P2 UI refinement audit](P2-UI-REFINEMENT-AUDIT-2026-07-17.md) records the completed P2 source, 39-fixture/79-artifact synthetic review, 461-check gate, final package/install hashes, `⌘,` routing, installed disclosure Return/Space and AX state, and explicitly unrun/nonclaimed VoiceOver boundary |
 | Preceding UI/UX installed audit | [UI/UX simplification and installed-app audit](UI-UX-SIMPLIFICATION-INSTALLED-AUDIT-2026-07-17.md) records the attached-wrapper root cause, native popover regression, persistent-window clamps, async-generation ownership, preceding installed screenshots/geometry, package and unchanged safety-state evidence, and explicit manual-accessibility gap |
 | Preceding native UI structural audit | [Native UI structural reliability audit](UI-STRUCTURAL-RELIABILITY-AUDIT-2026-07-17.md) records the earlier selective-safe-area boundary, window cancellation/liveness audit, adaptive minimum workflow, focus policy, synthetic evidence, and focused 52-test regression gate |
-| Current P2 full local gate | The final integrated gate passed with 461 checks: 144 XCTest cases, 316 Swift Testing cases across 39 suites, and one isolated native `NSPopover` regression; lint/localization policy; Swift Debug/Release; universal Xcode Debug/Release; Analyze; DMG/checksum; mounted metadata/resources/`x86_64 arm64`; and ad-hoc/no-Developer-ID classification |
+| Current open-source baseline gate | `make verify` passed with 496 checks: 173 XCTest cases, 322 Swift Testing cases across 40 suites, and one isolated native `NSPopover` regression; lint/localization policy; Swift Debug/Release; universal Xcode Debug/Release; Analyze; DMG/checksum; mounted metadata/resources/`x86_64 arm64`; and ad-hoc/no-Developer-ID classification |
+| Current public-history/asset audit | The complete, non-shallow history and tracked image/assets pass the public-release audit for high-confidence credentials, concrete personal home paths, and embedded asset metadata. This scoped result does not replace repository-secret settings or operator review |
+| Current public-beta support boundary | Initial support is Apple Silicon on macOS 14 or later. x86_64 cross-build/package evidence is retained only as an unverified convenience slice; physical Intel is not claimed |
+| Current public-beta release boundary | Developer ID + hardened runtime + timestamp, signed DMG, accepted notarization, stapling/validation, app-and-DMG Gatekeeper checks, protected release environment, checksum/SBOM/attestation/redownload evidence, three external clean installs, static bilingual no-tracking site/assets, remote repository protections, and explicit publication approval remain mandatory and pending |
+| Historical P2 full local gate | The P2 integrated gate passed with 461 checks: 144 XCTest cases, 316 Swift Testing cases across 39 suites, and one isolated native `NSPopover` regression; lint/localization policy; Swift Debug/Release; universal Xcode Debug/Release; Analyze; DMG/checksum; mounted metadata/resources/`x86_64 arm64`; and ad-hoc/no-Developer-ID classification |
 | Preceding native UI structural full local gate | The preceding integrated gate passed on 2026-07-17 with 446 checks: 144 XCTest cases, 301 Swift Testing cases across 38 suites, and one separately executed native `NSPopover` regression |
 | Historical full local verification | Post-fix `make verify` passed on 2026-07-11: lint/policy, 158 tests (83 XCTest + 75 Swift Testing), Swift/Xcode Debug and Release, Analyze, package, checksum, and mounted-DMG inspection |
 | GitHub Actions | Run `29154880831` for `0d8f510` recorded the Swift 6.1 actor-isolation failure. [Run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) for repair `4e45328` succeeded on 2026-07-11 under macOS 15, Xcode 16.4, and Swift 6.1.2; full `make verify` and unsigned-package upload passed |
@@ -36,14 +40,17 @@ This ledger separates current implementation/test/local-commit gates from histor
 | Xcode/package architectures | Current Debug/Release builds and packaged executable verified as `x86_64 arm64`; x86_64 was not run on Intel hardware |
 | Tray Surface v2 baseline package | Universal no-Developer-ID DMG with ad-hoc-signed app; SHA-256 `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`. It passed checksum, mount, metadata, resources, architectures, and signature classification and is now historical evidence |
 | Previously installed app | The preceding UI-stability package replaced `/Applications/Desk Setup Switcher.app`; bundle ID, version 0.1.0, `x86_64 arm64`, and signature passed read-only checks. It remains historical evidence |
-| Current P2 package | Universal no-Developer-ID DMG SHA-256 `342d804d8bbff51209af4bccefb405ee76499050c1e640a011d41e2f78792031`; checksum, mount, metadata/resources, `x86_64 arm64`, and signature classification passed. The reinstalled ad-hoc-signed `/Applications` executable SHA-256 is `fb35352fb6a9588c0c50269975ccd3d7b73e52010de10de132bf45d60236f719` |
+| Current development-evidence package | Universal unsigned/ad-hoc DMG SHA-256 `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`; checksum, mount, metadata/resources, `x86_64 arm64`, and signature classification passed. It was not installed, launched, signed for distribution, uploaded, or published |
+| Historical P2 package | Universal no-Developer-ID DMG SHA-256 `342d804d8bbff51209af4bccefb405ee76499050c1e640a011d41e2f78792031`; checksum, mount, metadata/resources, `x86_64 arm64`, and signature classification passed. The reinstalled ad-hoc-signed `/Applications` executable SHA-256 is `fb35352fb6a9588c0c50269975ccd3d7b73e52010de10de132bf45d60236f719` |
 | Historical CI package | Downloaded artifact ID `8256718472` verified its checksum file; CI-generated DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. Local and CI DMGs are not byte-for-byte reproducible; no new CI run was requested |
 | Historical install smoke | Earlier scoped installed interactions exercised the status item, deletion Esc/Cancel/Confirm, Settings resize/state preservation, Capture purpose explanation, and permission handoff. The preceding UI-stability package replaced the bundle but was deliberately not launched, so those earlier interactions do not prove the current source |
 | Snapshot profile | Created one schema-v1 Ready profile from a read-only snapshot with all four groups; the zero-operation plan kept Apply and Force Apply disabled |
-| Login item | Default-on registration succeeded; BTM reported `[enabled, allowed, notified]`; UI opt-out disabled it and re-enable restored enabled status. Final cleanup opted out and left only disabled BTM history |
+| Login item | Current behavior is off by default and registers only after explicit opt-in. Deterministic tests cover fresh state, consented on/off persistence, opt-in registration, stale enabled-state cleanup, and reset/removal of legacy prerelease automatic registration. The earlier default-on BTM result remains historical only |
 | Live mutations | Not run for display, audio, network, mouse, or keyboard |
 | Live Keychain write | Not run |
-| Optional/unapproved evidence gaps | Full VoiceOver/keyboard order, focused-control AX observation, import/export/TCC permission matrix, real macOS text size, quarantined Gatekeeper install, physical Intel, login-item approval/retry and actual login-at-boot after a reboot, live Keychain write, live mutation/rollback, signing/notarization, release tag, and publication |
+| Optional/non-gating evidence gaps | Full VoiceOver certification, physical Intel execution, and live hardware mutation/rollback are not required for the initial Apple Silicon beta and are not claimed. Keyboard behavior, accessibility names/values, and non-color cues remain required even though a full VoiceOver audit is excluded |
+| Mandatory release gaps | Protected Developer ID/hardened-runtime signing, notarization, staple/validation, app-and-DMG Gatekeeper, checksum/SBOM/attestation/redownload evidence, clean-install review from three external beta testers, static bilingual no-tracking site/demo assets, remote repository protections, release tag, and explicit publication approval remain incomplete |
+| Other unverified manual paths | Import/export file panels, the TCC permission matrix, real macOS text size/contrast/transparency, login-item approval/retry and login-at-boot after reboot, live Keychain write, and focused-control AX observation remain unrun and must not be inferred from deterministic coverage |
 
 No test evidence contains a real SSID, exact location, IP host address, credential, serial number, or personal device identifier.
 
@@ -60,10 +67,11 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [ ] Actual v2 status-item/popover opening, anchor/arrow/material/ghost-frame behavior, native dismissal timing, and first responder are manually verified.
 - [x] A fresh copy from the final locally built DMG launches from `/Applications`.
 - [x] The fresh install launched background-only/menu-bar-only and exposed its popover without a normal app lifecycle.
-- [x] Default-on `SMAppService` registration, status inspection, UI opt-out, and re-enable passed; final cleanup opted out and left only disabled BTM history.
+- [x] Launch at login is off by default and calls `SMAppService` registration only after explicit user opt-in. Deterministic coverage preserves consented on/off choices, clears stale enabled state, and resets/removes legacy prerelease automatic registration. Earlier installed default-on transitions are historical rather than current behavior.
 - [ ] Approval-required and failure/retry login-item paths, plus actual login-at-boot after a reboot, are manually verified.
 - [ ] English and Korean UI coverage is complete. Current catalogs and exact runtime-bundle tests pass; six English and six Korean current-source static states passed visual/AX review, but complete interactive and linguistic-quality review remains pending.
-- [ ] VoiceOver, keyboard-only navigation, focus order, contrast, transparency, and macOS text-size behavior are audited. V2 source tests and simulated `.accessibility3`/high-contrast evidence pass, but the detached host exposes no virtual SwiftUI children and full assistive-technology/real-system-setting behavior remains pending.
+- [x] Full VoiceOver certification is excluded from initial public-beta scope and no VoiceOver speech/rotor claim is made. It is not a release gate.
+- [ ] Complete installed keyboard-only traversal, focused-control AX observation, contrast, transparency, and real macOS text-size behavior are audited. Source tests still require keyboard behavior, accessibility names/values, and non-color state cues; deterministic `.accessibility3`/high-contrast evidence does not close the native manual paths.
 
 ## Profiles and storage
 
@@ -71,11 +79,12 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] A fresh installed app manually created one schema-v1 Ready profile from a read-only snapshot with all four setting groups.
 - [x] Name, description, symbol, enabled state, conditions, group inclusion, and per-option inclusion are represented in versioned persisted models.
 - [x] Schema 0→1 migration, current schema round trip, legacy whole-second dates, and future/missing migration rejection pass tests.
-- [x] Atomic writes, last-known-good backup, primary/backup corruption quarantine, recovery, failed-update state preservation, 0700 directories, and 0600 managed files pass temporary-file tests. Staging files open at 0600 before the first byte, backup-only recovery canonicalizes the backup before the primary commit, permission/rename failures preserve the destination and in-memory document, quarantine has no fallible post-move chmod, and injected writer failures surface as typed `ProfileStorageError.io`.
-- [x] Import/export enforces the 5 MiB limit, schema/semantic limits, unique IDs, valid selection, regular-file input, source protection, and exclusive no-overwrite output.
+- [x] Atomic writes, last-known-good backup, primary/backup corruption quarantine, recovery, failed-update state preservation, 0700 directories, and 0600 managed/staged files pass temporary-file tests. Store paths are normalized; custom names are constrained to one non-reserved leaf; descriptor-bound no-follow reads reject traversal, symlinks, non-regular files, wrong owners, source replacement, and in-place mutation. Identity checks bind chmod, quarantine, recovery, and rewrite operations; quarantine uses exclusive rename with identity verification/restoration; file data is synced before commit and parent-directory sync is best effort.
+- [x] Import/export enforces the 5 MiB limit, schema/semantic limits, unique IDs, valid selection, descriptor-bound regular-file/owner/identity checks, source protection, and exclusive no-overwrite output. Import rejects path traversal, symlinks, non-regular files, wrong owners, source replacement, and in-place mutation before commit.
 - [x] Last application summary is persisted back into the profile and contains typed item statuses/messages without credential fields. Manual relaunch/readback remains part of the app audit.
 - [x] Unsupported display rotation/active state and administrative IPv4/DNS/proxy values are preserved but idempotently excluded at decode, store, import, capture, and planning boundaries; deterministic synthetic tests cover value retention and groups with no applicable leaves.
-- [ ] A custom `ProfileStore` file name is constrained to one non-reserved leaf, and profile directory/file access rejects symlink redirection with no-follow checks. Traversal through `fileName`, collision with `profiles.backup.json`, and symlink redirection remain follow-up storage hardening; the default app-owned path does not by itself close those cases.
+- [x] Custom `ProfileStore` file-name traversal, reserved-name collision, symlink/FIFO/directory redirection, wrong-owner input, leaf replacement, same-size/restored-mtime rewrite, quarantine replacement/open-to-rename/post-rename races, and identity-bound chmod paths have deterministic regressions.
+- **Accepted P2 boundaries (nonblocking):** a precisely timed same-UID ancestor swap remains best effort under the app's exclusive single-writer assumption; migration/backup retains a narrow identity-check-to-rename race without locking; export writes the final exclusive destination directly and a crash can leave a partial file; parent-directory sync is best effort and does not support a perfect sudden-power-loss durability claim.
 
 ## UI hardening
 
@@ -98,7 +107,7 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] English/Korean localization lint passes for key parity, duplicate keys, format placeholders, and statically discoverable UI keys; exact runtime-bundle tests assert unknown-key, action, role, experimental-input, and numeric formatting in both languages.
 - [x] Accessibility source includes labeled icon actions, distinct inclusion/target values, field invalid/error metadata, non-color state text, adaptive workflow action labels, safe Cancel/Revert/Close keyboard targets, heading/status accessibility focus intent, display-confirmation shortcuts, and one combined remaining-time value. Full assistive-technology behavior remains manually unverified.
 - [x] The current synthetic matrix adds combined minimum-size/Korean/accessibility-text Settings, permission, and dirty-Apply states to the preceding editor/overview/validation/System/diagnostics evidence. Layout containment, wrapping, reachable actions, opaque-RGB workflow encoding, and pixel brightness pass; actual native localization and assistive-technology behavior remain manual.
-- [ ] Exact denied/granted permission-result-card actions, complete keyboard-only traversal, VoiceOver speech/focus, contrast, transparency, and real macOS text-size behavior are manually verified. These remain pending.
+- [ ] Exact denied/granted permission-result-card actions, complete keyboard-only traversal, contrast, transparency, and real macOS text-size behavior are manually verified. These remain pending. Full VoiceOver certification is not tracked as completion work.
 
 ## Snapshot and adapters
 
@@ -135,12 +144,16 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] Redaction tests cover credentials, exact coordinates, SSIDs, IP host portions, home paths, and entry fields before persistence.
 - [x] Rotating diagnostic JSONL storage enforces local directory/file permissions, size/count bounds, serialized complete entries, pruning, and scoped clearing; Settings browsing/refresh/clear is implemented.
 - [ ] Permission explanations and denial isolation are manually verified for location/SSID. Source paths are nonfatal, but the user-facing matrix is pending.
-- [x] Import validation prevents path-driven traversal/network access, rejects non-regular files and oversize input before decode, and never overwrites the source or an existing export.
+- [x] Import validation prevents path-driven traversal/network access; rejects symlinks, non-regular files, wrong owners, oversize input, source replacement, and in-place mutation before decode/commit; and never overwrites the source or an existing export.
+- [x] The public-release audit passes against complete, non-shallow Git history plus tracked image/assets, checking high-confidence credential patterns, concrete personal home paths, and embedded asset metadata without printing suspected secret values.
 - [x] Current-tree `make lint` passes source policy and English/Korean structural localization checks, rejecting shell, outbound-networking, and UI-scripting primitives.
 
 ## Quality, packaging, and delivery
 
 - [x] Required repository, community, privacy, architecture, support, asset-provenance, and distribution documentation exists.
+- [x] The current open-source baseline passed 496 non-live checks in one `make verify` run: 173 XCTest, 322 Swift Testing cases across 40 suites, and one isolated native popover regression; lint/localization policy, Swift Debug/Release, universal Xcode Debug/Release, Analyze, package/checksum, mounted metadata/resources/architectures, and ad-hoc/no-Developer-ID classification passed.
+- [x] The current unsigned development-evidence universal DMG passed checksum/mount/resource/architecture/signature verification at SHA-256 `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`. It was not installed, launched, uploaded, or published.
+- [x] Complete-history/current-asset public-release audit passes locally. Passing this scoped audit does not replace protected remote settings, secret scanning, private vulnerability reporting, or operator review.
 - [x] The preceding default unit and mock integration suites passed locally with 215 tests: 112 XCTest and 103 Swift Testing cases; six explicit opt-in cases skipped and no live setting change was part of the run.
 - [x] The preceding header/editor tree's `make lint` and `make build` passed.
 - [x] The preceding header/editor tree's `make analyze`, full `make verify`, package/checksum, and mounted-image verification passed. Its verified local DMG SHA-256 is `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`.
@@ -152,14 +165,31 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] Versioned no-Developer-ID DMG contains the ad-hoc-signed universal app and `/Applications` link.
 - [x] SHA-256 validation and mounted-DMG metadata/resource/architecture/signature checks pass locally; the Tray Surface v2 baseline checksum is `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`. Earlier measured-height, permission-handoff, installed-interaction, capture, tray/editor, layout, apply-reliability, and post-fix checksums remain historical in the roadmap/support matrix.
 - [x] Downloaded historical CI artifact ID `8256718472` verifies against its checksum file; its DMG SHA-256 is `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. It is distinct from the local DMG because packaging is not byte-for-byte reproducible. Historical artifact `8249295840` remains recorded in the support matrix.
-- [ ] Manual release review is complete. Historical fresh `/Applications` launch, background/menu-bar-only behavior, snapshot-profile creation, and login-item transitions passed; current static bilingual/AX evidence plus actual deletion, resize state/focus, Settings open/reopen, and stable permission handoff also passed. Gatekeeper, login approval/retry/reboot, import/export, the full permission matrix, full accessibility, and mutation paths remain.
+- [ ] Manual release review is complete. Historical fresh `/Applications` launch, background/menu-bar-only behavior, snapshot-profile creation, and login-item transitions passed; static bilingual/AX evidence plus actual deletion, resize state/focus, Settings open/reopen, and stable permission handoff also passed. Three external clean-install beta reports, Gatekeeper, login approval/retry/reboot, import/export, and the full permission matrix remain. Full VoiceOver certification and hardware mutation are excluded from the initial beta gate and are not claimed.
 - [x] Signing status is accurately classified: ad-hoc integrity signature only, no Developer ID identity, no notarization, and no claim of Gatekeeper trust.
 - [x] Mandatory implementation, test, package, push, and CI gates are complete for the historical repair commit `4e45328`.
 - [x] Mandatory full verification, package, push, and CI gates are complete for UI-hardening commit `5f0cabc`.
 - [ ] The header/editor follow-up has matching push and CI artifact evidence. It is locally verified but has not been pushed in this task.
 - [x] The apply-reliability follow-up has a verified behavior-focused local commit and a clean worktree. This row is closed by the final commit/status handoff; push/CI evidence is not required by its current goal and must not be inferred.
 - [x] The UI-audit follow-up has a verified behavior-focused local commit and a clean worktree. This row is closed by the final commit/status handoff; push/CI evidence is not required and must not be inferred.
-- [ ] Optional release publication and manual/hardware evidence are complete. They remain unapproved or unrun and do not negate the completed implementation gates.
+- [ ] Canonical public-beta signing and publication are complete. Developer ID/hardened-runtime/timestamp signing, signed DMG, accepted notarization, stapling/validation, app-and-DMG Gatekeeper checks, protected release environment, checksum/SBOM/attestation/redownload evidence, static bilingual no-tracking site/demo assets, remote repository protections, three external clean-install beta reports, release tag, and explicit user approval remain mandatory.
+- **Optional/non-gating evidence:** full VoiceOver certification, physical Intel execution, and live hardware mutation/rollback are unrun and unclaimed. They are not completion requirements for the initial Apple Silicon non-live implementation baseline.
+
+## Current open-source public-beta baseline ledger
+
+- [x] Launch at login is off by default, requires explicit opt-in, preserves consented choices, cleans stale state, and resets/removes legacy prerelease automatic registration in deterministic tests.
+- [x] Profile storage and import reject traversal, reserved leaves, symlinks, non-regular files, wrong owners, oversized input, source replacement, and in-place mutation through descriptor-bound identity checks; quarantine, recovery, chmod, and migration/backup paths carry identity evidence.
+- [x] Storage persistence uses 0600 staging, file sync before atomic replacement, and best-effort parent-directory sync. The documented same-UID ancestor, narrow migration/backup check-to-rename, direct-export crash residue, and parent-sync durability limitations remain accepted P2 boundaries rather than hidden guarantees.
+- [x] Complete public Git history and tracked image/assets pass the scoped public-release credential, personal-path, and embedded-metadata audit.
+- [x] `make verify` passes 496 checks: 173 XCTest + 322 Swift Testing across 40 suites + one isolated native popover regression.
+- [x] The unsigned/ad-hoc universal development-evidence DMG passed local verification at SHA-256 `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`; it was not installed, launched, uploaded, or published.
+- [x] Initial public-beta support is limited to Apple Silicon on macOS 14 or later. The x86_64 slice is cross-built but physically unverified and unsupported for the initial beta.
+- [x] Full VoiceOver certification is excluded and no VoiceOver claim is made. It is not a public-beta gate; keyboard behavior, accessibility names/values, localizable English/Korean copy, and non-color state cues remain required.
+- [ ] Protected Developer ID/hardened-runtime/timestamp signing, signed DMG, notarization acceptance, stapling/validation, and app-and-DMG Gatekeeper checks pass on one canonical build.
+- [ ] Checksum, SBOM, provenance/attestation, redownload verification, protected release environment/secrets, branch/release protections, and private vulnerability reporting are configured and verified.
+- [ ] Static bilingual no-tracking site/demo assets and user/contributor integration guidance are complete and match the supported capability matrix.
+- [ ] Three external Apple Silicon clean-install beta reports pass without P0/P1 issues.
+- [ ] The user explicitly approves the final tag, release publication, site launch, and any promotional posting.
 
 ## Historical tray/settings refinement completion ledger
 
@@ -174,7 +204,7 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] Network service IPv4 uses portable Ethernet/Wi-Fi identity, validates DHCP/manual data, handles ambiguity nonfatally, and never persists a runtime service ID as sole identity.
 - [x] English/Korean keys, accessibility/help text, non-color reasons, 12 refreshed 0/1/3/10/long-Korean tray pairs, and five standard/minimum/large-text/dark profile-editor PNG/AX pairs are recorded in [TRAY-SETTINGS-REFINEMENT-AUDIT-2026-07-15.md](TRAY-SETTINGS-REFINEMENT-AUDIT-2026-07-15.md).
 - [x] Current installed popover centering and Settings/workflow minimum/normal geometry are verified by the bounded structural follow-up.
-- [ ] Red-close/frontmost behavior beyond deterministic coverage, native bilingual interaction, full keyboard traversal, VoiceOver, and focused-control AX observation are manually verified.
+- [ ] Red-close/frontmost behavior beyond deterministic coverage, native bilingual interaction, full keyboard traversal, and focused-control AX observation are manually verified. Full VoiceOver certification is excluded.
 - [ ] Display/audio/network hardware mutation and rollback are verified. These remain explicitly unrun and are not required for the non-live implementation gate.
 - [ ] Push, CI, tag, signing/notarization, or release publication is performed for this milestone. They remain operator decisions outside the local goal.
 
@@ -199,11 +229,11 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] Execution-equivalence ignores JSON object-key ordering but rejects changed values and rollback evidence. The selected profile's adjacent normal and available-items preparations pass read-only without mutation, and failure diagnostics expose no preparation payload.
 - [x] The preceding canonical-plan implementation commit `8bd70dd` and UI-stability commit `8a1e80e` are recorded; the current structural-fix commit is reported in the final handoff. Nothing was pushed or published.
 - [x] The current package was reinstalled to `/Applications`; executable SHA-256 `40876bd671dd4286fa4684192097f6dbd702df899bccf8efb588b244c3d27305` matches the audited installed build. Twenty popover measurements have center delta `0`; Settings minimum/normal geometry, workflow minimum/initial geometry, and Escape close passed without Apply, Capture, TCC, login, or system-setting mutation.
-- [ ] Full native bilingual interaction, keyboard traversal beyond the recorded Escape close, VoiceOver speech/rotor behavior, and focused-control AX observation are manually verified.
+- [ ] Full native bilingual interaction, keyboard traversal beyond the recorded Escape close, and focused-control AX observation are manually verified. Full VoiceOver certification is excluded.
 - [ ] Display/ColorSync, audio, and Ethernet/Wi‑Fi IPv4 hardware mutation plus independent rollback are verified. They remain explicitly unrun.
 - [ ] Push, CI, tag, Developer ID signing, notarization, or publication is performed. They remain outside this local goal.
 
-## Current bounded P2 UI refinement ledger
+## Historical bounded P2 UI refinement ledger
 
 - [x] A pristine empty/idle tray has one labelled body-level **Capture Current Settings** primary CTA; nonempty and non-idle states retain one compact header action; deterministic policy requires exactly one visible Capture affordance.
 - [x] **New Profile** is the one direct management action; Duplicate/Delete, Move Up/Down, and Import/**Export Saved Profiles…** are grouped in one secondary menu.
@@ -224,7 +254,7 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 - [x] `git diff --check` passes on the final documentation state.
 - [x] This verified behavior-focused local commit records the completed P2 pass. Push, CI, tag, Developer ID signing, notarization, and publication are not part of this local goal and must not be inferred.
 
-This P2 ledger does not certify full-app VoiceOver/rotor behavior, complete keyboard traversal, or every focused-control AX state. Profile-store path hardening, Apply/Capture execution, TCC/login changes, Gatekeeper, physical Intel, diagnostics clearing, import/export interaction, hardware mutation/rollback, and release work remain outside this pass.
+This P2 ledger does not certify full-app VoiceOver/rotor behavior, complete keyboard traversal, or every focused-control AX state. Profile-store/import and login-item consent hardening were outside that historical pass and are recorded in the current open-source baseline above. Apply/Capture execution, TCC, Gatekeeper, physical Intel, diagnostics clearing, import/export interaction, hardware mutation/rollback, and public release remain unverified.
 
 ## Manual hardware evidence format
 

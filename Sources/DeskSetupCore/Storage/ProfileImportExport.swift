@@ -57,7 +57,11 @@ public struct ProfileImportExport: Sendable {
 
   private func write(_ document: ProfileDocument, to destinationURL: URL) throws {
     let data = try codec.encode(normalizer.normalize(document))
-    let descriptor = destinationURL.withUnsafeFileSystemRepresentation { path -> Int32 in
+    guard destinationURL.isFileURL else {
+      throw ProfileStorageError.unsafeFilesystemObject
+    }
+    let normalizedDestinationURL = destinationURL.standardizedFileURL
+    let descriptor = normalizedDestinationURL.withUnsafeFileSystemRepresentation { path -> Int32 in
       guard let path else { return -1 }
       return Darwin.open(path, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)
     }
@@ -75,7 +79,7 @@ public struct ProfileImportExport: Sendable {
       try handle.close()
     } catch {
       try? handle.close()
-      try? FileManager.default.removeItem(at: destinationURL)
+      try? FileManager.default.removeItem(at: normalizedDestinationURL)
       throw ProfileStorageError.io(String(describing: error))
     }
   }

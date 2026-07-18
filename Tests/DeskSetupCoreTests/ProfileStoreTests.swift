@@ -1,9 +1,257 @@
+import Darwin
 import Foundation
 import XCTest
 
 @testable import DeskSetupCore
 
 final class ProfileStoreTests: XCTestCase {
+  func testCustomFileNameAcceptsOneNonReservedLeaf() async throws {
+    let directory = try makeTemporaryDirectory()
+    let store = ProfileStore(directoryURL: directory, fileName: "workstation-profiles.json")
+
+    let result = try await store.load()
+
+    XCTAssertEqual(result.status, .createdEmpty)
+    XCTAssertEqual(store.locations.fileName, "workstation-profiles.json")
+    XCTAssertEqual(store.locations.primaryURL.lastPathComponent, "workstation-profiles.json")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: store.locations.primaryURL.path))
+  }
+
+  func testCustomFileNameRejectsTraversalAndReservedManagedNamesBeforeIO() async throws {
+    let parent = try makeTemporaryDirectory()
+    let outside = parent.appendingPathComponent("escape.json")
+    let sentinel = Data("unchanged".utf8)
+    try sentinel.write(to: outside)
+    let invalidNames = [
+      "",
+      ".",
+      "..",
+      "../escape.json",
+      "nested/profiles.json",
+      "/tmp/profiles.json",
+      "profiles.backup.json",
+      "PROFILES.BACKUP.JSON",
+      "Quarantine",
+      "quarantine",
+    ]
+
+    for (index, fileName) in invalidNames.enumerated() {
+      let directory = parent.appendingPathComponent("store-\(index)", isDirectory: true)
+      let store = ProfileStore(directoryURL: directory, fileName: fileName)
+
+      do {
+        _ = try await store.load()
+        XCTFail("Expected invalid store file name: \(fileName)")
+      } catch {
+        XCTAssertEqual(error as? ProfileStorageError, .invalidStoreFileName)
+      }
+      XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+    }
+
+    XCTAssertEqual(try Data(contentsOf: outside), sentinel)
+  }
+
+  func testProfileStoreRejectsNonFileDirectoryURL() async throws {
+    let remoteURL = try XCTUnwrap(URL(string: "https://profiles.invalid/store"))
+
+    do {
+      _ = try await ProfileStore(directoryURL: remoteURL).load()
+      XCTFail("Expected non-file profile directory rejection")
+    } catch {
+      XCTAssertEqual(error as? ProfileStorageError, .unsafeFilesystemObject)
+    }
+  }
+
+  func testProfileStoreNormalizesDotComponentsBeforeDerivingManagedPaths() async throws {
+    let parent = try makeTemporaryDirectory()
+    let rawDirectory = URL(
+      fileURLWithPath: parent.path + "/unused/../normalized-store",
+      isDirectory: true
+    )
+    let expectedDirectory = parent.appendingPathComponent(
+      "normalized-store",
+      isDirectory: true
+    )
+    let store = ProfileStore(directoryURL: rawDirectory)
+
+    _ = try await store.load()
+
+    XCTAssertEqual(store.locations.directoryURL, expectedDirectory.standardizedFileURL)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: store.locations.primaryURL.path))
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: parent.appendingPathComponent("unused", isDirectory: true).path
+      )
+    )
+  }
+
+  func testManagedDirectorySymlinkIsRejectedWithoutWritingThroughIt() async throws {
+    let parent = try makeTemporaryDirectory()
+    let target = parent.appendingPathComponent("target", isDirectory: true)
+    let link = parent.appendingPathComponent("store-link", isDirectory: true)
+    try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false)
+    let targetPermissions = try permissions(at: target)
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+
+    do {
+      _ = try await ProfileStore(directoryURL: link).load()
+      XCTFail("Expected managed directory symlink rejection")
+    } catch {
+      XCTAssertEqual(error as? ProfileStorageError, .unsafeFilesystemObject)
+    }
+
+    XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: target.path).isEmpty)
+    XCTAssertEqual(try permissions(at: target), targetPermissions)
+  }
+
+  func testUserOwnedAncestorSymlinkIsRejectedWithoutCreatingManagedDirectory() async throws {
+    let parent = try makeTemporaryDirectory()
+    let target = parent.appendingPathComponent("redirect-target", isDirectory: true)
+    let link = parent.appendingPathComponent("redirect-parent", isDirectory: true)
+    try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false)
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+    let redirectedStore = link.appendingPathComponent("Store", isDirectory: true)
+
+    do {
+      _ = try await ProfileStore(directoryURL: redirectedStore).load()
+      XCTFail("Expected user-owned ancestor symlink rejection")
+    } catch {
+      XCTAssertEqual(error as? ProfileStorageError, .unsafeFilesystemObject)
+    }
+
+    XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: target.path).isEmpty)
+  }
+
+  func testManagedPrimarySymlinkIsRejectedWithoutQuarantineOrTargetMutation() async throws {
+    let directory = try makeTemporaryDirectory()
+    let outside = directory.deletingLastPathComponent().appendingPathComponent(
+      "ProfileStoreOutside-\(UUID().uuidString).json"
+    )
+    addTeardownBlock { try? FileManager.default.removeItem(at: outside) }
+    let sentinel = Data("outside-sentinel".utf8)
+    try sentinel.write(to: outside)
+    let outsidePermissions = try permissions(at: outside)
+    let locations = ProfileStoreLocations(directoryURL: directory)
+    try FileManager.default.createSymbolicLink(
+      at: locations.primaryURL,
+      withDestinationURL: outside
+    )
+
+    do {
+      _ = try await ProfileStore(directoryURL: directory).load()
+      XCTFail("Expected managed primary symlink rejection")
+    } catch {
+      XCTAssertEqual(error as? ProfileStorageError, .unsafeFilesystemObject)
+    }
+
+    XCTAssertEqual(try Data(contentsOf: outside), sentinel)
+    XCTAssertEqual(try permissions(at: outside), outsidePermissions)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: locations.backupURL.path))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: locations.quarantineDirectoryURL.path))
+  }
+
+  func testManagedBackupSymlinkIsRejectedWithoutReadingItsTarget() async throws {
+    let directory = try makeTemporaryDirectory()
+    let outside = directory.deletingLastPathComponent().appendingPathComponent(
+      "ProfileStoreBackupOutside-\(UUID().uuidString).json"
+    )
+    addTeardownBlock { try? FileManager.default.removeItem(at: outside) }
+    let sentinel = Data("not-a-profile".utf8)
+    try sentinel.write(to: outside)
+    let locations = ProfileStoreLocations(directoryURL: directory)
+    try FileManager.default.createSymbolicLink(
+      at: locations.backupURL,
+      withDestinationURL: outside
+    )
+
+    do {
+      _ = try await ProfileStore(directoryURL: directory).load()
+      XCTFail("Expected managed backup symlink rejection")
+    } catch {
+      XCTAssertEqual(error as? ProfileStorageError, .unsafeFilesystemObject)
+    }
+
+    XCTAssertEqual(try Data(contentsOf: outside), sentinel)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: locations.primaryURL.path))
+  }
+
+  func testManagedQuarantineDirectorySymlinkIsRejectedBeforeCorruptFileMove() async throws {
+    let directory = try makeTemporaryDirectory()
+    let outside = directory.deletingLastPathComponent().appendingPathComponent(
+      "ProfileStoreQuarantineOutside-\(UUID().uuidString)",
+      isDirectory: true
+    )
+    addTeardownBlock { try? FileManager.default.removeItem(at: outside) }
+    try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: false)
+    let locations = ProfileStoreLocations(directoryURL: directory)
+    let corrupt = Data("not-json".utf8)
+    try corrupt.write(to: locations.primaryURL)
+    try FileManager.default.createSymbolicLink(
+      at: locations.quarantineDirectoryURL,
+      withDestinationURL: outside
+    )
+
+    do {
+      _ = try await ProfileStore(directoryURL: directory).load()
+      XCTFail("Expected managed quarantine symlink rejection")
+    } catch {
+      XCTAssertEqual(error as? ProfileStorageError, .unsafeFilesystemObject)
+    }
+
+    XCTAssertEqual(try Data(contentsOf: locations.primaryURL), corrupt)
+    XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: outside.path).isEmpty)
+  }
+
+  func testManagedNonRegularPrimaryIsRejectedWithoutRecoverySideEffects() async throws {
+    let directory = try makeTemporaryDirectory()
+    let locations = ProfileStoreLocations(directoryURL: directory)
+    try FileManager.default.createDirectory(
+      at: locations.primaryURL,
+      withIntermediateDirectories: false
+    )
+
+    do {
+      _ = try await ProfileStore(directoryURL: directory).load()
+      XCTFail("Expected non-regular managed primary rejection")
+    } catch {
+      XCTAssertEqual(error as? ProfileStorageError, .unsafeFilesystemObject)
+    }
+
+    XCTAssertFalse(FileManager.default.fileExists(atPath: locations.backupURL.path))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: locations.quarantineDirectoryURL.path))
+  }
+
+  func testSecureManagedAccessRejectsUnexpectedOwnerDeterministically() throws {
+    let directory = try makeTemporaryDirectory()
+    let file = directory.appendingPathComponent("profile.json")
+    try Data("{}".utf8).write(to: file)
+    let anotherOwner = Darwin.geteuid() == uid_t.max ? Darwin.geteuid() - 1 : Darwin.geteuid() + 1
+    let directoryPermissions = try permissions(at: directory)
+
+    XCTAssertThrowsError(
+      try SecureFileAccess.preparePrivateDirectory(
+        directory,
+        expectedOwnerID: anotherOwner
+      )
+    ) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .unexpectedFileOwner)
+    }
+    XCTAssertThrowsError(
+      try SecureFileAccess.state(at: file, expectedOwnerID: anotherOwner)
+    ) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .unexpectedFileOwner)
+    }
+    XCTAssertThrowsError(
+      try SecureFileSnapshotReader(expectedOwnerID: anotherOwner).read(
+        from: file,
+        maximumBytes: 1_024
+      )
+    ) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .unexpectedFileOwner)
+    }
+    XCTAssertEqual(try permissions(at: directory), directoryPermissions)
+  }
+
   func testCRUDReorderSelectionAndReload() async throws {
     let directory = try makeTemporaryDirectory()
     let store = ProfileStore(
@@ -41,6 +289,75 @@ final class ProfileStoreTests: XCTestCase {
       ))
   }
 
+  func testLoadRejectsPrimaryReplacedBeforeIdentityBoundPermissionRepair() async throws {
+    let directory = try makeTemporaryDirectory()
+    let timestamp = Date(timeIntervalSince1970: 1_700_000_000)
+    let locations = ProfileStoreLocations(directoryURL: directory)
+    let displacedPrimary = directory.appendingPathComponent("displaced-primary.json")
+    let replacement = directory.appendingPathComponent("replacement.json")
+    let codec = ProfileJSONCodec()
+    let originalProfile = DeskProfile(
+      name: "Snapshot A",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    )
+    let originalDocument = ProfileDocument(
+      profiles: [originalProfile],
+      selectedProfileID: originalProfile.id,
+      updatedAt: timestamp
+    )
+    let replacementProfile = DeskProfile(
+      name: "Replacement B",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    )
+    let replacementDocument = ProfileDocument(
+      profiles: [replacementProfile],
+      selectedProfileID: replacementProfile.id,
+      updatedAt: timestamp
+    )
+    let originalData = try codec.encode(originalDocument)
+    let replacementData = try codec.encode(replacementDocument)
+    try originalData.write(to: locations.primaryURL)
+    try replacementData.write(to: replacement)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o640],
+      ofItemAtPath: replacement.path
+    )
+    let operations = ProfileStoreFileOperations(
+      setPrivatePermissions: { source, expectedIdentity in
+        guard let expectedIdentity else {
+          try SecureFileAccess.setPrivateFilePermissions(source)
+          return
+        }
+        try FileManager.default.moveItem(at: source, to: displacedPrimary)
+        try FileManager.default.moveItem(at: replacement, to: source)
+        try SecureFileAccess.setPrivateFilePermissions(
+          source,
+          expectedIdentity: expectedIdentity
+        )
+      }
+    )
+    let store = ProfileStore(
+      directoryURL: directory,
+      now: { timestamp },
+      fileOperations: operations
+    )
+
+    do {
+      _ = try await store.load()
+      XCTFail("Expected replacement to invalidate the decoded snapshot")
+    } catch {
+      XCTAssertEqual(error as? ProfileStorageError, .fileChangedDuringRead)
+    }
+
+    XCTAssertEqual(try Data(contentsOf: locations.primaryURL), replacementData)
+    XCTAssertEqual(try permissions(at: locations.primaryURL), 0o640)
+    XCTAssertEqual(try Data(contentsOf: displacedPrimary), originalData)
+    let inMemoryDocument = await store.currentDocument()
+    XCTAssertTrue(inMemoryDocument.profiles.isEmpty)
+  }
+
   func testCorruptPrimaryRecoversLastKnownGoodBackupAndQuarantinesSource() async throws {
     let directory = try makeTemporaryDirectory()
     let store = ProfileStore(
@@ -64,6 +381,41 @@ final class ProfileStoreTests: XCTestCase {
     }
     XCTAssertEqual(quarantinedURLs.count, 1)
     XCTAssertTrue(FileManager.default.fileExists(atPath: quarantinedURLs[0].path))
+  }
+
+  func testQuarantineRefusesPrimaryReplacedAfterCorruptSnapshot() async throws {
+    let directory = try makeTemporaryDirectory()
+    let locations = ProfileStoreLocations(directoryURL: directory)
+    let displacedCorrupt = directory.appendingPathComponent("displaced-corrupt.json")
+    let replacement = directory.appendingPathComponent("replacement.json")
+    let corruptData = Data("not-json".utf8)
+    let validDocument = ProfileDocument(
+      updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+    let validData = try ProfileJSONCodec().encode(validDocument)
+    try corruptData.write(to: locations.primaryURL)
+    try validData.write(to: replacement)
+    let operations = ProfileStoreFileOperations(
+      beforeQuarantine: { source in
+        try FileManager.default.moveItem(at: source, to: displacedCorrupt)
+        try FileManager.default.moveItem(at: replacement, to: source)
+      }
+    )
+    let store = ProfileStore(
+      directoryURL: directory,
+      fileOperations: operations
+    )
+
+    do {
+      _ = try await store.load()
+      XCTFail("Expected replaced corrupt snapshot to abort quarantine")
+    } catch {
+      XCTAssertEqual(error as? ProfileStorageError, .fileChangedDuringRead)
+    }
+
+    XCTAssertEqual(try Data(contentsOf: locations.primaryURL), validData)
+    XCTAssertEqual(try Data(contentsOf: displacedCorrupt), corruptData)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: locations.quarantineDirectoryURL.path))
   }
 
   func testCorruptPrimaryAndBackupAreQuarantinedBeforeEmptyReset() async throws {
@@ -92,6 +444,66 @@ final class ProfileStoreTests: XCTestCase {
         FileManager.default.fileExists(atPath: $0.path)
       })
     XCTAssertNoThrow(try ProfileJSONCodec().decode(contentsOf: recoveredStore.locations.primaryURL))
+  }
+
+  func testOversizedPrimaryRecoversValidBackupUsingReadFailureIdentity() async throws {
+    let directory = try makeTemporaryDirectory()
+    let codec = constrainedCodec(maximumDocumentBytes: 1_024)
+    let locations = ProfileStoreLocations(directoryURL: directory)
+    let document = ProfileDocument(updatedAt: Date(timeIntervalSince1970: 1_700_000_000))
+    let validData = try codec.encode(document)
+    try Data(repeating: 0x78, count: 1_025).write(to: locations.primaryURL)
+    try validData.write(to: locations.backupURL)
+
+    let result = try await ProfileStore(directoryURL: directory, codec: codec).load()
+
+    XCTAssertEqual(result.document, document)
+    guard case .recoveredFromBackup(let quarantinedURLs) = result.status else {
+      return XCTFail("Expected oversized-primary recovery, got \(result.status)")
+    }
+    XCTAssertEqual(quarantinedURLs.count, 1)
+    XCTAssertEqual(try Data(contentsOf: locations.primaryURL), validData)
+  }
+
+  func testCorruptPrimaryAndOversizedBackupAreBothQuarantinedBeforeReset() async throws {
+    let directory = try makeTemporaryDirectory()
+    let codec = constrainedCodec(maximumDocumentBytes: 1_024)
+    let locations = ProfileStoreLocations(directoryURL: directory)
+    try Data("not-json".utf8).write(to: locations.primaryURL)
+    try Data(repeating: 0x78, count: 1_025).write(to: locations.backupURL)
+
+    let result = try await ProfileStore(directoryURL: directory, codec: codec).load()
+
+    XCTAssertTrue(result.document.profiles.isEmpty)
+    guard case .resetAfterCorruption(let quarantinedURLs) = result.status else {
+      return XCTFail("Expected oversized-backup reset, got \(result.status)")
+    }
+    XCTAssertEqual(quarantinedURLs.count, 2)
+    XCTAssertTrue(quarantinedURLs.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
+    XCTAssertNoThrow(try codec.decode(contentsOf: locations.primaryURL))
+    XCTAssertNoThrow(try codec.decode(contentsOf: locations.backupURL))
+  }
+
+  func testPersistQuarantinesOversizedCurrentPrimaryBeforeCandidateCommit() async throws {
+    let directory = try makeTemporaryDirectory()
+    let codec = constrainedCodec(maximumDocumentBytes: 4_096)
+    let store = ProfileStore(directoryURL: directory, codec: codec)
+    _ = try await store.load()
+    try Data(repeating: 0x78, count: 4_097).write(
+      to: store.locations.primaryURL,
+      options: [.atomic]
+    )
+
+    let profile = try await store.createProfile(DeskProfile(name: "Recovered Candidate"))
+
+    let reloaded = try await ProfileStore(directoryURL: directory, codec: codec).load()
+    XCTAssertEqual(reloaded.document.profiles.map(\.id), [profile.id])
+    let quarantined = try FileManager.default.contentsOfDirectory(
+      at: store.locations.quarantineDirectoryURL,
+      includingPropertiesForKeys: nil
+    )
+    XCTAssertEqual(quarantined.count, 1)
+    XCTAssertEqual(try Data(contentsOf: quarantined[0]).count, 4_097)
   }
 
   func testFailedUpdateDoesNotChangePersistedOrInMemoryDocument() async throws {
@@ -138,6 +550,101 @@ final class ProfileStoreTests: XCTestCase {
         $0.hasPrefix(".profiles.json.") && $0.hasSuffix(".tmp")
       }
     )
+  }
+
+  func testAtomicReplaceDoesNotFollowDestinationSymlinkInsertedAfterPreflight() throws {
+    let directory = try makeTemporaryDirectory()
+    let destination = directory.appendingPathComponent("profiles.json")
+    let outside = directory.appendingPathComponent("outside.json")
+    let sentinel = Data("outside-sentinel".utf8)
+    let replacement = Data("replacement".utf8)
+    try sentinel.write(to: outside)
+    let writer = PrivateAtomicFileWriter(
+      atomicReplace: { stagingURL, destinationURL in
+        try FileManager.default.createSymbolicLink(
+          at: destinationURL,
+          withDestinationURL: outside
+        )
+        let result = stagingURL.path.withCString { stagingPath in
+          destinationURL.path.withCString { destinationPath in
+            Darwin.rename(stagingPath, destinationPath)
+          }
+        }
+        guard result == 0 else {
+          throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+      }
+    )
+
+    try writer.write(replacement, to: destination)
+
+    XCTAssertEqual(try Data(contentsOf: destination), replacement)
+    XCTAssertEqual(try Data(contentsOf: outside), sentinel)
+    let values = try destination.resourceValues(forKeys: [.isSymbolicLinkKey])
+    XCTAssertEqual(values.isSymbolicLink, false)
+  }
+
+  func testSecureMoveRestoresSourceLeafSwappedBetweenOpenAndRename() throws {
+    let directory = try makeTemporaryDirectory()
+    let quarantine = directory.appendingPathComponent("Quarantine", isDirectory: true)
+    try FileManager.default.createDirectory(at: quarantine, withIntermediateDirectories: false)
+    let source = directory.appendingPathComponent("profiles.json")
+    let displaced = directory.appendingPathComponent("opened-profiles.json")
+    let replacement = directory.appendingPathComponent("replacement.json")
+    let destination = quarantine.appendingPathComponent("corrupt.json")
+    let originalData = Data("original-corrupt".utf8)
+    let replacementData = Data("new-valid-file".utf8)
+    try originalData.write(to: source)
+    try replacementData.write(to: replacement)
+    let expectedIdentity = try SecureFileAccess.regularFileIdentity(at: source)
+
+    XCTAssertThrowsError(
+      try SecureFileAccess.moveRegularFileWithoutFollowing(
+        source,
+        to: destination,
+        expectedIdentity: expectedIdentity,
+        beforeRename: { source, _ in
+          try FileManager.default.moveItem(at: source, to: displaced)
+          try FileManager.default.moveItem(at: replacement, to: source)
+        }
+      )
+    ) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .fileChangedDuringRead)
+    }
+
+    XCTAssertEqual(try Data(contentsOf: source), replacementData)
+    XCTAssertEqual(try Data(contentsOf: displaced), originalData)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+  }
+
+  func testSecureMoveRestoresSourceAfterPostRenameVerificationFailure() throws {
+    let directory = try makeTemporaryDirectory()
+    let quarantine = directory.appendingPathComponent("Quarantine", isDirectory: true)
+    try FileManager.default.createDirectory(at: quarantine, withIntermediateDirectories: false)
+    let source = directory.appendingPathComponent("profiles.json")
+    let destination = quarantine.appendingPathComponent("corrupt.json")
+    let data = Data("recoverable-corrupt-data".utf8)
+    try data.write(to: source)
+    let expectedIdentity = try SecureFileAccess.regularFileIdentity(at: source)
+
+    XCTAssertThrowsError(
+      try SecureFileAccess.moveRegularFileWithoutFollowing(
+        source,
+        to: destination,
+        expectedIdentity: expectedIdentity,
+        afterRename: { _, _ in
+          throw InjectedFileOperationError.postRenameVerificationFailure
+        }
+      )
+    ) { error in
+      XCTAssertEqual(
+        error as? InjectedFileOperationError,
+        .postRenameVerificationFailure
+      )
+    }
+
+    XCTAssertEqual(try Data(contentsOf: source), data)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
   }
 
   func testRenameFailurePreservesDestinationAndCleansPrivateStagingFile() throws {
@@ -252,7 +759,7 @@ final class ProfileStoreTests: XCTestCase {
     let expected = ProfileApplicabilityNormalizer().normalize(document)
     try codec.encode(document).write(to: locations.primaryURL)
     let operations = ProfileStoreFileOperations(
-      setPrivatePermissions: { _ in
+      setPrivatePermissions: { _, _ in
         throw CocoaError(.fileWriteNoPermission)
       }
     )
@@ -277,7 +784,7 @@ final class ProfileStoreTests: XCTestCase {
     let corruptData = Data("not-json".utf8)
     try corruptData.write(to: locations.primaryURL)
     let operations = ProfileStoreFileOperations(
-      setPrivatePermissions: { _ in
+      setPrivatePermissions: { _, _ in
         throw CocoaError(.fileWriteNoPermission)
       }
     )
@@ -466,6 +973,14 @@ final class ProfileStoreTests: XCTestCase {
     return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
   }
 
+  private func constrainedCodec(maximumDocumentBytes: Int) -> ProfileJSONCodec {
+    ProfileJSONCodec(
+      limits: ProfileValidationLimits(
+        maximumDocumentBytes: maximumDocumentBytes
+      )
+    )
+  }
+
   private func unsupportedNetworkDocument(timestamp: Date) -> ProfileDocument {
     var settings = ProfileSettings()
     settings.network = .init(
@@ -495,4 +1010,5 @@ final class ProfileStoreTests: XCTestCase {
 private enum InjectedFileOperationError: Error, Equatable, Sendable {
   case unexpectedStagingPermissions
   case renameFailure
+  case postRenameVerificationFailure
 }

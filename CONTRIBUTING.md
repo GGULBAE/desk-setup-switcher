@@ -4,11 +4,13 @@ Thanks for helping build Desk Setup Switcher. The project is a pre-release 0.1.0
 
 ## Before starting
 
-1. Read [docs/PRODUCT.md](docs/PRODUCT.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [AGENTS.md](AGENTS.md).
+1. Read [docs/PRODUCT.md](docs/PRODUCT.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md), and [AGENTS.md](AGENTS.md).
 2. Check [docs/ROADMAP.md](docs/ROADMAP.md) and existing issues.
 3. Discuss changes that expand scope, add a permission, use a non-public contract, or alter distribution/privacy behavior.
 
-Use full Xcode with a Swift 6.1-or-later toolchain. The project targets macOS 14 or later and checks a universal `arm64 x86_64` Xcode app.
+Use full Xcode with a Swift 6.1-or-later toolchain. The project targets macOS 14 or later and checks a universal `arm64 x86_64` Xcode app. Physical runtime evidence currently covers Apple Silicon only; an `x86_64` cross-build is not an Intel support claim.
+
+General use questions belong in [SUPPORT.md](SUPPORT.md). Roles, decision authority, triage, and release approval are defined in [GOVERNANCE.md](GOVERNANCE.md). Suspected security problems must follow [SECURITY.md](SECURITY.md) and must never be described in a public issue.
 
 ## Canonical commands
 
@@ -17,13 +19,14 @@ make build
 make test
 make lint
 make analyze
+make audit-public-release
 make package
 make verify-package
 make verify
 make clean
 ```
 
-`make verify` is the required local gate. It runs source-policy and formatting checks, the default unit/mock suite, Swift and universal Xcode Debug/Release builds with warnings as errors, Xcode Analyze, no-Developer-ID DMG packaging, SHA-256 validation, and mounted-image inspection.
+`make verify` is the required local gate. It runs source-policy and formatting checks, the default unit/mock suite, Swift and universal Xcode Debug/Release builds with warnings as errors, Xcode Analyze, no-Developer-ID DMG packaging, SHA-256 validation, and mounted-image inspection. `make audit-public-release` separately scans the complete Git history and image metadata for high-confidence credential and personal-path patterns while suppressing matched values; run it from a full, non-shallow checkout before preparing anything public.
 
 The read-only live discovery tests require an explicit opt-in and still do not change settings:
 
@@ -44,6 +47,7 @@ The Keychain round trip has a separate write gate and is not part of normal veri
 - Add deterministic tests for success, capability limitation, permission denial, no-op behavior, partial/fatal failure, stale state, and rollback where relevant.
 - Use synthetic device/network/location data in tests and screenshots.
 - Keep user-facing copy localizable in English and Korean and update README, roadmap, support matrix, and completion evidence with behavior changes.
+- Treat the Swift library products as internal, unstable implementation boundaries. Do not advertise a public SDK or compatibility guarantee without first changing the compatibility policy and adding its tests and documentation.
 
 ## Pull requests
 

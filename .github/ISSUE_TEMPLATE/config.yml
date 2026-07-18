@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Security report
-    url: https://github.com/GGULBAE/desk-setup-switcher/security/advisories/new
-    about: Privately report vulnerabilities or unsafe system mutations.
+  - name: Support question
+    url: https://github.com/GGULBAE/desk-setup-switcher/issues/new?template=support_question.yml
+    about: Ask about installation, use, permissions, recovery, or removal without sensitive data.
+  - name: Security reporting instructions
+    url: https://github.com/GGULBAE/desk-setup-switcher/security/policy
+    about: Do not use public issues; check the current private-reporting status and safe contact path.

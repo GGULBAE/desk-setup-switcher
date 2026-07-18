@@ -1,126 +1,234 @@
 # Distribution
 
-## Current status
+Last updated: 2026-07-18
 
-The version 0.1.0 no-Developer-ID packaging path passes locally. The final P2 integrated gate covered 461 checks: 144 XCTest cases, 316 Swift Testing cases across 39 suites, and one isolated native `NSPopover` regression. Universal Debug/Release, Analyze, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc/no-Developer-ID signature classification passed. Current DMG SHA-256 is `342d804d8bbff51209af4bccefb405ee76499050c1e640a011d41e2f78792031`. The package was reinstalled to `/Applications` and launched; its ad-hoc-signed executable SHA-256 is `fb35352fb6a9588c0c50269975ccd3d7b73e52010de10de132bf45d60236f719`. Profile primary/backup/defaults remained unchanged. The [P2 audit](P2-UI-REFINEMENT-AUDIT-2026-07-17.md) and [P2 evidence index](evidence/p2-ui-refinement-2026-07-17/README.md) are the authoritative UI/package record for this build.
+Desk Setup Switcher has no public release. The repository can currently build and inspect an ad-hoc-signed development DMG, but that artifact is not an end-user distribution. The official `v0.1.0` public beta requires Developer ID signing, hardened runtime, secure timestamps, notarization, stapling, Gatekeeper verification, protected approval, and clean-download evidence before publication.
 
-Initial Actions run `29154880831` for implementation commit `0d8f510` exposed the Swift 6.1 actor-isolation issue. Repair commit `4e45328` is pushed, and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) succeeded on 2026-07-11 under macOS 15/Xcode 16.4/Swift 6.1.2; full `make verify` and unsigned-package upload passed. No release has been published, and the downloaded/quarantined Gatekeeper path remains untested.
+## Distribution classes
 
-Developer ID signing and notarization remain optional and unimplemented because the repository has no Apple signing identity or notarization credentials.
+| Class | Purpose | May be public/canonical? |
+| --- | --- | --- |
+| Local or CI ad-hoc DMG | Contributor testing, deterministic package inspection, and historical evidence | No |
+| GitHub unsigned draft prerelease | A protected review record for the current verification pipeline | No |
+| Developer ID + notarized release candidate | Clean-install beta testing after all trust checks pass | Only inside a protected draft until final approval |
+| Approved `v0.1.0` GitHub Release | Canonical public-beta download with checksum, provenance, SBOM, and release evidence | Yes |
+| Homebrew cask | Convenience installation after the canonical notarized release is proven | Only after the GitHub Release; own tap first |
 
-## Baseline no-Developer-ID release
+An ad-hoc signature is never promoted by changing its description. A public artifact must be built through the separate identity-signed path and must pass every public gate below.
 
-Run:
+## Current development baseline
+
+The 2026-07-18 open-source baseline's no-Developer-ID path passed 496 checks: 173 XCTest checks, 322 Swift Testing checks across 40 suites, and one isolated native `NSPopover` regression. Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed. The package was not installed or launched.
+
+- Development-only DMG SHA-256: `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`
+- Authoritative record: [Open-source release baseline audit](OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md)
+
+This hash is local development evidence only. It must not appear as the checksum of a signed public candidate.
+
+## Historical P2 development baseline
+
+The P2 baseline's no-Developer-ID path passed 461 checks: 144 XCTest cases, 316 Swift Testing cases across 39 suites, and one isolated native `NSPopover` regression. Universal Debug/Release, Analyze, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed.
+
+- P2 development DMG SHA-256: `342d804d8bbff51209af4bccefb405ee76499050c1e640a011d41e2f78792031`
+- Reinstalled P2 ad-hoc executable SHA-256: `fb35352fb6a9588c0c50269975ccd3d7b73e52010de10de132bf45d60236f719`
+- Authoritative records: [P2 audit](P2-UI-REFINEMENT-AUDIT-2026-07-17.md) and [P2 evidence index](evidence/p2-ui-refinement-2026-07-17/README.md)
+
+Those hashes identify a historical development baseline, not the current changing worktree and not a release candidate. They must not be copied into `v0.1.0` release notes.
+
+GitHub Actions run `29154880831` historically exposed a Swift 6.1 actor-isolation failure. Repair commit `4e45328` and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) passed the then-current `make verify` and unsigned artifact upload. No release workflow, Developer ID signing, notarization, stapling, or downloaded-quarantine install has passed.
+
+## Development-only ad-hoc package
+
+Contributors can run:
 
 ```sh
-make package
-make verify-package
+make verify
+make audit-public-release
 ```
 
-`make package` performs the universal Release Xcode build with automatic signing disabled, copies the app into a temporary staging directory, then applies a free ad-hoc signature:
+The packaging portion creates:
+
+- `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`
+- `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg.sha256`
+
+`make package` builds the universal Release app with automatic signing disabled and applies this ad-hoc signature:
 
 ```text
 Signature=adhoc
 Authority=(none)
 ```
 
-That signature supplies a local code-integrity envelope and satisfies the packaging design's code-signature prerequisite. It does **not** authenticate GGULBAE, establish an Apple trust chain, provide a Developer ID identity, notarize the app, or bypass Gatekeeper. The DMG itself is not Developer ID signed or notarized. The artifact keeps `unsigned` in its name to mean “not identity-signed,” even though the contained app is ad-hoc signed.
+`make verify-package` recomputes the checksum, mounts the DMG read-only, checks the app and `/Applications` link, confirms `arm64 x86_64`, validates bundle metadata and English/Korean resources, and requires a structurally valid ad-hoc signature with no identity authority. `make audit-public-release` scans complete Git history and image metadata for high-confidence credential and personal-path patterns while suppressing matched values.
 
-The command creates:
+These checks provide development integrity evidence only. They do not authenticate the publisher, establish an Apple trust chain, enable hardened runtime, notarize or staple the artifact, or prove the downloaded Gatekeeper path. Local and CI DMGs are not byte-for-byte reproducible, so each artifact requires its own checksum.
 
-- `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`
-- `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg.sha256`
+### Contributor installation only
 
-The historical 2026-07-11 post-fix locally verified DMG has SHA-256 `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`; the current checksum is recorded above.
-
-Downloaded CI artifact ID `8249295840` verified its checksum file and CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`. The local and CI-generated DMGs are not byte-for-byte reproducible, so both checksums remain part of the evidence.
-
-The DMG contains `Desk Setup Switcher.app` and an `/Applications` symbolic link. `make verify-package`:
-
-- parses and recomputes the single SHA-256 entry;
-- mounts the image read-only;
-- validates the executable and `/Applications` link;
-- confirms `arm64 x86_64`;
-- checks bundle identity, versions, deployment target, `LSUIElement`, location usage copy, icon, and English/Korean resources;
-- rejects any identity-signed app in an artifact named unsigned;
-- requires and structurally verifies the ad-hoc app signature.
-
-The checksum detects accidental or malicious byte changes only when the checksum itself comes from a separately trusted source. Neither the checksum nor `codesign --verify` supplies publisher identity.
-
-`make verify` is the full release-candidate gate and also runs lint, default tests, Debug/Release Swift and Xcode builds, and Xcode Analyze. CI is configured to use the same command and does not opt into live discovery, Keychain writes, or setting mutations.
-
-## Manual evidence and remaining gaps
-
-A separately authorized 2026-07-18 follow-up reinstalled and launched the final P2 DMG. `⌘,` routed Profiles from visible System/About and close→reopen/stale cases. Return expanded and Space collapsed the named disclosure while AX value, hint, and child presence updated. `x86_64 arm64`, profile primary/backup/defaults invariants, and VoiceOver process/preference 0 were confirmed. VoiceOver was not run and no VoiceOver claim is made. No Apply, Capture, TCC, login-item, or hardware-setting mutation was invoked.
-
-A separately authorized 2026-07-17 follow-up reinstalled the current package to `/Applications` and exercised only bounded UI geometry. Twenty measured popover opens had exact center delta `0`. A `500×300` Settings request clamped to `680×480`, while the normal `900×568` frame remained stable across ten opens. A `500×300` workflow request clamped to `520×392`; its initial frame was `620×532` with `620×500` content, and Escape closed it. Apply, Capture, TCC, login, and system-setting mutations were not invoked.
-
-A historical 2026-07-11 DMG was also installed fresh to `/Applications` and launched background-only/menu-bar-only. Its then-current popover and Settings window rendered in Korean, and an accessibility label passed inspection. It created one schema-v1 Ready profile from a read-only snapshot with all four setting groups; its zero-operation plan kept Apply and Force Apply disabled. That historical evidence does not prove full-app accessibility behavior.
-
-Default-on `SMAppService` registration succeeded and Background Task Management reported `[enabled, allowed, notified]`. UI opt-out moved it to disabled, and re-enable restored enabled status. Final cleanup opted out and left only disabled BTM history.
-
-This does not complete the release matrix:
-
-- Login-item approval-required and failure/retry paths were not exercised, and actual login-at-boot after a reboot was not tested.
-- No full keyboard audit, focused-control AX observation, import/export workflow, or permission-denial matrix was run. VoiceOver was explicitly excluded from the P2 release gate and remains unverified/nonblocking; the recorded disclosure check is not a complete keyboard walkthrough.
-- A locally built file does not exercise download quarantine. Gatekeeper/Open Anyway remains untested on a clean user account or Mac.
-- The x86_64 slice was inspected, but the app was not executed on physical Intel hardware.
-- No display, audio, network, mouse, or keyboard mutation was run.
-
-## Installing an unsigned build
-
-An app without a Developer ID identity can be blocked after download. Verify the published SHA-256 checksum first:
+If a contributor explicitly chooses to install an ad-hoc build, verify its locally supplied checksum first:
 
 ```sh
 shasum -a 256 -c Desk-Setup-Switcher-0.1.0-unsigned.dmg.sha256
 ```
 
-Then mount the DMG, drag the app to Applications, and use a normal macOS approval flow:
+macOS may require an explicit **Open Anyway** decision for this development artifact. Never disable Gatekeeper globally or remove quarantine recursively. End-user documentation, the demo site, and promotional material must not link to this artifact or instruct ordinary users to bypass Gatekeeper.
 
-1. Attempt to open the app once.
-2. Open **System Settings → Privacy & Security**.
-3. Confirm **Open Anyway** for Desk Setup Switcher and approve the warning.
+## Current GitHub Actions candidate path
 
-On macOS versions that offer it, Control-clicking the app in Finder and choosing **Open** can provide an equivalent explicit approval. Never disable Gatekeeper globally, remove quarantine recursively, or tell users the ad-hoc build is Developer ID signed or notarized.
+The CI workflow uses a complete checkout, runs `make verify` and `make audit-public-release`, and uploads the ad-hoc DMG/checksum for 14 days. It does not receive signing or notarization secrets.
 
-This exact quarantined install flow has not yet been recorded, so these steps remain guidance rather than verified release evidence.
+The tag workflow currently:
 
-## GitHub Actions release path
+1. triggers for `v*` tags and requires the tag to equal `v` plus `CFBundleShortVersionString`;
+2. references the GitHub environment named `release`;
+3. reruns `make verify` and `make audit-public-release` from a complete checkout; and
+4. calls `gh release create` with `--draft --prerelease`, an **unsigned candidate** title, and only the ad-hoc DMG/checksum.
 
-The CI workflow runs `make verify` for pushes to `master`, pull requests, and manual dispatch, then uploads the no-Developer-ID DMG/checksum. The release workflow triggers on `v*` tags, rejects a tag that does not equal `v` plus `CFBundleShortVersionString`, reruns `make verify`, and uses GitHub's token to create an explicitly unsigned release.
+It does not use Developer ID, hardened runtime, secure timestamping, notarization, stapling, SBOM generation, artifact attestation, clean-install verification, or an automatic publish command. A draft/prerelease is not a public release, and the current workflow must never be described as the official distribution path.
 
-Run `29154880831` preserves the initial compiler-compatibility failure history. Repair [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) passed full `make verify` and unsigned artifact upload for `4e45328`, including the SHA-pinned `actions/checkout` v7.0.0 and `actions/upload-artifact` v7.0.1 Node-24 majors. The release workflow has not run. A tag must not be pushed until the remaining release/manual matrix has been accepted and the completion ledger is current.
+Do not push the final `v0.1.0` tag until the release-only signed path exists and the release environment is actually protected. The workflow name `environment: release` does not configure protection by itself. A read-only GitHub API check on 2026-07-18 found zero configured environments and no protection on `master`.
 
-## Optional Developer ID signing
+Before any release tag is allowed, a repository administrator must:
 
-Signing requires an Apple Developer Program membership, a Developer ID Application certificate, protected credentials, hardened-runtime decisions, and any required entitlements. None are checked in. A future release operator must add a reviewed, reproducible path that:
+- create the `release` environment;
+- restrict it to intended release tags;
+- configure the real required reviewer and decide whether self-review and administrator bypass are prohibited;
+- store signing/notarization credentials only in that protected environment;
+- protect `master` with the required CI checks and a documented emergency-bypass policy; and
+- enable the private reporting path required by [SECURITY.md](../SECURITY.md).
 
-1. Builds the universal Release app with hardened runtime and reviewed entitlements.
-2. Signs every required nested code object and the app with the Developer ID Application identity.
-3. Verifies with `codesign --verify --deep --strict --verbose=2` and inspects the designated requirement and authority chain.
-4. Builds and signs the DMG, then records identity/team metadata without exposing credentials.
+See [GOVERNANCE.md](../GOVERNANCE.md) for current roles and approval authority. GitHub documents that environment secrets remain unavailable until required approval when that protection is configured; merely referencing an environment supplies no such guarantee.
 
-Until a real run passes, release notes and artifact names must say **unsigned** or **no Developer ID**. An ad-hoc signature is not Developer ID evidence.
+## Required public-beta trust path
 
-## Optional notarization and stapling
+This path is mandatory for `v0.1.0` and is not implemented yet. The operator must use one release build as the candidate through signing, packaging, notarization, stapling, and approval. A retry after any source, resource, entitlement, or executable change is a new candidate and must restart the gate.
 
-After a valid Developer ID signing path exists, submit the DMG with `xcrun notarytool submit --wait` using a protected Keychain profile or CI secret. A successful submission is insufficient by itself: staple the ticket, validate the staple, and assess the app/DMG with `spctl` on a clean system.
+### 1. Freeze and audit the candidate
 
-Credentials, certificate exports, API keys, and notarization profiles must never be committed or printed. Fork pull requests must not receive release secrets. Notarization is currently **not implemented and not tested**.
+- Start from a clean commit whose app version, build number, tag, changelog, support matrix, and completion ledger agree.
+- Run `make verify`, `make audit-public-release`, and `git diff --check` from a complete checkout.
+- Confirm the supported public-beta platform is Apple Silicon unless physical Intel verification has been recorded.
+- Audit the minimum entitlements. Hardened-runtime exceptions require an explicit justification; `com.apple.security.get-task-allow` must not be present in the release signature.
+- Confirm the Apple Developer Program team, Developer ID Application certificate, and notarization credential are available without exporting or logging secrets.
 
-## Release evidence checklist
+### 2. Build once and sign for distribution
 
-For each release, record:
+Build the release app once. Sign nested code from the inside out if any is introduced, then sign the app with a **Developer ID Application** identity, hardened runtime, and secure timestamp. Illustrative verification commands are:
 
-- tag and commit;
-- Xcode, Swift, SDK, and macOS versions;
-- lint, test, Debug/Release build, Analyze, and `make verify` results;
-- executable architecture and signature-class inspection;
-- DMG file listing, mounted-image validation, and checksum verification;
-- packaged-app launch, menu-bar/Dock, login-item, import/export, diagnostics, and accessibility results;
-- quarantined Gatekeeper procedure on a clean user or Mac;
-- signing, notarization, and stapling status, explicitly “not performed” when absent;
-- read-only and hardware-mutation status from the support matrix;
-- CI run and release URL.
+```sh
+codesign --force --sign "$DEVELOPER_ID_APPLICATION" \
+  --options runtime \
+  --timestamp \
+  "Desk Setup Switcher.app"
+
+codesign --verify --deep --strict --verbose=2 "Desk Setup Switcher.app"
+codesign --display --verbose=4 "Desk Setup Switcher.app"
+codesign --display --entitlements - "Desk Setup Switcher.app"
+```
+
+If the audited app needs entitlements, the implemented script must add `--entitlements` with the reviewed release plist; it must not reuse debug entitlements implicitly. The release script must supply `--options runtime` and `--timestamp` when signing. It must inspect the authority chain and fail if the identity, Team ID, hardened-runtime flag, secure timestamp, or reviewed entitlement set differs from policy. Ad-hoc signing, Apple Development, and Mac App Distribution identities are not substitutes for Developer ID Application.
+
+Package that exact signed app without rebuilding it. Sign the final DMG with the reviewed Developer ID identity and a secure timestamp, then verify the app extracted from the DMG is byte-identical to the signed app that entered packaging:
+
+```sh
+codesign --force --sign "$DEVELOPER_ID_APPLICATION" \
+  --timestamp \
+  "Desk-Setup-Switcher-0.1.0.dmg"
+codesign --verify --strict --verbose=2 "Desk-Setup-Switcher-0.1.0.dmg"
+```
+
+### 3. Notarize, staple, and assess
+
+Use `notarytool`, not the retired `altool`, with credentials stored in a protected Keychain profile or protected CI secret. The operator flow is:
+
+```sh
+xcrun notarytool submit "Desk-Setup-Switcher-0.1.0.dmg" \
+  --keychain-profile "NOTARY_PROFILE" \
+  --wait \
+  --output-format json > notary-result.json
+
+xcrun notarytool log "SUBMISSION_ID" notary-log.json \
+  --keychain-profile "NOTARY_PROFILE"
+
+xcrun stapler staple "Desk-Setup-Switcher-0.1.0.dmg"
+xcrun stapler validate "Desk-Setup-Switcher-0.1.0.dmg"
+spctl --assess --type open --context context:primary-signature --verbose=4 \
+  "Desk-Setup-Switcher-0.1.0.dmg"
+```
+
+The implementation must parse the submission result and require `Accepted`; command exit alone is insufficient. Preserve the submission ID and redacted notary log as release evidence. Staple and validate the final DMG, mount it read-only, and assess the contained app separately with `spctl --assess --type execute --verbose=4`. Any modification after signing or notarization invalidates the candidate and restarts the path.
+
+### 4. Verify and attach release evidence
+
+After stapling, compute the final SHA-256 and verify:
+
+- Developer ID authority, Team ID, hardened runtime, secure timestamps, and minimal entitlements;
+- notarization result/log and stapler validation;
+- Gatekeeper assessment of both DMG and app;
+- deployment target, `arm64` support, resources, localization, bundle ID, app/build versions, and login-item opt-in behavior;
+- checksum file syntax and recomputation;
+- an SBOM for the exact candidate;
+- GitHub artifact provenance/attestation bound to the exact final asset; and
+- tag, commit, workflow run, source tree, and artifact identity.
+
+Attach the signed/stapled DMG, checksum, SBOM, provenance/attestation, curated English/Korean notes, and sanitized evidence to a protected draft. The repository currently has no SBOM, attestation, or signed-release implementation, so none may be claimed yet.
+
+Download every proposed asset back through GitHub, recompute its hash, verify its signature and attestation, and compare it with the approved local candidate. Enable immutable-release behavior when available and compatible with the repository plan. Approval must be recorded before publication; no workflow may silently turn the current unsigned draft into a public release.
+
+## Clean-download public-beta gate
+
+Test the exact downloaded and quarantined candidate on a clean account or Mac without deleting quarantine metadata:
+
+1. Verify the published checksum before mounting.
+2. Confirm Gatekeeper identifies the Developer ID publisher and opens the app without an **Open Anyway** workaround.
+3. Verify first launch, menu-bar-only behavior, Capture → Edit → Review & Apply explanation, permissions, and login-at-launch default-off/explicit opt-in.
+4. Verify upgrade, schema migration, last-known-good backup recovery, import/export, diagnostics, uninstall, and optional local-data removal.
+5. Record Apple Silicon results. Do not advertise Intel until the physical Intel matrix passes.
+6. Collect at least three external clean-install beta results and resolve every P0/P1 issue before public approval.
+
+No live display, audio, or network mutation is authorized by this distribution procedure. Hardware mutation evidence requires its own explicit approval, preflight snapshot, interactive action, and rollback procedure from the [support matrix](SUPPORT-MATRIX.md). Features without that evidence remain labelled mock verified, live-read verified, experimental, or unverified.
+
+Keyboard operation, accessibility names/values, and non-color cues remain release requirements. Full-app VoiceOver certification is not a release gate and must not be claimed.
+
+## Homebrew sequence
+
+GitHub Releases remains the canonical download. Do not create or advertise a cask until the Developer ID-signed, notarized, stapled public artifact has a stable GitHub Release URL and final SHA-256.
+
+After that release:
+
+1. Add a cask to a project-owned tap using the canonical versioned URL and exact checksum.
+2. Define uninstall and `zap` behavior that accurately covers the app bundle and optional app-owned local data without deleting unrelated files.
+3. Verify clean `install`, `upgrade`, `uninstall`, and `zap` on supported macOS/Apple Silicon using the downloaded notarized artifact.
+4. Keep the official Homebrew Cask submission as a later milestone after the self-hosted tap and patch-release process are proven.
+
+Homebrew must not become a runtime dependency, and the app must not gain an updater or outbound network path.
+
+## Release failure and support policy
+
+Never replace a published asset or move/reuse its tag to hide a problem. Mark the affected release as discontinued or affected, stop promotion/download links, and publish a corrected patch version through the full gate. The latest beta is supported; the immediately preceding beta may receive critical fixes for up to 30 days when practical. The stable support window is the latest and immediately preceding stable minor lines, as defined in [Compatibility and versioning](COMPATIBILITY.md).
+
+## Final release evidence checklist
+
+For each public release, record:
+
+- tag, commit, app version, build number, clean-worktree status, and protected approval;
+- Xcode, Swift, SDK, runner macOS, supported CPU, and deployment target;
+- `make verify`, `make audit-public-release`, `git diff --check`, remote CI, and version/tag checks;
+- exact build/sign/package candidate lineage with no rebuild between stages;
+- Developer ID authority/Team ID, hardened runtime, secure timestamps, and reviewed entitlements;
+- notary submission ID, accepted status, redacted log, stapling, and app/DMG Gatekeeper assessments;
+- mounted package resources, checksum, SBOM, provenance/attestation, and re-downloaded asset identity;
+- clean-quarantine first launch, upgrade, migration/backup recovery, import/export, diagnostics, uninstall, and local-data removal;
+- external beta results and zero unresolved P0/P1 issues;
+- capability claims matched to the support matrix, with no Intel, hardware-mutation, or VoiceOver certification overclaim;
+- GitHub Release URL plus synchronized site, README, English/Korean notes, and support/security documents; and
+- Homebrew status, explicitly “not offered” until post-notarization verification.
 
 Do not include personal device identifiers, real SSIDs, exact locations, IP host addresses, credentials, or unredacted diagnostics in release evidence.
+
+## Authoritative references
+
+- [Apple: Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
+- [Apple: Hardened Runtime](https://developer.apple.com/documentation/security/hardened-runtime)
+- [GitHub: Deployments and environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
+- [GitHub: Using artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations)
+- [Homebrew: Cask Cookbook](https://docs.brew.sh/Cask-Cookbook)

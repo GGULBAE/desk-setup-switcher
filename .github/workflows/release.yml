@@ -13,14 +13,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  unsigned-release:
-    name: Verify and publish unsigned DMG
+  unsigned-candidate:
+    name: Verify unsigned release candidate
     runs-on: macos-15
     timeout-minutes: 45
+    environment: release
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Show toolchain
@@ -37,13 +39,18 @@ jobs:
       - name: Run complete verification
         run: make verify
 
-      - name: Publish GitHub release
+      - name: Audit public release history and assets
+        run: make audit-public-release
+
+      - name: Create draft GitHub release candidate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
             artifacts/*.dmg \
             artifacts/*.sha256 \
+            --draft \
+            --prerelease \
             --generate-notes \
             --verify-tag \
-            --title "Desk Setup Switcher $GITHUB_REF_NAME (unsigned)"
+            --title "Desk Setup Switcher $GITHUB_REF_NAME (unsigned candidate)"

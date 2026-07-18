@@ -23,21 +23,31 @@ struct PrivateAtomicFileWriter: Sendable {
   /// Prepares a private staging file completely before one atomic rename commits it.
   /// No fallible permission change occurs after the destination has been replaced.
   func write(_ data: Data, to destination: URL) throws {
-    let stagingURL = destination.deletingLastPathComponent().appendingPathComponent(
-      ".\(destination.lastPathComponent).\(UUID().uuidString).tmp",
+    let normalizedDestination = destination.standardizedFileURL
+    switch try SecureFileAccess.state(at: normalizedDestination) {
+    case .missing, .regularFile:
+      break
+    case .directory:
+      throw ProfileStorageError.unsafeFilesystemObject
+    }
+    let stagingURL = normalizedDestination.deletingLastPathComponent().appendingPathComponent(
+      ".\(normalizedDestination.lastPathComponent).\(UUID().uuidString).tmp",
       isDirectory: false
     )
     defer { try? FileManager.default.removeItem(at: stagingURL) }
 
     try createPrivateStagingFile(data, stagingURL)
-    try atomicReplace(stagingURL, destination)
+    try atomicReplace(stagingURL, normalizedDestination)
+    Self.synchronizeParentDirectoryBestEffort(
+      normalizedDestination.deletingLastPathComponent()
+    )
   }
 
   private static func writePrivateStagingFile(_ data: Data, to url: URL) throws {
     let descriptor = url.path.withCString { path in
       Darwin.open(
         path,
-        O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC,
+        O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
         mode_t(0o600)
       )
     }
@@ -83,6 +93,14 @@ struct PrivateAtomicFileWriter: Sendable {
       }
     }
 
+    // Flush staged bytes before the atomic rename publishes this inode. APFS
+    // supports F_FULLFSYNC; fall back to fsync for other mounted filesystems.
+    if Darwin.fcntl(descriptor, F_FULLFSYNC) == -1,
+      Darwin.fsync(descriptor) != 0
+    {
+      throw posixError(errno)
+    }
+
     let closeResult = Darwin.close(descriptor)
     let closeError = errno
     isOpen = false
@@ -103,6 +121,18 @@ struct PrivateAtomicFileWriter: Sendable {
     }
   }
 
+  /// The committed rename cannot be rolled back safely if directory syncing
+  /// fails, so this is a best-effort durability step after atomic visibility.
+  private static func synchronizeParentDirectoryBestEffort(_ directoryURL: URL) {
+    let descriptor = directoryURL.withUnsafeFileSystemRepresentation { path -> Int32 in
+      guard let path else { return -1 }
+      return Darwin.open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    }
+    guard descriptor >= 0 else { return }
+    _ = Darwin.fsync(descriptor)
+    _ = Darwin.close(descriptor)
+  }
+
   private static func posixError(_ code: Int32) -> POSIXError {
     POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
   }
@@ -110,44 +140,62 @@ struct PrivateAtomicFileWriter: Sendable {
 
 struct ProfileStoreFileOperations: Sendable {
   typealias PrivateFileWriter = @Sendable (Data, URL) throws -> Void
-  typealias SetPrivatePermissions = @Sendable (URL) throws -> Void
-  typealias MoveItem = @Sendable (URL, URL) throws -> Void
+  typealias SetPrivatePermissions = @Sendable (URL, SecureFileIdentity?) throws -> Void
+  typealias MoveItem = @Sendable (URL, URL, SecureFileIdentity) throws -> Void
+  typealias BeforeQuarantine = @Sendable (URL) throws -> Void
 
   let privateFileWriter: PrivateFileWriter
   let setPrivatePermissions: SetPrivatePermissions
   let moveItem: MoveItem
+  let beforeQuarantine: BeforeQuarantine
 
   init(
     privateFileWriter: @escaping PrivateFileWriter = { data, url in
       try PrivateAtomicFileWriter().write(data, to: url)
     },
-    setPrivatePermissions: @escaping SetPrivatePermissions = { url in
-      try FileManager.default.setAttributes(
-        [.posixPermissions: 0o600],
-        ofItemAtPath: url.path
+    setPrivatePermissions: @escaping SetPrivatePermissions = { url, expectedIdentity in
+      try SecureFileAccess.setPrivateFilePermissions(
+        url,
+        expectedIdentity: expectedIdentity
       )
     },
-    moveItem: @escaping MoveItem = { source, destination in
-      try FileManager.default.moveItem(at: source, to: destination)
-    }
+    moveItem: @escaping MoveItem = { source, destination, expectedIdentity in
+      try SecureFileAccess.moveRegularFileWithoutFollowing(
+        source,
+        to: destination,
+        expectedIdentity: expectedIdentity
+      )
+    },
+    beforeQuarantine: @escaping BeforeQuarantine = { _ in }
   ) {
     self.privateFileWriter = privateFileWriter
     self.setPrivatePermissions = setPrivatePermissions
     self.moveItem = moveItem
+    self.beforeQuarantine = beforeQuarantine
   }
 }
 
 public struct ProfileStoreLocations: Equatable, Sendable {
   public let directoryURL: URL
+  public let fileName: String
   public let primaryURL: URL
   public let backupURL: URL
   public let quarantineDirectoryURL: URL
 
   public init(directoryURL: URL, fileName: String = "profiles.json") {
-    self.directoryURL = directoryURL
-    self.primaryURL = directoryURL.appendingPathComponent(fileName, isDirectory: false)
-    self.backupURL = directoryURL.appendingPathComponent("profiles.backup.json", isDirectory: false)
-    self.quarantineDirectoryURL = directoryURL.appendingPathComponent(
+    let normalizedDirectoryURL =
+      directoryURL.isFileURL ? directoryURL.standardizedFileURL : directoryURL
+    self.directoryURL = normalizedDirectoryURL
+    self.fileName = fileName
+    self.primaryURL = normalizedDirectoryURL.appendingPathComponent(
+      fileName,
+      isDirectory: false
+    )
+    self.backupURL = normalizedDirectoryURL.appendingPathComponent(
+      "profiles.backup.json",
+      isDirectory: false
+    )
+    self.quarantineDirectoryURL = normalizedDirectoryURL.appendingPathComponent(
       "Quarantine", isDirectory: true)
   }
 }
@@ -212,10 +260,11 @@ public actor ProfileStore {
   }
 
   public func load() throws -> ProfileLoadResult {
+    try validateLocations()
     try createDirectoryIfNeeded(locations.directoryURL)
 
-    guard FileManager.default.fileExists(atPath: locations.primaryURL.path) else {
-      if FileManager.default.fileExists(atPath: locations.backupURL.path) {
+    guard try regularFileExists(at: locations.primaryURL) else {
+      if try regularFileExists(at: locations.backupURL) {
         return try recoverFromBackup(quarantinedURLs: [])
       }
       let empty = ProfileDocument(updatedAt: now())
@@ -225,13 +274,33 @@ public actor ProfileStore {
       return ProfileLoadResult(document: empty, status: .createdEmpty)
     }
 
+    let primarySnapshot: SecureFileSnapshot
     do {
-      let decoded = try codec.decode(contentsOf: locations.primaryURL)
+      primarySnapshot = try codec.readSnapshot(contentsOf: locations.primaryURL)
+    } catch let failure as SecureFileSnapshotReadFailure
+      where failure.storageError.canQuarantine
+    {
+      return try recoverAfterCorruption(
+        cause: failure.storageError,
+        expectedIdentity: failure.identity
+      )
+    } catch let failure as SecureFileSnapshotReadFailure {
+      throw failure.storageError
+    }
+    do {
+      let decoded = try codec.decode(primarySnapshot.data)
       if decoded.requiresPersistence {
+        try ensureCurrentIdentity(
+          of: locations.primaryURL,
+          equals: primarySnapshot.identity
+        )
         try persist(decoded.document)
       } else {
-        try setPrivateFilePermissions(locations.primaryURL)
-        if FileManager.default.fileExists(atPath: locations.backupURL.path) {
+        try setPrivateFilePermissions(
+          locations.primaryURL,
+          expectedIdentity: primarySnapshot.identity
+        )
+        if try regularFileExists(at: locations.backupURL) {
           try setPrivateFilePermissions(locations.backupURL)
         }
       }
@@ -245,9 +314,17 @@ public actor ProfileStore {
       }
       return ProfileLoadResult(document: decoded.document, status: .loaded)
     } catch let error as ProfileValidationError {
-      return try recoverAfterCorruption(cause: error)
+      return try recoverAfterCorruption(
+        cause: error,
+        expectedIdentity: primarySnapshot.identity
+      )
     } catch let error as ProfileStorageError where error.canQuarantine {
-      return try recoverAfterCorruption(cause: error)
+      return try recoverAfterCorruption(
+        cause: error,
+        expectedIdentity: primarySnapshot.identity
+      )
+    } catch let error as ProfileStorageError {
+      throw error
     } catch {
       throw ProfileStorageError.io(String(describing: error))
     }
@@ -391,19 +468,37 @@ public actor ProfileStore {
   private func persist(_ candidate: ProfileDocument) throws {
     let data = try codec.encode(candidate)
     try createDirectoryIfNeeded(locations.directoryURL)
-    var hasUsableBackup = FileManager.default.fileExists(atPath: locations.backupURL.path)
+    var hasUsableBackup = try regularFileExists(at: locations.backupURL)
 
-    if FileManager.default.fileExists(atPath: locations.primaryURL.path) {
+    if try regularFileExists(at: locations.primaryURL) {
       do {
-        let previous = try codec.decode(contentsOf: locations.primaryURL).document
-        let previousData = try codec.encode(previous)
-        try writePrivateFileAtomically(previousData, to: locations.backupURL)
-        hasUsableBackup = true
-      } catch let error as ProfileValidationError {
-        _ = try quarantine(locations.primaryURL)
-        _ = error
-      } catch let error as ProfileStorageError where error.canQuarantine {
-        _ = try quarantine(locations.primaryURL)
+        let primarySnapshot = try codec.readSnapshot(contentsOf: locations.primaryURL)
+        do {
+          let previous = try codec.decode(primarySnapshot.data).document
+          let previousData = try codec.encode(previous)
+          try writePrivateFileAtomically(previousData, to: locations.backupURL)
+          hasUsableBackup = true
+        } catch let error as ProfileValidationError {
+          _ = try quarantine(
+            locations.primaryURL,
+            expectedIdentity: primarySnapshot.identity
+          )
+          _ = error
+        } catch let error as ProfileStorageError where error.canQuarantine {
+          _ = try quarantine(
+            locations.primaryURL,
+            expectedIdentity: primarySnapshot.identity
+          )
+        }
+      } catch let failure as SecureFileSnapshotReadFailure
+        where failure.storageError.canQuarantine
+      {
+        _ = try quarantine(
+          locations.primaryURL,
+          expectedIdentity: failure.identity
+        )
+      } catch let failure as SecureFileSnapshotReadFailure {
+        throw failure.storageError
       }
     }
 
@@ -412,24 +507,52 @@ public actor ProfileStore {
         try writePrivateFileAtomically(data, to: locations.backupURL)
       }
       try writePrivateFileAtomically(data, to: locations.primaryURL)
+    } catch let error as ProfileStorageError {
+      throw error
     } catch {
       throw ProfileStorageError.io(String(describing: error))
     }
   }
 
-  private func recoverAfterCorruption(cause: Error) throws -> ProfileLoadResult {
-    let quarantinedPrimary = try quarantine(locations.primaryURL)
+  private func recoverAfterCorruption(
+    cause: Error,
+    expectedIdentity: SecureFileIdentity
+  ) throws -> ProfileLoadResult {
+    let quarantinedPrimary = try quarantine(
+      locations.primaryURL,
+      expectedIdentity: expectedIdentity
+    )
     _ = cause
-    if FileManager.default.fileExists(atPath: locations.backupURL.path) {
+    if try regularFileExists(at: locations.backupURL) {
       return try recoverFromBackup(quarantinedURLs: [quarantinedPrimary])
     }
     return try resetAfterCorruption(quarantinedURLs: [quarantinedPrimary])
   }
 
   private func recoverFromBackup(quarantinedURLs: [URL]) throws -> ProfileLoadResult {
+    let backupSnapshot: SecureFileSnapshot
     do {
-      let decoded = try codec.decode(contentsOf: locations.backupURL)
+      backupSnapshot = try codec.readSnapshot(contentsOf: locations.backupURL)
+    } catch let failure as SecureFileSnapshotReadFailure
+      where failure.storageError.canQuarantine
+    {
+      let quarantinedBackup = try quarantine(
+        locations.backupURL,
+        expectedIdentity: failure.identity
+      )
+      return try resetAfterCorruption(
+        quarantinedURLs: quarantinedURLs + [quarantinedBackup]
+      )
+    } catch let failure as SecureFileSnapshotReadFailure {
+      throw failure.storageError
+    }
+    do {
+      let decoded = try codec.decode(backupSnapshot.data)
       let canonical = try codec.encode(decoded.document)
+      try ensureCurrentIdentity(
+        of: locations.backupURL,
+        equals: backupSnapshot.identity
+      )
       try writePrivateFileAtomically(canonical, to: locations.backupURL)
       try writePrivateFileAtomically(canonical, to: locations.primaryURL)
       document = decoded.document
@@ -439,11 +562,17 @@ public actor ProfileStore {
         status: .recoveredFromBackup(quarantinedURLs: quarantinedURLs)
       )
     } catch let error as ProfileValidationError {
-      let quarantinedBackup = try quarantine(locations.backupURL)
+      let quarantinedBackup = try quarantine(
+        locations.backupURL,
+        expectedIdentity: backupSnapshot.identity
+      )
       _ = error
       return try resetAfterCorruption(quarantinedURLs: quarantinedURLs + [quarantinedBackup])
     } catch let error as ProfileStorageError where error.canQuarantine {
-      let quarantinedBackup = try quarantine(locations.backupURL)
+      let quarantinedBackup = try quarantine(
+        locations.backupURL,
+        expectedIdentity: backupSnapshot.identity
+      )
       return try resetAfterCorruption(quarantinedURLs: quarantinedURLs + [quarantinedBackup])
     } catch let error as ProfileStorageError {
       throw error
@@ -463,7 +592,17 @@ public actor ProfileStore {
     )
   }
 
-  private func quarantine(_ url: URL) throws -> URL {
+  private func quarantine(
+    _ url: URL,
+    expectedIdentity: SecureFileIdentity
+  ) throws -> URL {
+    try fileOperations.beforeQuarantine(url)
+    guard try regularFileExists(at: url) else {
+      throw ProfileStorageError.io("managed file disappeared before quarantine")
+    }
+    guard try SecureFileAccess.regularFileIdentity(at: url) == expectedIdentity else {
+      throw ProfileStorageError.fileChangedDuringRead
+    }
     try createDirectoryIfNeeded(locations.quarantineDirectoryURL)
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -471,46 +610,68 @@ public actor ProfileStore {
     let name =
       "\(url.deletingPathExtension().lastPathComponent)-corrupt-\(timestamp)-\(UUID().uuidString).json"
     let destination = locations.quarantineDirectoryURL.appendingPathComponent(name)
-    try setPrivateFilePermissions(url)
-    try moveItem(url, to: destination)
+    try setPrivateFilePermissions(url, expectedIdentity: expectedIdentity)
+    guard try SecureFileAccess.regularFileIdentity(at: url) == expectedIdentity else {
+      throw ProfileStorageError.fileChangedDuringRead
+    }
+    try moveItem(url, to: destination, expectedIdentity: expectedIdentity)
+    guard try SecureFileAccess.regularFileIdentity(at: destination) == expectedIdentity else {
+      throw ProfileStorageError.fileChangedDuringRead
+    }
     return destination
   }
 
   private func createDirectoryIfNeeded(_ url: URL) throws {
     do {
-      try FileManager.default.createDirectory(
-        at: url,
-        withIntermediateDirectories: true,
-        attributes: [.posixPermissions: 0o700]
-      )
-      try FileManager.default.setAttributes(
-        [.posixPermissions: 0o700],
-        ofItemAtPath: url.path
-      )
+      try SecureFileAccess.preparePrivateDirectory(url)
+    } catch let error as ProfileStorageError {
+      throw error
     } catch {
       throw ProfileStorageError.io(String(describing: error))
     }
   }
 
-  private func setPrivateFilePermissions(_ url: URL) throws {
+  private func setPrivateFilePermissions(
+    _ url: URL,
+    expectedIdentity: SecureFileIdentity? = nil
+  ) throws {
     do {
-      try fileOperations.setPrivatePermissions(url)
+      try fileOperations.setPrivatePermissions(url, expectedIdentity)
+    } catch let error as ProfileStorageError {
+      throw error
     } catch {
       throw ProfileStorageError.io(String(describing: error))
+    }
+  }
+
+  private func ensureCurrentIdentity(
+    of url: URL,
+    equals expectedIdentity: SecureFileIdentity
+  ) throws {
+    guard try SecureFileAccess.regularFileIdentity(at: url) == expectedIdentity else {
+      throw ProfileStorageError.fileChangedDuringRead
     }
   }
 
   private func writePrivateFileAtomically(_ data: Data, to url: URL) throws {
     do {
       try fileOperations.privateFileWriter(data, url)
+    } catch let error as ProfileStorageError {
+      throw error
     } catch {
       throw ProfileStorageError.io(String(describing: error))
     }
   }
 
-  private func moveItem(_ source: URL, to destination: URL) throws {
+  private func moveItem(
+    _ source: URL,
+    to destination: URL,
+    expectedIdentity: SecureFileIdentity
+  ) throws {
     do {
-      try fileOperations.moveItem(source, destination)
+      try fileOperations.moveItem(source, destination, expectedIdentity)
+    } catch let error as ProfileStorageError {
+      throw error
     } catch {
       throw ProfileStorageError.io(String(describing: error))
     }
@@ -519,6 +680,55 @@ public actor ProfileStore {
   private func ensureLoaded() throws {
     if !hasLoaded {
       _ = try load()
+    }
+  }
+
+  private func validateLocations() throws {
+    guard locations.directoryURL.isFileURL else {
+      throw ProfileStorageError.unsafeFilesystemObject
+    }
+    guard Self.isValidStoreFileName(locations.fileName) else {
+      throw ProfileStorageError.invalidStoreFileName
+    }
+
+    let directory = locations.directoryURL.standardizedFileURL
+    guard locations.primaryURL.deletingLastPathComponent().standardizedFileURL == directory,
+      locations.backupURL.deletingLastPathComponent().standardizedFileURL == directory,
+      locations.quarantineDirectoryURL.deletingLastPathComponent().standardizedFileURL
+        == directory
+    else {
+      throw ProfileStorageError.invalidStoreFileName
+    }
+  }
+
+  private static func isValidStoreFileName(_ fileName: String) -> Bool {
+    guard !fileName.isEmpty,
+      fileName != ".",
+      fileName != "..",
+      !fileName.utf8.contains(0),
+      !fileName.contains("/"),
+      (fileName as NSString).lastPathComponent == fileName
+    else {
+      return false
+    }
+
+    let reservedNames = ["profiles.backup.json", "Quarantine"]
+    return !reservedNames.contains { reserved in
+      fileName.compare(
+        reserved,
+        options: [.caseInsensitive, .diacriticInsensitive]
+      ) == .orderedSame
+    }
+  }
+
+  private func regularFileExists(at url: URL) throws -> Bool {
+    switch try SecureFileAccess.state(at: url) {
+    case .missing:
+      return false
+    case .regularFile:
+      return true
+    case .directory:
+      throw ProfileStorageError.unsafeFilesystemObject
     }
   }
 }

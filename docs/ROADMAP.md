@@ -230,6 +230,29 @@ The installed follow-up invoked no Apply, Capture, TCC, login-item, or system-se
 - Promote generic profile storage failures into a heading/icon/card with one context-valid Retry Loading or Dismiss Error action while keeping editor-owned errors single and nonduplicated.
 - Record source, synthetic, installed, and accessibility boundaries in [P2-UI-REFINEMENT-AUDIT-2026-07-17.md](P2-UI-REFINEMENT-AUDIT-2026-07-17.md). The final integrated count is 461; the reviewed evidence contains 39 fixtures and 79 artifacts; DMG SHA-256 is `342d804d8bbff51209af4bccefb405ee76499050c1e640a011d41e2f78792031`; the reinstalled executable SHA-256 is `fb35352fb6a9588c0c50269975ccd3d7b73e52010de10de132bf45d60236f719`.
 
-The P2 pass does not include profile-store path hardening, Apply/Capture execution, TCC, login approval/retry/reboot, Gatekeeper, physical Intel, diagnostics clearing, import/export interaction, or ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 mutation. Full-app VoiceOver/rotor, complete keyboard traversal, and focused-control AX observation remain separate nonblocking manual evidence.
+The P2 pass does not include profile-store path hardening, Apply/Capture execution, TCC, login approval/retry/reboot, Gatekeeper, physical Intel, diagnostics clearing, import/export interaction, or ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 mutation. Complete keyboard traversal and focused-control AX observation remain separate nonblocking manual evidence; full-app VoiceOver certification is excluded and unclaimed.
 
-Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+Release publication, push, Gatekeeper, physical Intel, optional full VoiceOver evidence, required TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+
+## M6 — Open-source public beta release (baseline locally verified; publication pending)
+
+The first public beta remains bounded to the simple **Capture → Edit → Review & Apply** product flow. It does not add accounts, cloud services, telemetry, automatic profile switching, arbitrary shell execution, UI automation, private APIs, or a new plugin/SDK surface.
+
+Baseline completed locally:
+
+- Harden profile storage and import against traversal, symlinks, non-regular files, wrong ownership, oversized inputs, source replacement, and tested file-identity/TOCTOU races. Descriptor-bound reads, identity-bound quarantine/permission repair, and durable staging preserve fail-closed behavior without turning unrelated permission denial into an application-wide failure.
+- Make launch at login explicitly opt-in. Reset the unverifiable pre-release automatic-registration state, remove stale registration, and preserve subsequent user choices with a versioned consent marker.
+- Add a full-history public-release audit for credential patterns, concrete personal home paths, current-tree placeholders, and historical PNG/JPEG/ICNS metadata; run it from full-history CI.
+- Freeze the public-beta compatibility boundary in policy documentation: bundle and Keychain identities, SemVer/build/schema behavior, macOS baseline, initial Apple Silicon support, and internal/unstable Swift library products.
+- Add support, governance, compatibility, security, privacy, contribution, and distribution guidance. The tag workflow is limited to an unsigned **draft prerelease candidate** and cannot publish a public release.
+- Pass non-live `make verify` on 2026-07-18 with 496 checks: 173 XCTest, 322 Swift Testing cases across 40 suites, and one isolated native popover regression. The unsigned development-evidence DMG SHA-256 is `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`.
+
+Mandatory gates before public v0.1.0:
+
+- Produce one canonical Developer ID/hardened-runtime build, signed DMG, accepted notarization log, stapled artifact, app-and-DMG Gatekeeper validation, checksum, SBOM, attestation/provenance, and redownload verification.
+- Protect the remote release environment and default branch, enable the intended vulnerability-reporting/support settings, and verify that no workflow can bypass human publication approval.
+- Publish a no-tracking bilingual demo site, screenshots/video or other provenance-reviewed promotional assets, and English/Korean user, integration, and contributor guidance with capability claims that match the support matrix.
+- Complete clean quarantined installation evidence and three external Apple Silicon beta passes with no open P0/P1 issue. Intel remains unclaimed until physical verification exists.
+- Obtain the user's explicit approval for the final artifact, tag, release notes, site publication, and promotional posts. Until then, this milestone is **not a public release**.
+
+Full VoiceOver certification is intentionally excluded from this release goal and is not claimed. The bounded accessibility contract remains localized keyboard behavior, accessible names/values/help where implemented, and non-color state cues; full VoiceOver/rotor evidence may be pursued independently without blocking v0.1.0.

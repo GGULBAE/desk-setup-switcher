@@ -1,4 +1,4 @@
-.PHONY: build test lint analyze package verify-package verify clean
+.PHONY: build test lint analyze audit-public-release package verify-package verify clean
 
 build:
 	./scripts/build.sh
@@ -11,6 +11,9 @@ lint:
 
 analyze:
 	./scripts/analyze.sh
+
+audit-public-release:
+	./scripts/audit-public-release.sh
 
 package:
 	./scripts/package.sh

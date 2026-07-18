@@ -25,6 +25,7 @@
 		4D0189BCB5D864F05E1828FF = { isa = PBXBuildFile; fileRef = 1DD086FE2B808E830A627D48; };
 		1F0664DC526FD6A9A96BC761 = { isa = PBXBuildFile; fileRef = 107C7E54C261B1098B88BEEB; };
 		40EF594BEC0ADB55C2F3CB54 = { isa = PBXBuildFile; fileRef = 297FF9548096F3ACB37F219A; };
+		099EBFACF7AE9A78D8193A16 = { isa = PBXBuildFile; fileRef = 7B24981AC14232E657B25AC6; };
 		85E31A4942A00E2104B13643 = { isa = PBXBuildFile; fileRef = A31719566B87E80590DF7FC5; };
 		1E537E53165E7AFF2C1A6488 = { isa = PBXBuildFile; fileRef = 36359FD870E2D91E91CD4034; };
 		D223B5D76EF35DADBD76915E = { isa = PBXBuildFile; fileRef = 6841B8865D54FA6E4544A973; };
@@ -115,6 +116,7 @@
 		1DD086FE2B808E830A627D48 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Storage/ProfileJSONCodec.swift"; sourceTree = "<group>"; };
 		107C7E54C261B1098B88BEEB = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Storage/ProfileStorageError.swift"; sourceTree = "<group>"; };
 		297FF9548096F3ACB37F219A = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Storage/ProfileStore.swift"; sourceTree = "<group>"; };
+		7B24981AC14232E657B25AC6 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Storage/SecureFileAccess.swift"; sourceTree = "<group>"; };
 		A31719566B87E80590DF7FC5 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Utilities/CIDR.swift"; sourceTree = "<group>"; };
 		36359FD870E2D91E91CD4034 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupCore/Utilities/DisplayIdentityMatcher.swift"; sourceTree = "<group>"; };
 		6841B8865D54FA6E4544A973 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupPresentation/ApplyWorkflowPresentation.swift"; sourceTree = "<group>"; };
@@ -242,6 +244,7 @@
 				1DD086FE2B808E830A627D48,
 				107C7E54C261B1098B88BEEB,
 				297FF9548096F3ACB37F219A,
+				7B24981AC14232E657B25AC6,
 				A31719566B87E80590DF7FC5,
 				36359FD870E2D91E91CD4034,
 				6841B8865D54FA6E4544A973,
@@ -426,6 +429,7 @@
 				4D0189BCB5D864F05E1828FF,
 				1F0664DC526FD6A9A96BC761,
 				40EF594BEC0ADB55C2F3CB54,
+				099EBFACF7AE9A78D8193A16,
 				85E31A4942A00E2104B13643,
 				1E537E53165E7AFF2C1A6488,
 				D223B5D76EF35DADBD76915E,

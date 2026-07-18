@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 2026-07-11
+Last updated: 2026-07-18
 
 Desk Setup Switcher is designed to operate entirely on the Mac where it is installed.
 
@@ -34,7 +34,7 @@ Reading local interface state is not telemetry. The app does not probe internet 
 
 ## Open-source review
 
-The implementation and its permission declarations are public under the MIT License. Security/privacy reports should follow [../SECURITY.md](../SECURITY.md) once that file is present.
+The implementation and its permission declarations are public under the MIT License. Security and privacy reports must follow [SECURITY.md](../SECURITY.md). Do not put report details in a public issue; that policy records the currently available private-contact path and the repository setting that must be enabled before public launch.
 
 ## Current status
 
