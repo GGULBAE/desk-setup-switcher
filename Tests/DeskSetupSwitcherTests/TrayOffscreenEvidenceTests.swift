@@ -612,6 +612,9 @@ import Testing
         : hostingController
       let host = hostingController.view
       host.frame = NSRect(origin: .zero, size: viewport)
+      // The ink classifier assumes the fixture's white background. Do not let
+      // the system's automatic dark appearance render white foreground on it.
+      host.appearance = NSAppearance(named: .aqua)
       let boundaryView = contentController.view
       boundaryView.frame = NSRect(origin: .zero, size: viewport)
       let nativeContainer = AsymmetricSafeAreaContainerView(
