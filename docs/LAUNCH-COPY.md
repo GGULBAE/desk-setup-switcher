@@ -213,6 +213,7 @@ Do not apply metadata or publish copy until every applicable box has recorded ev
 - [ ] The final support matrix states the exact Display/Audio/Network hardware-mutation evidence or preserves the explicit mock-verified limitation.
 - [ ] The canonical [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases) contains the approved immutable assets and curated English/Korean notes.
 - [ ] The bilingual site is deployed at its final HTTPS origin, passes its no-cookie/no-tracking checks, and any download link points only to the canonical release.
+- [ ] After the immutable `v0.1.0` Release is public, the reviewed `site/release-publication.json` change sets `state` to `published` and its URL to exactly `https://github.com/GGULBAE/desk-setup-switcher/releases/tag/v0.1.0`; no component or copy rewrite accompanies that activation.
 - [ ] The screenshot, silent-captioned demo, social preview, captions, and provenance use synthetic or sanitized data and match actual behavior.
 - [ ] Private vulnerability reporting is enabled and tested; public support and security links resolve to the intended routes.
 - [ ] `APPROVED_RELEASE_URL`, `APPROVED_SITE_URL`, and `FINAL_DMG_SHA256` are replaced in the copies selected for publication. No instruction line or unused variant remains.

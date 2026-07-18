@@ -241,6 +241,7 @@ ol {
 }
 
 .release-status,
+.primary-action,
 .secondary-action {
   display: inline-flex;
   min-height: 47px;
@@ -257,7 +258,7 @@ ol {
   background: rgba(255, 255, 255, 0.52);
 }
 
-.secondary-action {
+.primary-action {
   color: white;
   background: var(--evergreen);
   box-shadow: 0 9px 22px rgba(23, 62, 56, 0.18);
@@ -266,8 +267,22 @@ ol {
     background 160ms ease;
 }
 
-.secondary-action:hover {
+.primary-action:hover {
   background: var(--evergreen-soft);
+  transform: translateY(-2px);
+}
+
+.secondary-action {
+  border: 1px solid var(--line-strong);
+  color: var(--evergreen);
+  background: rgba(255, 255, 255, 0.72);
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.secondary-action:hover {
+  background: white;
   transform: translateY(-2px);
 }
 
@@ -1061,6 +1076,8 @@ ol {
 
   .trust-list li,
   .release-status,
+  .primary-action,
+  .secondary-action,
   .capability-card,
   .flow-card {
     border-width: 2px;

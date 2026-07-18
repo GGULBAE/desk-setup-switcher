@@ -16,9 +16,11 @@ npm run verify
 
 From the repository root, `make verify-public-surface` runs the site build,
 lint, rendered-output/privacy tests, and the complete public/source asset gate.
-CI installs only the lockfile-pinned dependency graph with lifecycle scripts
-disabled, checks the registry advisory feed, then runs that same command in a
-dedicated public-surface job.
+The media gate also requires `ffmpeg`/`ffprobe`; CI installs the Homebrew
+`ffmpeg@7` developer tool, then installs only the lockfile-pinned site dependency
+graph with lifecycle scripts disabled, checks the registry advisory feed, and
+runs that same command in a dedicated public-surface job. Neither Homebrew nor
+FFmpeg is an application or site runtime dependency.
 
 Copy `.env.example` to the gitignored `.env.local` and replace its placeholder
 `NEXT_PUBLIC_SITE_URL` with the final HTTPS origin before an approved
@@ -29,6 +31,15 @@ name. `npm run build:local` and `npm run verify` opt into exact HTTP loopback
 origins only for local metadata checks.
 
 `npm run verify` builds the Cloudflare Worker-compatible Sites output, lints the source, renders the page, checks the honest release/support copy and security headers, verifies that no cookie is set, scans application source and the built client for tracking/storage boundaries, and requires all public screenshots, video, and bilingual captions.
+
+[`release-publication.json`](release-publication.json) is the only launch-state
+switch. It is schema-checked during every build. `holding` requires a null URL;
+`published` accepts only the exact canonical `v0.1.0` GitHub Release URL. The
+verification command renders and checks both states before rebuilding the
+currently tracked state. If an intermediate state check fails, it still attempts
+that restoration and removes `dist` if restoration cannot complete. Launch
+activation is therefore a reviewed data-only change instead of an untested
+component rewrite or a reusable synthetic build artifact.
 
 The application-authored site code does not persist product or visitor data in
 browser storage. The bundled vinext router contains two framework-owned,

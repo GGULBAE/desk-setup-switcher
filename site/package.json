@@ -6,14 +6,18 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "NEXT_PUBLIC_SITE_URL=http://localhost:3000 WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
-    "build": "node --env-file-if-exists=.env.local scripts/verify-site-origin.mjs && WRANGLER_LOG_PATH=.wrangler/wrangler.log node --env-file-if-exists=.env.local node_modules/vinext/dist/cli.js build",
-    "build:local": "ALLOW_LOCAL_SITE_ORIGIN=1 NEXT_PUBLIC_SITE_URL=http://localhost:3000 npm run build",
+    "dev": "node scripts/verify-release-publication.mjs && NEXT_PUBLIC_SITE_URL=http://localhost:3000 WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
+    "build": "node scripts/verify-release-publication.mjs && node --env-file-if-exists=.env.local scripts/verify-site-origin.mjs && WRANGLER_LOG_PATH=.wrangler/wrangler.log node --env-file-if-exists=.env.local node_modules/vinext/dist/cli.js build",
+    "build:local": "ALLOW_LOCAL_SITE_ORIGIN=1 NEXT_PUBLIC_SITE_URL=http://localhost:3000 NEXT_PUBLIC_RELEASE_FIXTURE= npm run build",
+    "build:test-holding": "ALLOW_LOCAL_SITE_ORIGIN=1 NEXT_PUBLIC_SITE_URL=http://localhost:3000 NEXT_PUBLIC_RELEASE_FIXTURE=holding npm run build",
+    "build:test-published": "ALLOW_LOCAL_SITE_ORIGIN=1 NEXT_PUBLIC_SITE_URL=http://localhost:3000 NEXT_PUBLIC_RELEASE_FIXTURE=published npm run build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "node --test tests/rendered-html.test.mjs",
+    "test": "EXPECTED_RELEASE_STATE=current node --test tests/rendered-html.test.mjs",
+    "test:holding": "EXPECTED_RELEASE_STATE=holding node --test tests/rendered-html.test.mjs",
+    "test:published": "EXPECTED_RELEASE_STATE=published node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "audit:dependencies": "npm audit",
-    "verify": "npm run build:local && npm run lint && npm test"
+    "verify": "node scripts/verify-site.mjs"
   },
   "dependencies": {
     "next": "16.2.10",

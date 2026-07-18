@@ -34,6 +34,10 @@ const isExplicitLocalOrigin = origin.protocol === "http:" && [
   "[::1]",
 ].includes(rawHostname);
 
+if (allowLocal && !isExplicitLocalOrigin) {
+  throw new Error("ALLOW_LOCAL_SITE_ORIGIN is valid only for an explicit HTTP loopback origin");
+}
+
 if (isIPAddress || isLocalhostName) {
   if (!allowLocal || !isExplicitLocalOrigin) {
     throw new Error(

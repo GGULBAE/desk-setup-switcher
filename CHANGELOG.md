@@ -6,7 +6,7 @@ All notable changes will be documented here. The project follows Keep a Changelo
 
 ### Added
 
-- A dedicated public-surface verification command and CI job that install the lockfile-pinned site graph with lifecycle scripts disabled, check dependency advisories, build/lint/test the bilingual holding site, and verify every declared public/source release asset without deploying anything.
+- A dedicated public-surface verification command and CI job that install the lockfile-pinned site graph with lifecycle scripts disabled, check dependency advisories, render and test both holding and canonical-download states, rebuild the tracked state, and verify every declared public/source release asset without deploying anything. A closed-schema publication file is now the site's only launch switch and accepts only the exact `v0.1.0` GitHub Release URL.
 - A user-first public surface for the bounded **Capture → Edit → Review & Apply** flow: rewritten root README, English/Korean user guides, profile-schema and adapter-contract references, launch copy, and a public-surface readiness audit.
 - A locally verified bilingual static demo site with no project analytics, client tracking, project-set cookies, account, database, object storage, or download; the disabled release state remains in place until the complete maintainer-approved distribution gate passes.
 - Provenance-reviewed synthetic Capture, Edit, and Review screenshots; a silent captioned 37-second demo; a deterministic social preview; mandatory public/source checksum manifests; metadata, stream, caption, and sensitive-string verification; and complete source/transformation/licensing records.

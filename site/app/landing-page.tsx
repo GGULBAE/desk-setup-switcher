@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { releasePresentation } from "../lib/release-copy.mjs";
 
 const repositoryURL = "https://github.com/GGULBAE/desk-setup-switcher";
 
@@ -20,7 +21,6 @@ const content = {
     summary:
       "Capture display, audio, and network settings. Edit only what matters. Review every proposed change before anything happens.",
     badges: ["Local only", "No account", "No cloud", "No telemetry"],
-    releaseStatus: "v0.1.0 download opens only after the complete release gate passes",
     github: "View source on GitHub",
     heroAlt: {
       edit: "Synthetic Desk Setup Switcher profile editor showing display settings",
@@ -104,9 +104,6 @@ const content = {
     hostingNote:
       "This project code sets no cookies and contains no project analytics or client-side tracking. Its hosting provider still processes requests and may retain aggregate operational metrics.",
     installEyebrow: "Install",
-    installTitle: "A trusted download, once the gate passes.",
-    installBody:
-      "There is no supported public download today. The canonical GitHub Release will open only after the complete release gate—including Developer ID signing, notarization, stapling, Gatekeeper checks, and clean external beta installs—passes.",
     installSteps: [
       "Download the signed DMG and checksum from the canonical GitHub Release.",
       "Verify SHA-256, open the DMG, and drag Desk Setup Switcher to Applications.",
@@ -150,7 +147,6 @@ const content = {
     summary:
       "디스플레이·오디오·네트워크 설정을 캡처하고 필요한 값만 편집하세요. 실제 변경 전에는 항상 모든 변경 내용을 검토합니다.",
     badges: ["로컬 전용", "계정 없음", "클라우드 없음", "텔레메트리 없음"],
-    releaseStatus: "v0.1.0은 전체 릴리스 관문을 통과한 뒤에만 다운로드할 수 있습니다",
     github: "GitHub에서 소스 보기",
     heroAlt: {
       edit: "합성 데이터로 만든 Desk Setup Switcher 디스플레이 프로필 편집 화면",
@@ -234,9 +230,6 @@ const content = {
     hostingNote:
       "이 프로젝트 코드는 쿠키, 프로젝트 분석, 클라이언트 추적을 넣지 않습니다. 다만 호스팅 제공자는 요청을 처리하고 집계된 운영 지표를 보관할 수 있습니다.",
     installEyebrow: "설치",
-    installTitle: "검증 관문을 통과한 다운로드만 제공합니다.",
-    installBody:
-      "현재 지원되는 공개 다운로드는 없습니다. Developer ID 서명, 공증, stapling, Gatekeeper, 외부 clean-install 베타를 포함한 전체 릴리스 관문을 통과한 뒤 GitHub Release를 공식 다운로드로 엽니다.",
     installSteps: [
       "공식 GitHub Release에서 서명된 DMG와 checksum을 다운로드합니다.",
       "SHA-256을 확인하고 DMG를 연 뒤 앱을 Applications로 옮깁니다.",
@@ -270,9 +263,10 @@ const content = {
 
 type Language = keyof typeof content;
 
-export function LandingPage() {
+export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
   const [language, setLanguage] = useState<Language>("en");
   const text = content[language];
+  const release = releasePresentation(language, releaseURL !== null);
 
   return (
     <div className="site-shell" lang={language}>
@@ -314,10 +308,16 @@ export function LandingPage() {
               ))}
             </ul>
             <div className="hero-actions">
-              <span className="release-status" aria-disabled="true">
-                {text.releaseStatus}
-              </span>
-              <a className="secondary-action" href={repositoryURL}>
+              {releaseURL ? (
+                <a className="primary-action" href={releaseURL}>
+                  {release.actionLabel}
+                </a>
+              ) : (
+                <span className="release-status" aria-disabled="true">
+                  {release.actionLabel}
+                </span>
+              )}
+              <a className={releaseURL ? "secondary-action" : "primary-action"} href={repositoryURL}>
                 {text.github}
               </a>
             </div>
@@ -430,8 +430,8 @@ export function LandingPage() {
         <section className="install-section section-wrap">
           <div className="install-copy">
             <p className="eyebrow">{text.installEyebrow}</p>
-            <h2>{text.installTitle}</h2>
-            <p>{text.installBody}</p>
+            <h2>{release.installTitle}</h2>
+            <p>{release.installBody}</p>
             <ol>
               {text.installSteps.map((step) => (
                 <li key={step}>{step}</li>
