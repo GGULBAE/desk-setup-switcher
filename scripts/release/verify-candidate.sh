@@ -18,6 +18,8 @@ release_require_single_line GITHUB_SERVER_URL
 release_require_single_line GITHUB_REPOSITORY
 release_require_env GITHUB_RUN_ID
 release_require_env GITHUB_RUN_ATTEMPT
+release_require_env RELEASE_CANDIDATE_RUN_ID
+release_require_env RELEASE_CANDIDATE_RUN_ATTEMPT
 [[ "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]] || release_die "APPLE_TEAM_ID has an invalid format."
 [[ "$DEVELOPER_ID_APPLICATION" == "Developer ID Application: "*" ($APPLE_TEAM_ID)" ]] || {
     release_die "The expected Developer ID identity does not match APPLE_TEAM_ID."
@@ -26,6 +28,14 @@ release_require_env GITHUB_RUN_ATTEMPT
 [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] || release_die "EXPECTED_COMMIT has an invalid format."
 [[ "$GITHUB_SERVER_URL" == https://github.com ]] || release_die "Unexpected GitHub server URL."
 [[ "$GITHUB_REPOSITORY" == GGULBAE/desk-setup-switcher ]] || release_die "Unexpected GitHub repository identity."
+[[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]] || release_die "GITHUB_RUN_ID has an invalid format."
+[[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || release_die "GITHUB_RUN_ATTEMPT has an invalid format."
+[[ "$RELEASE_CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]] || {
+    release_die "RELEASE_CANDIDATE_RUN_ID has an invalid format."
+}
+[[ "$RELEASE_CANDIDATE_RUN_ATTEMPT" == 1 ]] || {
+    release_die "RELEASE_CANDIDATE_RUN_ATTEMPT must identify origin attempt 1."
+}
 
 dmg_name="Desk-Setup-Switcher-$VERSION.dmg"
 dmg_path="$release_directory/$dmg_name"
@@ -65,7 +75,7 @@ ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-sbom \
 
 created_at="$(ruby -rtime -e 'puts Time.parse(ARGV.fetch(0)).utc.iso8601' "$(git show -s --format=%cI "$EXPECTED_COMMIT")")"
 manifest_namespace="https://github.com/GGULBAE/desk-setup-switcher/release-evidence/$RELEASE_TAG/$expected_checksum"
-run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$RELEASE_CANDIDATE_RUN_ID"
 ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-release-manifest \
     --manifest "$manifest_path" \
     --version "$VERSION" \
@@ -74,8 +84,8 @@ ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-release-manifest \
     --commit "$EXPECTED_COMMIT" \
     --namespace "$manifest_namespace" \
     --created "$created_at" \
-    --run-id "$GITHUB_RUN_ID" \
-    --run-attempt "$GITHUB_RUN_ATTEMPT" \
+    --run-id "$RELEASE_CANDIDATE_RUN_ID" \
+    --run-attempt "$RELEASE_CANDIDATE_RUN_ATTEMPT" \
     --run-url "$run_url" \
     --asset "$dmg_name=$dmg_path" \
     --asset "$(basename "$checksum_path")=$checksum_path" \

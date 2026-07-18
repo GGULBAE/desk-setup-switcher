@@ -3,6 +3,13 @@ name: Signed release candidate
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: "Choose the isolated release phase"
+        required: true
+        type: choice
+        options:
+          - build-candidate
+          - prepare-draft
       tag:
         description: "Existing release tag (v0.1.0)"
         required: true
@@ -15,29 +22,107 @@ on:
         description: "Type exactly: prepare signed draft v0.1.0"
         required: true
         type: string
+      candidate_origin_run_id:
+        description: "Successful build-candidate run ID; leave 0 while building"
+        required: true
+        default: "0"
+        type: string
+      candidate_artifact_id:
+        description: "Exact retained artifact ID; leave 0 while building"
+        required: true
+        default: "0"
+        type: string
+      candidate_artifact_sha256:
+        description: "Exact retained artifact SHA-256; leave 0 while building"
+        required: true
+        default: "0"
+        type: string
 
-# Every token capability is granted only to the protected candidate job below.
+# Tokens default to none; each protected phase job grants only its own capabilities.
 permissions: {}
 
 concurrency:
-  group: signed-release-candidate-${{ inputs.tag }}
+  group: signed-release-candidate-v0.1.0
   cancel-in-progress: false
 
 jobs:
-  signed-draft:
-    name: Build and verify signed draft
+  validate-dispatch:
+    name: Validate isolated release dispatch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      RELEASE_OPERATION: ${{ inputs.operation }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+      REQUESTED_CANDIDATE_RUN_ID: ${{ inputs.candidate_origin_run_id }}
+      REQUESTED_CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+      REQUESTED_CANDIDATE_ARTIFACT_SHA256: ${{ inputs.candidate_artifact_sha256 }}
+    steps:
+      - name: Reject ambiguous or destructive phase inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE_TAG" != v0.1.0 ]] \
+            || [[ ! "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ "$RELEASE_CONFIRMATION" != "prepare signed draft $RELEASE_TAG" ]] \
+            || [[ "$GITHUB_REF_TYPE" != tag ]] \
+            || [[ "$GITHUB_REF" != "refs/tags/$RELEASE_TAG" ]] \
+            || [[ "$GITHUB_REF_NAME" != "$RELEASE_TAG" ]] \
+            || [[ ! "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::The release dispatch does not identify the exact v0.1.0 tag and commit context." >&2
+            exit 1
+          fi
+
+          case "$RELEASE_OPERATION" in
+            build-candidate)
+              if [[ "$GITHUB_RUN_ATTEMPT" != 1 ]] \
+                || [[ "$REQUESTED_CANDIDATE_RUN_ID" != 0 ]] \
+                || [[ "$REQUESTED_CANDIDATE_ARTIFACT_ID" != 0 ]] \
+                || [[ "$REQUESTED_CANDIDATE_ARTIFACT_SHA256" != 0 ]]; then
+                echo "::error::Never rerun a build-candidate operation. GitHub removes the origin artifact on a full rerun; dispatch a new build-candidate operation with all candidate inputs set to 0." >&2
+                exit 1
+              fi
+              ;;
+            prepare-draft)
+              if [[ ! "$REQUESTED_CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]] \
+                || [[ ! "$REQUESTED_CANDIDATE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] \
+                || [[ ! "$REQUESTED_CANDIDATE_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+                || [[ "$REQUESTED_CANDIDATE_RUN_ID" == "$GITHUB_RUN_ID" ]]; then
+                echo "::error::Draft preparation requires a separate successful origin run and its exact artifact ID and SHA-256." >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Unknown release operation." >&2
+              exit 1
+              ;;
+          esac
+
+  build-candidate:
+    name: Build and retain signed candidate
+    needs: validate-dispatch
+    if: ${{ inputs.operation == 'build-candidate' }}
     runs-on: macos-15
     timeout-minutes: 90
     environment: release-candidate
     permissions:
-      contents: write
+      contents: read
       id-token: write
       attestations: write
       artifact-metadata: write
     env:
+      RELEASE_OPERATION: ${{ inputs.operation }}
       RELEASE_TAG: ${{ inputs.tag }}
       EXPECTED_COMMIT: ${{ inputs.expected_commit }}
       RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+      RELEASE_CANDIDATE_RUN_ID: ${{ github.run_id }}
+      RELEASE_CANDIDATE_RUN_ATTEMPT: "1"
+      REQUESTED_CANDIDATE_RUN_ID: ${{ inputs.candidate_origin_run_id }}
+      REQUESTED_CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+      REQUESTED_CANDIDATE_ARTIFACT_SHA256: ${{ inputs.candidate_artifact_sha256 }}
       RELEASE_PROTECTED_ENVIRONMENT: release-candidate
       DESK_SETUP_RELEASE_MUTATIONS: "1"
       RELEASE_NOTES_PATH: docs/releases/v0.1.0.md
@@ -69,6 +154,17 @@ jobs:
           fi
           if [[ ! "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::expected_commit must be an exact lowercase 40-character commit SHA." >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_OPERATION" != build-candidate ]] \
+            || [[ "$GITHUB_RUN_ATTEMPT" != 1 ]] \
+            || [[ ! "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ "$RELEASE_CANDIDATE_RUN_ID" != "$GITHUB_RUN_ID" ]] \
+            || [[ "$RELEASE_CANDIDATE_RUN_ATTEMPT" != 1 ]] \
+            || [[ "$REQUESTED_CANDIDATE_RUN_ID" != 0 ]] \
+            || [[ "$REQUESTED_CANDIDATE_ARTIFACT_ID" != 0 ]] \
+            || [[ "$REQUESTED_CANDIDATE_ARTIFACT_SHA256" != 0 ]]; then
+            echo "::error::The candidate must originate from workflow attempt 1." >&2
             exit 1
           fi
           if [[ "$GITHUB_REF_TYPE" != "tag" || "$GITHUB_REF" != "refs/tags/$RELEASE_TAG" || "$GITHUB_REF_NAME" != "$RELEASE_TAG" ]]; then
@@ -233,114 +329,11 @@ jobs:
             "$RELEASE_SBOM_BUNDLE_PATH" \
             "$RELEASE_MANIFEST_BUNDLE_PATH"
 
-      - name: Create draft prerelease with the exact asset set
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          require_remote_tag_commit() {
-            local tag_ref remote_refs peeled direct remote_commit
-            tag_ref="refs/tags/$RELEASE_TAG"
-            remote_refs="$(git ls-remote --exit-code --tags origin "$tag_ref" "$tag_ref^{}")" || {
-              echo "::error::The existing release tag could not be read from origin." >&2
-              exit 1
-            }
-            peeled="$(printf '%s\n' "$remote_refs" | awk -v ref="$tag_ref^{}" '$2 == ref { print $1 }')"
-            direct="$(printf '%s\n' "$remote_refs" | awk -v ref="$tag_ref" '$2 == ref { print $1 }')"
-            remote_commit="${peeled:-$direct}"
-            if [[ ! "$remote_commit" =~ ^[0-9a-f]{40}$ || "$remote_commit" != "$EXPECTED_COMMIT" ]]; then
-              echo "::error::The remote release tag does not resolve uniquely to EXPECTED_COMMIT." >&2
-              exit 1
-            fi
-          }
-
-          require_remote_tag_commit
-
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::A GitHub Release already exists for $RELEASE_TAG; refusing to replace or mutate it." >&2
-            exit 1
-          fi
-
-          release_assets=(
-            "$RELEASE_DMG_PATH"
-            "$RELEASE_CHECKSUM_PATH"
-            "$RELEASE_SBOM_PATH"
-            "$RELEASE_MANIFEST_PATH"
-            "$RELEASE_NOTARY_RESULT_PATH"
-            "$RELEASE_NOTARY_LOG_PATH"
-            "$RELEASE_PROVENANCE_BUNDLE_PATH"
-            "$RELEASE_SBOM_BUNDLE_PATH"
-            "$RELEASE_MANIFEST_BUNDLE_PATH"
-          )
-          for path in "${release_assets[@]}"; do
-            if [[ ! -f "$path" || -L "$path" ]]; then
-              echo "::error::Exact release asset is missing or is not a regular file: $path" >&2
-              exit 1
-            fi
-          done
-
-          gh release create "$RELEASE_TAG" \
-            "${release_assets[@]}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --draft \
-            --prerelease \
-            --verify-tag \
-            --notes-file "$RELEASE_NOTES_PATH" \
-            --title "Desk Setup Switcher $RELEASE_TAG signed candidate"
-
-          release_state="$(gh release view "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --json tagName,isDraft,isPrerelease \
-            --jq '[.tagName, (.isDraft | tostring), (.isPrerelease | tostring)] | @tsv')"
-          if [[ "$release_state" != "$RELEASE_TAG"$'\t'true$'\t'true ]]; then
-            echo "::error::The created release is not the expected draft prerelease." >&2
-            exit 1
-          fi
-          require_remote_tag_commit
-
-      - name: Redownload and verify the draft release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
-          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-
-          rm -rf -- "$RELEASE_DOWNLOAD_DIR"
-          mkdir -p "$RELEASE_DOWNLOAD_DIR"
-          gh release download "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --dir "$RELEASE_DOWNLOAD_DIR"
-
-          expected_assets="$RUNNER_TEMP/expected-release-assets.txt"
-          actual_assets="$RUNNER_TEMP/actual-release-assets.txt"
-          printf '%s\n' \
-            "$(basename "$RELEASE_DMG_PATH")" \
-            "$(basename "$RELEASE_CHECKSUM_PATH")" \
-            "$(basename "$RELEASE_SBOM_PATH")" \
-            "$(basename "$RELEASE_MANIFEST_PATH")" \
-            "$(basename "$RELEASE_NOTARY_RESULT_PATH")" \
-            "$(basename "$RELEASE_NOTARY_LOG_PATH")" \
-            "$(basename "$RELEASE_PROVENANCE_BUNDLE_PATH")" \
-            "$(basename "$RELEASE_SBOM_BUNDLE_PATH")" \
-            "$(basename "$RELEASE_MANIFEST_BUNDLE_PATH")" \
-            | LC_ALL=C sort >"$expected_assets"
-          find "$RELEASE_DOWNLOAD_DIR" -mindepth 1 -maxdepth 1 -type f -exec basename {} \; \
-            | LC_ALL=C sort >"$actual_assets"
-          if ! cmp -s "$expected_assets" "$actual_assets"; then
-            echo "::error::Downloaded draft assets do not match the exact candidate asset list." >&2
-            exit 1
-          fi
-
-          make verify-downloaded-release
-
-      - name: Retain the verified signed candidate bundle
+      - name: Retain the signed candidate before any draft mutation
+        id: candidate-artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: desk-setup-switcher-v0.1.0-signed-candidate
+          name: desk-setup-switcher-v0.1.0-signed-candidate-${{ github.run_id }}-attempt-1
           path: |
             artifacts/release/Desk-Setup-Switcher-0.1.0.dmg
             artifacts/release/Desk-Setup-Switcher-0.1.0.dmg.sha256
@@ -352,7 +345,27 @@ jobs:
             artifacts/release/Desk-Setup-Switcher-0.1.0.sbom.sigstore.json
             artifacts/release/release-manifest.provenance.sigstore.json
           if-no-files-found: error
+          overwrite: false
           retention-days: 30
+
+      - name: Record the immutable candidate artifact identity
+        shell: bash
+        env:
+          CANDIDATE_ARTIFACT_ID: ${{ steps.candidate-artifact.outputs.artifact-id }}
+          CANDIDATE_ARTIFACT_DIGEST: ${{ steps.candidate-artifact.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$CANDIDATE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$CANDIDATE_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::The immutable candidate artifact identity is invalid." >&2
+            exit 1
+          fi
+          {
+            printf 'candidate_artifact_id=%s\n' "$CANDIDATE_ARTIFACT_ID"
+            printf 'candidate_artifact_sha256=%s\n' "$CANDIDATE_ARTIFACT_DIGEST"
+            printf 'candidate_origin_run_id=%s\n' "$RELEASE_CANDIDATE_RUN_ID"
+            printf 'candidate_origin_run_attempt=%s\n' "$RELEASE_CANDIDATE_RUN_ATTEMPT"
+          } >>"$GITHUB_STEP_SUMMARY"
 
       - name: Clean release credentials and temporary state
         if: ${{ always() }}
@@ -362,6 +375,161 @@ jobs:
           if [[ -x scripts/release/cleanup-signing-keychain.sh ]]; then
             scripts/release/cleanup-signing-keychain.sh
           fi
+          if [[ -d "$RELEASE_DOWNLOAD_DIR" ]]; then
+            rm -rf -- "$RELEASE_DOWNLOAD_DIR"
+          fi
+
+  signed-draft:
+    name: Prepare and verify signed draft
+    needs: validate-dispatch
+    if: ${{ inputs.operation == 'prepare-draft' }}
+    runs-on: macos-15
+    timeout-minutes: 45
+    environment: release-candidate
+    permissions:
+      actions: read
+      attestations: read
+      contents: write
+    env:
+      RELEASE_OPERATION: ${{ inputs.operation }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+      RELEASE_CANDIDATE_RUN_ID: ${{ inputs.candidate_origin_run_id }}
+      RELEASE_CANDIDATE_RUN_ATTEMPT: "1"
+      RELEASE_CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+      RELEASE_CANDIDATE_ARTIFACT_SHA256: ${{ inputs.candidate_artifact_sha256 }}
+      RELEASE_PROTECTED_ENVIRONMENT: release-candidate
+      DESK_SETUP_RELEASE_MUTATIONS: "1"
+      RELEASE_NOTES_PATH: docs/releases/v0.1.0.md
+      RELEASE_SOURCE_DIR: artifacts/release
+      RELEASE_DOWNLOAD_DIR: .build/release-download
+      RELEASE_DMG_PATH: artifacts/release/Desk-Setup-Switcher-0.1.0.dmg
+      RELEASE_CHECKSUM_PATH: artifacts/release/Desk-Setup-Switcher-0.1.0.dmg.sha256
+      RELEASE_SBOM_PATH: artifacts/release/Desk-Setup-Switcher-0.1.0.spdx.json
+      RELEASE_MANIFEST_PATH: artifacts/release/release-manifest.json
+      RELEASE_NOTARY_RESULT_PATH: artifacts/release/notary-result.json
+      RELEASE_NOTARY_LOG_PATH: artifacts/release/notary-log.json
+      RELEASE_PROVENANCE_BUNDLE_PATH: artifacts/release/Desk-Setup-Switcher-0.1.0.provenance.sigstore.json
+      RELEASE_SBOM_BUNDLE_PATH: artifacts/release/Desk-Setup-Switcher-0.1.0.sbom.sigstore.json
+      RELEASE_MANIFEST_BUNDLE_PATH: artifacts/release/release-manifest.provenance.sigstore.json
+
+    steps:
+      - name: Validate draft preparation attempt
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE_CONFIRMATION" != "prepare signed draft $RELEASE_TAG" ]]; then
+            echo "::error::The signed-draft confirmation phrase does not match." >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_OPERATION" != prepare-draft ]] \
+            || [[ "$RELEASE_TAG" != "v0.1.0" ]] \
+            || [[ ! "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ ! "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$RELEASE_CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ "$RELEASE_CANDIDATE_RUN_ID" == "$GITHUB_RUN_ID" ]] \
+            || [[ "$RELEASE_CANDIDATE_RUN_ATTEMPT" != 1 ]]; then
+            echo "::error::The draft attempt does not match the immutable v0.1.0 candidate origin." >&2
+            exit 1
+          fi
+          if [[ ! "$RELEASE_CANDIDATE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$RELEASE_CANDIDATE_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::The draft attempt does not name one exact retained candidate artifact." >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF_TYPE" != "tag" || "$GITHUB_REF" != "refs/tags/$RELEASE_TAG" || "$GITHUB_REF_NAME" != "$RELEASE_TAG" ]]; then
+            echo "::error::Run this workflow from the existing $RELEASE_TAG tag ref, not from a branch." >&2
+            exit 1
+          fi
+
+      - name: Check out the existing release tag for draft verification
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind draft checkout to the immutable candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git check-ref-format --allow-onelevel "$RELEASE_TAG" >/dev/null
+          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
+          if [[ "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" != "$EXPECTED_COMMIT" ]] \
+            || [[ "$(git rev-parse HEAD)" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::The draft checkout does not match the candidate commit." >&2
+            exit 1
+          fi
+          if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+            echo "::error::The draft verification checkout is not clean." >&2
+            exit 1
+          fi
+
+      - name: Require protected draft verification variables
+        shell: bash
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          for name in DEVELOPER_ID_APPLICATION APPLE_TEAM_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Required protected release value $name is not configured." >&2
+              exit 1
+            fi
+          done
+
+      - name: Run draft recovery preflight
+        run: make release-preflight
+
+      - name: Prepare private candidate paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in artifacts .build; do
+            if [[ -e "$path" || -L "$path" ]]; then
+              echo "::error::Expected an absent private release path: $path" >&2
+              exit 1
+            fi
+            mkdir -m 0700 -- "$path"
+          done
+
+      - name: Restore the exact candidate from its separate origin run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: exec /bin/bash scripts/release/restore-candidate-artifact.sh
+
+      - name: Verify the exact origin candidate and attestations before draft mutation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          RELEASE_DOWNLOAD_DIR: artifacts/release
+        run: make verify-downloaded-release
+
+      - name: Create or resume the exact additive-only draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: exec /bin/bash scripts/release/prepare-draft-release.sh
+
+      - name: Verify the redownloaded draft and attestations
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: make verify-downloaded-release
+
+      - name: Clean draft download state
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
           if [[ -d "$RELEASE_DOWNLOAD_DIR" ]]; then
             rm -rf -- "$RELEASE_DOWNLOAD_DIR"
           fi

@@ -201,16 +201,21 @@ The first option provides the stronger trust boundary.
   `master` and never restore the unsigned automatic publisher.
 - If approval cannot proceed, cancel the run and correct the reviewer policy;
   do not use a silent administrator bypass.
-- If a credentialed candidate fails before any GitHub Release exists and without
-  a source change, correct only the protected credential/environment state and
-  rerun the same immutable tag.
-- If a draft Release already exists, the workflow intentionally refuses to rerun
-  or mutate it. Preserve the draft, assets, and run. Read-only inspection may
-  diagnose a transient observation failure, but it cannot close missing protected
-  redownload, candidate-verification, workflow-artifact, or completed-run evidence.
-  If any mandatory gate is incomplete, start a new versioned candidate and tag
-  even when source files did not change; the current repository has no approved
-  resume workflow.
+- If a credentialed candidate fails before its exact nine assets are finalized as
+  the immutable attempt-1 origin artifact, preserve the run and start a new
+  versioned candidate. Never rerun the origin build: GitHub full reruns remove its
+  artifact before jobs execute, and the workflow guard rejects rebuilding it.
+- A local post-audit follow-up now proposes a separate `prepare-draft` dispatch
+  after that artifact exists. It binds the origin run, artifact ID, and archive
+  digest; verifies the raw ZIP, exact files, candidate, and attestations before
+  mutation; preserves the origin run/attempt in the manifest; and separately
+  records the draft verification run/attempt. Only then may its additive reconciler
+  accept exact draft metadata and byte-identical assets or append missing names.
+- Any extra or different asset, changed notes/title/state, unavailable artifact,
+  origin mismatch, or API ambiguity still requires a new versioned candidate and
+  tag. The resume path never clobbers, edits, deletes, publishes, or moves a tag.
+  It remains unpushed and unproven until the protected environment and a real
+  credential-free recovery rehearsal produce evidence.
 - If source, resources, entitlements, or release tooling must change, do not move
   or reuse the tag. Increment the build/version, preserve the failed evidence,
   and start a new candidate.

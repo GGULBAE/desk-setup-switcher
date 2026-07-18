@@ -1,9 +1,19 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
 set +x
+set +a
+
+unset github_token
+github_token="${GH_TOKEN:-}"
+export -n github_token 2>/dev/null || true
+unset GH_TOKEN GITHUB_TOKEN
+
+set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
+[[ -n "$github_token" && "$github_token" != *$'\n'* && "$github_token" != *$'\r'* ]] || {
+    release_die "Required release input is missing or malformed: GH_TOKEN"
+}
 release_require_env RELEASE_SOURCE_DIR
 release_require_env RELEASE_DOWNLOAD_DIR
 release_require_single_line RELEASE_TAG
@@ -67,7 +77,7 @@ manifest_bundle="$download_directory/release-manifest.provenance.sigstore.json"
 signer_workflow="$GITHUB_REPOSITORY/.github/workflows/release.yml"
 source_ref="refs/tags/$RELEASE_TAG"
 
-gh attestation verify "$dmg_path" \
+GH_TOKEN="$github_token" gh attestation verify "$dmg_path" \
     --repo "$GITHUB_REPOSITORY" \
     --bundle "$provenance_bundle" \
     --signer-workflow "$signer_workflow" \
@@ -76,7 +86,7 @@ gh attestation verify "$dmg_path" \
     --deny-self-hosted-runners \
     --format json >"$temporary_root/provenance-verification.json"
 
-gh attestation verify "$dmg_path" \
+GH_TOKEN="$github_token" gh attestation verify "$dmg_path" \
     --repo "$GITHUB_REPOSITORY" \
     --bundle "$sbom_bundle" \
     --predicate-type https://spdx.dev/Document/v2.3 \
@@ -86,7 +96,7 @@ gh attestation verify "$dmg_path" \
     --deny-self-hosted-runners \
     --format json >"$temporary_root/sbom-verification.json"
 
-gh attestation verify "$manifest_path" \
+GH_TOKEN="$github_token" gh attestation verify "$manifest_path" \
     --repo "$GITHUB_REPOSITORY" \
     --bundle "$manifest_bundle" \
     --signer-workflow "$signer_workflow" \
@@ -105,4 +115,5 @@ for result in \
     ' "$result"
 done
 
+github_token=""
 printf 'Redownloaded draft assets and all three exact-candidate attestations are verified.\n'

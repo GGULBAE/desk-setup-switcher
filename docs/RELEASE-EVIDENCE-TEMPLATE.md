@@ -85,7 +85,9 @@ The release app is built once. Signing, packaging, notarization, and stapling ma
 | Catchable cancellation/tracked-child cleanup result | `<not recorded; result only>` |
 | Private vulnerability reporting enabled/tested | `<not recorded>` |
 | Immutable releases enabled | `<not recorded>` |
-| Protected workflow run and artifact ID | `<not recorded>` |
+| Protected `build-candidate` origin run/attempt | `<not recorded; origin attempt must be 1 and never rerun>` |
+| Immutable artifact ID/archive SHA-256 | `<not recorded; bind to the exact origin run>` |
+| Separate `prepare-draft` verification run/attempt | `<not recorded; distinguish from candidate origin>` |
 | Protected draft Release URL/ID | `<not recorded>` |
 
 - [ ] A read-only query proves the effective remote workflow cannot publish an unsigned artifact or bypass approval.
@@ -93,6 +95,9 @@ The release app is built once. Signing, packaging, notarization, and stapling ma
 - [ ] The recorded result came from `make verify-remote-controls`; direct `remote_controls_policy.rb` normalized-evidence output is offline component evidence and is not accepted as the final gate.
 - [ ] The release manifest records `runner-environment=github-hosted`; each secret had one direct-exec consumer and was absent from unrelated child environments.
 - [ ] Normal completion and one catchable-cancellation probe confirm no decoded release credential or tracked notarization child remains. Do not claim shell cleanup for `SIGKILL` or host loss.
+- [ ] The immutable exact-nine-asset workflow artifact was finalized before the first Release mutation. Its ID/archive digest and attempt-1 origin run are recorded, and the origin build run was never rerun.
+- [ ] The separate draft run proved the origin workflow/repository/commit/job/artifact metadata, downloaded the raw archive by ID, matched its SHA-256, extracted exactly nine regular files, and verified the signed candidate plus all three attestation bundles before mutation.
+- [ ] If draft recovery ran, every pre-existing asset first compared byte-for-byte with that artifact, only missing names were appended without clobber, and no Release edit/delete/publication or tag mutation occurred. Record each draft attempt separately.
 - [ ] The protected draft contains exactly the nine assets below. Curated English/Korean notes are the Release body, not a tenth asset.
 - [ ] All nine assets were downloaded again byte-for-byte; hashes and signatures match this record, and all three attestation bundles verify their exact subjects.
 - [ ] Immutable releases are enabled before publication.

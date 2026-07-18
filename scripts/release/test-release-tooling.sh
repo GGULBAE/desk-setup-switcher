@@ -27,6 +27,19 @@ assert_not_contains() {
     pass
 }
 
+assert_before() {
+    local path="$1"
+    local first="$2"
+    local second="$3"
+    local first_line second_line
+    first_line="$(grep -F -n -m 1 -- "$first" "$path" | cut -d: -f1 || true)"
+    second_line="$(grep -F -n -m 1 -- "$second" "$path" | cut -d: -f1 || true)"
+    [[ -n "$first_line" && -n "$second_line" && "$first_line" -lt "$second_line" ]] || {
+        release_die "Expected release-tooling order is missing from $path: $first before $second"
+    }
+    pass
+}
+
 assert_fails() {
     if "$@" >"$temporary_root/expected-failure.stdout" 2>"$temporary_root/expected-failure.stderr"; then
         release_die "A release safety guard unexpectedly allowed execution."
@@ -47,6 +60,12 @@ ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_policy.rb"
 pass
 
 "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector.sh"
+pass
+
+"$RELEASE_SCRIPTS_DIR/test_prepare_draft_release.sh"
+pass
+
+"$RELEASE_SCRIPTS_DIR/test_restore_candidate_artifact.sh"
 pass
 
 ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-entitlements \
@@ -212,7 +231,10 @@ if [[ -n "${DEVELOPER_ID_CERTIFICATE_BASE64+x}" \
    || -n "${APPLE_NOTARY_API_KEY_BASE64+x}" \
    || -n "${certificate_base64+x}" \
    || -n "${certificate_password+x}" \
-   || -n "${notary_api_key_base64+x}" ]]; then
+   || -n "${notary_api_key_base64+x}" \
+   || -n "${GH_TOKEN+x}" \
+   || -n "${GITHUB_TOKEN+x}" \
+   || -n "${github_token+x}" ]]; then
     printf 'A release secret reached the first external child command.\n' >&2
     exit 97
 fi
@@ -234,6 +256,21 @@ assert_fails env -i \
     notary_api_key_base64=preexisting-exported-secret \
     "$RELEASE_SCRIPTS_DIR/build-candidate.sh"
 [[ -s "$build_secret_probe" ]] || release_die "The build secret isolation probe never reached the first child command."
+pass
+
+github_token_probe="$temporary_root/github-token-probe.txt"
+assert_fails env -i \
+    "PATH=$mock_bin:$PATH" \
+    "HOME=${HOME:-/tmp}" \
+    "TMPDIR=${TMPDIR:-/tmp}" \
+    "RELEASE_SECRET_PROBE_MARKER=$github_token_probe" \
+    GH_TOKEN=synthetic-gh-token \
+    GITHUB_TOKEN=synthetic-github-token \
+    github_token=synthetic-lowercase-token \
+    "$RELEASE_SCRIPTS_DIR/verify-downloaded-candidate.sh"
+[[ -s "$github_token_probe" ]] || {
+    release_die "The downloaded verifier did not isolate inherited GitHub credentials before its first child command."
+}
 pass
 
 credential_environment=(
@@ -372,23 +409,131 @@ printf 'tamper\n' >>"$fixture_app/Contents/Resources/value.txt"
 assert_fails "$RELEASE_SCRIPTS_DIR/compare-bundle-manifest.sh" "$first_manifest" "$fixture_app"
 
 workflow=.github/workflows/release.yml
+prepare_draft="$RELEASE_SCRIPTS_DIR/prepare-draft-release.sh"
+restore_candidate="$RELEASE_SCRIPTS_DIR/restore-candidate-artifact.sh"
+verify_candidate="$RELEASE_SCRIPTS_DIR/verify-candidate.sh"
+verify_downloaded="$RELEASE_SCRIPTS_DIR/verify-downloaded-candidate.sh"
 assert_contains "$workflow" "workflow_dispatch:"
 assert_contains "$workflow" "environment: release-candidate"
 assert_contains "$workflow" "DESK_SETUP_RELEASE_MUTATIONS: \"1\""
-assert_contains "$workflow" "--draft"
-assert_contains "$workflow" "--prerelease"
+assert_contains "$workflow" "RELEASE_CANDIDATE_RUN_ATTEMPT: \"1\""
+assert_contains "$workflow" "- build-candidate"
+assert_contains "$workflow" "- prepare-draft"
+assert_contains "$workflow" "candidate_origin_run_id:"
+assert_contains "$workflow" "candidate_artifact_id:"
+assert_contains "$workflow" "candidate_artifact_sha256:"
+assert_contains "$workflow" "needs: validate-dispatch"
+assert_contains "$workflow" "Never rerun a build-candidate operation."
 assert_contains "$workflow" "actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6"
+assert_contains "$workflow" "overwrite: false"
+assert_contains "$workflow" 'signed-candidate-${{ github.run_id }}-attempt-1'
+assert_contains "$workflow" "run: exec /bin/bash scripts/release/restore-candidate-artifact.sh"
+assert_contains "$workflow" "run: exec /bin/bash scripts/release/prepare-draft-release.sh"
 assert_contains "$workflow" "make verify-downloaded-release"
+assert_before "$workflow" "Retain the signed candidate before any draft mutation" "Create or resume the exact additive-only draft"
+assert_before "$workflow" "Run draft recovery preflight" "Prepare private candidate paths"
+assert_before "$workflow" "Prepare private candidate paths" "Restore the exact candidate from its separate origin run"
+assert_before "$workflow" "Restore the exact candidate from its separate origin run" "Verify the exact origin candidate and attestations before draft mutation"
+assert_before "$workflow" "Verify the exact origin candidate and attestations before draft mutation" "Create or resume the exact additive-only draft"
+assert_before "$workflow" "Create or resume the exact additive-only draft" "Verify the redownloaded draft and attestations"
 assert_not_contains "$workflow" "push:"
 assert_not_contains "$workflow" "--generate-notes"
 assert_not_contains "$workflow" "--draft=false"
 assert_not_contains "$workflow" "gh release edit"
+assert_not_contains "$workflow" "gh release delete"
+assert_not_contains "$workflow" "--clobber"
 assert_not_contains "$workflow" "unsigned"
 assert_not_contains "$workflow" "artifacts/*.dmg"
 assert_not_contains "$workflow" "RELEASE_SIGNING_KEYCHAIN:"
 assert_contains "$workflow" "run: exec /bin/bash scripts/release/import-signing-certificate.sh"
 assert_contains "$workflow" "run: exec /bin/bash scripts/release/build-candidate.sh"
 assert_not_contains "$workflow" "run: make release-candidate"
+
+ruby -ryaml -rjson -e '
+  workflow = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: true)
+  jobs = workflow.fetch("jobs")
+  guard = jobs.fetch("validate-dispatch")
+  build = jobs.fetch("build-candidate")
+  draft = jobs.fetch("signed-draft")
+  abort "dispatch guard unexpectedly has token permissions" unless guard.fetch("permissions") == {}
+  abort "build does not depend only on the dispatch guard" unless build.fetch("needs") == "validate-dispatch"
+  abort "draft does not depend only on the dispatch guard" unless draft.fetch("needs") == "validate-dispatch"
+  abort "build phase condition differs" unless build.fetch("if") == "${{ inputs.operation == '\''build-candidate'\'' }}"
+  abort "draft phase condition differs" unless draft.fetch("if") == "${{ inputs.operation == '\''prepare-draft'\'' }}"
+  abort "build permissions differ" unless build.fetch("permissions") == {
+    "contents" => "read", "id-token" => "write", "attestations" => "write", "artifact-metadata" => "write"
+  }
+  abort "draft permissions differ" unless draft.fetch("permissions") == {
+    "actions" => "read", "attestations" => "read", "contents" => "write"
+  }
+  abort "protected environments differ" unless [build, draft].all? { |job| job.fetch("environment") == "release-candidate" }
+  abort "draft contains a signing secret expression" if JSON.generate(draft).include?("${{ secrets.")
+  names = draft.fetch("steps").map { |step| step.fetch("name") }
+  private_paths = names.index("Prepare private candidate paths")
+  restore = names.index("Restore the exact candidate from its separate origin run")
+  preverify = names.index("Verify the exact origin candidate and attestations before draft mutation")
+  mutate = names.index("Create or resume the exact additive-only draft")
+  postverify = names.index("Verify the redownloaded draft and attestations")
+  abort "draft verification/mutation order differs" unless [private_paths, restore, preverify, mutate, postverify].all? && private_paths < restore && restore < preverify && preverify < mutate && mutate < postverify
+  private_paths_script = draft.fetch("steps").fetch(private_paths).fetch("run")
+  abort "private candidate paths are not fail-closed" unless
+    private_paths_script.include?(%q{if [[ -e "$path" || -L "$path" ]]}) &&
+    private_paths_script.include?(%q{mkdir -m 0700 -- "$path"})
+  preverify_step = draft.fetch("steps").fetch(preverify)
+  abort "pre-mutation attestation gate differs" unless preverify_step.fetch("run") == "make verify-downloaded-release" && preverify_step.fetch("env").fetch("RELEASE_DOWNLOAD_DIR") == "artifacts/release"
+' "$workflow"
+pass
+
+draft_job="$temporary_root/signed-draft-job.yml"
+sed -n '/^  signed-draft:/,$p' "$workflow" >"$draft_job"
+assert_contains "$draft_job" "actions: read"
+assert_contains "$draft_job" "attestations: read"
+assert_contains "$draft_job" "contents: write"
+assert_not_contains "$draft_job" '${{ secrets.'
+
+assert_contains "$prepare_draft" "--draft"
+assert_contains "$prepare_draft" "--prerelease"
+assert_not_contains "$prepare_draft" "--clobber"
+assert_not_contains "$prepare_draft" "gh release edit"
+assert_not_contains "$prepare_draft" "gh release delete"
+assert_contains "$verify_candidate" "release_require_env RELEASE_CANDIDATE_RUN_ATTEMPT"
+assert_contains "$verify_candidate" "release_require_env RELEASE_CANDIDATE_RUN_ID"
+assert_contains "$verify_candidate" '--run-id "$RELEASE_CANDIDATE_RUN_ID"'
+assert_not_contains "$verify_candidate" '--run-id "$GITHUB_RUN_ID"'
+assert_contains "$verify_candidate" '--run-attempt "$RELEASE_CANDIDATE_RUN_ATTEMPT"'
+assert_not_contains "$verify_candidate" '--run-attempt "$GITHUB_RUN_ATTEMPT"'
+assert_contains "$prepare_draft" "Draft preparation must restore a candidate from a separate origin run."
+assert_contains "$prepare_draft" "unset github_token"
+assert_contains "$prepare_draft" 'github_token="${GH_TOKEN:-}"'
+assert_contains "$prepare_draft" "export -n github_token"
+assert_contains "$prepare_draft" "unset GH_TOKEN GITHUB_TOKEN"
+assert_before "$prepare_draft" "unset github_token" 'github_token="${GH_TOKEN:-}"'
+assert_before "$prepare_draft" 'github_token="${GH_TOKEN:-}"' "unset GH_TOKEN GITHUB_TOKEN"
+assert_before "$prepare_draft" "unset GH_TOKEN GITHUB_TOKEN" 'source "$(dirname "$0")/lib.sh"'
+assert_contains "$restore_candidate" 'github_token="${GH_TOKEN:-}"'
+assert_contains "$restore_candidate" "unset GH_TOKEN"
+assert_contains "$restore_candidate" "RELEASE_CANDIDATE_ARTIFACT_SHA256"
+assert_not_contains "$restore_candidate" "gh release"
+assert_contains "$verify_downloaded" "unset github_token"
+assert_contains "$verify_downloaded" 'github_token="${GH_TOKEN:-}"'
+assert_contains "$verify_downloaded" "export -n github_token"
+assert_contains "$verify_downloaded" "unset GH_TOKEN GITHUB_TOKEN"
+assert_before "$verify_downloaded" "unset github_token" 'github_token="${GH_TOKEN:-}"'
+assert_before "$verify_downloaded" 'github_token="${GH_TOKEN:-}"' "unset GH_TOKEN GITHUB_TOKEN"
+assert_before "$verify_downloaded" "unset GH_TOKEN GITHUB_TOKEN" 'source "$(dirname "$0")/lib.sh"'
+assert_contains "$verify_downloaded" 'GH_TOKEN="$github_token" gh attestation verify'
+assert_not_contains "$verify_downloaded" "release_require_env GH_TOKEN"
+
+ruby -e '
+  prepare, downloaded = ARGV
+  prepare_gh = File.readlines(prepare).grep(/\bgh (?:api|release) /)
+  abort "draft reconciler has an unscoped gh command" unless
+    prepare_gh.length == 4 && prepare_gh.all? { |line| line.include?(%q{GH_TOKEN="$github_token" gh }) }
+  downloaded_gh = File.readlines(downloaded).grep(/\bgh attestation verify /)
+  abort "downloaded verifier has an unscoped gh command" unless
+    downloaded_gh.length == 3 && downloaded_gh.all? { |line| line.include?(%q{GH_TOKEN="$github_token" gh }) }
+' "$prepare_draft" "$verify_downloaded"
+pass
 
 import_signing="$RELEASE_SCRIPTS_DIR/import-signing-certificate.sh"
 build_candidate="$RELEASE_SCRIPTS_DIR/build-candidate.sh"
