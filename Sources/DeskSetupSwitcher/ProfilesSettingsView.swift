@@ -116,6 +116,132 @@ enum ProfileEditorSurfacePolicy {
   static let showsCurrentSettingsDraftRefresh = false
 }
 
+enum ProfileManagementAction: Hashable, Sendable {
+  case create
+  case duplicate
+  case delete
+  case moveUp
+  case moveDown
+  case importProfiles
+  case exportSavedProfiles
+}
+
+enum ProfileManagementActionPolicy {
+  static let primaryActions: [ProfileManagementAction] = [.create]
+  static let secondaryActionGroups: [[ProfileManagementAction]] = [
+    [.duplicate, .delete],
+    [.moveUp, .moveDown],
+    [.importProfiles, .exportSavedProfiles],
+  ]
+}
+
+enum ProfileExportScopePolicy {
+  static let actionTitle = "Export Saved Profiles…"
+  static let unsavedDraftNotice =
+    "Export uses saved profiles only. Unsaved changes are not included."
+  static let accessibilityHint =
+    "Exports all saved profiles to a local JSON file; the unsaved draft is not included"
+}
+
+enum ProfileStorageFooterPolicy {
+  static func showsStorageStatus(
+    hasGlobalStorageFailure: Bool,
+    editorOwnsCurrentError: Bool
+  ) -> Bool {
+    !hasGlobalStorageFailure && !editorOwnsCurrentError
+  }
+
+  static func showsFooter(
+    hasUnsavedDraft: Bool,
+    showsStorageStatus: Bool
+  ) -> Bool {
+    hasUnsavedDraft || showsStorageStatus
+  }
+}
+
+enum ProfileEditorErrorVisibilityPolicy {
+  static func showsEditorError(hasGlobalStorageFailure: Bool) -> Bool {
+    !hasGlobalStorageFailure
+  }
+}
+
+enum ProfileWorkspaceInteractionPolicy {
+  static func isDisabled(
+    isMutationLocked: Bool,
+    hasGlobalStorageFailure: Bool
+  ) -> Bool {
+    isMutationLocked || hasGlobalStorageFailure
+  }
+}
+
+enum ProfileStorageFailureAccessibilityPolicy {
+  static let movesFocusToHeadingOnPresentation = true
+}
+
+private struct ProfileStorageFailureOwnershipModifier: ViewModifier {
+  @ObservedObject var model: ApplicationModel
+  @ObservedObject var profileEditor: ProfileEditorModel
+
+  func body(content: Content) -> some View {
+    content
+      .onChange(of: model.profileStorageFailure) { _, failure in
+        if failure != nil {
+          profileEditor.clearTransientFeedback()
+        }
+      }
+      .onChange(of: profileEditor.activity) {
+        if model.profileStorageFailure != nil {
+          profileEditor.clearTransientFeedback()
+        }
+      }
+  }
+}
+
+struct ProfileSettingInclusionPresentation: Equatable, Sendable {
+  let visibleTitle: String
+  let visibleState: String
+  let systemImage: String
+  let accessibilityLabel: String
+  let accessibilityValue: String
+  let accessibilityHint: String
+
+  static func make(settingTitle: String, isIncluded: Bool) -> Self {
+    let visibleTitle = appLocalized("Apply with profile")
+    let labelFormat = appLocalized("%@: Apply with profile")
+    let visibleState = isIncluded ? appLocalized("Included") : appLocalized("Not included")
+    let accessibilityValue =
+      isIncluded
+      ? appLocalized("Included in profile application")
+      : appLocalized("Not included in profile application")
+    return Self(
+      visibleTitle: visibleTitle,
+      visibleState: visibleState,
+      systemImage: isIncluded ? "checkmark.circle.fill" : "minus.circle",
+      accessibilityLabel: String.localizedStringWithFormat(labelFormat, settingTitle),
+      accessibilityValue: accessibilityValue,
+      accessibilityHint: appLocalized(
+        "Controls whether this setting changes when the profile is applied"
+      )
+    )
+  }
+}
+
+enum ProfileSettingInclusionLayoutPolicy {
+  static let formHorizontalInset: CGFloat = 18
+  static let groupContentInset: CGFloat = 8
+  static let optionContentInset: CGFloat = 12
+  static let maximumExpectedControlWidth: CGFloat = 220
+
+  static var minimumAvailableHeaderWidth: CGFloat {
+    ProfileWorkspaceLayoutPolicy.minimumEditorWidth
+      - 2 * (formHorizontalInset + groupContentInset + optionContentInset)
+  }
+
+  static func usesStackedHeader(for dynamicTypeSize: DynamicTypeSize) -> Bool {
+    dynamicTypeSize.isAccessibilitySize
+  }
+}
+
 enum ProfileEditorEmptyStateCopy {
   static let noProfilesDescription =
     "Capture from the tray, or choose + to create a blank profile."
@@ -217,6 +343,7 @@ struct ProfilesSettingsView: View {
   @State private var requestedValidationFocus: DraftFieldIdentifier?
   @State private var unsavedPromptValidationHandoff = UnsavedPromptValidationHandoff()
   @State private var catalogSession = ProfileEditorCatalogSession()
+  @AccessibilityFocusState private var isStorageFailureHeadingFocused: Bool
   let presentationGeneration: UInt64
 
   init(presentationGeneration: UInt64 = 0) {
@@ -225,18 +352,25 @@ struct ProfilesSettingsView: View {
 
   var body: some View {
     VStack(spacing: 12) {
+      if let failure = model.profileStorageFailure {
+        profileStorageFailureCard(failure)
+      }
+
       profileWorkspace
-        .disabled(model.isProfileMutationLocked)
+        .disabled(isProfileWorkspaceDisabled)
 
-      Divider()
-
-      HStack(spacing: 10) {
-        storageStatusLabel
-        Spacer(minLength: 12)
-        importExportButtons
+      if showsStorageFooter {
+        Divider()
+        storageFooter
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .modifier(
+      ProfileStorageFailureOwnershipModifier(
+        model: model,
+        profileEditor: profileEditor
+      )
+    )
     .onAppear {
       profileEditor.initialize(
         profiles: model.profiles,
@@ -249,6 +383,9 @@ struct ProfilesSettingsView: View {
       )
       if profileEditor.session.pendingSelection != nil {
         isUnsavedPromptPresented = true
+      }
+      if model.profileStorageFailure != nil {
+        profileEditor.clearTransientFeedback()
       }
       #if DEBUG
         if uiAuditConfiguration.isEnabled,
@@ -336,10 +473,7 @@ struct ProfilesSettingsView: View {
     }
     .confirmationDialog(
       "Delete this profile?",
-      isPresented: Binding(
-        get: { profilePendingDeletion != nil },
-        set: { if !$0 { profilePendingDeletion = nil } }
-      ),
+      isPresented: profileDeletionPresentationBinding,
       presenting: profilePendingDeletion
     ) { profile in
       Button(appLocalized("Delete \(profile.name)"), role: .destructive) {
@@ -359,10 +493,7 @@ struct ProfilesSettingsView: View {
     }
     .alert(
       "Replace all local profiles?",
-      isPresented: Binding(
-        get: { model.pendingImport != nil },
-        set: { if !$0 { model.cancelImportReplacement() } }
-      ),
+      isPresented: pendingImportPresentationBinding,
       presenting: model.pendingImport
     ) { request in
       Button("Cancel", role: .cancel) { model.cancelImportReplacement() }
@@ -379,6 +510,27 @@ struct ProfilesSettingsView: View {
         )
       )
     }
+  }
+
+  private var isProfileWorkspaceDisabled: Bool {
+    ProfileWorkspaceInteractionPolicy.isDisabled(
+      isMutationLocked: model.isProfileMutationLocked,
+      hasGlobalStorageFailure: model.profileStorageFailure != nil
+    )
+  }
+
+  private var pendingImportPresentationBinding: Binding<Bool> {
+    Binding(
+      get: { model.pendingImport != nil },
+      set: { if !$0 { model.cancelImportReplacement() } }
+    )
+  }
+
+  private var profileDeletionPresentationBinding: Binding<Bool> {
+    Binding(
+      get: { profilePendingDeletion != nil },
+      set: { if !$0 { profilePendingDeletion = nil } }
+    )
   }
 
   private var profileWorkspace: some View {
@@ -430,61 +582,31 @@ struct ProfilesSettingsView: View {
         Button {
           requestDeferredAction(.create)
         } label: {
-          Label("New Profile", systemImage: "plus")
+          Label(appLocalized("New Profile"), systemImage: "plus")
         }
-        .labelStyle(.iconOnly)
-        .accessibilityLabel("Create profile")
-        .help("Create profile")
-
-        Button {
-          if let selection = profileEditor.selectedProfileID {
-            requestDeferredAction(.duplicate(selection))
-          }
-        } label: {
-          Label("Duplicate Profile", systemImage: "plus.square.on.square")
-        }
-        .labelStyle(.iconOnly)
-        .disabled(profileEditor.selectedProfileID == nil)
-        .accessibilityLabel("Duplicate selected profile")
-        .help("Duplicate selected profile")
-
-        Button {
-          if let profile = selectedProfile {
-            requestDeferredAction(.delete(profile))
-          }
-        } label: {
-          Label("Delete Profile", systemImage: "trash")
-        }
-        .labelStyle(.iconOnly)
-        .disabled(profileEditor.selectedProfileID == nil)
-        .accessibilityLabel("Delete selected profile")
-        .help("Delete selected profile")
+        .accessibilityLabel(appLocalized("Create profile"))
+        .help(appLocalized("Create profile"))
 
         Spacer()
 
-        Button {
-          if let selection = profileEditor.selectedProfileID {
-            model.moveProfile(id: selection, by: -1)
+        Menu {
+          ForEach(
+            Array(ProfileManagementActionPolicy.secondaryActionGroups.enumerated()),
+            id: \.offset
+          ) { groupIndex, actions in
+            if groupIndex > 0 {
+              Divider()
+            }
+            ForEach(actions, id: \.self) { action in
+              profileManagementAction(action)
+            }
           }
         } label: {
-          Label("Move Up", systemImage: "chevron.up")
+          Label(appLocalized("More Profile Actions"), systemImage: "ellipsis.circle")
         }
         .labelStyle(.iconOnly)
-        .disabled(!canMove(by: -1))
-        .accessibilityLabel("Move selected profile up")
-        .help("Move selected profile up")
-
-        Button {
-          if let selection = profileEditor.selectedProfileID {
-            model.moveProfile(id: selection, by: 1)
-          }
-        } label: {
-          Label("Move Down", systemImage: "chevron.down")
-        }
-        .labelStyle(.iconOnly)
-        .disabled(!canMove(by: 1))
-        .accessibilityLabel("Move selected profile down")
-        .help("Move selected profile down")
+        .accessibilityLabel(appLocalized("More Profile Actions"))
+        .help(appLocalized("More Profile Actions"))
       }
     }
   }
@@ -527,6 +649,41 @@ struct ProfilesSettingsView: View {
     return model.profiles.first { $0.id == selection }
   }
 
+  private var storageFooter: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      if profileEditor.isDirty {
+        Label(
+          appLocalizedRuntime(ProfileExportScopePolicy.unsavedDraftNotice),
+          systemImage: "document.badge.clock"
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
+      }
+
+      if showsStorageStatus {
+        storageStatusLabel
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var showsStorageStatus: Bool {
+    ProfileStorageFooterPolicy.showsStorageStatus(
+      hasGlobalStorageFailure: model.profileStorageFailure != nil,
+      editorOwnsCurrentError: editorActivityIsError
+    )
+  }
+
+  private var showsStorageFooter: Bool {
+    ProfileStorageFooterPolicy.showsFooter(
+      hasUnsavedDraft: profileEditor.isDirty,
+      showsStorageStatus: showsStorageStatus
+    )
+  }
+
   private var storageStatusLabel: some View {
     Label(
       model.isProfileMutationLocked
@@ -549,14 +706,131 @@ struct ProfilesSettingsView: View {
         : appLocalized("Profile storage status: \(model.storageStatus)"))
   }
 
-  private var importExportButtons: some View {
-    HStack(spacing: 8) {
-      Button("Import…") { requestDeferredAction(.importProfiles) }
-        .disabled(model.isProfileMutationLocked)
-        .accessibilityHint("Selects and validates a local profile JSON file")
-      Button("Export…") { model.exportProfiles() }
-        .disabled(model.profiles.isEmpty || model.isProfileMutationLocked)
-        .accessibilityHint("Exports all profiles to a new local JSON file")
+  private func profileStorageFailureCard(
+    _ failure: ProfileStorageFailurePresentation
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Label(appLocalized("Profile Storage Error"), systemImage: "exclamationmark.triangle.fill")
+        .font(.headline)
+        .foregroundStyle(.red)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityLabel(
+          "\(appLocalized("Profile Storage Error")): \(failure.message)"
+        )
+        .accessibilityFocused($isStorageFailureHeadingFocused)
+
+      Text(failure.message)
+        .fixedSize(horizontal: false, vertical: true)
+
+      HStack {
+        Spacer()
+        switch failure.recovery {
+        case .retryLoading:
+          Button(appLocalized("Retry Loading")) {
+            model.retryProfileStorageLoad()
+          }
+          .buttonStyle(.borderedProminent)
+          .disabled(model.isProfileMutationLocked)
+          .accessibilityHint(
+            appLocalized("Attempts to load the local profile storage again")
+          )
+        case .dismiss:
+          Button(appLocalized("Dismiss Error")) {
+            model.dismissProfileStorageFailure()
+          }
+          .accessibilityHint(
+            appLocalized("Closes this error without repeating the failed action")
+          )
+        }
+      }
+    }
+    .padding(12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .overlay {
+      RoundedRectangle(cornerRadius: 10)
+        .stroke(Color.red.opacity(0.45))
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("profile-storage-error")
+    .onAppear {
+      guard ProfileStorageFailureAccessibilityPolicy.movesFocusToHeadingOnPresentation else {
+        return
+      }
+      Task { @MainActor in
+        await Task.yield()
+        isStorageFailureHeadingFocused = true
+      }
+    }
+    .onDisappear {
+      isStorageFailureHeadingFocused = false
+    }
+  }
+
+  @ViewBuilder
+  private func profileManagementAction(_ action: ProfileManagementAction) -> some View {
+    switch action {
+    case .create:
+      EmptyView()
+    case .duplicate:
+      Button {
+        if let selection = profileEditor.selectedProfileID {
+          requestDeferredAction(.duplicate(selection))
+        }
+      } label: {
+        Label(appLocalized("Duplicate Profile"), systemImage: "plus.square.on.square")
+      }
+      .disabled(profileEditor.selectedProfileID == nil)
+      .accessibilityHint(appLocalized("Creates a copy of the selected saved profile"))
+    case .delete:
+      Button(role: .destructive) {
+        if let profile = selectedProfile {
+          requestDeferredAction(.delete(profile))
+        }
+      } label: {
+        Label(appLocalized("Delete Profile"), systemImage: "trash")
+      }
+      .disabled(profileEditor.selectedProfileID == nil)
+      .accessibilityHint(appLocalized("Requests permanent deletion of the selected profile"))
+    case .moveUp:
+      Button {
+        if let selection = profileEditor.selectedProfileID {
+          model.moveProfile(id: selection, by: -1)
+        }
+      } label: {
+        Label(appLocalized("Move Up"), systemImage: "chevron.up")
+      }
+      .disabled(!canMove(by: -1))
+    case .moveDown:
+      Button {
+        if let selection = profileEditor.selectedProfileID {
+          model.moveProfile(id: selection, by: 1)
+        }
+      } label: {
+        Label(appLocalized("Move Down"), systemImage: "chevron.down")
+      }
+      .disabled(!canMove(by: 1))
+    case .importProfiles:
+      Button {
+        requestDeferredAction(.importProfiles)
+      } label: {
+        Label(appLocalized("Import…"), systemImage: "square.and.arrow.down")
+      }
+      .disabled(model.isProfileMutationLocked)
+      .accessibilityHint(appLocalized("Selects and validates a local profile JSON file"))
+    case .exportSavedProfiles:
+      Button {
+        model.exportProfiles()
+      } label: {
+        Label(
+          appLocalizedRuntime(ProfileExportScopePolicy.actionTitle),
+          systemImage: "square.and.arrow.up"
+        )
+      }
+      .disabled(model.profiles.isEmpty || model.isProfileMutationLocked)
+      .accessibilityHint(
+        appLocalizedRuntime(ProfileExportScopePolicy.accessibilityHint)
+      )
     }
   }
 
@@ -666,7 +940,10 @@ struct ProfilesSettingsView: View {
     case .message(let message):
       (message, "info.circle")
     case .error(let message):
-      (message, "exclamationmark.triangle")
+      ProfileEditorErrorVisibilityPolicy.showsEditorError(
+        hasGlobalStorageFailure: model.profileStorageFailure != nil
+      )
+        ? (message, "exclamationmark.triangle") : nil
     }
   }
 
@@ -855,6 +1132,7 @@ private enum DeferredProfileAction: Identifiable {
 
 private struct ProfileEditorForm: View {
   @Environment(\.uiAuditConfiguration) private var uiAuditConfiguration
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Binding var profile: DeskProfile
   let systemSnapshot: SystemSnapshotResult?
   let validation: ProfileDraftValidation
@@ -862,6 +1140,7 @@ private struct ProfileEditorForm: View {
   let presentationGeneration: UInt64
   @FocusState private var focusedField: DraftFieldIdentifier?
   @State private var showsValidationSummary = false
+  @State private var showsImportedIconTechnicalInformation = false
 
   var body: some View {
     ScrollView {
@@ -880,7 +1159,7 @@ private struct ProfileEditorForm: View {
           lastApplicationCard(lastApplication)
         }
       }
-      .padding(.horizontal, 18)
+      .padding(.horizontal, ProfileSettingInclusionLayoutPolicy.formHorizontalInset)
       .padding(.vertical, 16)
       .frame(maxWidth: 860)
       .frame(maxWidth: .infinity, alignment: .top)
@@ -898,11 +1177,13 @@ private struct ProfileEditorForm: View {
       focusedField = nil
       requestedValidationFocus = nil
       showsValidationSummary = false
+      showsImportedIconTechnicalInformation = false
     }
     .onChange(of: presentationGeneration) {
       focusedField = nil
       requestedValidationFocus = nil
       showsValidationSummary = false
+      showsImportedIconTechnicalInformation = false
     }
     .onChange(of: requestedValidationFocus) {
       guard let fieldID = requestedValidationFocus else { return }
@@ -932,7 +1213,11 @@ private struct ProfileEditorForm: View {
           )
         }
         if !profileIconChoices.contains(where: { $0.symbolName == profile.symbolName }) {
-          DisclosureGroup("Technical Information") {
+          AccessibleDisclosureGroup(
+            appLocalized("Technical Information"),
+            accessibilityIdentifier: "profile-imported-icon-technical-information",
+            isExpanded: $showsImportedIconTechnicalInformation
+          ) {
             LabeledContent("Imported symbol name") {
               Text(profile.symbolName)
                 .font(.caption.monospaced())
@@ -941,7 +1226,7 @@ private struct ProfileEditorForm: View {
           }
         }
       }
-      .padding(8)
+      .padding(ProfileSettingInclusionLayoutPolicy.groupContentInset)
     } label: {
       Label("Profile", systemImage: "person.crop.rectangle")
         .font(.headline)
@@ -1017,7 +1302,7 @@ private struct ProfileEditorForm: View {
           }
         }
       }
-      .padding(8)
+      .padding(ProfileSettingInclusionLayoutPolicy.groupContentInset)
     } label: {
       Text("Last application")
         .font(.headline)
@@ -1488,7 +1773,7 @@ private struct ProfileEditorForm: View {
           content()
         }
       }
-      .padding(8)
+      .padding(ProfileSettingInclusionLayoutPolicy.groupContentInset)
     }
   }
 
@@ -1503,27 +1788,12 @@ private struct ProfileEditorForm: View {
     let localizedTitle = appLocalized(title)
 
     VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 12) {
-        Text(localizedTitle)
-          .fontWeight(.medium)
-          .lineLimit(2)
-          .multilineTextAlignment(.leading)
-          .accessibilityAddTraits(.isHeader)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .layoutPriority(1)
-          .accessibilityInvalid(!validationIssues(for: validationFields).isEmpty)
-
-        compactIncludeToggle(
-          isOn: Binding(
-            get: { isOn.wrappedValue },
-            set: { newValue in
-              isOn.wrappedValue = newValue
-              onIncludeChange?.perform(newValue)
-            }
-          ),
-          accessibilityLabel: appLocalized("Include \(localizedTitle)")
-        )
-      }
+      optionInclusionHeader(
+        title: localizedTitle,
+        isOn: isOn,
+        validationFields: validationFields,
+        onIncludeChange: onIncludeChange
+      )
 
       VStack(alignment: .leading, spacing: 8) {
         content()
@@ -1537,7 +1807,7 @@ private struct ProfileEditorForm: View {
         )
       }
     }
-    .padding(12)
+    .padding(ProfileSettingInclusionLayoutPolicy.optionContentInset)
     .background(
       Color(nsColor: .controlBackgroundColor).opacity(0.7),
       in: RoundedRectangle(cornerRadius: 10)
@@ -1555,21 +1825,11 @@ private struct ProfileEditorForm: View {
     warning: String
   ) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 12) {
-        Text(title)
-          .fontWeight(.medium)
-          .lineLimit(2)
-          .multilineTextAlignment(.leading)
-          .accessibilityAddTraits(.isHeader)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .layoutPriority(1)
-          .accessibilityInvalid(!validationIssues(for: validationFields).isEmpty)
-
-        compactIncludeToggle(
-          isOn: isOn,
-          accessibilityLabel: appLocalized("Include \(title)")
-        )
-      }
+      optionInclusionHeader(
+        title: title,
+        isOn: isOn,
+        validationFields: validationFields
+      )
 
       Label(warning, systemImage: "exclamationmark.triangle.fill")
         .font(.caption)
@@ -1584,7 +1844,7 @@ private struct ProfileEditorForm: View {
         )
       }
     }
-    .padding(12)
+    .padding(ProfileSettingInclusionLayoutPolicy.optionContentInset)
     .background(
       Color(nsColor: .controlBackgroundColor).opacity(0.7),
       in: RoundedRectangle(cornerRadius: 10)
@@ -1597,13 +1857,23 @@ private struct ProfileEditorForm: View {
 
   private func compactIncludeToggle(
     isOn: Binding<Bool>,
-    accessibilityLabel: String
+    settingTitle: String
   ) -> some View {
-    HStack(spacing: 8) {
-      Text(appLocalized("Include"))
-        .font(.subheadline)
-        .fixedSize()
-        .accessibilityHidden(true)
+    let presentation = ProfileSettingInclusionPresentation.make(
+      settingTitle: settingTitle,
+      isIncluded: isOn.wrappedValue
+    )
+
+    return HStack(spacing: 8) {
+      VStack(alignment: .trailing, spacing: 1) {
+        Text(presentation.visibleTitle)
+          .font(.caption)
+        Label(presentation.visibleState, systemImage: presentation.systemImage)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+      .fixedSize(horizontal: true, vertical: false)
+      .accessibilityHidden(true)
       Toggle(isOn: isOn) {
         EmptyView()
       }
@@ -1611,10 +1881,56 @@ private struct ProfileEditorForm: View {
       .toggleStyle(.switch)
       .controlSize(.regular)
       .fixedSize()
-      .accessibilityLabel(accessibilityLabel)
-      .accessibilityValue(isOn.wrappedValue ? Text("Included") : Text("Excluded"))
+      .accessibilityLabel(presentation.accessibilityLabel)
+      .accessibilityValue(presentation.accessibilityValue)
+      .accessibilityHint(presentation.accessibilityHint)
     }
     .fixedSize(horizontal: true, vertical: false)
+  }
+
+  @ViewBuilder
+  private func optionInclusionHeader(
+    title: String,
+    isOn: Binding<Bool>,
+    validationFields: [DraftFieldIdentifier],
+    onIncludeChange: IncludeChangeAction? = nil
+  ) -> some View {
+    let toggleBinding = Binding(
+      get: { isOn.wrappedValue },
+      set: { newValue in
+        isOn.wrappedValue = newValue
+        onIncludeChange?.perform(newValue)
+      }
+    )
+
+    if ProfileSettingInclusionLayoutPolicy.usesStackedHeader(for: dynamicTypeSize) {
+      VStack(alignment: .leading, spacing: 8) {
+        optionTitle(title, validationFields: validationFields)
+        HStack {
+          Spacer(minLength: 0)
+          compactIncludeToggle(isOn: toggleBinding, settingTitle: title)
+        }
+      }
+    } else {
+      HStack(spacing: 12) {
+        optionTitle(title, validationFields: validationFields)
+        compactIncludeToggle(isOn: toggleBinding, settingTitle: title)
+      }
+    }
+  }
+
+  private func optionTitle(
+    _ title: String,
+    validationFields: [DraftFieldIdentifier]
+  ) -> some View {
+    Text(title)
+      .fontWeight(.medium)
+      .lineLimit(2)
+      .multilineTextAlignment(.leading)
+      .accessibilityAddTraits(.isHeader)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .layoutPriority(1)
+      .accessibilityInvalid(!validationIssues(for: validationFields).isEmpty)
   }
 
   @ViewBuilder

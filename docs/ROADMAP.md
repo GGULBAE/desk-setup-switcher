@@ -111,7 +111,7 @@ Evidence: non-live `make verify` passed 326 default cases (130 XCTest + 196 Swif
 
 Remaining: user-driven installed status-item/popover interaction, complete keyboard/VoiceOver and real accessibility-setting walkthroughs, TCC, login approval/retry/reboot, Gatekeeper, physical Intel, import/export, Keychain, and every hardware mutation/rollback procedure.
 
-## M5 — Packaging and CI (current local package verified; historical CI green)
+## M5 — Packaging and CI (P2 local package verified; historical CI green)
 
 - The 2026-07-11 post-fix full `make verify` locally passed lint, 158 tests (83 XCTest + 75 Swift Testing), universal builds, Analyze, packaging, checksum, and mounted-image inspection
 - Versioned DMG contains universal app, `/Applications` link, resources, and a verified ad-hoc integrity signature
@@ -125,7 +125,8 @@ Remaining: user-driven installed status-item/popover interaction, complete keybo
 - The stable permission-handoff follow-up `make verify` produced and mounted its then-current universal package, verified `x86_64 arm64`, resources, checksum, and ad-hoc/no-Developer-ID signature status; SHA-256 is `150d1e0bb620fba52c2ec2a6a78345b5b74f44ca10c9d5375178f6ab16ea370d`. The installed-interaction package SHA-256 `df674b37e2a2fe9a94d37435313265069e27f6130ae05ad02b8ae822ac00e8b6`, pre-stable-handoff capture SHA-256 `ed52b253159e6abc8fe35e606aed56cc269693a53b76986dae20a04ffb2bd4fc`, pre-live-test-adjustment capture SHA-256 `8760d68754f3bc1eebca37319bd0d2bfc29b6b3d90832532e0a64cd072506a9b`, preceding tray/editor SHA-256 `f3d24ae95709d0db9de13ba6032eb63a1d19a5be89af15aa68244da9019afbde`, and layout-correction SHA-256 `ae940ce1cffb969f309b8ffa8f6ffcd0637fd0845ee21bf24fa59129ea530ef7` are historical
 - The measured-height tray/responsive-settings follow-up `make verify` produced and mounted historical universal package SHA-256 `8bf4d547fae0df3cbe999db84e7be169b33d495b3993cf7c37f46ba37d6ea71d`; its executable matched the then-installed app byte-for-byte. The pre-correction package SHA-256 `8422b042b793bf0845ac56e2dcbd9808075a0467226d79ee65408440736648d8`, stable permission-handoff, and earlier checksums above are historical.
 - Tray Surface v2 supersedes that package. Its non-live gate produced and mounted universal SHA-256 `2e5248175e8c68810bd17abf52da30356ff9ccee7cd167d97ac3b815e3b04127`; installation, launch, push, and CI were not performed.
-- The 2026-07-17 native UI structural follow-up's final integrated gate passed 446 checks (144 XCTest + 301 Swift Testing across 38 suites + one separately executed native `NSPopover` regression) and produced a mounted universal package with SHA-256 `82b05e6a3b1b20978c85c4d82d0976237a731c76c07bcd7d1729a84e3e0b6f21`. The package was later reinstalled to `/Applications` for the separately authorized non-mutating UI geometry follow-up; push and CI were not performed.
+- The 2026-07-17 native UI structural follow-up's integrated gate passed 446 checks (144 XCTest + 301 Swift Testing across 38 suites + one separately executed native `NSPopover` regression) and produced a mounted universal package with SHA-256 `82b05e6a3b1b20978c85c4d82d0976237a731c76c07bcd7d1729a84e3e0b6f21`. That package was reinstalled to `/Applications` for the separately authorized non-mutating UI geometry follow-up; it is now preceding evidence.
+- The P2 UI refinement final local gate passed 461 checks: 144 XCTest, 316 Swift Testing across 39 suites, and one isolated native popover regression. Its universal no-Developer-ID DMG SHA-256 is `342d804d8bbff51209af4bccefb405ee76499050c1e640a011d41e2f78792031`; the reinstalled ad-hoc-signed `/Applications` executable SHA-256 is `fb35352fb6a9588c0c50269975ccd3d7b73e52010de10de132bf45d60236f719`. The app launched with `x86_64 arm64`, and profile primary/backup/defaults remained unchanged. Preceding hashes must not be reused. Push and CI were not requested by the local P2 goal.
 
 Remaining:
 
@@ -218,18 +219,17 @@ No installed-app launch, live hardware mutation, TCC action, Keychain write, UI 
 
 The installed follow-up invoked no Apply, Capture, TCC, login-item, or system-setting mutation. Full VoiceOver use, focused-control AX observation, push, CI, tag, notarization, and publication remain outside the completed evidence.
 
-## Current next task — bounded P2 UI follow-up
+## M4.11 — bounded P2 UI refinement (completed locally)
 
-Keep the next pass to these P2 items only:
+- Make the pristine empty/idle tray's one Capture affordance a labelled body-level primary CTA while retaining one compact header action for nonempty and non-idle states.
+- Keep **New Profile** as the direct management action and group Duplicate/Delete, Move Up/Down, and Import/**Export Saved Profiles…** behind one secondary menu. State directly that dirty unsaved changes are excluded, and export only `ProfileStore`'s persisted document.
+- Replace ambiguous Included controls with **Apply with profile**, explicit Included/Not included text, non-color symbols, and setting-specific accessibility label/value/help.
+- Replace relevant SwiftUI disclosures with an app-owned button disclosure that exposes localized Expanded/Collapsed value and next-action hint, owns expansion state at the screen, and removes collapsed children from the tree. Installed Return expands and Space collapses with AX value, hint, and child presence updated. VoiceOver was not run, was explicitly removed from P2 completion scope by the user on 2026-07-18, was restored disabled, and is not claimed. Full-app accessibility remains a separate nonblocking follow-up.
+- Replace Advanced Diagnostics' former 700-point minimum with a 520×360 minimum and 640×460 ideal contained by Settings' 680×480 minimum. Add Korean accessibility-text fixtures for direct About, protected safety, long result, and long workflow error at 520×360, plus diagnostics and Settings/About at 680×480.
+- Route every Settings/`⌘,` command synchronously to Profiles, including visible, close→reopen, and stale out-of-order presentation cases.
+- Promote generic profile storage failures into a heading/icon/card with one context-valid Retry Loading or Dismiss Error action while keeping editor-owned errors single and nonduplicated.
+- Record source, synthetic, installed, and accessibility boundaries in [P2-UI-REFINEMENT-AUDIT-2026-07-17.md](P2-UI-REFINEMENT-AUDIT-2026-07-17.md). The final integrated count is 461; the reviewed evidence contains 39 fixtures and 79 artifacts; DMG SHA-256 is `342d804d8bbff51209af4bccefb405ee76499050c1e640a011d41e2f78792031`; the reinstalled executable SHA-256 is `fb35352fb6a9588c0c50269975ccd3d7b73e52010de10de132bf45d60236f719`.
 
-- Improve the empty-tray Capture call to action.
-- Settle the Duplicate/Reorder/Import/Export hierarchy and define Export behavior when the selected profile has a dirty draft.
-- Remove ambiguity from Included toggles.
-- Verify `DisclosureGroup` behavior with VoiceOver; do not treat focus intent or synthetic AX metadata as a completed assistive-technology walkthrough.
-- Reconcile Advanced Diagnostics' 700-point minimum with Settings' 680-point minimum.
-- Add minimum-size and accessibility fixtures for About, protected-change safety, and result states.
-- Verify `⌘,` tab forcing and increase generic storage-error prominence.
-
-Do not expand this P2 pass into Apply, Capture execution, TCC, login approval/retry/reboot, Gatekeeper, physical Intel, profile-store path hardening, or any ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 mutation. Full VoiceOver use and focused-control AX observation remain separate manual evidence.
+The P2 pass does not include profile-store path hardening, Apply/Capture execution, TCC, login approval/retry/reboot, Gatekeeper, physical Intel, diagnostics clearing, import/export interaction, or ColorSync/Core Audio/Ethernet/Wi‑Fi IPv4 mutation. Full-app VoiceOver/rotor, complete keyboard traversal, and focused-control AX observation remain separate nonblocking manual evidence.
 
 Release publication, push, Gatekeeper, physical Intel, full VoiceOver/TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).

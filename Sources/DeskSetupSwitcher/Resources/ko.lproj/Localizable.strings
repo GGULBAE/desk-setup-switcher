@@ -1203,3 +1203,24 @@
 "Could Not Continue" = "계속 진행할 수 없음";
 "Close this window, or choose one of the available actions below." = "이 창을 닫거나 아래에서 사용 가능한 작업을 다시 선택하세요.";
 "Closing this window prevents capture from starting, even if the profile save finishes." = "이 창을 닫으면 프로필 저장이 끝나더라도 캡처는 시작되지 않습니다.";
+
+/* P2 UI 정리 */
+"Export Saved Profiles…" = "저장된 프로필 내보내기…";
+"Export uses saved profiles only. Unsaved changes are not included." = "내보내기에는 저장된 프로필만 사용됩니다. 저장하지 않은 변경사항은 포함되지 않습니다.";
+"Exports all saved profiles to a local JSON file; the unsaved draft is not included" = "저장된 모든 프로필을 로컬 JSON 파일로 내보냅니다. 저장하지 않은 초안은 포함하지 않습니다";
+"Apply with profile" = "프로필 적용에 포함";
+"%@: Apply with profile" = "%@: 프로필 적용에 포함";
+"Not included" = "포함되지 않음";
+"Included in profile application" = "프로필 적용에 포함됨";
+"Not included in profile application" = "프로필 적용에 포함되지 않음";
+"Controls whether this setting changes when the profile is applied" = "프로필을 적용할 때 이 설정을 변경할지 선택합니다";
+"Ready for profile actions." = "프로필 작업을 수행할 수 있습니다.";
+"Profile Storage Error" = "프로필 저장소 오류";
+"Retry Loading" = "다시 불러오기";
+"Attempts to load the local profile storage again" = "로컬 프로필 저장소를 다시 불러옵니다";
+"Dismiss Error" = "오류 닫기";
+"Closes this error without repeating the failed action" = "실패한 작업을 다시 실행하지 않고 이 오류를 닫습니다";
+"Creates a copy of the selected saved profile" = "선택한 저장된 프로필의 복사본을 만듭니다";
+"Requests permanent deletion of the selected profile" = "선택한 프로필의 영구 삭제를 요청합니다";
+"Expands this section" = "이 섹션을 펼칩니다";
+"Collapses this section" = "이 섹션을 접습니다";

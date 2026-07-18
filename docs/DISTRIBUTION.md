@@ -2,7 +2,7 @@
 
 ## Current status
 
-The version 0.1.0 no-Developer-ID packaging path passes locally. The final 2026-07-17 integrated gate covered 446 checks: 144 XCTest cases, 301 Swift Testing cases across 38 suites, and one separately executed native `NSPopover` regression. Universal Debug/Release, Analyze, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc/no-Developer-ID signature classification passed. Current DMG SHA-256 is `82b05e6a3b1b20978c85c4d82d0976237a731c76c07bcd7d1729a84e3e0b6f21`. The package was reinstalled to `/Applications`, where the executable SHA-256 is `40876bd671dd4286fa4684192097f6dbd702df899bccf8efb588b244c3d27305`. The [current installed audit](UI-UX-SIMPLIFICATION-INSTALLED-AUDIT-2026-07-17.md) and [evidence index](evidence/ui-ux-installed-2026-07-17/README.md) are the authoritative UI/package record for this build.
+The version 0.1.0 no-Developer-ID packaging path passes locally. The final P2 integrated gate covered 461 checks: 144 XCTest cases, 316 Swift Testing cases across 39 suites, and one isolated native `NSPopover` regression. Universal Debug/Release, Analyze, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc/no-Developer-ID signature classification passed. Current DMG SHA-256 is `342d804d8bbff51209af4bccefb405ee76499050c1e640a011d41e2f78792031`. The package was reinstalled to `/Applications` and launched; its ad-hoc-signed executable SHA-256 is `fb35352fb6a9588c0c50269975ccd3d7b73e52010de10de132bf45d60236f719`. Profile primary/backup/defaults remained unchanged. The [P2 audit](P2-UI-REFINEMENT-AUDIT-2026-07-17.md) and [P2 evidence index](evidence/p2-ui-refinement-2026-07-17/README.md) are the authoritative UI/package record for this build.
 
 Initial Actions run `29154880831` for implementation commit `0d8f510` exposed the Swift 6.1 actor-isolation issue. Repair commit `4e45328` is pushed, and [run `29155207923`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29155207923) succeeded on 2026-07-11 under macOS 15/Xcode 16.4/Swift 6.1.2; full `make verify` and unsigned-package upload passed. No release has been published, and the downloaded/quarantined Gatekeeper path remains untested.
 
@@ -51,16 +51,18 @@ The checksum detects accidental or malicious byte changes only when the checksum
 
 ## Manual evidence and remaining gaps
 
+A separately authorized 2026-07-18 follow-up reinstalled and launched the final P2 DMG. `⌘,` routed Profiles from visible System/About and close→reopen/stale cases. Return expanded and Space collapsed the named disclosure while AX value, hint, and child presence updated. `x86_64 arm64`, profile primary/backup/defaults invariants, and VoiceOver process/preference 0 were confirmed. VoiceOver was not run and no VoiceOver claim is made. No Apply, Capture, TCC, login-item, or hardware-setting mutation was invoked.
+
 A separately authorized 2026-07-17 follow-up reinstalled the current package to `/Applications` and exercised only bounded UI geometry. Twenty measured popover opens had exact center delta `0`. A `500×300` Settings request clamped to `680×480`, while the normal `900×568` frame remained stable across ten opens. A `500×300` workflow request clamped to `520×392`; its initial frame was `620×532` with `620×500` content, and Escape closed it. Apply, Capture, TCC, login, and system-setting mutations were not invoked.
 
-A historical 2026-07-11 DMG was also installed fresh to `/Applications` and launched background-only/menu-bar-only. Its then-current popover and Settings window rendered in Korean, and an accessibility label passed inspection. It created one schema-v1 Ready profile from a read-only snapshot with all four setting groups; its zero-operation plan kept Apply and Force Apply disabled. That historical evidence does not replace current VoiceOver or focused-control AX verification.
+A historical 2026-07-11 DMG was also installed fresh to `/Applications` and launched background-only/menu-bar-only. Its then-current popover and Settings window rendered in Korean, and an accessibility label passed inspection. It created one schema-v1 Ready profile from a read-only snapshot with all four setting groups; its zero-operation plan kept Apply and Force Apply disabled. That historical evidence does not prove full-app accessibility behavior.
 
 Default-on `SMAppService` registration succeeded and Background Task Management reported `[enabled, allowed, notified]`. UI opt-out moved it to disabled, and re-enable restored enabled status. Final cleanup opted out and left only disabled BTM history.
 
 This does not complete the release matrix:
 
 - Login-item approval-required and failure/retry paths were not exercised, and actual login-at-boot after a reboot was not tested.
-- No full VoiceOver/keyboard audit, focused-control AX observation, import/export workflow, or permission-denial matrix was run. The recorded Escape close is not a complete keyboard walkthrough.
+- No full keyboard audit, focused-control AX observation, import/export workflow, or permission-denial matrix was run. VoiceOver was explicitly excluded from the P2 release gate and remains unverified/nonblocking; the recorded disclosure check is not a complete keyboard walkthrough.
 - A locally built file does not exercise download quarantine. Gatekeeper/Open Anyway remains untested on a clean user account or Mac.
 - The x86_64 slice was inspected, but the app was not executed on physical Intel hardware.
 - No display, audio, network, mouse, or keyboard mutation was run.

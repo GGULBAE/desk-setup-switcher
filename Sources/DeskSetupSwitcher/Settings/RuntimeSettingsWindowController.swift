@@ -126,11 +126,25 @@ func presentApplicationSettings(
   navigation: SettingsNavigationModel,
   presenter: any RuntimeSettingsWindowPresenting
 ) async -> TrayDestinationPresentation {
-  navigation.selectedTab = .profiles
-  if !presenter.isPresentationVisible {
-    navigation.beginPresentation()
-  }
+  navigation.routeToDefaultTab(
+    startsNewPresentation: !presenter.isPresentationVisible
+  )
   return await presenter.presentAndWaitUntilKey()
+}
+
+enum RuntimeSettingsWindowLayoutPolicy {
+  static let initialContentSize = CGSize(width: 900, height: 568)
+  static let minimumContentSize = CGSize(width: 680, height: 480)
+}
+
+enum AdvancedDiagnosticsLayoutPolicy {
+  static let minimumContentSize = CGSize(width: 520, height: 360)
+  static let idealContentSize = CGSize(width: 640, height: 460)
+
+  static func isContained(in settingsViewport: CGSize) -> Bool {
+    minimumContentSize.width <= settingsViewport.width
+      && minimumContentSize.height <= settingsViewport.height
+  }
 }
 
 @MainActor
@@ -138,9 +152,6 @@ final class RuntimeSettingsWindowController: NSWindowController,
   RuntimeSettingsWindowPresenting, NSWindowDelegate
 {
   typealias AwaiterFactory = @MainActor (NSWindow) -> WindowPresentationAwaiter
-
-  private static let initialContentSize = CGSize(width: 900, height: 568)
-  private static let minimumContentSize = CGSize(width: 680, height: 480)
 
   private var presentationRequest: WindowPresentationRequest?
   private let activationCoordinator: ApplicationWindowActivationCoordinator?
@@ -176,7 +187,10 @@ final class RuntimeSettingsWindowController: NSWindowController,
     // transition changes the root view's intrinsic size.
     hostingController.sizingOptions = []
     let window = NSWindow(
-      contentRect: NSRect(origin: .zero, size: Self.initialContentSize),
+      contentRect: NSRect(
+        origin: .zero,
+        size: RuntimeSettingsWindowLayoutPolicy.initialContentSize
+      ),
       styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
       backing: .buffered,
       defer: false
@@ -189,8 +203,8 @@ final class RuntimeSettingsWindowController: NSWindowController,
     window.isReleasedWhenClosed = false
     window.tabbingMode = .disallowed
     window.collectionBehavior = [.managed, .participatesInCycle]
-    window.contentMinSize = Self.minimumContentSize
-    window.setContentSize(Self.initialContentSize)
+    window.contentMinSize = RuntimeSettingsWindowLayoutPolicy.minimumContentSize
+    window.setContentSize(RuntimeSettingsWindowLayoutPolicy.initialContentSize)
     window.center()
     super.init(window: window)
     window.delegate = self
@@ -268,7 +282,10 @@ final class RuntimeSettingsWindowController: NSWindowController,
 
   func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
     let minimumFrameSize = sender.frameRect(
-      forContentRect: NSRect(origin: .zero, size: Self.minimumContentSize)
+      forContentRect: NSRect(
+        origin: .zero,
+        size: RuntimeSettingsWindowLayoutPolicy.minimumContentSize
+      )
     ).size
     return NSSize(
       width: max(frameSize.width, minimumFrameSize.width),
@@ -309,7 +326,7 @@ final class RuntimeSettingsWindowController: NSWindowController,
     // SwiftUI/AppKit may recompute a hosted window's resizing constraints
     // after the controller is attached. Reassert the app-owned minimum on
     // every presentation before repairing any legacy undersized frame.
-    window.contentMinSize = Self.minimumContentSize
+    window.contentMinSize = RuntimeSettingsWindowLayoutPolicy.minimumContentSize
     restoreMinimumContentSizeIfNeeded(window)
     if window.isMiniaturized {
       window.deminiaturize(nil)
@@ -318,7 +335,7 @@ final class RuntimeSettingsWindowController: NSWindowController,
 
   private func restoreMinimumContentSizeIfNeeded(_ window: NSWindow) {
     let currentSize = window.contentRect(forFrameRect: window.frame).size
-    let minimumSize = Self.minimumContentSize
+    let minimumSize = RuntimeSettingsWindowLayoutPolicy.minimumContentSize
     guard currentSize.width < minimumSize.width || currentSize.height < minimumSize.height else {
       return
     }
@@ -496,6 +513,16 @@ final class SettingsNavigationModel: ObservableObject {
   func beginPresentation() {
     presentationGeneration &+= 1
   }
+
+  /// Routes every Settings command through one synchronous state transition.
+  /// An older asynchronous presentation can settle later, but it never owns a
+  /// tab write and therefore cannot restore a stale System or About selection.
+  func routeToDefaultTab(startsNewPresentation: Bool) {
+    selectedTab = .profiles
+    if startsNewPresentation {
+      beginPresentation()
+    }
+  }
 }
 
 struct RuntimeSettingsRoot: View {
@@ -509,11 +536,11 @@ struct RuntimeSettingsRoot: View {
     )
     .uiAuditEnvironment(uiAuditConfiguration)
     .frame(
-      minWidth: 680,
-      idealWidth: 900,
+      minWidth: RuntimeSettingsWindowLayoutPolicy.minimumContentSize.width,
+      idealWidth: RuntimeSettingsWindowLayoutPolicy.initialContentSize.width,
       maxWidth: .infinity,
-      minHeight: 480,
-      idealHeight: 568,
+      minHeight: RuntimeSettingsWindowLayoutPolicy.minimumContentSize.height,
+      idealHeight: RuntimeSettingsWindowLayoutPolicy.initialContentSize.height,
       maxHeight: .infinity
     )
   }
@@ -535,16 +562,16 @@ struct SettingsView: View {
   var body: some View {
     TabView(selection: $selectedTab) {
       ProfilesSettingsView(presentationGeneration: presentationGeneration)
-        .tabItem { Label("Profiles", systemImage: "rectangle.stack") }
+        .tabItem { Label(appLocalized("Profiles"), systemImage: "rectangle.stack") }
         .tag(SettingsTab.profiles)
 
       SystemSettingsView()
         .environmentObject(model)
-        .tabItem { Label("System", systemImage: "gearshape.2") }
+        .tabItem { Label(appLocalized("System"), systemImage: "gearshape.2") }
         .tag(SettingsTab.system)
 
       AboutSettingsView()
-        .tabItem { Label("About", systemImage: "info.circle") }
+        .tabItem { Label(appLocalized("About"), systemImage: "info.circle") }
         .tag(SettingsTab.about)
     }
     .padding(20)
@@ -556,6 +583,7 @@ private struct SystemSettingsView: View {
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var locationPermission: LocationPermissionController
   @State private var showsAdvancedDiagnostics = false
+  @State private var isLoginExplanationExpanded = false
 
   var body: some View {
     Form {
@@ -582,16 +610,20 @@ private struct SystemSettingsView: View {
 
         HStack {
           if model.canRetryLoginItemRegistration {
-            Button("Retry Registration") {
+            Button(appLocalized("Retry Registration")) {
               model.retryLaunchAtLoginRegistration()
             }
           }
-          Button("Refresh Status") {
+          Button(appLocalized("Refresh Status")) {
             model.refreshLoginItemStatusFromSystem()
           }
         }
 
-        DisclosureGroup("Why can these states differ?") {
+        AccessibleDisclosureGroup(
+          appLocalized("Why can these states differ?"),
+          accessibilityIdentifier: "settings.login-state-explanation",
+          isExpanded: $isLoginExplanationExpanded
+        ) {
           Text(
             "macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration."
           )
@@ -622,7 +654,7 @@ private struct SystemSettingsView: View {
         )
         .font(.caption)
         .foregroundStyle(.secondary)
-        Button("Open Advanced Diagnostics…") {
+        Button(appLocalized("Open Advanced Diagnostics…")) {
           showsAdvancedDiagnostics = true
         }
         .accessibilityHint("Shows redacted local status, snapshot details, and recent events")
@@ -682,99 +714,153 @@ private struct SystemSettingsView: View {
   }
 }
 
-private struct AdvancedDiagnosticsSheet: View {
+struct AdvancedDiagnosticsSheet: View {
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @AccessibilityFocusState private var isHeadingAccessibilityFocused: Bool
+  @FocusState private var isDoneKeyboardFocused: Bool
 
   var body: some View {
     VStack(spacing: 0) {
-      HStack(spacing: 10) {
-        Label("Advanced Diagnostics", systemImage: "stethoscope")
-          .font(.title3.bold())
-          .accessibilityAddTraits(.isHeader)
-        Spacer()
-        Button("Done") { dismiss() }
-          .keyboardShortcut(.cancelAction)
-      }
-      .padding(.horizontal, 20)
-      .padding(.vertical, 14)
+      diagnosticsHeader
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
 
       Divider()
       DiagnosticsSettingsView()
     }
-    .frame(minWidth: 700, minHeight: 560)
+    .frame(
+      minWidth: AdvancedDiagnosticsLayoutPolicy.minimumContentSize.width,
+      idealWidth: AdvancedDiagnosticsLayoutPolicy.idealContentSize.width,
+      maxWidth: .infinity,
+      minHeight: AdvancedDiagnosticsLayoutPolicy.minimumContentSize.height,
+      idealHeight: AdvancedDiagnosticsLayoutPolicy.idealContentSize.height,
+      maxHeight: .infinity
+    )
+    .task {
+      await Task.yield()
+      isHeadingAccessibilityFocused = true
+      isDoneKeyboardFocused = true
+    }
+  }
+
+  @ViewBuilder
+  private var diagnosticsHeader: some View {
+    if dynamicTypeSize.isAccessibilitySize {
+      VStack(alignment: .leading, spacing: 10) {
+        diagnosticsTitle
+        HStack {
+          Spacer(minLength: 0)
+          doneButton
+        }
+      }
+    } else {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 10) {
+          diagnosticsTitle
+          Spacer(minLength: 0)
+          doneButton
+        }
+        VStack(alignment: .leading, spacing: 10) {
+          diagnosticsTitle
+          HStack {
+            Spacer(minLength: 0)
+            doneButton
+          }
+        }
+      }
+    }
+  }
+
+  private var diagnosticsTitle: some View {
+    Label(appLocalized("Advanced Diagnostics"), systemImage: "stethoscope")
+      .font(.title3.bold())
+      .accessibilityAddTraits(.isHeader)
+      .accessibilityFocused($isHeadingAccessibilityFocused)
+  }
+
+  private var doneButton: some View {
+    Button(appLocalized("Done")) { dismiss() }
+      .keyboardShortcut(.cancelAction)
+      .focused($isDoneKeyboardFocused)
   }
 }
 
-private struct DiagnosticsSettingsView: View {
+struct DiagnosticsSettingsView: View {
   @EnvironmentObject private var model: ApplicationModel
   @State private var confirmClear = false
+  @State private var expandedDisclosureIDs: Set<String> = []
 
   var body: some View {
     Form {
-      LabeledContent("Last result", value: model.lastMessage)
-      LabeledContent("Last snapshot", value: model.snapshotStatus)
-      LabeledContent("Storage", value: appLocalized("Local Application Support only"))
-      LabeledContent("Telemetry", value: appLocalized("None"))
-      LabeledContent("Live mutations", value: appLocalized("User-confirmed only"))
-      Section("Readiness facts") {
-        HStack {
-          VStack(alignment: .leading, spacing: 2) {
-            Text(model.conditionContextStatus)
-              .font(.caption)
-              .foregroundStyle(.secondary)
-            if let refreshedAt = model.readinessLastRefreshedAt {
-              Text(appLocalized("Last refreshed \(refreshedAt.formatted())"))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
+      LabeledContent(appLocalized("Last result"), value: model.lastMessage)
+      LabeledContent(appLocalized("Last snapshot"), value: model.snapshotStatus)
+      LabeledContent(appLocalized("Storage"), value: appLocalized("Local Application Support only"))
+      LabeledContent(appLocalized("Telemetry"), value: appLocalized("None"))
+      LabeledContent(appLocalized("Live mutations"), value: appLocalized("User-confirmed only"))
+      Section(appLocalized("Readiness facts")) {
+        ViewThatFits(in: .horizontal) {
+          HStack {
+            readinessStatus
+            Spacer(minLength: 12)
+            refreshReadinessButton
           }
-          Spacer()
-          Button("Refresh Readiness") { model.refreshReadinessFacts() }
-            .disabled(model.isApplyTransactionInProgress)
-            .accessibilityHint("Reads current system facts without changing any setting")
+          VStack(alignment: .leading, spacing: 8) {
+            readinessStatus
+            refreshReadinessButton
+          }
         }
 
         LabeledContent(
-          "Connected displays",
+          appLocalized("Connected displays"),
           value: appLocalized("\(model.lastConditionContext.displays.count) detected")
         )
         LabeledContent(
-          "Wi-Fi SSID",
+          appLocalized("Wi-Fi SSID"),
           value: model.lastConditionContext.wifiSSID ?? appLocalized("Unavailable")
         )
         LabeledContent(
-          "Ethernet",
+          appLocalized("Ethernet"),
           value: model.lastConditionContext.ethernetConnected
             ? appLocalized("Connected") : appLocalized("Not connected")
         )
         LabeledContent(
-          "Cached location",
+          appLocalized("Cached location"),
           value: model.lastConditionContext.location == nil
             ? appLocalized("Unavailable") : appLocalized("Available; coordinates hidden")
         )
 
         factList(
-          appLocalized("Audio input UIDs"),
+          id: "audio-input-uids",
+          title: appLocalized("Audio input UIDs"),
           values: model.lastConditionContext.audioInputUIDs.sorted()
         )
         factList(
-          appLocalized("Audio output UIDs"),
+          id: "audio-output-uids",
+          title: appLocalized("Audio output UIDs"),
           values: model.lastConditionContext.audioOutputUIDs.sorted()
         )
         factList(
-          appLocalized("USB hardware identifiers"),
+          id: "usb-hardware-identifiers",
+          title: appLocalized("USB hardware identifiers"),
           values: model.lastConditionContext.hardwareIdentifiers.sorted()
         )
         factList(
-          appLocalized("Local IP addresses"),
+          id: "local-ip-addresses",
+          title: appLocalized("Local IP addresses"),
           values: model.lastConditionContext.ipAddresses.sorted()
         )
       }
       if let snapshot = model.lastSnapshot {
-        Section("Snapshot details") {
-          LabeledContent("Captured", value: snapshot.capturedAt.formatted())
+        Section(appLocalized("Snapshot details")) {
+          LabeledContent(appLocalized("Captured"), value: snapshot.capturedAt.formatted())
           ForEach(snapshot.groups, id: \.group) { group in
-            DisclosureGroup(appSettingGroupTitle(group.group)) {
+            let disclosureID = "snapshot-\(group.group.rawValue)"
+            AccessibleDisclosureGroup(
+              appSettingGroupTitle(group.group),
+              accessibilityIdentifier: "diagnostics.\(disclosureID)",
+              isExpanded: expansionBinding(for: disclosureID)
+            ) {
               Text(appLocalizedRuntime(group.capability.reason))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -802,16 +888,16 @@ private struct DiagnosticsSettingsView: View {
         }
       }
       if let result = model.lastApplyResult {
-        Section("Last apply details") {
+        Section(appLocalized("Last apply details")) {
           LabeledContent(
-            "Status",
+            appLocalized("Status"),
             value: appApplicationStatusTitle(
               result.status,
               isAwaitingSafetyConfirmation: result.safetyConfirmationID != nil
             )
           )
           LabeledContent(
-            "Executed",
+            appLocalized("Executed"),
             value: result.didExecute ? appLocalized("Yes") : appLocalized("No")
           )
           ForEach(
@@ -823,15 +909,18 @@ private struct DiagnosticsSettingsView: View {
         }
       }
 
-      Section("Redacted local events") {
+      Section(appLocalized("Redacted local events")) {
         Text(model.diagnosticStatus)
           .font(.caption)
           .foregroundStyle(.secondary)
 
-        HStack {
-          Button("Refresh") { model.refreshDiagnostics() }
-          Button("Clear Events…", role: .destructive) { confirmClear = true }
-            .disabled(model.diagnosticEntries.isEmpty)
+        ViewThatFits(in: .horizontal) {
+          HStack {
+            diagnosticActionButtons
+          }
+          VStack(alignment: .leading, spacing: 8) {
+            diagnosticActionButtons
+          }
         }
 
         if !model.diagnosticEntries.isEmpty {
@@ -856,11 +945,37 @@ private struct DiagnosticsSettingsView: View {
     }
     .formStyle(.grouped)
     .confirmationDialog("Remove all local diagnostic events?", isPresented: $confirmClear) {
-      Button("Remove Events", role: .destructive) { model.clearDiagnostics() }
-      Button("Cancel", role: .cancel) {}
+      Button(appLocalized("Remove Events"), role: .destructive) { model.clearDiagnostics() }
+      Button(appLocalized("Cancel"), role: .cancel) {}
     } message: {
       Text("This removes only Desk Setup Switcher’s rotated, redacted diagnostic files.")
     }
+  }
+
+  private var readinessStatus: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(model.conditionContextStatus)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      if let refreshedAt = model.readinessLastRefreshedAt {
+        Text(appLocalized("Last refreshed \(refreshedAt.formatted())"))
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private var refreshReadinessButton: some View {
+    Button(appLocalized("Refresh Readiness")) { model.refreshReadinessFacts() }
+      .disabled(model.isApplyTransactionInProgress)
+      .accessibilityHint("Reads current system facts without changing any setting")
+  }
+
+  @ViewBuilder
+  private var diagnosticActionButtons: some View {
+    Button(appLocalized("Refresh")) { model.refreshDiagnostics() }
+    Button(appLocalized("Clear Events…"), role: .destructive) { confirmClear = true }
+      .disabled(model.diagnosticEntries.isEmpty)
   }
 
   private func diagnosticSymbol(_ severity: DiagnosticSeverity) -> String {
@@ -883,13 +998,16 @@ private struct DiagnosticsSettingsView: View {
 
   private func applicationItemRow(_ item: ApplicationItemSummary) -> some View {
     VStack(alignment: .leading, spacing: 3) {
-      HStack(alignment: .firstTextBaseline) {
-        Text(appSettingGroupTitle(item.group))
-          .font(.caption.bold())
-        Text(appApplicationItemTitle(item.key))
-        Spacer()
-        Text(appApplicationItemStatusTitle(item.status))
-          .font(.caption.bold())
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .firstTextBaseline) {
+          applicationItemTitle(item)
+          Spacer(minLength: 8)
+          applicationItemStatus(item)
+        }
+        VStack(alignment: .leading, spacing: 3) {
+          applicationItemTitle(item)
+          applicationItemStatus(item)
+        }
       }
       Text(appLocalizedRuntime(item.message))
         .font(.caption)
@@ -900,11 +1018,28 @@ private struct DiagnosticsSettingsView: View {
     .accessibilityElement(children: .combine)
   }
 
+  private func applicationItemTitle(_ item: ApplicationItemSummary) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 6) {
+      Text(appSettingGroupTitle(item.group))
+        .font(.caption.bold())
+      Text(appApplicationItemTitle(item.key))
+    }
+  }
+
+  private func applicationItemStatus(_ item: ApplicationItemSummary) -> some View {
+    Text(appApplicationItemStatusTitle(item.status))
+      .font(.caption.bold())
+  }
+
   @ViewBuilder
-  private func factList(_ title: String, values: [String]) -> some View {
-    DisclosureGroup(appLocalized("\(title) (\(values.count))")) {
+  private func factList(id: String, title: String, values: [String]) -> some View {
+    AccessibleDisclosureGroup(
+      appLocalized("\(title) (\(values.count))"),
+      accessibilityIdentifier: "diagnostics.fact-list.\(id)",
+      isExpanded: expansionBinding(for: id)
+    ) {
       if values.isEmpty {
-        Text("None detected")
+        Text(appLocalized("None detected"))
           .foregroundStyle(.secondary)
       } else {
         ForEach(values, id: \.self) { value in
@@ -914,6 +1049,19 @@ private struct DiagnosticsSettingsView: View {
         }
       }
     }
+  }
+
+  private func expansionBinding(for id: String) -> Binding<Bool> {
+    Binding(
+      get: { expandedDisclosureIDs.contains(id) },
+      set: { isExpanded in
+        if isExpanded {
+          expandedDisclosureIDs.insert(id)
+        } else {
+          expandedDisclosureIDs.remove(id)
+        }
+      }
+    )
   }
 
   private func snapshotSymbol(_ state: SnapshotItemState) -> String {
@@ -937,45 +1085,94 @@ private struct DiagnosticsSettingsView: View {
   }
 }
 
-private struct AboutSettingsView: View {
+struct AboutSettingsView: View {
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @AccessibilityFocusState private var isHeadingAccessibilityFocused: Bool
+
   var body: some View {
-    VStack(spacing: 14) {
-      Image(systemName: "switch.2")
-        .font(.system(size: 56))
-        .accessibilityHidden(true)
-      Text("Desk Setup Switcher")
-        .font(.title2.bold())
-      Text(appLocalized("Version \(appVersion)"))
-        .foregroundStyle(.secondary)
-      Text("Free and open source under the MIT License")
-        .font(.caption)
+    ScrollView {
+      VStack(spacing: 14) {
+        Image(systemName: "switch.2")
+          .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 42 : 56))
+          .accessibilityHidden(true)
+        Text(appLocalized("Desk Setup Switcher"))
+          .font(.title2.bold())
+          .accessibilityAddTraits(.isHeader)
+          .accessibilityFocused($isHeadingAccessibilityFocused)
+        Text(appLocalized("Version \(appVersion)"))
+          .foregroundStyle(.secondary)
+        Text(appLocalized("Free and open source under the MIT License"))
+          .font(.caption)
 
-      Divider()
-        .frame(maxWidth: 360)
+        Divider()
+          .frame(maxWidth: 360)
 
-      HStack(spacing: 16) {
-        Link(destination: repositoryURL) {
-          Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
+        LazyVGrid(columns: linkColumns, alignment: .leading, spacing: 12) {
+          aboutLink(
+            title: appLocalized("Source Code"),
+            systemImage: "chevron.left.forwardslash.chevron.right",
+            destination: repositoryURL,
+            identifier: "about.source-code"
+          )
+          aboutLink(
+            title: appLocalized("Report an Issue"),
+            systemImage: "exclamationmark.bubble",
+            destination: issuesURL,
+            identifier: "about.report-issue"
+          )
+          aboutLink(
+            title: appLocalized("MIT License"),
+            systemImage: "doc.text",
+            destination: licenseURL,
+            identifier: "about.license"
+          )
+          aboutLink(
+            title: appLocalized("Privacy Principles"),
+            systemImage: "hand.raised",
+            destination: privacyURL,
+            identifier: "about.privacy"
+          )
         }
-        Link(destination: issuesURL) {
-          Label("Report an Issue", systemImage: "exclamationmark.bubble")
-        }
+        .frame(maxWidth: 480)
+        .focusSection()
+
+        Text(appLocalized("Links open only when you choose them and use your default browser."))
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
-
-      HStack(spacing: 16) {
-        Link(destination: licenseURL) {
-          Label("MIT License", systemImage: "doc.text")
-        }
-        Link(destination: privacyURL) {
-          Label("Privacy Principles", systemImage: "hand.raised")
-        }
-      }
-
-      Text("Links open only when you choose them and use your default browser.")
-        .font(.caption)
-        .foregroundStyle(.secondary)
+      .padding(.vertical, 12)
+      .frame(maxWidth: .infinity)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .defaultScrollAnchor(.top)
+    .scrollBounceBehavior(.basedOnSize)
+    .task {
+      await Task.yield()
+      isHeadingAccessibilityFocused = true
+    }
+  }
+
+  private var linkColumns: [GridItem] {
+    if dynamicTypeSize.isAccessibilitySize {
+      return [GridItem(.flexible(), alignment: .leading)]
+    }
+    return [
+      GridItem(.flexible(), alignment: .leading),
+      GridItem(.flexible(), alignment: .leading),
+    ]
+  }
+
+  private func aboutLink(
+    title: String,
+    systemImage: String,
+    destination: URL,
+    identifier: String
+  ) -> some View {
+    Link(destination: destination) {
+      Label(title, systemImage: systemImage)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .accessibilityLabel(title)
+    .accessibilityIdentifier(identifier)
   }
 
   private var appVersion: String {

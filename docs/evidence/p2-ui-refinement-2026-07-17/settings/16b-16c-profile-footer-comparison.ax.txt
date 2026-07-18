@@ -1,0 +1,10 @@
+source=paired opaque profile settings evidence
+baseline-fixture=16b-profile-ko-minimum-large-text
+comparison-fixture=16c-profile-dirty-export-ko-minimum-large-text
+viewport=680x480
+image-has-alpha=false
+logical-region-from-top=x20,y425,width640,height55
+minimum-channel-delta=0.08
+footer-pairwise-pixel-difference-count=1378
+comparison-state=dirty-draft
+declared-dirty-export-notice=내보내기에는 저장된 프로필만 사용됩니다. 저장하지 않은 변경사항은 포함되지 않습니다.

@@ -182,6 +182,19 @@ final class ProfileEditorModel: ObservableObject {
     AccessibilityNotification.Announcement(message).post()
   }
 
+  /// Clears window-scoped feedback when a higher-priority storage failure
+  /// becomes the single owner of the visible error state. The draft and its
+  /// dirty state remain intact, so dismissing the storage failure cannot
+  /// resurrect a stale editor message or silently discard work.
+  func clearTransientFeedback() {
+    switch activity {
+    case .message, .error:
+      refreshIdleActivity(force: true)
+    case .saved, .changed, .saving, .capturing:
+      break
+    }
+  }
+
   private func preferredProfile(in profiles: [DeskProfile], id: UUID?) -> DeskProfile? {
     if let id, let profile = profiles.first(where: { $0.id == id }) {
       return profile

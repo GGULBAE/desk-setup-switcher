@@ -4,6 +4,113 @@ import Testing
 
 @Suite("Tray and profile surface clarity policies")
 struct TraySurfaceClarityPolicyTests {
+  @Test("pristine empty tray exposes one primary capture action instead of a header icon")
+  func pristineEmptyTrayCapturePlacement() {
+    let placement = TrayCaptureAffordancePolicy.placement(
+      profileCount: 0,
+      capturePhase: .idle,
+      hasCaptureSummary: false,
+      hasApplySummary: false,
+      hasHandoffError: false
+    )
+
+    #expect(placement == .emptyStatePrimary)
+    #expect(placement.visibleActionCount == 1)
+    #expect(placement.showsEmptyStatePrimary)
+    #expect(!placement.showsCompactHeader)
+    #expect(placement.focusTarget == .emptyState)
+  }
+
+  @Test("profiles and non-idle empty states retain one compact header capture action")
+  func compactHeaderCapturePlacement() {
+    let fixtures: [TrayCaptureAffordancePlacement] = [
+      TrayCaptureAffordancePolicy.placement(
+        profileCount: 1,
+        capturePhase: .idle,
+        hasCaptureSummary: false,
+        hasApplySummary: false,
+        hasHandoffError: false
+      ),
+      TrayCaptureAffordancePolicy.placement(
+        profileCount: 0,
+        capturePhase: .running,
+        hasCaptureSummary: false,
+        hasApplySummary: false,
+        hasHandoffError: false
+      ),
+      TrayCaptureAffordancePolicy.placement(
+        profileCount: 0,
+        capturePhase: .failure("Synthetic failure"),
+        hasCaptureSummary: false,
+        hasApplySummary: false,
+        hasHandoffError: false
+      ),
+      TrayCaptureAffordancePolicy.placement(
+        profileCount: 0,
+        capturePhase: .success("Synthetic success"),
+        hasCaptureSummary: false,
+        hasApplySummary: false,
+        hasHandoffError: false
+      ),
+      TrayCaptureAffordancePolicy.placement(
+        profileCount: 0,
+        capturePhase: .partial("Synthetic partial result"),
+        hasCaptureSummary: false,
+        hasApplySummary: false,
+        hasHandoffError: false
+      ),
+      TrayCaptureAffordancePolicy.placement(
+        profileCount: 0,
+        capturePhase: .idle,
+        hasCaptureSummary: true,
+        hasApplySummary: false,
+        hasHandoffError: false
+      ),
+      TrayCaptureAffordancePolicy.placement(
+        profileCount: 0,
+        capturePhase: .idle,
+        hasCaptureSummary: false,
+        hasApplySummary: true,
+        hasHandoffError: false
+      ),
+      TrayCaptureAffordancePolicy.placement(
+        profileCount: 0,
+        capturePhase: .idle,
+        hasCaptureSummary: false,
+        hasApplySummary: false,
+        hasHandoffError: true
+      ),
+    ]
+
+    for placement in fixtures {
+      #expect(placement == .compactHeader)
+      #expect(placement.visibleActionCount == 1)
+      #expect(placement.showsCompactHeader)
+      #expect(!placement.showsEmptyStatePrimary)
+      #expect(placement.focusTarget == .capture)
+    }
+  }
+
+  @Test("primary capture copy has matching English and Korean meaning")
+  func primaryCaptureLocalizationParity() {
+    #expect(
+      appLocalizedRuntime(TrayAccessibilityCopy.captureLabel, languageCode: "en")
+        == "Capture Current Settings"
+    )
+    #expect(
+      appLocalizedRuntime(TrayAccessibilityCopy.captureLabel, languageCode: "ko")
+        == "현재 설정 캡처"
+    )
+    #expect(
+      appLocalizedRuntime(TrayAccessibilityCopy.captureHelp, languageCode: "en")
+        == "Reads current settings without changing the Mac and creates a profile."
+    )
+    #expect(
+      appLocalizedRuntime(TrayAccessibilityCopy.captureHelp, languageCode: "ko")
+        == "Mac 설정을 변경하지 않고 현재 설정을 읽어 프로필을 만듭니다."
+    )
+  }
+
   @Test("quit uses a power symbol instead of a popover-close symbol")
   func quitSymbolCommunicatesApplicationExit() {
     #expect(TrayHeaderIconPolicy.quitSystemImage.hasPrefix("power"))

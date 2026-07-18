@@ -26,6 +26,50 @@ enum TrayHeaderIconPolicy {
   static let quitSystemImage = "power"
 }
 
+enum TrayCaptureAffordancePlacement: String, Equatable, Sendable {
+  case compactHeader = "compact-header"
+  case emptyStatePrimary = "empty-state-primary"
+
+  var showsCompactHeader: Bool { self == .compactHeader }
+  var showsEmptyStatePrimary: Bool { self == .emptyStatePrimary }
+
+  /// Every state owns exactly one Capture affordance. Keeping this derived
+  /// count here makes a future accidental header/body duplication testable.
+  var visibleActionCount: Int {
+    [showsCompactHeader, showsEmptyStatePrimary].filter { $0 }.count
+  }
+
+  var focusTarget: TrayFocusTarget {
+    switch self {
+    case .compactHeader:
+      .capture
+    case .emptyStatePrimary:
+      .emptyState
+    }
+  }
+}
+
+enum TrayCaptureAffordancePolicy {
+  static func placement(
+    profileCount: Int,
+    capturePhase: TrayCapturePhase,
+    hasCaptureSummary: Bool,
+    hasApplySummary: Bool,
+    hasHandoffError: Bool
+  ) -> TrayCaptureAffordancePlacement {
+    guard profileCount == 0,
+      !hasCaptureSummary,
+      !hasApplySummary,
+      !hasHandoffError
+    else { return .compactHeader }
+
+    if case .idle = capturePhase {
+      return .emptyStatePrimary
+    }
+    return .compactHeader
+  }
+}
+
 enum TrayCaptureStatusPresentationPolicy {
   static func showsStatusBanner(
     for phase: TrayCapturePhase,
@@ -102,23 +146,22 @@ struct TrayRootView: View {
 
       Spacer(minLength: 8)
 
-      Button {
-        route(presentation.captureAction)
-      } label: {
-        Label(appLocalized("Capture"), systemImage: "camera.metering.center.weighted")
-          .labelStyle(.iconOnly)
-          .frame(width: 20, height: 20)
+      if captureAffordancePlacement.showsCompactHeader {
+        Button {
+          route(presentation.captureAction)
+        } label: {
+          Label(appLocalized("Capture"), systemImage: "camera.metering.center.weighted")
+            .labelStyle(.iconOnly)
+            .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.regular)
+        .frame(minWidth: 32, minHeight: 32)
+        .disabled(isCaptureDisabled)
+        .focused($focusedControl, equals: captureAffordancePlacement.focusTarget)
+        .accessibilityLabel(appLocalizedRuntime(TrayAccessibilityCopy.captureLabel))
+        .help(appLocalizedRuntime(TrayAccessibilityCopy.captureHelp))
       }
-      .buttonStyle(.bordered)
-      .controlSize(.regular)
-      .frame(minWidth: 32, minHeight: 32)
-      .disabled(
-        model.isProfileMutationLocked || profileEditor.session.pendingSelection != nil
-          || presentation.hasCaptureTask
-      )
-      .focused($focusedControl, equals: .capture)
-      .accessibilityLabel(appLocalizedRuntime(TrayAccessibilityCopy.captureLabel))
-      .help(appLocalizedRuntime(TrayAccessibilityCopy.captureHelp))
 
       iconButton(
         action: .openSettings,
@@ -140,6 +183,21 @@ struct TrayRootView: View {
       .keyboardShortcut("q")
     }
     .frame(minHeight: TrayGeometry.headerHeight)
+  }
+
+  private var captureAffordancePlacement: TrayCaptureAffordancePlacement {
+    TrayCaptureAffordancePolicy.placement(
+      profileCount: model.profiles.count,
+      capturePhase: presentation.capturePhase,
+      hasCaptureSummary: model.lastCaptureSummary != nil,
+      hasApplySummary: model.lastApplySummary != nil,
+      hasHandoffError: presentation.handoffError != nil
+    )
+  }
+
+  private var isCaptureDisabled: Bool {
+    model.isProfileMutationLocked || profileEditor.session.pendingSelection != nil
+      || presentation.hasCaptureTask
   }
 
   private var usesStaticEmptyBody: Bool {
@@ -188,22 +246,43 @@ struct TrayRootView: View {
   private var profileContent: some View {
     if model.profiles.isEmpty {
       VStack(spacing: 8) {
-        Image(systemName: "rectangle.stack.badge.plus")
-          .font(.system(size: 30, weight: .medium))
-          .foregroundStyle(.secondary)
-          .accessibilityHidden(true)
-        Text(appLocalized("No Profiles"))
-          .font(.headline)
-        Text(appLocalized("Capture the current Mac to create your first editable profile."))
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .multilineTextAlignment(.center)
-          .fixedSize(horizontal: false, vertical: true)
-          .frame(maxWidth: 260)
+        VStack(spacing: 8) {
+          Image(systemName: "rectangle.stack.badge.plus")
+            .font(.system(size: 30, weight: .medium))
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+          Text(appLocalized("No Profiles"))
+            .font(.headline)
+          Text(appLocalized("Capture the current Mac to create your first editable profile."))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 260)
+        }
+        .accessibilityElement(children: .combine)
+
+        if captureAffordancePlacement.showsEmptyStatePrimary {
+          Button {
+            route(presentation.captureAction)
+          } label: {
+            Label(
+              appLocalizedRuntime(TrayAccessibilityCopy.captureLabel),
+              systemImage: "camera.metering.center.weighted"
+            )
+          }
+          .buttonStyle(.borderedProminent)
+          .controlSize(.large)
+          .disabled(isCaptureDisabled)
+          .focused($focusedControl, equals: captureAffordancePlacement.focusTarget)
+          .keyboardShortcut(.defaultAction)
+          .accessibilityLabel(appLocalizedRuntime(TrayAccessibilityCopy.captureLabel))
+          .help(appLocalizedRuntime(TrayAccessibilityCopy.captureHelp))
+        }
       }
       .frame(maxWidth: .infinity, alignment: .center)
       .padding(.vertical, 8)
-      .accessibilityElement(children: .combine)
+      .accessibilityElement(children: .contain)
       .id(TrayFocusTarget.emptyState)
     } else {
       TrayProfileListView(

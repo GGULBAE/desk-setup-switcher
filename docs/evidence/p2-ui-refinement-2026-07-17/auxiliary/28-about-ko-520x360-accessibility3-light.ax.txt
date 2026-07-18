@@ -1,0 +1,15 @@
+source=direct P2 auxiliary SwiftUI surface in attached offscreen NSWindow
+synthetic-p2-auxiliary=true
+fixture=28-about-ko-520x360-accessibility3-light
+state=about
+language=ko
+viewport=520x360
+dynamic-type=accessibility3
+color-scheme=light
+expected-accessibility-focus=heading
+expected-keyboard-focus=about links in source-issue-license-privacy order
+image-format=jpeg
+image-has-alpha=false
+live-display-audio-network-mutations=false
+offscreen-ax-limit=virtual SwiftUI children require an onscreen accessibility host
+role=AXGroup identifier=

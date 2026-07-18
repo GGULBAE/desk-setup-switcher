@@ -1203,3 +1203,24 @@
 "Could Not Continue" = "Could Not Continue";
 "Close this window, or choose one of the available actions below." = "Close this window, or choose one of the available actions below.";
 "Closing this window prevents capture from starting, even if the profile save finishes." = "Closing this window prevents capture from starting, even if the profile save finishes.";
+
+/* P2 UI refinement */
+"Export Saved Profiles…" = "Export Saved Profiles…";
+"Export uses saved profiles only. Unsaved changes are not included." = "Export uses saved profiles only. Unsaved changes are not included.";
+"Exports all saved profiles to a local JSON file; the unsaved draft is not included" = "Exports all saved profiles to a local JSON file; the unsaved draft is not included";
+"Apply with profile" = "Apply with profile";
+"%@: Apply with profile" = "%@: Apply with profile";
+"Not included" = "Not included";
+"Included in profile application" = "Included in profile application";
+"Not included in profile application" = "Not included in profile application";
+"Controls whether this setting changes when the profile is applied" = "Controls whether this setting changes when the profile is applied";
+"Ready for profile actions." = "Ready for profile actions.";
+"Profile Storage Error" = "Profile Storage Error";
+"Retry Loading" = "Retry Loading";
+"Attempts to load the local profile storage again" = "Attempts to load the local profile storage again";
+"Dismiss Error" = "Dismiss Error";
+"Closes this error without repeating the failed action" = "Closes this error without repeating the failed action";
+"Creates a copy of the selected saved profile" = "Creates a copy of the selected saved profile";
+"Requests permanent deletion of the selected profile" = "Requests permanent deletion of the selected profile";
+"Expands this section" = "Expands this section";
+"Collapses this section" = "Collapses this section";

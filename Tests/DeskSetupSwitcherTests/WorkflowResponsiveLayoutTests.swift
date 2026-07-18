@@ -1,4 +1,6 @@
 import AppKit
+import DeskSetupCore
+import DeskSetupPresentation
 import SwiftUI
 import Testing
 
@@ -16,6 +18,23 @@ import Testing
     private struct Fixture {
       let name: String
       let state: FixtureState
+    }
+
+    private enum AuxiliaryFixtureState: String {
+      case about
+      case safetyConfirmation = "safety-confirmation"
+      case applyResult = "apply-result"
+      case workflowError = "workflow-error"
+      case diagnostics
+      case settingsAbout = "settings-about"
+    }
+
+    private struct AuxiliaryFixture {
+      let name: String
+      let state: AuxiliaryFixtureState
+      let size: CGSize
+      let colorScheme: ColorScheme
+      let expectedKeyboardFocus: String
     }
 
     private struct RGBSample {
@@ -167,6 +186,100 @@ import Testing
       }
     }
 
+    @Test(
+      "About, safety, result, error, and diagnostics render at their minimum viewport in Korean accessibility text"
+    )
+    func rendersP2AuxiliarySurfaces() throws {
+      let allFixtures = [
+        AuxiliaryFixture(
+          name: "28-about-ko-520x360-accessibility3-light",
+          state: .about,
+          size: CGSize(width: 520, height: 360),
+          colorScheme: .light,
+          expectedKeyboardFocus: "about links in source-issue-license-privacy order"
+        ),
+        AuxiliaryFixture(
+          name: "29-safety-ko-520x360-accessibility3-dark",
+          state: .safetyConfirmation,
+          size: CGSize(width: 520, height: 360),
+          colorScheme: .dark,
+          expectedKeyboardFocus: "revert"
+        ),
+        AuxiliaryFixture(
+          name: "30-result-ko-520x360-accessibility3-light",
+          state: .applyResult,
+          size: CGSize(width: 520, height: 360),
+          colorScheme: .light,
+          expectedKeyboardFocus: "close"
+        ),
+        AuxiliaryFixture(
+          name: "31-error-ko-520x360-accessibility3-dark",
+          state: .workflowError,
+          size: CGSize(width: 520, height: 360),
+          colorScheme: .dark,
+          expectedKeyboardFocus: "close"
+        ),
+        AuxiliaryFixture(
+          name: "32-diagnostics-ko-680x480-accessibility3-light",
+          state: .diagnostics,
+          size: CGSize(width: 680, height: 480),
+          colorScheme: .light,
+          expectedKeyboardFocus: "done"
+        ),
+        AuxiliaryFixture(
+          name: "33-settings-about-ko-680x480-accessibility3-light",
+          state: .settingsAbout,
+          size: CGSize(width: 680, height: 480),
+          colorScheme: .light,
+          expectedKeyboardFocus: "about links in source-issue-license-privacy order"
+        ),
+      ]
+      let selectedFixture = ProcessInfo.processInfo.environment[
+        "DESK_SETUP_P2_AUXILIARY_FIXTURE"
+      ]
+      let fixtures =
+        selectedFixture.map { selected in
+          allFixtures.filter { $0.name == selected }
+        } ?? allFixtures
+      #expect(selectedFixture == nil || fixtures.count == 1)
+      let outputDirectory = p2AuxiliaryEvidenceOutputDirectory
+      if let outputDirectory {
+        try FileManager.default.createDirectory(
+          at: outputDirectory,
+          withIntermediateDirectories: true
+        )
+      }
+
+      setenv("DESK_SETUP_UI_AUDIT_LANGUAGE", "ko", 1)
+      defer { unsetenv("DESK_SETUP_UI_AUDIT_LANGUAGE") }
+      for fixture in fixtures {
+        let rendered = try renderAuxiliary(fixture)
+        #expect(rendered.image.count > 10_000)
+        #expect(rendered.notes.contains("synthetic-p2-auxiliary=true"))
+        #expect(rendered.notes.contains("dynamic-type=accessibility3"))
+        #expect(rendered.notes.contains("language=ko"))
+        #expect(rendered.notes.contains("live-display-audio-network-mutations=false"))
+        #expect(!rendered.notes.contains("/Users/"))
+        #expect(!rendered.notes.localizedCaseInsensitiveContains("password"))
+        let decodedImage = try #require(NSBitmapImageRep(data: rendered.image))
+        #expect(!decodedImage.hasAlpha)
+        #expect(decodedImage.pixelsWide >= Int(fixture.size.width))
+        #expect(decodedImage.pixelsHigh >= Int(fixture.size.height))
+
+        if let outputDirectory {
+          try rendered.image.write(
+            to: outputDirectory.appendingPathComponent("\(fixture.name).jpg"),
+            options: .atomic
+          )
+          try rendered.notes.write(
+            to: outputDirectory.appendingPathComponent("\(fixture.name).ax.txt"),
+            atomically: true,
+            encoding: .utf8
+          )
+        }
+      }
+    }
+
     private var evidenceOutputDirectory: URL? {
       guard
         ProcessInfo.processInfo.environment["DESK_SETUP_WRITE_WORKFLOW_RESPONSIVE_EVIDENCE"]
@@ -175,6 +288,222 @@ import Testing
           "DESK_SETUP_WORKFLOW_RESPONSIVE_EVIDENCE_DIR"]
       else { return nil }
       return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    private var p2AuxiliaryEvidenceOutputDirectory: URL? {
+      guard
+        ProcessInfo.processInfo.environment["DESK_SETUP_WRITE_P2_AUXILIARY_EVIDENCE"] == "1",
+        let path = ProcessInfo.processInfo.environment[
+          "DESK_SETUP_P2_AUXILIARY_EVIDENCE_DIR"]
+      else { return nil }
+      return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    private func renderAuxiliary(
+      _ fixture: AuxiliaryFixture
+    ) throws -> (image: Data, notes: String) {
+      let configuration = UIAuditConfiguration(
+        isEnabled: true,
+        variant: fixture.state == .diagnostics ? .diagnostics : .overview,
+        displayMode: .largeText,
+        showsStatusPopover: false
+      )
+      let model = UIAuditFixtures.makeModel(configuration: configuration)
+      let content = auxiliaryContent(for: fixture.state, model: model)
+
+      let backgroundColor: NSColor =
+        fixture.colorScheme == .dark
+        ? NSColor(calibratedWhite: 0.12, alpha: 1)
+        : .white
+      let root = ZStack {
+        Color(nsColor: backgroundColor)
+          .ignoresSafeArea()
+        content
+      }
+      .environment(\.locale, Locale(identifier: "ko"))
+      .environment(\.colorScheme, fixture.colorScheme)
+      .dynamicTypeSize(.accessibility3)
+      .preferredColorScheme(fixture.colorScheme)
+      .uiAuditEnvironment(configuration)
+      .frame(width: fixture.size.width, height: fixture.size.height)
+
+      let host = NSHostingView(rootView: root)
+      host.frame = NSRect(origin: .zero, size: fixture.size)
+      host.appearance = NSAppearance(
+        named: fixture.colorScheme == .dark ? .darkAqua : .aqua
+      )
+      host.autoresizingMask = [.width, .height]
+      let container = NSView(frame: NSRect(origin: .zero, size: fixture.size))
+      container.wantsLayer = true
+      container.layer?.backgroundColor = backgroundColor.cgColor
+      container.addSubview(host)
+      let window = NSWindow(
+        contentRect: NSRect(origin: .zero, size: fixture.size),
+        styleMask: .borderless,
+        backing: .buffered,
+        defer: false
+      )
+      window.appearance = host.appearance
+      window.contentView = container
+      window.setContentSize(fixture.size)
+      host.layoutSubtreeIfNeeded()
+      host.displayIfNeeded()
+      RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.2))
+      host.needsLayout = true
+      host.needsDisplay = true
+      host.layoutSubtreeIfNeeded()
+      host.displayIfNeeded()
+
+      let representation = try #require(
+        container.bitmapImageRepForCachingDisplay(in: container.bounds)
+      )
+      container.cacheDisplay(in: container.bounds, to: representation)
+      let image = try opaqueJPEG(from: representation)
+      var lines = [
+        "source=direct P2 auxiliary SwiftUI surface in attached offscreen NSWindow",
+        "synthetic-p2-auxiliary=true",
+        "fixture=\(fixture.name)",
+        "state=\(fixture.state.rawValue)",
+        "language=ko",
+        "viewport=\(Int(fixture.size.width))x\(Int(fixture.size.height))",
+        "dynamic-type=accessibility3",
+        "color-scheme=\(fixture.colorScheme == .dark ? "dark" : "light")",
+        "expected-accessibility-focus=heading",
+        "expected-keyboard-focus=\(fixture.expectedKeyboardFocus)",
+        "image-format=jpeg",
+        "image-has-alpha=false",
+        "live-display-audio-network-mutations=false",
+        "offscreen-ax-limit=virtual SwiftUI children require an onscreen accessibility host",
+      ]
+      var visited: Set<ObjectIdentifier> = []
+      appendAccessibility(host, depth: 0, lines: &lines, visited: &visited)
+      return (image, lines.joined(separator: "\n") + "\n")
+    }
+
+    private func auxiliaryContent(
+      for state: AuxiliaryFixtureState,
+      model: ApplicationModel
+    ) -> AnyView {
+      switch state {
+      case .about:
+        return AnyView(AboutSettingsView())
+      case .safetyConfirmation:
+        return AnyView(
+          SafetyConfirmationView(
+            state: SafetyConfirmationState(
+              id: UUID(uuidString: "30000000-0000-0000-0000-000000000001")!,
+              profileID: UIAuditFixtures.readyProfileID,
+              guardedGroups: [.display, .network],
+              changeSummaries: [
+                "연결된 디스플레이 전체의 배치와 기본 화면을 임시로 변경했습니다.",
+                "선택한 유선 네트워크 서비스의 IPv4 구성을 권한 확인 후 적용했습니다.",
+              ],
+              secondsRemaining: 9
+            )
+          )
+          .environmentObject(model)
+        )
+      case .applyResult:
+        let evidence = makeLongKoreanApplyResult()
+        return AnyView(
+          ApplyResultDetailsView(
+            summary: evidence.summary,
+            result: evidence.result,
+            verification: nil
+          )
+        )
+      case .workflowError:
+        return AnyView(
+          WorkflowErrorView(
+            message:
+              "선택한 프로필을 안전하게 준비하는 동안 로컬 저장소 결과를 확인할 수 없었습니다. 현재 화면을 닫은 뒤 프로필을 다시 선택하고 저장 상태를 확인하세요."
+          )
+        )
+      case .diagnostics:
+        return AnyView(AdvancedDiagnosticsSheet().environmentObject(model))
+      case .settingsAbout:
+        let navigation = SettingsNavigationModel(selectedTab: .about)
+        return AnyView(
+          RuntimeSettingsRoot(
+            navigation: navigation,
+            uiAuditConfiguration: .disabled
+          )
+          .environmentObject(model)
+          .environmentObject(
+            LocationPermissionController(
+              allowsSystemRequests: false,
+              syntheticAuthorizationStatus: .denied
+            )
+          )
+          .environmentObject(ProfileEditorModel())
+        )
+      }
+    }
+
+    private func makeLongKoreanApplyResult() -> (
+      summary: ApplyResultSummary,
+      result: ApplyExecutionResult
+    ) {
+      let profileID = UIAuditFixtures.readyProfileID
+      let completedAt = Date(timeIntervalSince1970: 1_700_000_000)
+      let failedOperationID = UUID(uuidString: "40000000-0000-0000-0000-000000000001")!
+      let preparation = ApplyPreparation(
+        profileID: profileID,
+        mode: .normal,
+        preparedAt: completedAt,
+        includedGroups: [.display, .network],
+        capabilities: [],
+        snapshots: [],
+        validationIssues: [],
+        operations: [],
+        omissions: [],
+        readiness: ReadinessEvaluation(
+          status: .ready,
+          applicableGroups: [.display, .network],
+          unavailableGroups: [],
+          reasons: []
+        ),
+        rejectionReasons: []
+      )
+      let itemResults = [
+        ApplicationItemSummary(
+          id: failedOperationID,
+          group: .display,
+          key: "display.atomic-configuration",
+          status: .failed,
+          message:
+            "요청한 디스플레이 구성을 안전하게 확인할 수 없어 변경을 완료하지 않았습니다."
+        )
+      ]
+      let rollbackResults = [
+        ApplicationItemSummary(
+          id: failedOperationID,
+          group: .display,
+          key: "display.atomic-configuration",
+          status: .rollbackFailed,
+          message:
+            "이전 구성이 완전히 복원되었는지 확인할 수 없습니다. macOS 디스플레이 설정을 확인하세요."
+        )
+      ]
+      let result = ApplyExecutionResult(
+        preparation: preparation,
+        didExecute: true,
+        completedAt: completedAt,
+        status: .failed,
+        itemResults: itemResults,
+        rollbackResults: rollbackResults,
+        fatalOperationID: failedOperationID
+      )
+      return (
+        ApplyResultSummary(
+          profileID: profileID,
+          profileName: "집중 업무용 디스플레이·오디오·네트워크 설정을 포함하는 매우 긴 프로필 이름",
+          appliedAt: completedAt,
+          itemResults: itemResults,
+          rollbackResults: rollbackResults
+        ),
+        result
+      )
     }
 
     private func render(_ fixture: Fixture) throws -> (image: Data, notes: String) {

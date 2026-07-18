@@ -573,6 +573,7 @@ struct ApplyPreviewView: View {
   @EnvironmentObject private var model: ApplicationModel
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @AccessibilityFocusState private var isHeadingAccessibilityFocused: Bool
+  @State private var expandedTechnicalOperationIDs: Set<UUID> = []
   let request: PendingApplyRequest
   let onCancel: () -> Void
   let onConfirm: () -> Void
@@ -895,7 +896,11 @@ struct ApplyPreviewView: View {
     let previousDetails = preview.previousValue.technicalDetails
     let desiredDetails = preview.desiredValue.technicalDetails
     if !previousDetails.isEmpty || !desiredDetails.isEmpty {
-      DisclosureGroup("Technical Information") {
+      AccessibleDisclosureGroup(
+        appLocalized("Technical Information"),
+        accessibilityIdentifier: "apply-preview.technical-information.\(operation.id.uuidString)",
+        isExpanded: technicalInformationBinding(for: operation.id)
+      ) {
         ForEach(Array(previousDetails.enumerated()), id: \.offset) { _, detail in
           LabeledContent(
             appLocalized("Current \(appLocalizedPresentationText(detail.label))")
@@ -917,6 +922,19 @@ struct ApplyPreviewView: View {
       }
       .font(.caption)
     }
+  }
+
+  private func technicalInformationBinding(for operationID: UUID) -> Binding<Bool> {
+    Binding(
+      get: { expandedTechnicalOperationIDs.contains(operationID) },
+      set: { isExpanded in
+        if isExpanded {
+          expandedTechnicalOperationIDs.insert(operationID)
+        } else {
+          expandedTechnicalOperationIDs.remove(operationID)
+        }
+      }
+    )
   }
 
   private func operationPreviewValue(title: String, value: String) -> some View {
@@ -994,65 +1012,83 @@ struct ApplyResultDetailsView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
-      resultHeader
-
-      Text(recoveryGuidance)
-        .font(.callout)
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-
-      let countItems = ApplyResultCountPresentation.nonzeroItems(for: summary)
-      if !countItems.isEmpty {
-        Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 5) {
-          ForEach(countItems) { item in
-            resultCount(item.kind.title, item.count)
-          }
-        }
-        .font(.caption)
-      }
-
-      Divider()
       ScrollView {
-        VStack(alignment: .leading, spacing: 16) {
-          resultSection("Apply Results", items: result.itemResults)
-          if !result.rollbackResults.isEmpty {
-            resultSection("Rollback Results", items: result.rollbackResults)
+        VStack(alignment: .leading, spacing: 14) {
+          resultHeader
+
+          Text(recoveryGuidance)
+            .font(.callout)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+
+          let countItems = ApplyResultCountPresentation.nonzeroItems(for: summary)
+          if !countItems.isEmpty {
+            if dynamicTypeSize.isAccessibilitySize {
+              VStack(alignment: .leading, spacing: 5) {
+                ForEach(countItems) { item in
+                  HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(item.kind.title)
+                    Spacer(minLength: 8)
+                    Text(item.count, format: .number)
+                      .monospacedDigit()
+                  }
+                }
+              }
+              .font(.caption)
+            } else {
+              Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 5) {
+                ForEach(countItems) { item in
+                  resultCount(item.kind.title, item.count)
+                }
+              }
+              .font(.caption)
+            }
           }
 
-          if let unexpected = verification?.unexpectedRemainingOperations,
-            !unexpected.isEmpty
-          {
-            VStack(alignment: .leading, spacing: 6) {
-              Label("Additional Read-back Changes", systemImage: "questionmark.circle")
-                .font(.headline)
-              Text(
-                "Read-back found additional changes that were not part of the completed operation. Refresh readiness before applying again."
-              )
-              .font(.caption)
-              .foregroundStyle(.secondary)
-              ForEach(Array(unexpected.enumerated()), id: \.offset) { _, reference in
+          Divider()
+          VStack(alignment: .leading, spacing: 24) {
+            resultSection(appLocalized("Apply Results"), items: result.itemResults)
+            if !result.rollbackResults.isEmpty {
+              resultSection(appLocalized("Rollback Results"), items: result.rollbackResults)
+            }
+
+            if let unexpected = verification?.unexpectedRemainingOperations,
+              !unexpected.isEmpty
+            {
+              VStack(alignment: .leading, spacing: 6) {
                 Label(
+                  appLocalized("Additional Read-back Changes"),
+                  systemImage: "questionmark.circle"
+                )
+                .font(.headline)
+                Text(
                   appLocalized(
-                    "\(appSettingGroupTitle(reference.group)): \(appApplicationItemTitle(reference.key))"
-                  ),
-                  systemImage: "arrow.clockwise"
+                    "Read-back found additional changes that were not part of the completed operation. Refresh readiness before applying again."
+                  )
                 )
                 .font(.caption)
+                .foregroundStyle(.secondary)
+                ForEach(Array(unexpected.enumerated()), id: \.offset) { _, reference in
+                  Label(
+                    appLocalized(
+                      "\(appSettingGroupTitle(reference.group)): \(appApplicationItemTitle(reference.key))"
+                    ),
+                    systemImage: "arrow.clockwise"
+                  )
+                  .font(.caption)
+                }
               }
             }
           }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
+      .defaultScrollAnchor(.top)
+      .scrollBounceBehavior(.basedOnSize)
 
       Divider()
-      HStack(spacing: 12) {
-        appliedAtText
-        Spacer(minLength: 0)
-        closeButton
-          .fixedSize(horizontal: true, vertical: false)
-      }
-      .focusSection()
+      resultFooter
     }
     .padding(20)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -1060,6 +1096,37 @@ struct ApplyResultDetailsView: View {
       await Task.yield()
       isHeadingAccessibilityFocused = true
       isCloseKeyboardFocused = true
+    }
+  }
+
+  @ViewBuilder
+  private var resultFooter: some View {
+    if dynamicTypeSize.isAccessibilitySize {
+      VStack(alignment: .leading, spacing: 8) {
+        appliedAtText
+        HStack {
+          Spacer(minLength: 0)
+          closeButton
+        }
+      }
+      .focusSection()
+    } else {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 12) {
+          appliedAtText
+          Spacer(minLength: 0)
+          closeButton
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        VStack(alignment: .leading, spacing: 8) {
+          appliedAtText
+          HStack {
+            Spacer(minLength: 0)
+            closeButton
+          }
+        }
+      }
+      .focusSection()
     }
   }
 
@@ -1107,7 +1174,7 @@ struct ApplyResultDetailsView: View {
   }
 
   private var closeButton: some View {
-    Button("Close") { onClose() }
+    Button(appLocalized("Close")) { onClose() }
       .keyboardShortcut(.cancelAction)
       .focused($isCloseKeyboardFocused)
   }
@@ -1123,14 +1190,14 @@ struct ApplyResultDetailsView: View {
 
   @ViewBuilder
   private func resultSection(
-    _ title: LocalizedStringKey,
+    _ title: String,
     items: [ApplicationItemSummary]
   ) -> some View {
     VStack(alignment: .leading, spacing: 7) {
       Text(title)
         .font(.headline)
       if items.isEmpty {
-        Text("No item results were recorded.")
+        Text(appLocalized("No item results were recorded."))
           .font(.caption)
           .foregroundStyle(.secondary)
       } else {
@@ -1264,49 +1331,54 @@ struct SafetyConfirmationView: View {
   let state: SafetyConfirmationState
 
   var body: some View {
-    VStack(spacing: 16) {
-      Image(systemName: "exclamationmark.shield")
-        .font(.system(size: 42))
-        .accessibilityHidden(true)
-      Text("Keep these protected settings?")
-        .font(.headline)
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityFocused($isHeadingAccessibilityFocused)
-      Text(
-        appLocalized(
-          "The previous configuration will return in \(state.secondsRemaining) seconds.")
-      )
-      .monospacedDigit()
-      .multilineTextAlignment(.center)
-      .accessibilityHidden(true)
+    VStack(alignment: .leading, spacing: 14) {
+      ScrollView {
+        VStack(spacing: 16) {
+          Image(systemName: "exclamationmark.shield")
+            .font(.system(size: 42))
+            .accessibilityHidden(true)
+          Text(appLocalized("Keep these protected settings?"))
+            .font(.headline)
+            .multilineTextAlignment(.center)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityFocused($isHeadingAccessibilityFocused)
+          Text(
+            appLocalized(
+              "The previous configuration will return in \(state.secondsRemaining) seconds.")
+          )
+          .monospacedDigit()
+          .multilineTextAlignment(.center)
+          .accessibilityHidden(true)
 
-      if !state.changeSummaries.isEmpty {
-        ScrollView {
-          VStack(alignment: .leading, spacing: 6) {
-            if !state.guardedGroups.isEmpty {
-              Text(state.guardedGroups.map(appSettingGroupTitle).joined(separator: " · "))
-                .font(.caption.bold())
+          if !state.changeSummaries.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+              if !state.guardedGroups.isEmpty {
+                Text(state.guardedGroups.map(appSettingGroupTitle).joined(separator: " · "))
+                  .font(.caption.bold())
+              }
+              ForEach(Array(state.changeSummaries.enumerated()), id: \.offset) { _, summary in
+                Label(
+                  appLocalizedRuntime(summary),
+                  systemImage: "arrow.triangle.2.circlepath"
+                )
+                .font(.caption)
+              }
             }
-            ForEach(Array(state.changeSummaries.enumerated()), id: \.offset) { _, summary in
-              Label(
-                appLocalizedRuntime(summary),
-                systemImage: "arrow.triangle.2.circlepath"
-              )
-              .font(.caption)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
           }
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(10)
+
+          ProgressView(value: Double(state.secondsRemaining), total: 15)
+            .accessibilityLabel(appLocalized("Protected change confirmation time remaining"))
+            .accessibilityValue(appLocalized("\(state.secondsRemaining) seconds remaining"))
         }
-        .defaultScrollAnchor(.top)
-        .scrollBounceBehavior(.basedOnSize)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+        .frame(maxWidth: .infinity)
       }
+      .defaultScrollAnchor(.top)
+      .scrollBounceBehavior(.basedOnSize)
 
-      ProgressView(value: Double(state.secondsRemaining), total: 15)
-        .accessibilityLabel("Protected change confirmation time remaining")
-        .accessibilityValue(appLocalized("\(state.secondsRemaining) seconds remaining"))
-
+      Divider()
       AdaptiveWorkflowActionBar(
         cancelAction: WorkflowFooterAction(
           id: "revert",
@@ -1328,7 +1400,7 @@ struct SafetyConfirmationView: View {
       )
     }
     .padding(20)
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .task(id: state.id) {
       await Task.yield()
       isHeadingAccessibilityFocused = true
@@ -1545,18 +1617,60 @@ final class TrayWorkflowCloseRelay {
   }
 }
 
+struct WorkflowErrorView: View {
+  @AccessibilityFocusState private var isHeadingAccessibilityFocused: Bool
+  let message: String
+  let onClose: () -> Void
+
+  init(message: String, onClose: @escaping () -> Void = {}) {
+    self.message = message
+    self.onClose = onClose
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 12) {
+          Label(appLocalized("Could Not Continue"), systemImage: "exclamationmark.triangle")
+            .font(.title2.bold())
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityFocused($isHeadingAccessibilityFocused)
+          Text(message)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .defaultScrollAnchor(.top)
+      .scrollBounceBehavior(.basedOnSize)
+
+      Divider()
+      AdaptiveWorkflowActionBar(
+        cancelAction: WorkflowFooterAction(
+          id: "close",
+          title: appLocalized("Close"),
+          role: .cancel,
+          shortcut: .cancel,
+          perform: onClose
+        ),
+        trailingActions: [],
+        focusRequestID: message
+      )
+    }
+    .padding(24)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .task(id: message) {
+      await Task.yield()
+      isHeadingAccessibilityFocused = true
+    }
+  }
+}
+
 private enum WorkflowRootAccessibilityFocusTarget: Hashable {
   case permission(TrayPermissionWorkflow)
   case dirtyApply(UUID)
   case preparing(UUID)
   case calculating(UUID)
-  case error(String)
   case noResult
   case noWorkflow
-}
-
-private enum WorkflowRootKeyboardFocusTarget: Hashable {
-  case closeError(String)
 }
 
 struct TrayWorkflowRootView: View {
@@ -1565,7 +1679,6 @@ struct TrayWorkflowRootView: View {
   @ObservedObject var presentation: TrayPresentationModel
   @AccessibilityFocusState private var accessibilityFocusTarget:
     WorkflowRootAccessibilityFocusTarget?
-  @FocusState private var keyboardFocusTarget: WorkflowRootKeyboardFocusTarget?
   let onClose: @MainActor () -> Void
 
   var body: some View {
@@ -1594,14 +1707,6 @@ struct TrayWorkflowRootView: View {
       }
       await Task.yield()
       accessibilityFocusTarget = target
-    }
-    .task(id: requestedKeyboardFocusTarget) {
-      guard let target = requestedKeyboardFocusTarget else {
-        keyboardFocusTarget = nil
-        return
-      }
-      await Task.yield()
-      keyboardFocusTarget = target
     }
   }
 
@@ -1973,30 +2078,10 @@ struct TrayWorkflowRootView: View {
   }
 
   private func workflowError(_ message: String) -> some View {
-    VStack(alignment: .leading, spacing: 16) {
-      Label("Could Not Continue", systemImage: "exclamationmark.triangle")
-        .font(.title2.bold())
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityFocused($accessibilityFocusTarget, equals: .error(message))
-      Text(message)
-      Spacer()
-      HStack {
-        Spacer()
-        ForEach(WorkflowErrorActionPolicy.actions, id: \.self) { action in
-          switch action {
-          case .close:
-            Button("Close") {
-              presentation.closeApplyWorkflowAfterError()
-              onClose()
-            }
-            .keyboardShortcut(.cancelAction)
-            .focused($keyboardFocusTarget, equals: .closeError(message))
-          }
-        }
-      }
+    WorkflowErrorView(message: message) {
+      presentation.closeApplyWorkflowAfterError()
+      onClose()
     }
-    .padding(24)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private var requestedAccessibilityFocusTarget: WorkflowRootAccessibilityFocusTarget? {
@@ -2004,8 +2089,8 @@ struct TrayWorkflowRootView: View {
     case .permission(let workflow):
       .permission(workflow)
     case .applyPreview(let profileID, _):
-      if let error = presentation.applyDraftError {
-        .error(error)
+      if presentation.applyDraftError != nil {
+        nil
       } else if let prompt = presentation.applyDraftPrompt {
         .dirtyApply(prompt.id)
       } else if model.safetyConfirmation != nil || model.pendingApply?.profile.id == profileID {
@@ -2024,13 +2109,6 @@ struct TrayWorkflowRootView: View {
     case .settings, .profileEditor, .none:
       .noWorkflow
     }
-  }
-
-  private var requestedKeyboardFocusTarget: WorkflowRootKeyboardFocusTarget? {
-    guard case .applyPreview? = presentation.workflowDestination,
-      let error = presentation.applyDraftError
-    else { return nil }
-    return .closeError(error)
   }
 
   private func permissionTitle(_ workflow: TrayPermissionWorkflow) -> String {
@@ -2079,10 +2157,9 @@ final class TrayDestinationCoordinator: TrayDestinationPresenting {
       guard let settingsController else {
         return .failed(appLocalized("The Settings window is unavailable."))
       }
-      settingsNavigation.selectedTab = .profiles
-      if !settingsController.isPresentationVisible {
-        settingsNavigation.beginPresentation()
-      }
+      settingsNavigation.routeToDefaultTab(
+        startsNewPresentation: !settingsController.isPresentationVisible
+      )
       return await settingsController.presentAndWaitUntilKey()
 
     case .profileEditor(let profileID):
@@ -2098,10 +2175,9 @@ final class TrayDestinationCoordinator: TrayDestinationPresenting {
       guard let settingsController else {
         return .failed(appLocalized("The Settings window is unavailable."))
       }
-      settingsNavigation.selectedTab = .profiles
-      if !settingsController.isPresentationVisible {
-        settingsNavigation.beginPresentation()
-      }
+      settingsNavigation.routeToDefaultTab(
+        startsNewPresentation: !settingsController.isPresentationVisible
+      )
       return await settingsController.presentAndWaitUntilKey()
 
     case .permission(let workflow):

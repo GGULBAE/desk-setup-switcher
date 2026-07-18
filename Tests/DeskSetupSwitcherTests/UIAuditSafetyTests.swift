@@ -461,6 +461,68 @@ import Testing
       #expect(window.collectionBehavior.contains(.participatesInCycle))
     }
 
+    @Test("advanced diagnostics is contained by the minimum Settings viewport")
+    func advancedDiagnosticsFitsMinimumSettingsViewport() {
+      #expect(
+        RuntimeSettingsWindowLayoutPolicy.minimumContentSize
+          == CGSize(width: 680, height: 480)
+      )
+      #expect(
+        AdvancedDiagnosticsLayoutPolicy.minimumContentSize
+          == CGSize(width: 520, height: 360)
+      )
+      #expect(
+        AdvancedDiagnosticsLayoutPolicy.idealContentSize.width
+          <= RuntimeSettingsWindowLayoutPolicy.minimumContentSize.width
+      )
+      #expect(
+        AdvancedDiagnosticsLayoutPolicy.idealContentSize.height
+          <= RuntimeSettingsWindowLayoutPolicy.minimumContentSize.height
+      )
+      #expect(
+        AdvancedDiagnosticsLayoutPolicy.isContained(
+          in: RuntimeSettingsWindowLayoutPolicy.minimumContentSize
+        )
+      )
+      #expect(
+        !AdvancedDiagnosticsLayoutPolicy.isContained(
+          in: CGSize(width: 519, height: 480)
+        )
+      )
+      #expect(
+        !AdvancedDiagnosticsLayoutPolicy.isContained(
+          in: CGSize(width: 680, height: 359)
+        )
+      )
+    }
+
+    @Test("disclosures expose localized state and the next keyboard action")
+    func disclosureAccessibilitySemanticsAreExplicit() {
+      #expect(DisclosureAccessibilityPolicy.value(isExpanded: false) == "Collapsed")
+      #expect(DisclosureAccessibilityPolicy.value(isExpanded: true) == "Expanded")
+      #expect(
+        DisclosureAccessibilityPolicy.actionHint(isExpanded: false)
+          == "Expands this section"
+      )
+      #expect(
+        DisclosureAccessibilityPolicy.actionHint(isExpanded: true)
+          == "Collapses this section"
+      )
+
+      setenv("DESK_SETUP_UI_AUDIT_LANGUAGE", "ko", 1)
+      defer { unsetenv("DESK_SETUP_UI_AUDIT_LANGUAGE") }
+      #expect(DisclosureAccessibilityPolicy.value(isExpanded: false) == "접힘")
+      #expect(DisclosureAccessibilityPolicy.value(isExpanded: true) == "펼쳐짐")
+      #expect(
+        DisclosureAccessibilityPolicy.actionHint(isExpanded: false)
+          == "이 섹션을 펼칩니다"
+      )
+      #expect(
+        DisclosureAccessibilityPolicy.actionHint(isExpanded: true)
+          == "이 섹션을 접습니다"
+      )
+    }
+
     @Test("settings red-close preserves one controller and root for ten reopen cycles")
     func runtimeSettingsWindowReopenLifecycle() throws {
       let activation = ApplicationWindowActivationCoordinator { _ in }
@@ -1127,11 +1189,54 @@ import Testing
         presenter: presenter
       )
 
+      navigation.selectedTab = .about
+      let visibleResult = await presentApplicationSettings(
+        navigation: navigation,
+        presenter: presenter
+      )
+
+      presenter.close()
+      navigation.selectedTab = .system
+      let reopenedResult = await presentApplicationSettings(
+        navigation: navigation,
+        presenter: presenter
+      )
+
       #expect(firstResult == .presented(isVisible: true, isKeyOrActive: true))
       #expect(secondResult == .presented(isVisible: true, isKeyOrActive: true))
+      #expect(visibleResult == .presented(isVisible: true, isKeyOrActive: true))
+      #expect(reopenedResult == .presented(isVisible: true, isKeyOrActive: true))
+      #expect(navigation.selectedTab == .profiles)
+      #expect(navigation.presentationGeneration == 2)
+      #expect(presenter.presentationCount == 4)
+    }
+
+    @Test("a stale Settings presentation cannot restore an older tab")
+    func staleSettingsPresentationCannotRevertCommandRoute() async {
+      let navigation = SettingsNavigationModel(selectedTab: .system)
+      let presenter = DeferredSettingsPresenter()
+
+      let first = Task { @MainActor in
+        await presentApplicationSettings(navigation: navigation, presenter: presenter)
+      }
+      while presenter.presentationCount < 1 { await Task.yield() }
+
+      navigation.selectedTab = .about
+      let second = Task { @MainActor in
+        await presentApplicationSettings(navigation: navigation, presenter: presenter)
+      }
+      while presenter.presentationCount < 2 { await Task.yield() }
+
       #expect(navigation.selectedTab == .profiles)
       #expect(navigation.presentationGeneration == 1)
-      #expect(presenter.presentationCount == 2)
+
+      presenter.resolvePresentation(at: 1)
+      #expect(await second.value == .presented(isVisible: true, isKeyOrActive: true))
+      presenter.resolvePresentation(at: 0)
+      #expect(await first.value == .presented(isVisible: true, isKeyOrActive: true))
+
+      #expect(navigation.selectedTab == .profiles)
+      #expect(navigation.presentationGeneration == 1)
     }
   }
 
@@ -1179,6 +1284,29 @@ import Testing
 
     func close() {
       isPresentationVisible = false
+    }
+  }
+
+  @MainActor
+  private final class DeferredSettingsPresenter: RuntimeSettingsWindowPresenting {
+    private(set) var presentationCount = 0
+    private(set) var isPresentationVisible = false
+    private var continuations: [CheckedContinuation<TrayDestinationPresentation, Never>?] = []
+
+    func presentAndWaitUntilKey() async -> TrayDestinationPresentation {
+      presentationCount += 1
+      isPresentationVisible = true
+      return await withCheckedContinuation { continuation in
+        continuations.append(continuation)
+      }
+    }
+
+    func resolvePresentation(at index: Int) {
+      guard continuations.indices.contains(index), let continuation = continuations[index] else {
+        return
+      }
+      continuations[index] = nil
+      continuation.resume(returning: .presented(isVisible: true, isKeyOrActive: true))
     }
   }
 

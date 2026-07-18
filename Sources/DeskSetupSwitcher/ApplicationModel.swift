@@ -168,6 +168,20 @@ struct PendingImportRequest: Identifiable, Sendable {
   let existingProfileCount: Int
 }
 
+enum ProfileStorageFailureAction: Equatable, Sendable {
+  case retryLoading
+  case dismiss
+}
+
+struct ProfileStorageFailurePresentation: Equatable, Sendable {
+  let message: String
+  let recovery: ProfileStorageFailureAction
+
+  var availableActions: [ProfileStorageFailureAction] {
+    [recovery]
+  }
+}
+
 struct SafetyConfirmationState: Identifiable, Sendable {
   let id: UUID
   let profileID: UUID
@@ -254,6 +268,7 @@ final class ApplicationModel: ObservableObject {
   @Published private(set) var operationalStatusByProfile: [UUID: ProfileReadiness] = [:]
   @Published private(set) var pendingApply: PendingApplyRequest?
   @Published private(set) var pendingImport: PendingImportRequest?
+  @Published private(set) var profileStorageFailure: ProfileStorageFailurePresentation?
   @Published private(set) var lastApplyResult: ApplyExecutionResult?
   @Published private(set) var lastApplyVerification: PostApplyVerificationResult?
   @Published private(set) var lastApplySummary: ApplyResultSummary?
@@ -372,6 +387,18 @@ final class ApplicationModel: ObservableObject {
       )
       lastCaptureSummary = fixture.captureSummary
       lastApplySummary = fixture.applySummary
+    }
+
+    func configureProfileStorageFailureForUIAudit(
+      message: String = appLocalized("A local profile storage operation failed."),
+      recovery: ProfileStorageFailureAction = .dismiss
+    ) {
+      guard suppressesLiveSystemAccess else { return }
+      storageStatus = message
+      profileStorageFailure = ProfileStorageFailurePresentation(
+        message: message,
+        recovery: recovery
+      )
     }
   #endif
 
@@ -670,17 +697,48 @@ final class ApplicationModel: ObservableObject {
     guard panel.runModal() == .OK, let destinationURL = panel.url else { return }
 
     Task {
-      do {
-        let document = await profileStore.currentDocument()
-        let exporter = profileImportExport
-        try await Task.detached {
-          try exporter.export(document, to: destinationURL)
-        }.value
-        storageStatus = appLocalized("Exported profiles to a user-selected file.")
-      } catch {
-        reportStorageError(error)
-      }
+      _ = await exportProfiles(to: destinationURL)
     }
+  }
+
+  /// Exports the authoritative persisted document. Profile editor drafts live
+  /// outside `ProfileStore` and are intentionally never merged into this file.
+  @discardableResult
+  func exportProfiles(to destinationURL: URL) async -> Bool {
+    do {
+      let document = await profileStore.currentDocument()
+      let exporter = profileImportExport
+      try await Task.detached {
+        try exporter.export(document, to: destinationURL)
+      }.value
+      profileStorageFailure = nil
+      storageStatus = appLocalized("Exported profiles to a user-selected file.")
+      return true
+    } catch {
+      reportStorageError(error)
+      return false
+    }
+  }
+
+  func dismissProfileStorageFailure() {
+    guard profileStorageFailure?.recovery == .dismiss else { return }
+    profileStorageFailure = nil
+    storageStatus = appLocalized("Ready for profile actions.")
+  }
+
+  @discardableResult
+  func retryProfileStorageLoad() -> Bool {
+    guard !suppressesLiveSystemAccess,
+      profileStorageFailure?.recovery == .retryLoading,
+      beginProfileStoreMutation()
+    else { return false }
+    profileStorageFailure = nil
+    storageStatus = appLocalized("Loading local profiles…")
+    Task {
+      defer { finishProfileStoreMutation() }
+      await loadProfiles()
+    }
+    return true
   }
 
   func createProfileFromCurrentSettings() async -> ProfileCreationCaptureResult {
@@ -1201,6 +1259,7 @@ final class ApplicationModel: ObservableObject {
       let result = try await profileStore.load()
       profiles = result.document.profiles
       selectedProfileID = result.document.selectedProfileID
+      profileStorageFailure = nil
       storageStatus = storageMessage(for: result.status)
       recordDiagnostic(
         severity: .info,
@@ -1223,7 +1282,7 @@ final class ApplicationModel: ObservableObject {
       }
       await refreshReadiness()
     } catch {
-      reportStorageError(error)
+      reportStorageError(error, recovery: .retryLoading)
     }
   }
 
@@ -1231,6 +1290,7 @@ final class ApplicationModel: ObservableObject {
     let document = await profileStore.currentDocument()
     profiles = document.profiles
     selectedProfileID = document.selectedProfileID
+    profileStorageFailure = nil
     if let message {
       storageStatus = message
     }
@@ -1725,8 +1785,16 @@ final class ApplicationModel: ObservableObject {
     )
   }
 
-  private func reportStorageError(_ error: Error) {
-    storageStatus = profileStorageUserMessage(for: error)
+  private func reportStorageError(
+    _ error: Error,
+    recovery: ProfileStorageFailureAction = .dismiss
+  ) {
+    let message = profileStorageUserMessage(for: error)
+    storageStatus = message
+    profileStorageFailure = ProfileStorageFailurePresentation(
+      message: message,
+      recovery: recovery
+    )
     recordDiagnostic(
       severity: .error,
       component: "profile-storage",
