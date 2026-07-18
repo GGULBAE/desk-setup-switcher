@@ -1,6 +1,6 @@
 .PHONY: build test lint analyze audit-public-release verify-public-assets package verify-package \
 	test-release-tooling release-preflight release-candidate verify-release-candidate \
-	verify-downloaded-release verify clean
+	verify-downloaded-release verify-remote-controls verify clean
 
 build:
 	./scripts/build.sh
@@ -40,6 +40,9 @@ verify-release-candidate:
 
 verify-downloaded-release:
 	./scripts/release/verify-downloaded-candidate.sh
+
+verify-remote-controls:
+	./scripts/release/verify-remote-controls.sh
 
 verify:
 	./scripts/verify.sh

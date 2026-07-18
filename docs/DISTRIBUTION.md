@@ -97,14 +97,21 @@ Do not push the final `v0.1.0` tag until the release-only signed path is merged 
 
 The detailed [remote release controls audit](REMOTE-RELEASE-CONTROLS-AUDIT-2026-07-18.md) additionally records zero branch/tag rulesets, disabled immutable releases and private vulnerability reporting, empty repository secret/variable name lists, the missing protected environment, the pending sole-maintainer reviewer-policy decision, stale repository metadata, and the exact containment → feature-branch → PR → read-back sequence. It inspected no credential value. That audit authorizes no remote mutation; it exists so approval can name a bounded operation and rollback path.
 
+`make verify-remote-controls` is the explicit final-pre-tag read-only gate; it is intentionally excluded from ordinary `make verify` because credentials and network state are not deterministic test inputs. Its checked-in policy is fail-closed and currently `configured:false`, so the command stops before resolving `gh` or making a GitHub request. Once completely configured, the wrapper performs local reads and authenticated GitHub GETs, projects variable responses to names before evidence is written, binds both the release and CI workflow blobs, and rejects missing admin visibility or drift. It cross-binds the required check to the pinned CI workflow's exact successful run and job, then repeats every release-critical remote observation and requires normalized equality before success. Only secret/variable names are emitted, persisted, normalized, compared, or recorded; no credential value is inspected by the operator or retained in evidence. A successful result deliberately reports `manual_gates=1`: GitHub's documented REST response does not prove the environment's administrator-bypass setting, so that setting requires separate read-only Settings evidence. Calling `scripts/release/remote_controls_policy.rb` directly with a normalized evidence fixture exercises only the offline policy component; it is not the final remote gate and must not be recorded as one.
+
+Configure the authoritative policy through a reviewed code change, not by copying the synthetic fixture. Populate every closed-schema field from reviewed read-only evidence: repository numeric and node identity plus approved metadata/state, release version/tag, release and CI workflow IDs/names/paths/blobs, exact CI check identity, operator and reviewer IDs/logins/types, and approval mode/count/self-review behavior. Review that diff, commit the policy together with both workflow blobs it names, merge it through the protected `master` path, and wait for exact-commit CI. The final command must then run from a clean, complete, non-shallow checkout whose HEAD is the effective remote `master`, authenticated as the configured operator with repository-admin visibility, while no `v*` ref or GitHub Release exists. Capture its sanitized transcript immediately before separately approving tag creation; the verifier configures nothing, pushes nothing, and does not itself authorize a tag.
+
 Before any release tag is allowed, a repository administrator must:
 
-- create the `release-candidate` environment;
-- restrict it to intended release tags;
-- configure the real required reviewer and decide whether self-review and administrator bypass are prohibited;
-- store signing/notarization credentials only in that protected environment;
-- protect `master` with the required CI checks and a documented emergency-bypass policy; and
-- enable the private reporting path required by [SECURITY.md](../SECURITY.md).
+- create the `release-candidate` environment and restrict it to the exact `v0.1.0` tag;
+- configure the real required reviewer and self-review behavior, then separately record the environment administrator-bypass setting from the Settings UI;
+- store only the exact signing/notarization credential names in that protected environment and prove the repository level does not shadow them;
+- protect `master` with the exact required CI/review rules and no standing bypass actor; emergency recovery is a separately approved ruleset change or disable;
+- use one `v*` creation ruleset with only the approved release-operator User as bypass and a separate no-bypass `v*` update/deletion ruleset, so tag creation authority never becomes tag-move or tag-delete authority;
+- require selected GitHub-owned Actions, full-SHA pinning, read-only default workflow tokens, and no workflow PR-review approval permission;
+- enable immutable Releases and the private reporting path required by [SECURITY.md](../SECURITY.md);
+- create `needs-triage`, apply the exact approved public repository metadata and disabled-Discussions state; and
+- merge the anchored policy/workflows, pass exact-commit CI, and keep both `v*` refs and Releases empty until the final-pre-tag check succeeds.
 
 See [GOVERNANCE.md](../GOVERNANCE.md) for current roles and approval authority. GitHub documents that environment secrets remain unavailable until required approval when that protection is configured; merely referencing an environment supplies no such guarantee.
 

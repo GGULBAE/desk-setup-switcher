@@ -43,6 +43,12 @@ trap cleanup EXIT
 ruby "$RELEASE_SCRIPTS_DIR/test_release_policy.rb"
 pass
 
+ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_policy.rb"
+pass
+
+"$RELEASE_SCRIPTS_DIR/test_remote_controls_collector.sh"
+pass
+
 ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-entitlements \
     --plist Config/ReleaseEntitlements.plist
 pass

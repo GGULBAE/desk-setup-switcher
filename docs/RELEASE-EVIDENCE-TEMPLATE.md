@@ -20,6 +20,8 @@ Follow [Distribution](DISTRIBUTION.md), [Governance](../GOVERNANCE.md), the [sup
 
 ## Candidate freeze and verification
 
+Capture the sanitized `make verify-remote-controls` transcript immediately before creating the tag, while `v*` refs and Releases are still empty. It cannot be regenerated after tag creation. The command performs local reads and authenticated GitHub GETs only; it configures nothing, pushes nothing, and does not authorize the later tag action.
+
 - [ ] The tag equals `v` plus `CFBundleShortVersionString`; `CFBundleVersion` is a positive candidate-unique build number.
 - [ ] The commit and submodules/dependencies are fixed, the checkout is complete and non-shallow, and the worktree is clean.
 - [ ] `make verify`, `make audit-public-release`, and `git diff --check` pass on that commit.
@@ -70,9 +72,12 @@ The release app is built once. Signing, packaging, notarization, and stapling ma
 | Control | Evidence link or read-only result |
 | --- | --- |
 | Default-branch protection and required CI | `<not recorded>` |
-| Release-tag restriction | `<not recorded>` |
+| `make verify-remote-controls` sanitized output, exact commit, release/CI workflow blobs, and CI run/job IDs | `<not recorded>` |
+| Release-tag creation rule and exact operator-only bypass | `<not recorded>` |
+| No-bypass release-tag update/deletion rule | `<not recorded>` |
 | Protected `release-candidate` environment | `<not recorded>` |
 | Required reviewer and bypass policy | `<not recorded>` |
+| Settings evidence for environment administrator bypass | `<intended value; observed value; timestamp; authenticated viewer; read-only Settings evidence link>` |
 | GitHub-hosted runner enforcement and runner image | `<not recorded>` |
 | Environment-scoped signing/notary credentials present | `<not recorded; never record values>` |
 | Secret child-environment isolation and direct-exec consumer checks | `<not recorded; result only>` |
@@ -84,6 +89,8 @@ The release app is built once. Signing, packaging, notarization, and stapling ma
 | Protected draft Release URL/ID | `<not recorded>` |
 
 - [ ] A read-only query proves the effective remote workflow cannot publish an unsigned artifact or bypass approval.
+- [ ] The final-pre-tag API verifier passes with zero drift and reports the expected `manual_gates=1`; separate read-only Settings evidence closes that administrator-bypass gate.
+- [ ] The recorded result came from `make verify-remote-controls`; direct `remote_controls_policy.rb` normalized-evidence output is offline component evidence and is not accepted as the final gate.
 - [ ] The release manifest records `runner-environment=github-hosted`; each secret had one direct-exec consumer and was absent from unrelated child environments.
 - [ ] Normal completion and one catchable-cancellation probe confirm no decoded release credential or tracked notarization child remains. Do not claim shell cleanup for `SIGKILL` or host loss.
 - [ ] The protected draft contains exactly the nine assets below. Curated English/Korean notes are the Release body, not a tenth asset.

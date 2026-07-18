@@ -110,11 +110,13 @@ or promotional post unless that action is named separately.
    appointed; otherwise use zero required approvals and document the weaker
    one-maintainer path. Do not require signed commits for this integration
    because the reviewed pending commits are unsigned.
-3. **Protect tags.** Create a separate active `v*` tag ruleset that restricts
-   creation, update, and deletion to the documented release-operator bypass.
-   Do not test it with a release tag.
+3. **Protect tags without a mutable-tag bypass.** Create one active `v*`
+   creation ruleset whose only bypass is the approved release-operator User,
+   plus a second active `v*` ruleset that blocks update and deletion with no
+   bypass actor. Do not grant the operator a path to move or delete an existing
+   release tag, and do not test either rule with a release tag.
 4. **Create the release gate.** Create `release-candidate`, restrict it to the
-   exact intended release tag, configure the required reviewer, explicitly
+   exact `v0.1.0` tag, configure the required reviewer, explicitly
    decide self-review and administrator-bypass behavior, and leave it without
    credentials until read-back proves the protection.
 5. **Push code only to a feature branch.** After local verification, record and
@@ -134,17 +136,34 @@ or promotional post unless that action is named separately.
    without dispatching it. Read its state and default-branch content back again;
    require `active`, the reviewed blob, and `workflow_dispatch` as the only trigger.
 9. **Finish repository controls.** Enable private vulnerability reporting and
-   immutable releases; optionally enforce full-SHA Actions and GitHub-owned
-   actions. Create `needs-triage`, apply the approved description/topics, and
-   keep Homepage blank until site approval.
+   immutable Releases. Require selected GitHub-owned Actions and full-SHA
+   pinning, a read-only default workflow token, and no workflow PR-review
+   approval permission. Create `needs-triage`, apply the approved
+   description/topics/Homepage and disabled-Discussions state, and read every
+   value back.
 10. **Configure protected values without exposing them.** Add the four variables
    and three secrets below directly through GitHub's protected environment UI.
    Never paste values into issues, PRs, task messages, commands, fixtures, or logs.
-11. **Synchronize evidence.** After read-back confirms the changed settings,
-    update `SECURITY.md`, support/governance/distribution/readiness documents,
-    and the completion ledger through another reviewed PR. Rerun local and remote
-    verification; that final remote `master` commit becomes `EXPECTED_COMMIT`.
-12. **Stop for tag approval.** Creating the annotated `v0.1.0` tag, pushing only
+11. **Synchronize evidence and anchor the policy.** After read-back confirms the
+    changed settings, update `SECURITY.md`, support/governance/distribution/
+    readiness documents, and the completion ledger through another reviewed PR.
+    Populate every authoritative-policy field from reviewed read-only evidence:
+    repository numeric/node identity and approved metadata/state, release and CI
+    workflow IDs/names/paths/blobs, release and CI-check identity, actor
+    IDs/logins/types, and the approval mode/count/self-review setting. Do not copy
+    synthetic fixture identities. Review and merge that policy with both workflow
+    blobs it names,
+    then wait for exact-commit CI; the final remote `master` commit becomes
+    `EXPECTED_COMMIT`.
+12. **Run the final-pre-tag read-only gate.** From a clean, complete, non-shallow
+    checkout whose HEAD is that effective `master`, authenticate as the configured
+    operator with repository-admin visibility, and run
+    `make verify-remote-controls` while both `v*` refs and Releases remain empty. Record
+    the sanitized `manual_gates=1` transcript and separately record the environment
+    administrator-bypass Settings state. The command performs local reads and
+    authenticated GETs only; it configures, pushes, tags, dispatches, and approves
+    nothing.
+13. **Stop for tag approval.** Creating the annotated `v0.1.0` tag, pushing only
     that ref, dispatching the signed workflow, approving the environment, and
     preparing the draft are a later explicit approval boundary. Publication is
     another boundary after exact-candidate lifecycle and beta evidence.
@@ -204,3 +223,21 @@ remote-containment and PR-preparation phase covering only steps 1–6 above. It
 must name the reviewer policy and must continue to prohibit all tag, Release,
 site, signing/notarization, installation, live hardware mutation, and promotion
 actions.
+
+The local branch now also carries an explicit `make verify-remote-controls`
+final-pre-tag verifier. Its deterministic fixtures test the intended ready
+state, while the authoritative policy remains intentionally unconfigured until
+its complete repository, release-workflow, CI-workflow, operator, reviewer, and
+approval identity is reviewed;
+therefore a live invocation must fail before its first GitHub request today. The
+wrapper performs authenticated GETs and projects variable responses to names
+before evidence is written; the collector consumes only those name projections,
+requires authenticated draft visibility, cross-binds the required check to the
+pinned CI workflow's exact successful run/job, and collects all release-critical
+remote observations twice before requiring normalized equality. Only names are
+emitted, persisted, normalized, compared, or recorded, and no credential value
+is retained in evidence. Even a future API pass
+leaves the environment administrator-bypass switch as one separately recorded
+Settings-screen gate because the documented REST response does not expose that
+state. Direct normalized-evidence policy output remains offline component
+evidence and cannot replace step 12.

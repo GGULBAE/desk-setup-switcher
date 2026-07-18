@@ -11,7 +11,7 @@ Until additional people are explicitly recorded, [@GGULBAE](https://github.com/G
 | Maintainer | Product scope, architecture, roadmap, contributor review, and conflict resolution | Merge or decline changes; appoint or remove delegated roles |
 | Triager | Reproduce and classify issues, request redaction, identify support versus security reports | Apply labels and recommend priority; cannot publish a release |
 | Security responder | Receive private reports, coordinate remediation and disclosure | Prepare advisories and fixes; never move report details to public issues without reporter coordination |
-| Release operator | Build one candidate, sign/notarize it, collect evidence, and prepare a draft release | Access the protected release environment; cannot silently replace a published tag or asset |
+| Release operator | Build one candidate, sign/notarize it, collect evidence, and prepare a draft release | Access the protected release environment and create only the explicitly approved new release tag; can never move/delete that tag or replace published assets |
 | Release approver | Compare the draft, commit, tag, checks, artifact, and release ledger | Approve publication or stop the release |
 
 Delegation must be recorded in a pull request that updates this file or a future `CODEOWNERS`/maintainers file. Assignment to an issue alone does not grant merge, security, secret, or release access.
@@ -40,10 +40,12 @@ The repository currently has one maintainer, so independent two-person approval 
 
 A read-only GitHub API check on 2026-07-18 found no configured repository environments, no protection on `master`, disabled Discussions, and disabled private vulnerability reporting. The support issue form is the deliberate alternative to Discussions, but the other controls remain public-launch blockers:
 
-1. Create and protect the `release-candidate` environment, restrict it to release tags, and configure the real required-reviewer path. Naming the environment in workflow YAML does not configure those protections by itself.
-2. Protect `master` with the required CI checks and a reviewed emergency-bypass policy.
-3. Enable private vulnerability reporting, update the Security contact link to the private advisory form, and test it before announcing the beta.
-4. Enable immutable releases and confirm the setting through a read-only query before publication.
+1. Create and protect the `release-candidate` environment, restrict it to the exact `v0.1.0` tag, and configure the real required-reviewer path. Naming the environment in workflow YAML does not configure those protections by itself.
+2. Protect `master` with the required CI checks and no standing bypass actor. Emergency recovery requires a separately approved ruleset change or disable; it is not a configured bypass.
+3. Protect release tags with separate rules: the approved release operator may bypass creation only, while update and deletion have no bypass. Creation authority must never permit moving or deleting an existing release tag.
+4. Enable private vulnerability reporting, update the Security contact link to the private advisory form, and test it before announcing the beta.
+5. Enable immutable releases and confirm the setting through a read-only query before publication.
+6. Apply the exact Actions, repository-metadata, label, credential-scope, and empty tag/Release prerequisites specified by [Distribution](docs/DISTRIBUTION.md), then pass its final-pre-tag verifier and separate environment administrator-bypass Settings check.
 
 Do not push a public release tag merely to test these controls; exercise them first with the repository's documented candidate procedure.
 

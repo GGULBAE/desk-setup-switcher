@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "desk-setup-switcher.remote-release-controls-policy/v1",
+  "phase": "final-pre-tag",
+  "configured": true,
+  "repository": {
+    "id": 424242,
+    "nodeId": "R_SYNTHETIC_DESK_SETUP_SWITCHER",
+    "name": "desk-setup-switcher",
+    "fullName": "synthetic-operator/desk-setup-switcher",
+    "visibility": "public",
+    "defaultBranch": "master",
+    "archived": false,
+    "disabled": false,
+    "hasDiscussions": false,
+    "description": "Capture, edit, and safely apply local macOS desk setup profiles.",
+    "homepage": "https://example.invalid/desk-setup-switcher",
+    "topics": [
+      "macos",
+      "menu-bar",
+      "open-source",
+      "swift",
+      "swiftui"
+    ]
+  },
+  "release": {
+    "version": "0.1.0",
+    "tag": "v0.1.0",
+    "workflow": {
+      "id": 7001,
+      "name": "Signed release candidate",
+      "path": ".github/workflows/release.yml",
+      "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "ci": {
+      "name": "Verify macOS app",
+      "appId": 15368,
+      "workflow": {
+        "id": 7000,
+        "name": "CI",
+        "path": ".github/workflows/ci.yml",
+        "blobSha": "cccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  },
+  "actors": {
+    "operator": {
+      "configured": true,
+      "id": 1001,
+      "login": "synthetic-operator",
+      "type": "User"
+    },
+    "reviewer": {
+      "configured": true,
+      "id": 1002,
+      "login": "synthetic-reviewer",
+      "type": "User"
+    }
+  },
+  "approval": {
+    "mode": "independent-review",
+    "requiredApprovals": 1,
+    "preventSelfReview": true
+  }
+}
