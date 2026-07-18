@@ -18,9 +18,9 @@ An ad-hoc signature is never promoted by changing its description. A public arti
 
 ## Current development baseline
 
-The current 2026-07-18 public-surface candidate's no-Developer-ID path passed 908 deterministic checks/assertions: 501 app checks (178 XCTest cases, 322 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 407 release-tooling assertions (328 Ruby policy and 79 shell guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed. The release-tooling evidence is simulated and structural, not a credentialed signing or notarization result. The package was not installed or launched.
+The current 2026-07-18 public-surface candidate's no-Developer-ID path passed 1,648 deterministic checks/assertions: 501 app checks (178 XCTest cases, 322 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 1,147 release-tooling assertions (328 base release-policy, 659 remote-controls policy/normalizer, 79 collector-wrapper mock, and 81 shell guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed. The release-tooling evidence is simulated and structural, not a credentialed signing or notarization result. The package was not installed or launched.
 
-- Current development-only DMG SHA-256: `16c8ef3ede9630e15afc9d6627434bcd09d0a2ec4e1c9fc208d5dded9be82de7`
+- Current development-only DMG SHA-256: `d77435ee46cdc69f39f9ace41f74e6c2b63830eda0123b4a10818aa6516e5b96`
 - Authoritative current record: [Completion criteria and evidence ledger](COMPLETION-CRITERIA.md)
 - Historical 496-check baseline and DMG SHA-256 `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`: [Open-source release baseline audit](OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md)
 
