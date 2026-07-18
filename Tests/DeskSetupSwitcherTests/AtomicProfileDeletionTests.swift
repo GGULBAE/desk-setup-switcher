@@ -44,8 +44,7 @@ struct AtomicProfileDeletionTests {
         displayReader: conditionReader,
         audioReader: conditionReader,
         networkReader: conditionReader,
-        hardwareReader: conditionReader,
-        locationReader: conditionReader
+        hardwareReader: conditionReader
       ),
       applyEngine: ApplyEngine(registry: AdapterRegistry()),
       diagnosticLog: nil,
@@ -190,8 +189,7 @@ struct AtomicProfileDeletionTests {
         displayReader: conditionReader,
         audioReader: conditionReader,
         networkReader: conditionReader,
-        hardwareReader: conditionReader,
-        locationReader: conditionReader
+        hardwareReader: conditionReader
       ),
       applyEngine: ApplyEngine(registry: AdapterRegistry()),
       diagnosticLog: nil,
@@ -348,13 +346,12 @@ private actor AtomicDeleteGate {
 }
 
 private actor AtomicDeleteConditionReader: ConditionDisplayReading, ConditionAudioReading,
-  ConditionNetworkReading, ConditionHardwareReading, ConditionLocationReading
+  ConditionNetworkReading, ConditionHardwareReading
 {
   func readActiveDisplayIdentities() async throws -> Set<DisplayIdentity> { [] }
   func readAudioFacts() async throws -> ConditionAudioFacts { ConditionAudioFacts() }
   func readNetworkFacts() async throws -> ConditionNetworkFacts { ConditionNetworkFacts() }
   func readHardwareIdentifiers() async throws -> Set<String> { [] }
-  func readAuthorizedLocation() async throws -> LocationRegion? { nil }
 }
 
 @MainActor

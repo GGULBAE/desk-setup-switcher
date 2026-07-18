@@ -1,2 +1,2 @@
-"NSLocationUsageDescription" = "책상 설정 전환기는 macOS가 Wi-Fi 이름을 읽는 데 위치 정보가 필요하거나 사용자가 위치 준비 조건을 추가한 경우에만 위치를 사용합니다.";
-"NSLocationWhenInUseUsageDescription" = "책상 설정 전환기는 macOS가 Wi-Fi 이름을 읽는 데 위치 정보가 필요하거나 사용자가 위치 준비 조건을 추가한 경우에만 위치를 사용합니다.";
+"NSLocationUsageDescription" = "책상 설정 전환기는 Capture 중 macOS가 현재 Wi-Fi 네트워크 이름을 공개하는 데 필요한 경우에만 위치 접근 권한을 사용합니다. 앱은 사용자의 좌표를 요청하거나 저장하지 않습니다.";
+"NSLocationWhenInUseUsageDescription" = "책상 설정 전환기는 Capture 중 macOS가 현재 Wi-Fi 네트워크 이름을 공개하는 데 필요한 경우에만 위치 접근 권한을 사용합니다. 앱은 사용자의 좌표를 요청하거나 저장하지 않습니다.";

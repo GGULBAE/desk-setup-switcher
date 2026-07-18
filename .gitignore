@@ -18,6 +18,8 @@ Package.resolved
 artifacts/
 *.dmg
 *.sha256
+!site/public/assets.sha256
+!docs/evidence/public-release-assets/sources.sha256
 *.xcarchive
 *.app.dSYM/
 

@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 
 public struct ProfileMigrationStep: Sendable {
@@ -87,9 +88,13 @@ public struct ProfileDocumentMigrator: Sendable {
         throw ProfileStorageError.invalidJSON("top-level value must be an object")
       }
       guard let value = object["schemaVersion"] else {
-        return 0
+        throw ProfileStorageError.invalidJSON("schemaVersion is required")
       }
-      guard let version = value as? Int else {
+      guard let number = value as? NSNumber,
+        CFGetTypeID(number) != CFBooleanGetTypeID(),
+        !CFNumberIsFloatType(number),
+        let version = Int(number.stringValue)
+      else {
         throw ProfileStorageError.invalidJSON("schemaVersion must be an integer")
       }
       return version

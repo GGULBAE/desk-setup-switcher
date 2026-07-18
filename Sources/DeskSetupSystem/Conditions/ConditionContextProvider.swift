@@ -50,10 +50,6 @@ public protocol ConditionHardwareReading: Sendable {
   func readHardwareIdentifiers() async throws -> Set<String>
 }
 
-public protocol ConditionLocationReading: Sendable {
-  func readAuthorizedLocation() async throws -> LocationRegion?
-}
-
 public struct ConditionContextDiagnostic: Hashable, Sendable {
   public var source: ConditionContextSource
   public var message: String
@@ -94,27 +90,26 @@ public struct ConditionContextReadResult: Hashable, Sendable {
   }
 }
 
-/// Composes readiness-only facts. Each reader is attempted independently so one
-/// unavailable framework or permission does not erase facts from another source.
+/// Composes the public-beta runtime facts. Each reader is attempted independently
+/// so one unavailable framework or permission does not erase facts from another
+/// source. Imported location conditions remain decodable in core, but this
+/// provider intentionally never requests or supplies coordinates.
 public struct ConditionContextProvider: Sendable {
   private let displayReader: any ConditionDisplayReading
   private let audioReader: any ConditionAudioReading
   private let networkReader: any ConditionNetworkReading
   private let hardwareReader: any ConditionHardwareReading
-  private let locationReader: any ConditionLocationReading
 
   public init(
     displayReader: any ConditionDisplayReading = LiveConditionDisplayReader(),
     audioReader: any ConditionAudioReading = LiveConditionAudioReader(),
     networkReader: any ConditionNetworkReading = LiveConditionNetworkReader(),
-    hardwareReader: any ConditionHardwareReading = LiveUSBHardwareConditionReader(),
-    locationReader: any ConditionLocationReading = LiveConditionLocationReader()
+    hardwareReader: any ConditionHardwareReading = LiveUSBHardwareConditionReader()
   ) {
     self.displayReader = displayReader
     self.audioReader = audioReader
     self.networkReader = networkReader
     self.hardwareReader = hardwareReader
-    self.locationReader = locationReader
   }
 
   public func read() async -> ConditionContext {
@@ -151,12 +146,6 @@ public struct ConditionContextProvider: Sendable {
       context.hardwareIdentifiers = try await hardwareReader.readHardwareIdentifiers()
     } catch {
       context.unavailableSources.insert(.hardware)
-    }
-
-    do {
-      context.location = try await locationReader.readAuthorizedLocation()
-    } catch {
-      context.unavailableSources.insert(.location)
     }
 
     return ConditionContextReadResult(context: context)

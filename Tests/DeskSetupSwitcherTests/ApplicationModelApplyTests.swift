@@ -67,6 +67,46 @@ struct ApplicationModelApplyTests {
     #expect(model.lastApplyResult == nil)
   }
 
+  @Test("a persisted location condition remains dormant during manual apply")
+  func dormantLocationConditionDoesNotBlockManualApply() async throws {
+    let conditions = ProfileConditionSet(conditions: [
+      .init(
+        kind: .location(
+          .init(latitude: 12.5, longitude: -42.5, radiusMeters: 500)
+        )
+      )
+    ])
+    let fixture = try await makeFixture(planBehavior: .stable, conditions: conditions)
+    defer { fixture.cleanup() }
+    let model = fixture.model
+
+    model.start()
+    #expect(
+      await waitUntil {
+        model.profiles.count == 1 && !model.isProfileMutationLocked
+          && !model.isReadinessRefreshInProgress
+      }
+    )
+    let profile = try #require(model.profiles.first)
+    #expect(profile.conditions == conditions)
+    #expect(model.lastConditionContext.location == nil)
+
+    model.prepareApply(profile: profile, mode: .normal)
+    #expect(await waitUntil { model.pendingApply != nil })
+    #expect(
+      model.pendingApply?.preparation.rejectionReasons.contains(.conditionsUnsatisfied) == false
+    )
+    #expect(model.executePendingApply() == .started)
+    #expect(
+      await waitUntil {
+        model.lastApplyResult != nil && !model.isApplyTransactionInProgress
+      }
+    )
+
+    #expect(await fixture.adapter.applyCount == 1)
+    #expect(model.lastApplyResult?.didExecute == true)
+  }
+
   @Test("closing a window invalidates a late read-only preview preparation")
   func windowCloseInvalidatesLatePreparation() async throws {
     let fixture = try await makeFixture(planBehavior: .stable)
@@ -154,7 +194,10 @@ struct ApplicationModelApplyTests {
     #expect(model.pendingApply?.profile.id == profile.id)
   }
 
-  private func makeFixture(planBehavior: SequencedApplyAdapter.PlanBehavior) async throws
+  private func makeFixture(
+    planBehavior: SequencedApplyAdapter.PlanBehavior,
+    conditions: ProfileConditionSet = .init()
+  ) async throws
     -> ApplyModelFixture
   {
     let identifier = "DeskSetupSwitcherTests.Apply.\(UUID().uuidString)"
@@ -176,7 +219,8 @@ struct ApplicationModelApplyTests {
             outputVolume: SettingOption(isIncluded: true, value: 0.2)
           )
         )
-      )
+      ),
+      conditions: conditions
     )
     let store = ProfileStore(directoryURL: directory)
     _ = try await store.load()
@@ -191,8 +235,7 @@ struct ApplicationModelApplyTests {
         displayReader: conditionReader,
         audioReader: conditionReader,
         networkReader: conditionReader,
-        hardwareReader: conditionReader,
-        locationReader: conditionReader
+        hardwareReader: conditionReader
       ),
       applyEngine: ApplyEngine(registry: try AdapterRegistry([adapter])),
       diagnosticLog: nil,
@@ -343,13 +386,12 @@ private actor SequencedApplyAdapter: SystemSettingsAdapter {
 }
 
 private actor EmptyConditionReader: ConditionDisplayReading, ConditionAudioReading,
-  ConditionNetworkReading, ConditionHardwareReading, ConditionLocationReading
+  ConditionNetworkReading, ConditionHardwareReading
 {
   func readActiveDisplayIdentities() async throws -> Set<DisplayIdentity> { [] }
   func readAudioFacts() async throws -> ConditionAudioFacts { .init() }
   func readNetworkFacts() async throws -> ConditionNetworkFacts { .init() }
   func readHardwareIdentifiers() async throws -> Set<String> { [] }
-  func readAuthorizedLocation() async throws -> LocationRegion? { nil }
 }
 
 @MainActor

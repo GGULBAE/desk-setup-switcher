@@ -1,0 +1,42 @@
+{
+  "name": "desk-setup-switcher-site",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "NEXT_PUBLIC_SITE_URL=http://localhost:3000 WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
+    "build": "node --env-file-if-exists=.env.local scripts/verify-site-origin.mjs && WRANGLER_LOG_PATH=.wrangler/wrangler.log node --env-file-if-exists=.env.local node_modules/vinext/dist/cli.js build",
+    "build:local": "ALLOW_LOCAL_SITE_ORIGIN=1 NEXT_PUBLIC_SITE_URL=http://localhost:3000 npm run build",
+    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "test": "node --test tests/rendered-html.test.mjs",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "audit:dependencies": "npm audit",
+    "verify": "npm run build:local && npm run lint && npm test"
+  },
+  "dependencies": {
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.45.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "@vitejs/plugin-rsc": "0.5.28",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.10",
+    "react-server-dom-webpack": "19.2.7",
+    "typescript": "5.9.3",
+    "vinext": "0.0.50",
+    "vite": "8.1.5",
+    "wrangler": "4.112.0"
+  },
+  "overrides": {
+    "postcss": "8.5.19"
+  },
+  "type": "module"
+}

@@ -285,9 +285,6 @@ struct DeskSetupSwitcherApp: App {
         auditWindowController = nil
       }
     #endif
-    locationPermission.onReadinessFactsChanged = { [weak model] in
-      model?.refreshReadinessFacts()
-    }
     if uiAuditConfiguration.isEnabled, !uiAuditConfiguration.showsStatusPopover {
       NSApplication.shared.setActivationPolicy(.regular)
     } else {

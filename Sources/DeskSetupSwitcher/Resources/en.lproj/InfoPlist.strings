@@ -1,2 +1,2 @@
-"NSLocationUsageDescription" = "Desk Setup Switcher uses location only when macOS requires it to read a Wi-Fi name or when you add a location readiness condition.";
-"NSLocationWhenInUseUsageDescription" = "Desk Setup Switcher uses location only when macOS requires it to read a Wi-Fi name or when you add a location readiness condition.";
+"NSLocationUsageDescription" = "Desk Setup Switcher uses Location access only when macOS requires it to reveal the current Wi-Fi network name during Capture. The app does not request or store your coordinates.";
+"NSLocationWhenInUseUsageDescription" = "Desk Setup Switcher uses Location access only when macOS requires it to reveal the current Wi-Fi network name during Capture. The app does not request or store your coordinates.";

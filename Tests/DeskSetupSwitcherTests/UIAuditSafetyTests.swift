@@ -28,8 +28,7 @@ import Testing
         displayReader: conditionReaders,
         audioReader: conditionReaders,
         networkReader: conditionReaders,
-        hardwareReader: conditionReaders,
-        locationReader: conditionReaders
+        hardwareReader: conditionReaders
       )
       let loginItem = RecordingLoginItemService()
       let diagnosticLog = RecordingDiagnosticLog()
@@ -100,14 +99,13 @@ import Testing
       #expect(!FileManager.default.fileExists(atPath: storeDirectory.path))
     }
 
-    @Test("synthetic permission requests never call Core Location request closures")
+    @Test("synthetic permission requests never call the authorization request closure")
     func permissionRequestRemainsSideEffectFree() {
       let recorder = PermissionRequestRecorder()
       let controller = LocationPermissionController(
         allowsSystemRequests: false,
         syntheticAuthorizationStatus: .notDetermined,
-        requestWhenInUseAuthorization: recorder.requestAuthorization,
-        requestLocation: recorder.requestLocation
+        requestWhenInUseAuthorization: recorder.requestAuthorization
       )
 
       controller.requestAccess()
@@ -125,13 +123,29 @@ import Testing
         allowsSystemRequests: true,
         syntheticAuthorizationStatus: .notDetermined,
         requestWhenInUseAuthorization: recorder.requestAuthorization,
-        requestLocation: recorder.requestLocation,
         openSystemSettingsApplication: recorder.openSystemSettings
       )
 
       controller.requestAccess()
 
       #expect(recorder.invocations == ["authorization"])
+    }
+
+    @Test("an authorized status remains authorization-only and performs no system action")
+    func authorizedPermissionDoesNotRequestCoordinates() {
+      let recorder = PermissionRequestRecorder()
+      let controller = LocationPermissionController(
+        allowsSystemRequests: true,
+        syntheticAuthorizationStatus: .authorized,
+        requestWhenInUseAuthorization: recorder.requestAuthorization,
+        openSystemSettingsApplication: recorder.openSystemSettings
+      )
+
+      controller.requestAccess()
+
+      #expect(controller.isAuthorized)
+      #expect(controller.lastError == nil)
+      #expect(recorder.invocations.isEmpty)
     }
 
     @Test("denied capture permission opens only the injected System Settings action")
@@ -141,7 +155,6 @@ import Testing
         allowsSystemRequests: true,
         syntheticAuthorizationStatus: .denied,
         requestWhenInUseAuthorization: recorder.requestAuthorization,
-        requestLocation: recorder.requestLocation,
         openSystemSettingsApplication: recorder.openSystemSettings
       )
 
@@ -1241,7 +1254,7 @@ import Testing
   }
 
   private actor RecordingConditionReaders: ConditionDisplayReading, ConditionAudioReading,
-    ConditionNetworkReading, ConditionHardwareReading, ConditionLocationReading
+    ConditionNetworkReading, ConditionHardwareReading
   {
     private(set) var invocationCount = 0
 
@@ -1265,10 +1278,6 @@ import Testing
       return []
     }
 
-    func readAuthorizedLocation() async throws -> LocationRegion? {
-      invocationCount += 1
-      return nil
-    }
   }
 
   @MainActor
@@ -1357,10 +1366,6 @@ import Testing
 
     func requestAuthorization() {
       invocations.append("authorization")
-    }
-
-    func requestLocation() {
-      invocations.append("location")
     }
 
     func openSystemSettings() -> Bool {

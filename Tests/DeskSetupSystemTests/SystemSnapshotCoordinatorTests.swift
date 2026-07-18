@@ -123,6 +123,63 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     XCTAssertEqual(audioInvocations, [.capability, .snapshot])
   }
 
+  func testCapabilityGroupMismatchFailsClosedBeforeSnapshotAndOtherGroupsContinue() async throws {
+    let mismatchedAudioValue = AudioProfileSettings(
+      defaultOutputUID: .init(isIncluded: true, value: "must-not-be-captured")
+    )
+    let mismatchedAudio = MockSystemSettingsAdapter(
+      group: .audio,
+      capability: AdapterCapability(
+        group: .network,
+        state: .supported,
+        reason: "Synthetic mismatched capability."
+      ),
+      snapshot: AdapterSnapshot(
+        group: .audio,
+        capturedAt: Date(timeIntervalSince1970: 100),
+        payload: .audio(mismatchedAudioValue),
+        items: [item("defaultOutput", state: .storable)]
+      )
+    )
+    let networkValue = NetworkProfileSettings(
+      serviceIPv4: [
+        .init(
+          identity: .init(
+            kind: .ethernet,
+            serviceName: "Synthetic Ethernet",
+            interfaceType: "Ethernet"
+          ),
+          configuration: .init(value: .dhcp)
+        )
+      ]
+    )
+    let network = makeAdapter(
+      group: .network,
+      payload: .network(networkValue),
+      items: [item("serviceIPv4", state: .storable)]
+    )
+
+    let result = await SystemSnapshotCoordinator(
+      adapters: [network, mismatchedAudio]
+    ).capture()
+
+    XCTAssertEqual(result.groups.map(\.group), [.audio, .network])
+    let audioResult = try XCTUnwrap(result.result(for: .audio))
+    XCTAssertEqual(audioResult.failures.map(\.stage), [.capabilityContract])
+    XCTAssertEqual(audioResult.capability.group, .audio)
+    XCTAssertEqual(audioResult.capability.state, .unsupported)
+    XCTAssertNil(audioResult.snapshot)
+    XCTAssertEqual(audioResult.unreadableItems.map(\.key), ["capability"])
+    XCTAssertFalse(result.settings.audio.isIncluded)
+    XCTAssertNil(result.settings.audio.value.defaultOutputUID.value)
+    XCTAssertTrue(result.settings.network.isIncluded)
+    XCTAssertEqual(result.settings.network.value.serviceIPv4, networkValue.serviceIPv4)
+    let mismatchedInvocations = await mismatchedAudio.recordedInvocations()
+    let networkInvocations = await network.recordedInvocations()
+    XCTAssertEqual(mismatchedInvocations, [.capability])
+    XCTAssertEqual(networkInvocations, [.capability, .snapshot])
+  }
+
   func testPermissionRequiredWithoutStorableValueRemainsVisibleButExcluded() async throws {
     let networkValue = NetworkProfileSettings(
       wifiSSID: .init(isIncluded: false, value: nil)

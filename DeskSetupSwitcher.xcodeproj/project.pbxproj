@@ -57,7 +57,6 @@
 		B676A55A8D2B3D40F4836289 = { isa = PBXBuildFile; fileRef = 1F5AEF3D9175DA4FA07DC10D; };
 		20E009D7282572EEE3854F9B = { isa = PBXBuildFile; fileRef = EBF9BC12D8E980B0D78BA993; };
 		E1933BFD1C401049DB503F6C = { isa = PBXBuildFile; fileRef = B8630A64D6E66078BA3D3874; };
-		AADFDF6923458D0B69F9ED33 = { isa = PBXBuildFile; fileRef = BF65F6B156FF4728989E5AA7; };
 		EAFE27267118DB84565474C4 = { isa = PBXBuildFile; fileRef = 8FF9FE35944D57024AA54216; };
 		C83AC442E124FA59B677DEAC = { isa = PBXBuildFile; fileRef = B1912E0F4FB4F87947ACEFCC; };
 		08104490072B824F138CF802 = { isa = PBXBuildFile; fileRef = F91EADF284DAB86BE263E489; };
@@ -148,7 +147,6 @@
 		1F5AEF3D9175DA4FA07DC10D = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSystem/Audio/CoreAudioAdapter.swift"; sourceTree = "<group>"; };
 		EBF9BC12D8E980B0D78BA993 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSystem/Audio/CoreAudioSystemAPI.swift"; sourceTree = "<group>"; };
 		B8630A64D6E66078BA3D3874 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSystem/Conditions/ConditionContextProvider.swift"; sourceTree = "<group>"; };
-		BF65F6B156FF4728989E5AA7 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSystem/Conditions/LocationConditionReader.swift"; sourceTree = "<group>"; };
 		8FF9FE35944D57024AA54216 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSystem/Conditions/SystemConditionReaders.swift"; sourceTree = "<group>"; };
 		B1912E0F4FB4F87947ACEFCC = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSystem/Conditions/USBHardwareConditionReader.swift"; sourceTree = "<group>"; };
 		F91EADF284DAB86BE263E489 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSystem/Display/CoreGraphicsDisplayAdapter.swift"; sourceTree = "<group>"; };
@@ -276,7 +274,6 @@
 				1F5AEF3D9175DA4FA07DC10D,
 				EBF9BC12D8E980B0D78BA993,
 				B8630A64D6E66078BA3D3874,
-				BF65F6B156FF4728989E5AA7,
 				8FF9FE35944D57024AA54216,
 				B1912E0F4FB4F87947ACEFCC,
 				F91EADF284DAB86BE263E489,
@@ -461,7 +458,6 @@
 				B676A55A8D2B3D40F4836289,
 				20E009D7282572EEE3854F9B,
 				E1933BFD1C401049DB503F6C,
-				AADFDF6923458D0B69F9ED33,
 				EAFE27267118DB84565474C4,
 				C83AC442E124FA59B677DEAC,
 				08104490072B824F138CF802,

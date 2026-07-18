@@ -234,7 +234,7 @@ The P2 pass does not include profile-store path hardening, Apply/Capture executi
 
 Release publication, push, Gatekeeper, physical Intel, optional full VoiceOver evidence, required TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
-## M6 — Open-source public beta release (baseline locally verified; publication pending)
+## M6 — Open-source public beta release (public surface locally verified; publication pending)
 
 The first public beta remains bounded to the simple **Capture → Edit → Review & Apply** product flow. It does not add accounts, cloud services, telemetry, automatic profile switching, arbitrary shell execution, UI automation, private APIs, or a new plugin/SDK surface.
 
@@ -245,13 +245,18 @@ Baseline completed locally:
 - Add a full-history public-release audit for credential patterns, concrete personal home paths, current-tree placeholders, and historical PNG/JPEG/ICNS metadata; run it from full-history CI.
 - Freeze the public-beta compatibility boundary in policy documentation: bundle and Keychain identities, SemVer/build/schema behavior, macOS baseline, initial Apple Silicon support, and internal/unstable Swift library products.
 - Add support, governance, compatibility, security, privacy, contribution, and distribution guidance. The tag workflow is limited to an unsigned **draft prerelease candidate** and cannot publish a public release.
-- Pass non-live `make verify` on 2026-07-18 with 496 checks: 173 XCTest, 322 Swift Testing cases across 40 suites, and one isolated native popover regression. The unsigned development-evidence DMG SHA-256 is `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`.
+- Fail closed on missing/non-integral profile schema versions, nil included ColorSync values, and snapshot capability-group mismatches without blocking unrelated snapshot groups. Preserve only the explicit schema 0→1 migration.
+- Remove runtime coordinate collection/cache and its Settings refresh surface. Location authorization now exists only to read the current Wi-Fi SSID during an explicit Capture; imported location conditions remain dormant schema data.
+- Prepare the user-facing public surface locally: rewritten README, English/Korean user guides, profile-schema and adapter-contract references, launch copy, synthetic screenshots, silent captioned demo, deterministic social preview, asset provenance, and the bilingual static site.
+- Verify the site's privacy boundary locally: no project analytics, client tracking, project-set cookies, account, database, object storage, service binding, or download; disclose hosting-provider aggregate operations and the two pinned tab-scoped vinext router guards instead of claiming that no provider processing exists.
+- Pass integrated non-live `make verify` on 2026-07-18 with 501 checks: 178 XCTest, 322 default Swift Testing cases across 39 suites, and one isolated native popover case in a 40th Swift Testing suite. The unsigned development-evidence DMG SHA-256 is `b4492821a3734d343e14b227999783df8966cb7412bb7511062dd3d52f2a674b`.
+- Pass the local site build/lint/rendered-HTML tests, pinned dependency audit, public-asset checksum/metadata/video/caption checks, complete-history public-release audit, and integrated diff checks. No site, tag, release, or promotional post was published.
 
 Mandatory gates before public v0.1.0:
 
 - Produce one canonical Developer ID/hardened-runtime build, signed DMG, accepted notarization log, stapled artifact, app-and-DMG Gatekeeper validation, checksum, SBOM, attestation/provenance, and redownload verification.
 - Protect the remote release environment and default branch, enable the intended vulnerability-reporting/support settings, and verify that no workflow can bypass human publication approval.
-- Publish a no-tracking bilingual demo site, screenshots/video or other provenance-reviewed promotional assets, and English/Korean user, integration, and contributor guidance with capability claims that match the support matrix.
+- Merge the locally reviewed guides, support/security routes, and provenance-reviewed media before deploying the bilingual site; set approved canonical HTTPS/release URLs, complete a bounded manual browser and final bilingual-copy pass, then verify every public link from a clean session.
 - Complete clean quarantined installation evidence and three external Apple Silicon beta passes with no open P0/P1 issue. Intel remains unclaimed until physical verification exists.
 - Obtain the user's explicit approval for the final artifact, tag, release notes, site publication, and promotional posts. Until then, this milestone is **not a public release**.
 

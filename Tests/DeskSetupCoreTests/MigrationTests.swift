@@ -19,19 +19,40 @@ final class MigrationTests: XCTestCase {
     XCTAssertEqual(decoded.document, original)
   }
 
-  func testMissingSchemaVersionUsesSchemaZeroMigration() throws {
+  func testMissingSchemaVersionIsRejected() throws {
     let original = ProfileDocument(updatedAt: Date(timeIntervalSince1970: 1_700_000_000))
     let currentData = try ProfileJSONCodec().encode(original)
     var object = try XCTUnwrap(
       try JSONSerialization.jsonObject(with: currentData) as? [String: Any])
     object.removeValue(forKey: "schemaVersion")
 
-    let decoded = try ProfileJSONCodec().decode(
-      JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+
+    XCTAssertThrowsError(try ProfileDocumentMigrator().migrate(data)) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .invalidJSON)
+    }
+  }
+
+  func testBooleanSchemaVersionsAreRejected() throws {
+    let currentData = try ProfileJSONCodec().encode(ProfileDocument())
+
+    for value in [false, true] {
+      let data = try dataByChangingSchema(in: currentData, to: value)
+      XCTAssertThrowsError(try ProfileDocumentMigrator().migrate(data)) { error in
+        XCTAssertEqual(error as? ProfileStorageError, .invalidJSON)
+      }
+    }
+  }
+
+  func testFractionalSchemaVersionIsRejected() throws {
+    let data = try dataByChangingSchema(
+      in: ProfileJSONCodec().encode(ProfileDocument()),
+      to: 0.5
     )
 
-    XCTAssertEqual(decoded.originalSchemaVersion, 0)
-    XCTAssertEqual(decoded.document.schemaVersion, ProfileDocument.currentSchemaVersion)
+    XCTAssertThrowsError(try ProfileDocumentMigrator().migrate(data)) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .invalidJSON)
+    }
   }
 
   func testCurrentSchemaDoesNotMigrate() throws {
@@ -147,7 +168,7 @@ final class MigrationTests: XCTestCase {
     }
   }
 
-  private func dataByChangingSchema(in data: Data, to version: Int) throws -> Data {
+  private func dataByChangingSchema(in data: Data, to version: Any) throws -> Data {
     var object = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
     object["schemaVersion"] = version
     return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])

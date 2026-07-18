@@ -1,0 +1,16 @@
+WEBVTT
+
+00:00.000 --> 00:04.000
+Desk Setup Switcher · local-only public beta candidate
+
+00:04.000 --> 00:12.000
+1. Capture — Read current settings. Nothing changes.
+
+00:12.000 --> 00:24.000
+2. Edit — Choose the Display, Audio, and Network values in the profile.
+
+00:24.000 --> 00:32.000
+3. Review & Apply — The Apply Preview shows every planned change and risk.
+
+00:32.000 --> 00:37.000
+Apply stays a separate confirmation. No account. No telemetry.

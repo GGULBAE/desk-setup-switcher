@@ -139,6 +139,51 @@ final class ProfileValidationTests: XCTestCase {
     )
   }
 
+  func testRejectsMissingIncludedDisplayColorProfile() throws {
+    var target = displayTarget()
+    target.colorProfile = .init(isIncluded: true, value: nil)
+    let profile = DeskProfile(
+      name: "Missing ColorSync profile",
+      settings: ProfileSettings(
+        display: .init(value: .init(displays: [target]))
+      )
+    )
+    let document = ProfileDocument(profiles: [profile])
+
+    let issues = issues(in: document)
+
+    assertInvalidValue(
+      issues,
+      pathSuffix: ".displays[0].colorProfile",
+      reason: .missingIncludedValue
+    )
+
+    XCTAssertThrowsError(try ProfileJSONCodec().encode(document)) { error in
+      guard let validation = error as? ProfileValidationError else {
+        return XCTFail("Expected ProfileValidationError, got \(error)")
+      }
+      assertInvalidValue(
+        validation.issues,
+        pathSuffix: ".displays[0].colorProfile",
+        reason: .missingIncludedValue
+      )
+    }
+
+    let unvalidatedEncoder = JSONEncoder()
+    unvalidatedEncoder.dateEncodingStrategy = .iso8601
+    let importedData = try unvalidatedEncoder.encode(document)
+    XCTAssertThrowsError(try ProfileJSONCodec().decode(importedData)) { error in
+      guard let validation = error as? ProfileValidationError else {
+        return XCTFail("Expected ProfileValidationError, got \(error)")
+      }
+      assertInvalidValue(
+        validation.issues,
+        pathSuffix: ".displays[0].colorProfile",
+        reason: .missingIncludedValue
+      )
+    }
+  }
+
   func testRejectsMissingAndInvalidIncludedAudioValues() {
     let profile = DeskProfile(
       name: "Invalid audio",

@@ -7,7 +7,7 @@ There is no public release yet. The table describes the current pre-release boun
 | Version | Security status |
 | --- | --- |
 | Default development branch | Reports are accepted and fixes land here before the first public beta. Development snapshots are not supported end-user releases. |
-| `v0.1.0` public beta | Not published yet. It becomes supported only after the signed, notarized release is published through GitHub Releases. |
+| `v0.1.0` public beta | Not published yet. It becomes supported only after the complete distribution gate passes and the maintainer-approved canonical GitHub Release is published. |
 | Older builds and untagged artifacts | Unsupported. Do not redistribute the current ad-hoc-signed test DMG as a release. |
 
 During the `0.x` public-beta period, the latest published beta receives security fixes. The immediately preceding beta may receive critical fixes for up to 30 days when a safe backport is practical. After a stable release exists, the latest and immediately preceding stable minor lines are the intended support window. See [Compatibility and versioning](docs/COMPATIBILITY.md) for the application, platform, schema, and Swift-package policies.

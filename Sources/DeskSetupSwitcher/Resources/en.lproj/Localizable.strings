@@ -87,9 +87,8 @@
 "Refresh Status" = "Refresh Status";
 "macOS accepts login-item registration only for an eligible installed and code-signed app. The requested preference does not guarantee registration." = "macOS accepts login-item registration only for an eligible installed and code-signed app. The requested preference does not guarantee registration.";
 "System permissions" = "System permissions";
-"macOS can require Location Services to reveal a Wi-Fi network name and evaluate a location readiness condition. Desk Setup Switcher does not track location continuously." = "macOS can require Location Services to reveal a Wi-Fi network name and evaluate a location readiness condition. Desk Setup Switcher does not track location continuously.";
+"macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates." = "macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates.";
 "Location" = "Location";
-"Refresh Current Location" = "Refresh Current Location";
 "Request Location Access" = "Request Location Access";
 "Shows the macOS permission prompt only after this explanation" = "Shows the macOS permission prompt only after this explanation";
 
@@ -105,8 +104,6 @@
 "Ethernet" = "Ethernet";
 "Connected" = "Connected";
 "Not connected" = "Not connected";
-"Cached location" = "Cached location";
-"Available; coordinates hidden" = "Available; coordinates hidden";
 "Audio input UIDs" = "Audio input UIDs";
 "Audio output UIDs" = "Audio output UIDs";
 "USB hardware identifiers" = "USB hardware identifiers";
@@ -259,7 +256,6 @@
 "Allow Location Access?" = "Allow Location Access?";
 "Not Now" = "Not Now";
 "Continue" = "Continue";
-"Location is used only to evaluate readiness when you ask and can also be required by macOS to read the current Wi-Fi name. It is never logged or sent anywhere." = "Location is used only to evaluate readiness when you ask and can also be required by macOS to read the current Wi-Fi name. It is never logged or sent anywhere.";
 "Not" = "Not";
 "Invert only this condition." = "Invert only this condition.";
 "Require the opposite" = "Require the opposite";
@@ -290,24 +286,11 @@
 "Address or CIDR" = "Address or CIDR";
 "For example 192.168.1.0 slash 24 or a single IPv6 address" = "For example 192.168.1.0 slash 24 or a single IPv6 address";
 "Add IP Readiness Condition" = "Add IP Readiness Condition";
-"Add Location Readiness Condition" = "Add Location Readiness Condition";
 "Enter the address or network that must be present for readiness." = "Enter the address or network that must be present for readiness.";
-"Enter the center and radius used only to evaluate readiness." = "Enter the center and radius used only to evaluate readiness.";
 "Use a Current Address" = "Use a Current Address";
-"Use Current Location" = "Use Current Location";
-"No current location is available. Enter coordinates manually." = "No current location is available. Enter coordinates manually.";
 "This adds a readiness check only. It never applies or switches profiles." = "This adds a readiness check only. It never applies or switches profiles.";
 "Enter an IP address or CIDR." = "Enter an IP address or CIDR.";
 "Enter a valid IPv4 or IPv6 address, optionally followed by a CIDR prefix." = "Enter a valid IPv4 or IPv6 address, optionally followed by a CIDR prefix.";
-"Latitude" = "Latitude";
-"Longitude" = "Longitude";
-"Radius (m)" = "Radius (m)";
-"Radius" = "Radius";
-"Enter latitude, longitude, and radius." = "Enter latitude, longitude, and radius.";
-"Latitude must be between −90 and 90." = "Latitude must be between −90 and 90.";
-"Longitude must be between −180 and 180." = "Longitude must be between −180 and 180.";
-"Radius must be between 0 and 40,000,000 metres." = "Radius must be between 0 and 40,000,000 metres.";
-"Location is evaluated only when permission is granted. Exact coordinates are never written to diagnostics." = "Location is evaluated only when permission is granted. Exact coordinates are never written to diagnostics.";
 
 /* Runtime status text */
 "No profile has been applied." = "No profile has been applied.";
@@ -398,7 +381,6 @@
 "Allowed" = "Allowed";
 "Enable Location Services for Desk Setup Switcher in System Settings." = "Enable Location Services for Desk Setup Switcher in System Settings.";
 "The current location authorization state is unknown." = "The current location authorization state is unknown.";
-"A current location is not available yet." = "A current location is not available yet.";
 "No local diagnostic events." = "No local diagnostic events.";
 "Local diagnostic storage is unavailable." = "Local diagnostic storage is unavailable.";
 "Showing the most recent %lld redacted local events." = "Showing the most recent %lld redacted local events.";
@@ -1070,7 +1052,7 @@
 /* Capture permission and actionable results */
 "Capture Without Wi-Fi" = "Capture Without Wi-Fi";
 "Allow Location and Capture" = "Allow Location and Capture";
-"Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere." = "Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere.";
+"Location access lets macOS reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates." = "Location access lets macOS reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates.";
 "Location Access Is Off" = "Location Access Is Off";
 "Location Access Is Ready" = "Location Access Is Ready";
 "Location access is enabled. Capture the current settings to include the current Wi-Fi network." = "Location access is enabled. Capture the current settings to include the current Wi-Fi network.";
@@ -1078,7 +1060,6 @@
 "The location permission state is unknown. Choose Capture Without Wi-Fi or open System Settings." = "The location permission state is unknown. Choose Capture Without Wi-Fi or open System Settings.";
 "Open macOS System Settings" = "Open macOS System Settings";
 "Opens macOS System Settings to change Location access" = "Opens macOS System Settings to change Location access";
-"Refreshes the current location used by readiness checks" = "Refreshes the current location used by readiness checks";
 "After changing Location access, return to the menu bar and capture again." = "After changing Location access, return to the menu bar and capture again.";
 "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi." = "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi.";
 "macOS System Settings could not be opened." = "macOS System Settings could not be opened.";
@@ -1141,12 +1122,12 @@
 "This included volume setting is unavailable for the selected device. Turn off Include to apply other available settings normally." = "This included volume setting is unavailable for the selected device. Turn off Include to apply other available settings normally.";
 "This included ColorSync profile setting is unavailable for the saved display. Turn off Include to apply other available settings normally." = "This included ColorSync profile setting is unavailable for the saved display. Turn off Include to apply other available settings normally.";
 "The included IPv4 setting for %@ is unavailable in the current network configuration. Turn off Include to apply other available settings normally." = "The included IPv4 setting for %@ is unavailable in the current network configuration. Turn off Include to apply other available settings normally.";
-"High-risk display and network changes remain temporary and will be restored if the safety window closes, the app exits, or you do not confirm within 15 seconds." = "High-risk display and network changes remain temporary and will be restored if the safety window closes, the app exits, or you do not confirm within 15 seconds.";
+"High-risk display and network changes remain temporary. Desk Setup Switcher will attempt to restore the previous configuration if the safety window closes, the app exits, or you do not confirm within 15 seconds." = "High-risk display and network changes remain temporary. Desk Setup Switcher will attempt to restore the previous configuration if the safety window closes, the app exits, or you do not confirm within 15 seconds.";
 "Protected change confirmation" = "Protected change confirmation";
 "Awaiting protected-change confirmation" = "Awaiting protected-change confirmation";
 "Protected changes are temporary and are waiting for confirmation." = "Protected changes are temporary and are waiting for confirmation.";
 "Keep these protected settings?" = "Keep these protected settings?";
-"The previous configuration will return in %lld seconds." = "The previous configuration will return in %lld seconds.";
+"Desk Setup Switcher will attempt to restore the previous configuration in %lld seconds." = "Desk Setup Switcher will attempt to restore the previous configuration in %lld seconds.";
 "Protected change confirmation time remaining" = "Protected change confirmation time remaining";
 "Preparing and recording the protected apply workflow…" = "Preparing and recording the protected apply workflow…";
 "Confirm or revert the previous protected change first." = "Confirm or revert the previous protected change first.";

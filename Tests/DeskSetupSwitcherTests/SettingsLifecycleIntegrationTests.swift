@@ -53,8 +53,7 @@ struct SettingsLifecycleIntegrationTests {
         displayReader: conditionReader,
         audioReader: conditionReader,
         networkReader: conditionReader,
-        hardwareReader: conditionReader,
-        locationReader: conditionReader
+        hardwareReader: conditionReader
       ),
       applyEngine: ApplyEngine(registry: try AdapterRegistry([adapter])),
       diagnosticLog: nil,
@@ -312,14 +311,12 @@ private actor SettingsLifecycleAudioAdapter: SystemSettingsAdapter {
 }
 
 private actor SettingsLifecycleConditionReader: ConditionDisplayReading,
-  ConditionAudioReading, ConditionNetworkReading, ConditionHardwareReading,
-  ConditionLocationReading
+  ConditionAudioReading, ConditionNetworkReading, ConditionHardwareReading
 {
   func readActiveDisplayIdentities() async throws -> Set<DisplayIdentity> { [] }
   func readAudioFacts() async throws -> ConditionAudioFacts { .init() }
   func readNetworkFacts() async throws -> ConditionNetworkFacts { .init() }
   func readHardwareIdentifiers() async throws -> Set<String> { [] }
-  func readAuthorizedLocation() async throws -> LocationRegion? { nil }
 }
 
 @MainActor

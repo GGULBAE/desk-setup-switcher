@@ -17,6 +17,17 @@ final class UserFacingLocalizationTests: XCTestCase {
     XCTAssertEqual(appLocalizedRuntime("Review…", languageCode: "ko"), "검토…")
   }
 
+  func testLocationPermissionCopyDescribesSSIDAuthorizationWithoutCoordinates() {
+    let key =
+      "macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates."
+
+    XCTAssertEqual(appLocalizedRuntime(key, languageCode: "en"), key)
+    XCTAssertEqual(
+      appLocalizedRuntime(key, languageCode: "ko"),
+      "macOS에서는 Capture 중 현재 Wi-Fi 네트워크 이름을 확인할 때 위치 서비스 권한이 필요할 수 있습니다. 책상 설정 전환기는 사용자의 좌표를 요청하거나 저장하지 않습니다."
+    )
+  }
+
   func testAudioRoleTemplateLocalizesItsFormatArgument() {
     let value = "No default input device UID was saved."
 

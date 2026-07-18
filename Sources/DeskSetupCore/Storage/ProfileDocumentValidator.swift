@@ -139,6 +139,14 @@ public struct ProfileDocumentValidator: Sendable {
       }
       checkLength(display.identity.productName, at: "\(path).productName", issues: &issues)
 
+      if semanticsEnabled {
+        validateIncludedPresence(
+          display.colorProfile,
+          at: "\(path).colorProfile",
+          issues: &issues
+        )
+      }
+
       if semanticsEnabled, display.origin.isIncluded {
         let origin = display.origin.value
         if !fitsInt32(origin.x) {

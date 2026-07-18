@@ -53,7 +53,9 @@ fi
 
 ruby -e '
   bad = []
+  ignored_prefixes = ["site/node_modules/", "site/dist/", "site/.next/", "site/.wrangler/"]
   Dir["**/*.md", ".github/**/*.md"].uniq.each do |file|
+    next if ignored_prefixes.any? { |prefix| file.start_with?(prefix) }
     File.read(file).scan(/\[[^\]]*\]\(([^)]+)\)/).flatten.each do |link|
       next if link.start_with?("http://", "https://", "mailto:", "#")
       target = File.expand_path(link.split("#", 2).first, File.dirname(file))

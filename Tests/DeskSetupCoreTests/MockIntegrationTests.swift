@@ -147,6 +147,7 @@ struct MockIntegrationTests {
       group: .network,
       key: "association",
       summary: "Join network",
+      risk: .high,
       isFatalOnFailure: true,
       rollbackPayload: Data([0x01])
     )
@@ -169,6 +170,7 @@ struct MockIntegrationTests {
     )
 
     #expect(result.status == .failed)
+    #expect(result.safetyConfirmationID == nil)
     #expect(result.rollbackResults.map(\.key) == ["association"])
     #expect(result.rollbackResults.map(\.status) == [.rolledBack])
     #expect(

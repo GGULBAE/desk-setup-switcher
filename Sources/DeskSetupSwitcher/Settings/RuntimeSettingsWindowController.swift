@@ -634,13 +634,15 @@ private struct SystemSettingsView: View {
 
       Section("System permissions") {
         Text(
-          "macOS can require Location Services to reveal a Wi-Fi network name and evaluate a location readiness condition. Desk Setup Switcher does not track location continuously."
+          "macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates."
         )
         LabeledContent("Location", value: locationPermission.statusText)
-        Button(locationPermissionActionTitle) {
-          performLocationPermissionAction()
+        if let locationPermissionActionTitle {
+          Button(locationPermissionActionTitle) {
+            performLocationPermissionAction()
+          }
+          .accessibilityHint(locationPermissionActionHint)
         }
-        .accessibilityHint(locationPermissionActionHint)
         if !locationPermission.isAuthorized {
           Text("After changing Location access, return to the menu bar and capture again.")
             .font(.caption)
@@ -676,14 +678,14 @@ private struct SystemSettingsView: View {
     model.launchAtLoginDesired != model.loginItemEnabled
   }
 
-  private var locationPermissionActionTitle: String {
+  private var locationPermissionActionTitle: String? {
     switch locationPermission.authorizationStatus {
     case .notDetermined:
       appLocalized("Request Location Access")
     case .denied, .restricted:
       appLocalized("Open macOS System Settings")
     case .authorizedAlways, .authorized:
-      appLocalized("Refresh Current Location")
+      nil
     @unknown default:
       appLocalized("Open macOS System Settings")
     }
@@ -696,7 +698,7 @@ private struct SystemSettingsView: View {
     case .denied, .restricted:
       appLocalized("Opens macOS System Settings to change Location access")
     case .authorizedAlways, .authorized:
-      appLocalized("Refreshes the current location used by readiness checks")
+      ""
     @unknown default:
       appLocalized("Opens macOS System Settings to change Location access")
     }
@@ -704,8 +706,10 @@ private struct SystemSettingsView: View {
 
   private func performLocationPermissionAction() {
     switch locationPermission.authorizationStatus {
-    case .notDetermined, .authorizedAlways, .authorized:
+    case .notDetermined:
       locationPermission.requestAccess()
+    case .authorizedAlways, .authorized:
+      break
     case .denied, .restricted:
       locationPermission.openSystemSettings()
     @unknown default:
@@ -824,12 +828,6 @@ struct DiagnosticsSettingsView: View {
           value: model.lastConditionContext.ethernetConnected
             ? appLocalized("Connected") : appLocalized("Not connected")
         )
-        LabeledContent(
-          appLocalized("Cached location"),
-          value: model.lastConditionContext.location == nil
-            ? appLocalized("Unavailable") : appLocalized("Available; coordinates hidden")
-        )
-
         factList(
           id: "audio-input-uids",
           title: appLocalized("Audio input UIDs"),

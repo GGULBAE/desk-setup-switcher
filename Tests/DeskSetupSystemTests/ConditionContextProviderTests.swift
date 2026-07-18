@@ -6,7 +6,7 @@ import Testing
 
 @Suite("Condition context provider")
 struct ConditionContextProviderTests {
-  @Test("facts from every injected source compose into core context")
+  @Test("facts from every public runtime source compose without coordinates")
   func composesFacts() async {
     let display = DisplayIdentity(
       uuid: UUID(uuidString: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
@@ -15,7 +15,6 @@ struct ConditionContextProviderTests {
       serialNumber: 3,
       isBuiltIn: false
     )
-    let location = LocationRegion(latitude: 37.5, longitude: 127, radiusMeters: 25)
     let readers = FixtureConditionReaders(
       displays: [display],
       audio: .init(inputUIDs: ["input-a"], outputUIDs: ["output-a", "duplex-a"]),
@@ -24,8 +23,7 @@ struct ConditionContextProviderTests {
         ethernetConnected: true,
         ipAddresses: ["192.0.2.10", "2001:db8::10"]
       ),
-      hardware: ["usb:1234:5678"],
-      location: location
+      hardware: ["usb:1234:5678"]
     )
 
     let result = await makeProvider(readers).discover()
@@ -37,7 +35,7 @@ struct ConditionContextProviderTests {
     #expect(result.context.ethernetConnected)
     #expect(result.context.ipAddresses == ["192.0.2.10", "2001:db8::10"])
     #expect(result.context.hardwareIdentifiers == ["usb:1234:5678"])
-    #expect(result.context.location == location)
+    #expect(result.context.location == nil)
     #expect(result.unavailableSources.isEmpty)
     #expect(result.diagnostics.isEmpty)
   }
@@ -54,7 +52,6 @@ struct ConditionContextProviderTests {
         ipAddresses: ["192.0.2.20"]
       ),
       hardware: ["unused"],
-      location: .init(latitude: 1, longitude: 2, radiusMeters: 3),
       failures: [.audio, .hardware],
       failureDetail: secretSerial
     )
@@ -69,7 +66,7 @@ struct ConditionContextProviderTests {
     #expect(result.context.displays == readers.displays)
     #expect(result.context.wifiSSID == "Desk Wi-Fi")
     #expect(result.context.ethernetConnected)
-    #expect(result.context.location == readers.location)
+    #expect(result.context.location == nil)
     let diagnostics = result.diagnostics.map(\.message).joined(separator: " ")
     #expect(!diagnostics.contains(secretSerial))
     #expect(result.diagnostics.map(\.source) == [.audio, .hardware])
@@ -78,7 +75,7 @@ struct ConditionContextProviderTests {
   @Test("reader failures remain unavailable through condition inversion")
   func sourceFailureCannotMatchThroughInversion() async {
     let readers = FixtureConditionReaders(
-      failures: [.displays, .audio, .network, .hardware, .location]
+      failures: [.displays, .audio, .network, .hardware]
     )
     let context = await makeProvider(readers).read()
     let conditions = ProfileConditionSet(
@@ -103,7 +100,7 @@ struct ConditionContextProviderTests {
 
     let evaluation = ConditionEvaluator().evaluate(conditions, in: context)
 
-    #expect(context.unavailableSources == Set(ConditionContextSource.allCases))
+    #expect(context.unavailableSources == [.displays, .audio, .network, .hardware])
     #expect(!evaluation.isMatched)
     #expect(evaluation.items.allSatisfy { !$0.isMatched })
     #expect(evaluation.items.allSatisfy { $0.explanation.contains("unavailable") })
@@ -121,8 +118,7 @@ struct ConditionContextProviderTests {
           failsRead: true
         )
       ),
-      hardwareReader: fixtures,
-      locationReader: fixtures
+      hardwareReader: fixtures
     )
     let context = await provider.read()
     let conditions = ProfileConditionSet(
@@ -140,7 +136,7 @@ struct ConditionContextProviderTests {
     #expect(evaluation.items.allSatisfy { !$0.isMatched })
   }
 
-  @Test("permission-hidden SSID and location are unavailable facts, not reader failures")
+  @Test("permission-hidden SSID and dormant location remain conservative unknown facts")
   func permissionHiddenFactsPreserveUnavailableSemantics() async {
     let context = await makeProvider(FixtureConditionReaders()).read()
     let conditions = ProfileConditionSet(
@@ -298,11 +294,9 @@ struct ConditionContextProviderTests {
     #expect(second == first)
   }
 
-  @Test("an unauthorized or unavailable location remains nil without source failure")
-  func unavailableLocationIsNotAFailure() async {
-    let readers = FixtureConditionReaders(location: nil)
-
-    let result = await makeProvider(readers).discover()
+  @Test("the public runtime never supplies coordinates to dormant location conditions")
+  func dormantLocationNeverReceivesRuntimeCoordinates() async {
+    let result = await makeProvider(FixtureConditionReaders()).discover()
 
     #expect(result.context.location == nil)
     #expect(!result.unavailableSources.contains(.location))
@@ -321,20 +315,18 @@ struct ConditionContextProviderTests {
       displayReader: readers,
       audioReader: readers,
       networkReader: readers,
-      hardwareReader: readers,
-      locationReader: readers
+      hardwareReader: readers
     )
   }
 }
 
 private struct FixtureConditionReaders: ConditionDisplayReading, ConditionAudioReading,
-  ConditionNetworkReading, ConditionHardwareReading, ConditionLocationReading
+  ConditionNetworkReading, ConditionHardwareReading
 {
   var displays: Set<DisplayIdentity> = []
   var audio = ConditionAudioFacts()
   var network = ConditionNetworkFacts()
   var hardware: Set<String> = []
-  var location: LocationRegion?
   var failures: Set<ConditionContextSource> = []
   var failureDetail = "synthetic failure"
 
@@ -356,11 +348,6 @@ private struct FixtureConditionReaders: ConditionDisplayReading, ConditionAudioR
   func readHardwareIdentifiers() async throws -> Set<String> {
     try require(.hardware)
     return hardware
-  }
-
-  func readAuthorizedLocation() async throws -> LocationRegion? {
-    try require(.location)
-    return location
   }
 
   private func require(_ source: ConditionContextSource) throws {

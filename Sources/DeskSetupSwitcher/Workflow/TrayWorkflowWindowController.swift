@@ -366,7 +366,7 @@ enum PermissionWorkflowCopy {
       case .captureExplanation:
         isLocationAuthorized
           ? "Location access is enabled. Capture the current settings to include the current Wi-Fi network."
-          : "Location access lets macOS reveal the current Wi-Fi network name during capture. Desk Setup Switcher does not track location continuously, log it, or send it anywhere."
+          : "Location access lets macOS reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates."
       case .captureDenied, .systemSettings:
         isLocationAuthorized
           ? "Location access is enabled. Capture the current settings to include the current Wi-Fi network."
@@ -828,7 +828,7 @@ struct ApplyPreviewView: View {
     if request.preparation.operations.contains(where: { $0.risk == .high }) {
       Label(
         appLocalized(
-          "High-risk display and network changes remain temporary and will be restored if the safety window closes, the app exits, or you do not confirm within 15 seconds."
+          "High-risk display and network changes remain temporary. Desk Setup Switcher will attempt to restore the previous configuration if the safety window closes, the app exits, or you do not confirm within 15 seconds."
         ),
         systemImage: "exclamationmark.shield"
       )
@@ -1344,7 +1344,8 @@ struct SafetyConfirmationView: View {
             .accessibilityFocused($isHeadingAccessibilityFocused)
           Text(
             appLocalized(
-              "The previous configuration will return in \(state.secondsRemaining) seconds.")
+              "Desk Setup Switcher will attempt to restore the previous configuration in \(state.secondsRemaining) seconds."
+            )
           )
           .monospacedDigit()
           .multilineTextAlignment(.center)

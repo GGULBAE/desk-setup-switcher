@@ -38,9 +38,9 @@ The adapter sequence `snapshot → validate → plan → apply → verify → ro
 
 The current profile document schema is `schemaVersion: 1`.
 
-- A document with no `schemaVersion` is treated as legacy schema 0 and migrated deterministically to schema 1 before semantic validation.
+- A document with an explicit integer JSON `schemaVersion: 0` is migrated deterministically to schema 1 before semantic validation.
 - Schema 1 is decoded and semantically/resource validated before it may replace local state.
-- Negative versions, malformed versions, and versions newer than the running app understands are rejected rather than guessed or silently downgraded.
+- Missing versions, booleans, floating or fractional number representations, negative versions, malformed versions, and versions newer than the running app understands are rejected rather than guessed or silently downgraded.
 - The profile schema contains no password field. Exports can still contain sensitive labels, SSIDs, network ranges, device identifiers, and exact location conditions and must be reviewed before sharing.
 
 For the `0.1.x` line, schema 1 is the readable/writable interchange format. Before a future release raises the schema version, it must add deterministic migration from every profile schema written by a still-supported public release, preserve a last-known-good backup, and add failure-path tests. Older apps may reject a document written by a newer schema; forward compatibility is not promised.

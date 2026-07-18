@@ -149,8 +149,7 @@ struct ApplicationModelLoginItemTests {
         displayReader: conditionReader,
         audioReader: conditionReader,
         networkReader: conditionReader,
-        hardwareReader: conditionReader,
-        locationReader: conditionReader
+        hardwareReader: conditionReader
       ),
       applyEngine: ApplyEngine(registry: AdapterRegistry()),
       diagnosticLog: nil,
@@ -213,11 +212,10 @@ private final class RecordingLoginItemService: LoginItemServicing {
 }
 
 private actor LoginItemEmptyConditionReader: ConditionDisplayReading, ConditionAudioReading,
-  ConditionNetworkReading, ConditionHardwareReading, ConditionLocationReading
+  ConditionNetworkReading, ConditionHardwareReading
 {
   func readActiveDisplayIdentities() async throws -> Set<DisplayIdentity> { [] }
   func readAudioFacts() async throws -> ConditionAudioFacts { .init() }
   func readNetworkFacts() async throws -> ConditionNetworkFacts { .init() }
   func readHardwareIdentifiers() async throws -> Set<String> { [] }
-  func readAuthorizedLocation() async throws -> LocationRegion? { nil }
 }

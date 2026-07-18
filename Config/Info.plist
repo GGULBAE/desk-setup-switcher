@@ -29,9 +29,9 @@
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026 GGULBAE. MIT License.</string>
     <key>NSLocationUsageDescription</key>
-    <string>Desk Setup Switcher uses location only when macOS requires it to read a Wi-Fi name or when you add a location readiness condition.</string>
+    <string>Desk Setup Switcher uses Location access only when macOS requires it to reveal the current Wi-Fi network name during Capture. The app does not request or store your coordinates.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Desk Setup Switcher uses location only when macOS requires it to read a Wi-Fi name or when you add a location readiness condition.</string>
+    <string>Desk Setup Switcher uses Location access only when macOS requires it to reveal the current Wi-Fi network name during Capture. The app does not request or store your coordinates.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

@@ -153,12 +153,33 @@ public struct SystemSnapshotCoordinator: Sendable {
         )
       }
       if capability.group != group {
+        let message = "The adapter returned capability data for another settings group."
         failures.append(
           SystemSnapshotGroupFailure(
             stage: .capabilityContract,
-            message: "The adapter returned capability data for another settings group."
+            message: message
           )
         )
+        let unreadable = SnapshotItem(
+          key: "capability",
+          label: "\(group.rawValue.capitalized) capability",
+          state: .unreadable,
+          detail: "The adapter capability could not be attributed safely."
+        )
+        groupResults.append(
+          SystemSnapshotGroupResult(
+            group: group,
+            capability: AdapterCapability(
+              group: group,
+              state: .unsupported,
+              reason: message
+            ),
+            snapshot: nil,
+            items: [unreadable],
+            failures: failures
+          )
+        )
+        continue
       }
 
       let snapshot: AdapterSnapshot
