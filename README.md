@@ -2,7 +2,7 @@
 
 Desk Setup Switcher is a local-only macOS menu-bar app for saving selected display, audio, and network settings as profiles. Capture what is connected, keep only the settings you want, review the exact plan, and apply it only when you choose.
 
-> **Release status:** there is no supported public download yet. Contributor builds and ordinary CI produce development-only, ad-hoc-signed artifacts. The release-only signed-candidate path is not operational until its protected environment, credentials, repository protections, and credentialed verification are configured and recorded. Do not create a `v*` tag before the [completion ledger](docs/COMPLETION-CRITERIA.md) closes that gate. The first supported download will be a signed and notarized DMG published on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after every public-beta gate passes.
+> **Release status:** there is no supported public download yet. Contributor builds and ordinary CI produce development-only, ad-hoc-signed artifacts. A [read-only remote-controls audit](docs/REMOTE-RELEASE-CONTROLS-AUDIT-2026-07-18.md) confirmed that the effective default-branch workflow starts for every `v*` tag and can auto-publish the unsigned `v0.1.0` artifact after its version guard. The release-only signed-candidate path is not operational until its protected environment, credentials, repository protections, and credentialed verification are configured and recorded. Do not create a `v*` tag before the [completion ledger](docs/COMPLETION-CRITERIA.md) closes that gate. The first supported download will be a signed and notarized DMG published on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after every public-beta gate passes.
 
 [English user guide](docs/guides/USER-GUIDE.md) · [한국어 사용자 가이드](docs/guides/USER-GUIDE.ko.md) · [Support matrix](docs/SUPPORT-MATRIX.md)
 
@@ -85,7 +85,7 @@ Capability-level evidence and unresolved hardware/manual checks live in the [sup
 - [Adapter contract and transaction safety](docs/ADAPTER-CONTRACT.md)
 - [Product scope](docs/PRODUCT.md) and [architecture](docs/ARCHITECTURE.md)
 - [Distribution and release gates](docs/DISTRIBUTION.md)
-- [Detailed release-baseline audit](docs/OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md) and [completion ledger](docs/COMPLETION-CRITERIA.md)
+- [Detailed release-baseline audit](docs/OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md), [remote release-controls audit](docs/REMOTE-RELEASE-CONTROLS-AUDIT-2026-07-18.md), and [completion ledger](docs/COMPLETION-CRITERIA.md)
 
 ## Contributing, support, and security
 

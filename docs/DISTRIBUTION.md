@@ -20,7 +20,7 @@ An ad-hoc signature is never promoted by changing its description. A public arti
 
 The current 2026-07-18 public-surface candidate's no-Developer-ID path passed 908 deterministic checks/assertions: 501 app checks (178 XCTest cases, 322 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 407 release-tooling assertions (328 Ruby policy and 79 shell guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed. The release-tooling evidence is simulated and structural, not a credentialed signing or notarization result. The package was not installed or launched.
 
-- Current development-only DMG SHA-256: `c1b406b4a29571ed721c0c0255c9d2220bdefb601a8c6639e0f136c41820c503`
+- Current development-only DMG SHA-256: `16c8ef3ede9630e15afc9d6627434bcd09d0a2ec4e1c9fc208d5dded9be82de7`
 - Authoritative current record: [Completion criteria and evidence ledger](COMPLETION-CRITERIA.md)
 - Historical 496-check baseline and DMG SHA-256 `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`: [Open-source release baseline audit](OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md)
 
@@ -94,6 +94,8 @@ Strict duplicate-key-free JSON validation emits the normalized submission ID fro
 The effective remote workflow on `origin/master` is older and unsafe for a release tag. A read-only inspection on 2026-07-18 found that it triggers on `v*`, receives `contents: write`, builds an unsigned DMG, and calls `gh release create` without `--draft`, `--prerelease`, or an environment. The current local protection changes have not been pushed. Therefore **no `v*` tag may be pushed** until the safe workflow is merged, remote protections are configured, and a read-only check proves that the unsafe path is no longer effective.
 
 Do not push the final `v0.1.0` tag until the release-only signed path is merged and the `release-candidate` environment is actually protected. Referencing an environment in workflow YAML does not configure protection by itself. A read-only GitHub API check on 2026-07-18 found zero configured environments and no protection on `master`.
+
+The detailed [remote release controls audit](REMOTE-RELEASE-CONTROLS-AUDIT-2026-07-18.md) additionally records zero branch/tag rulesets, disabled immutable releases and private vulnerability reporting, empty repository secret/variable name lists, the missing protected environment, the pending sole-maintainer reviewer-policy decision, stale repository metadata, and the exact containment → feature-branch → PR → read-back sequence. It inspected no credential value. That audit authorizes no remote mutation; it exists so approval can name a bounded operation and rollback path.
 
 Before any release tag is allowed, a repository administrator must:
 

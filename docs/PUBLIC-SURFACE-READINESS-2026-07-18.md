@@ -81,7 +81,7 @@ The local surface passed:
   Analyze, DMG/checksum, mounted resources/architectures, and
   ad-hoc/no-Developer-ID classification; the release assertions are simulated
   and do not prove a credentialed signing/notarization run;
-- unsigned development-package verification at SHA-256
+- unsigned development-package verification at this audit snapshot's SHA-256
   `c1b406b4a29571ed721c0c0255c9d2220bdefb601a8c6639e0f136c41820c503`;
 - `npm run verify` in `site/`: static build, lint, server-rendered HTML tests,
   no-cookie assertion, application-source tracking/storage scan, a built-client
