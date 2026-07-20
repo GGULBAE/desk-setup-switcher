@@ -246,12 +246,12 @@ workflow_run = lambda do |id, attempt, status, conclusion|
     "conclusion" => conclusion
   }
 end
-workflow_job = lambda do |id, check_id, run_id, attempt, status, conclusion|
+workflow_job = lambda do |id, check_id, name, run_id, attempt, status, conclusion|
   {
     "id" => id,
     "run_id" => run_id,
     "run_attempt" => attempt,
-    "name" => "Verify macOS app",
+    "name" => name,
     "workflow_name" => "CI",
     "head_branch" => "master",
     "head_sha" => commit,
@@ -277,7 +277,8 @@ status_checks = {
     "strict_required_status_checks_policy" => true,
     "do_not_enforce_on_create" => false,
     "required_status_checks" => [
-      { "context" => "Verify macOS app", "integration_id" => 15_368 }
+      { "context" => "Verify macOS app", "integration_id" => 15_368 },
+      { "context" => "Verify public site and release assets", "integration_id" => 15_368 }
     ]
   }
 }
@@ -542,21 +543,33 @@ when "/repos/GGULBAE/desk-setup-switcher/releases?per_page=100"
       "prerelease" => true
     )
   end
-when %r{\A/repos/GGULBAE/desk-setup-switcher/commits/[0-9a-f]{40}/check-runs\?check_name=Verify%20macOS%20app&app_id=15368&filter=latest&per_page=100\z}
-  failed = ENV["MOCK_MODE"] == "latest-rerun-failed"
+when %r{\A/repos/GGULBAE/desk-setup-switcher/commits/[0-9a-f]{40}/check-runs\?app_id=15368&filter=latest&per_page=100\z}
+  primary_failed = ENV["MOCK_MODE"] == "latest-rerun-failed"
+  public_failed = ENV["MOCK_MODE"] == "public-check-failed"
+  checks = [
+    {
+      "id" => check_run_id,
+      "name" => "Verify macOS app",
+      "app_id" => 15_368,
+      "check_suite_id" => check_suite_id,
+      "head_sha" => commit,
+      "status" => "completed",
+      "conclusion" => primary_failed ? "failure" : "success"
+    },
+    {
+      "id" => check_run_id + 1,
+      "name" => "Verify public site and release assets",
+      "app_id" => 15_368,
+      "check_suite_id" => ENV["MOCK_MODE"] == "public-check-suite-drift" ? check_suite_id + 1 : check_suite_id,
+      "head_sha" => commit,
+      "status" => "completed",
+      "conclusion" => public_failed ? "failure" : "success"
+    }
+  ]
+  checks.pop if ENV["MOCK_MODE"] == "missing-public-check"
   json.call(
-    "total_count" => 1,
-    "items" => [
-      {
-        "id" => check_run_id,
-        "name" => "Verify macOS app",
-        "app_id" => 15_368,
-        "check_suite_id" => check_suite_id,
-        "head_sha" => commit,
-        "status" => "completed",
-        "conclusion" => failed ? "failure" : "success"
-      }
-    ]
+    "total_count" => checks.length,
+    "items" => checks
   )
 when %r{\A/repos/GGULBAE/desk-setup-switcher/actions/workflows/(\d+)/runs\?check_suite_id=(\d+)&head_sha=([0-9a-f]{40})&event=push&per_page=100\z}
   observed_workflow_id = Regexp.last_match(1).to_i
@@ -584,25 +597,39 @@ when %r{\A/repos/GGULBAE/desk-setup-switcher/actions/runs/(\d+)/attempts/(\d+)/j
   observed_run_id = Regexp.last_match(1).to_i
   observed_attempt = Regexp.last_match(2).to_i
   abort "unanchored workflow jobs lookup" unless observed_run_id == workflow_run_id && observed_attempt == 2
-  failed = ENV["MOCK_MODE"] == "latest-rerun-failed"
-  job = workflow_job.call(
+  primary_failed = ENV["MOCK_MODE"] == "latest-rerun-failed"
+  public_failed = ENV["MOCK_MODE"] == "public-job-failed"
+  primary_job = workflow_job.call(
     workflow_job_id,
     check_run_id,
+    "Verify macOS app",
     observed_run_id,
     observed_attempt,
     "completed",
-    failed ? "failure" : "success"
+    primary_failed ? "failure" : "success"
   )
+  public_job = workflow_job.call(
+    workflow_job_id + 1,
+    check_run_id + 1,
+    "Verify public site and release assets",
+    observed_run_id,
+    observed_attempt,
+    "completed",
+    public_failed ? "failure" : "success"
+  )
+  jobs = [primary_job, public_job]
+  jobs.pop if ENV["MOCK_MODE"] == "missing-public-job"
   if ENV["MOCK_MODE"] == "jobs-count-mismatch"
-    json.call("total_count" => 2, "items" => [job])
+    json.call("total_count" => 3, "items" => jobs)
   elsif ENV["MOCK_MODE"] == "ambiguous-jobs"
-    json.call("total_count" => 2, "items" => [job])
+    json.call("total_count" => 3, "items" => jobs)
     json.call(
-      "total_count" => 2,
+      "total_count" => 3,
       "items" => [
         workflow_job.call(
-          workflow_job_id + 1,
-          check_run_id + 1,
+          workflow_job_id + 2,
+          check_run_id + 2,
+          "Verify macOS app",
           observed_run_id,
           observed_attempt,
           "completed",
@@ -611,7 +638,7 @@ when %r{\A/repos/GGULBAE/desk-setup-switcher/actions/runs/(\d+)/attempts/(\d+)/j
       ]
     )
   else
-    json.call("total_count" => 1, "items" => [job])
+    json.call("total_count" => jobs.length, "items" => jobs)
   end
 else
   abort "unexpected endpoint"
@@ -741,13 +768,26 @@ assert_evidence_unavailable_mode() {
         "$label (stable error)"
 }
 
+assert_policy_mismatch_mode() {
+    local mode="$1"
+    local label="$2"
+    local stdout_path="$temporary_root/$mode.stdout"
+    local stderr_path="$temporary_root/$mode.stderr"
+    run_wrapper "$mode" "$stdout_path" "$stderr_path"
+    assert_equal 1 "$last_status" "$label"
+    assert_empty "$stdout_path"
+    assert_equal 'ERROR: remote controls policy mismatch' \
+        "$(tr -d '\n' <"$stderr_path")" \
+        "$label (stable error)"
+}
+
 success_stdout="$temporary_root/success.stdout"
 success_stderr="$temporary_root/success.stderr"
 run_wrapper success "$success_stdout" "$success_stderr"
 assert_equal 0 "$last_status" \
     "Complete mock evidence did not pass (status=$last_status, stderr=$(tr -d '\n' <"$success_stderr"))."
 assert_empty "$success_stderr"
-expected_success_pattern="^OK remote-controls phase=final-pre-tag repository=GGULBAE/desk-setup-switcher observed_master=$expected_commit release_workflow_blob=$workflow_blob ci_workflow_blob=$ci_workflow_blob publication_workflow_blob=$publication_workflow_blob publication_workflow_id=7002 ci_run_id=70001 ci_run_attempt=2 ci_job_id=10001 checks=1 manual_gates=2 evidence_sha256=[0-9a-f]{64} evidence_record=protected-external-output$"
+expected_success_pattern="^OK remote-controls phase=final-pre-tag repository=GGULBAE/desk-setup-switcher observed_master=$expected_commit release_workflow_blob=$workflow_blob ci_workflow_blob=$ci_workflow_blob publication_workflow_blob=$publication_workflow_blob publication_workflow_id=7002 ci_run_id=70001 ci_run_attempt=2 ci_job_id=10001 checks=2 manual_gates=2 evidence_sha256=[0-9a-f]{64} evidence_record=protected-external-output$"
 assert_matches "$expected_success_pattern" "$(tr -d '\n' <"$success_stdout")" \
     "Success summary was not exact."
 final_pre_tag_external_output="$temporary_root/success.final-pre-tag.json"
@@ -940,6 +980,22 @@ ruby -rjson -e '
   raise if endpoints.any? { |endpoint| endpoint&.include?("/attempts/") }
 ' "$mock_log" || fail "Alternate-workflow check was not resolved through the authoritative CI workflow."
 pass
+
+assert_evidence_unavailable_mode \
+    public-check-suite-drift \
+    "CI checks from different workflow suites were accepted."
+assert_policy_mismatch_mode \
+    missing-public-check \
+    "The public-surface CI check was optional."
+assert_policy_mismatch_mode \
+    missing-public-job \
+    "The public-surface CI job was optional."
+assert_policy_mismatch_mode \
+    public-check-failed \
+    "A failed public-surface CI check was accepted."
+assert_policy_mismatch_mode \
+    public-job-failed \
+    "A failed public-surface CI job was accepted."
 
 ambiguous_runs_stdout="$temporary_root/ambiguous-runs.stdout"
 ambiguous_runs_stderr="$temporary_root/ambiguous-runs.stderr"
@@ -1241,7 +1297,7 @@ run_wrapper success "$pre_success_stdout" "$pre_success_stderr" \
 assert_equal 0 "$last_status" \
     "Complete pre-publication evidence did not pass (stderr=$(tr -d '\n' <"$pre_success_stderr"))."
 assert_empty "$pre_success_stderr"
-pre_success_pattern="^OK remote-controls phase=pre-publication repository=GGULBAE/desk-setup-switcher observed_master=$expected_commit release_workflow_blob=$workflow_blob ci_workflow_blob=$ci_workflow_blob publication_workflow_blob=$publication_workflow_blob publication_workflow_id=7002 ci_run_id=70001 ci_run_attempt=2 ci_job_id=10001 checks=1 manual_gates=2 evidence_sha256=[0-9a-f]{64} evidence_record=docs/evidence/releases/v0.1.0/remote-controls-pre-publication.json$"
+pre_success_pattern="^OK remote-controls phase=pre-publication repository=GGULBAE/desk-setup-switcher observed_master=$expected_commit release_workflow_blob=$workflow_blob ci_workflow_blob=$ci_workflow_blob publication_workflow_blob=$publication_workflow_blob publication_workflow_id=7002 ci_run_id=70001 ci_run_attempt=2 ci_job_id=10001 checks=2 manual_gates=2 evidence_sha256=[0-9a-f]{64} evidence_record=docs/evidence/releases/v0.1.0/remote-controls-pre-publication.json$"
 assert_matches "$pre_success_pattern" "$(tr -d '\n' <"$pre_success_stdout")" \
     "Pre-publication success summary was not exact."
 ruby -rjson -rdigest -e '

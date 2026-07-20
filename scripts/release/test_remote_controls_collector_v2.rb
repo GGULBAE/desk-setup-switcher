@@ -112,6 +112,61 @@ class RemoteControlsCollectorV2Test
       assert(inventory["items"].none? { |item| item["id"] == 7999 })
     end
 
+    run("selects one suite and the primary job from the exact two-job CI") do
+      Dir.mktmpdir do |directory|
+        checks_path = File.join(directory, "checks.jsonl")
+        jobs_path = File.join(directory, "jobs.jsonl")
+        check_items = [
+          {
+            "id" => 11_001, "name" => "Verify macOS app", "app_id" => 15_368,
+            "check_suite_id" => 9_001, "head_sha" => "a" * 40,
+            "status" => "completed", "conclusion" => "success"
+          },
+          {
+            "id" => 11_002, "name" => "Verify public site and release assets",
+            "app_id" => 15_368, "check_suite_id" => 9_001, "head_sha" => "a" * 40,
+            "status" => "completed", "conclusion" => "success"
+          }
+        ]
+        job_items = [
+          {
+            "id" => 10_001, "run_id" => 8_001, "run_attempt" => 2,
+            "name" => "Verify macOS app", "workflow_name" => "CI",
+            "head_branch" => "master", "head_sha" => "a" * 40,
+            "status" => "completed", "conclusion" => "success",
+            "check_run_url" =>
+              "https://api.github.com/repos/GGULBAE/desk-setup-switcher/check-runs/11001"
+          },
+          {
+            "id" => 10_002, "run_id" => 8_001, "run_attempt" => 2,
+            "name" => "Verify public site and release assets", "workflow_name" => "CI",
+            "head_branch" => "master", "head_sha" => "a" * 40,
+            "status" => "completed", "conclusion" => "success",
+            "check_run_url" =>
+              "https://api.github.com/repos/GGULBAE/desk-setup-switcher/check-runs/11002"
+          }
+        ]
+        File.binwrite(checks_path, JSON.generate("total_count" => 2, "items" => check_items) + "\n")
+        File.binwrite(jobs_path, JSON.generate("total_count" => 2, "items" => job_items) + "\n")
+
+        stdout, stderr, status = cli("check-suite-id", "--input", checks_path)
+        assert(status.success?)
+        equal("9001\n", stdout)
+        equal("", stderr)
+        stdout, stderr, status = cli("workflow-job-id", "--input", jobs_path)
+        assert(status.success?)
+        equal("10001\n", stdout)
+        equal("", stderr)
+
+        check_items[1]["check_suite_id"] = 9_002
+        File.binwrite(checks_path, JSON.generate("total_count" => 2, "items" => check_items) + "\n")
+        assert_cli_failure("check-suite-id", "--input", checks_path, forbidden: [directory])
+        job_items[1]["name"] = "Verify macOS app"
+        File.binwrite(jobs_path, JSON.generate("total_count" => 2, "items" => job_items) + "\n")
+        assert_cli_failure("workflow-job-id", "--input", jobs_path, forbidden: [directory])
+      end
+    end
+
     run("normalizes exact tag object/commit and rejects duplicate refs") do
       raw = {
         "ref" => "refs/tags/v0.1.0",

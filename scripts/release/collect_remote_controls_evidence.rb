@@ -26,6 +26,7 @@ module RemoteControlsCollector
   RELEASE_WORKFLOW_PATH = ".github/workflows/release.yml"
   CI_WORKFLOW_PATH = ".github/workflows/ci.yml"
   PUBLICATION_WORKFLOW_PATH = ".github/workflows/publish-release.yml"
+  PRIMARY_CI_JOB_NAME = "Verify macOS app"
   LOCAL_TRIGGER_PROJECTION = "strict-local-workflow-ast/v1"
   MANUAL_EVIDENCE_SCHEMA = "desk-setup-switcher.manual-release-control-evidence/v1"
   MANUAL_CONTROLS = {
@@ -1718,7 +1719,9 @@ module RemoteControlsCollector
     when "check-suite-id"
       options = parse_options(argv, allowed: %i[input], required: %i[input])
       runs = normalize_check_runs(strict_json_lines(options.fetch(:input)))
-      puts exact_array(runs, length: 1).first.fetch("checkSuiteId")
+      unavailable! if runs.empty?
+      check_suite_ids = runs.map { |run| run.fetch("checkSuiteId") }.uniq
+      puts exact_array(check_suite_ids, length: 1).first
     when "workflow-run-id", "workflow-run-attempt"
       options = parse_options(argv, allowed: %i[input], required: %i[input])
       run = latest_workflow_run(normalize_workflow_runs(strict_json_lines(options.fetch(:input))))
@@ -1727,7 +1730,8 @@ module RemoteControlsCollector
     when "workflow-job-id"
       options = parse_options(argv, allowed: %i[input], required: %i[input])
       jobs = normalize_workflow_jobs(strict_json_lines(options.fetch(:input)))
-      puts exact_array(jobs, length: 1).first.fetch("id")
+      primary = jobs.select { |job| job.fetch("name") == PRIMARY_CI_JOB_NAME }
+      puts exact_array(primary, length: 1).first.fetch("id")
     when "active-workflow-inventory"
       options = parse_options(argv, allowed: %i[input], required: %i[input])
       value = normalize_active_workflow_inventory(strict_json_lines(options.fetch(:input)))

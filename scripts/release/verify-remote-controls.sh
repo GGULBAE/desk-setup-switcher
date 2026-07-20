@@ -809,7 +809,7 @@ collect_controls() {
             --paginate --jq '.[] | {id: .id, tag_name: .tag_name, draft: .draft, prerelease: .prerelease}'
     fi
     api_get C03 \
-        "/repos/GGULBAE/desk-setup-switcher/commits/$expected_commit/check-runs?check_name=Verify%20macOS%20app&app_id=15368&filter=latest&per_page=100" \
+        "/repos/GGULBAE/desk-setup-switcher/commits/$expected_commit/check-runs?app_id=15368&filter=latest&per_page=100" \
         "$snapshot/check-runs.json" \
         --paginate --jq '{total_count: .total_count, items: (.check_runs | map({id: .id, name: .name, app_id: .app.id, check_suite_id: .check_suite.id, head_sha: .head_sha, status: .status, conclusion: .conclusion}))}'
     if ! check_suite_id="$(

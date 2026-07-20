@@ -33,6 +33,8 @@ module RemoteControlsPolicy
   CI_RUN_PATH = CI_WORKFLOW_PATH
   CI_WORKFLOW_TRIGGERS = %w[pull_request push workflow_dispatch].freeze
   REQUIRED_CHECK_NAME = "Verify macOS app"
+  PUBLIC_SURFACE_CHECK_NAME = "Verify public site and release assets"
+  REQUIRED_CHECK_NAMES = [REQUIRED_CHECK_NAME, PUBLIC_SURFACE_CHECK_NAME].sort.freeze
   GITHUB_ACTIONS_APP_ID = 15_368
   MASTER_REF = "refs/heads/master"
   TAG_PATTERN = "refs/tags/v*"
@@ -260,7 +262,21 @@ module RemoteControlsPolicy
       reject!("policy approval")
     end
 
-    { repository: repository, release: release, operator: operator, reviewer: reviewer, approval: approval }
+    {
+      schema: :v1,
+      repository: repository,
+      release: release,
+      operator: operator,
+      reviewer: reviewer,
+      approval: approval
+    }
+  end
+
+  def policy_ci_checks(policy)
+    ci = policy.dig(:release, "ci")
+    return ci.fetch("checks") if policy.fetch(:schema) == :v2
+
+    [{ "name" => ci.fetch("name"), "appId" => ci.fetch("appId") }]
   end
 
   def compare_repository(value, policy)
@@ -416,12 +432,17 @@ module RemoteControlsPolicy
       label,
       %w[doNotEnforceOnCreate requiredStatusChecks strictRequiredStatusChecksPolicy]
     )
-    checks = exact_array(status_parameters["requiredStatusChecks"], label, length: 1)
-    check = exact_object(checks.first, label, %w[context integrationId])
+    expected_checks = policy_ci_checks(policy).map do |check|
+      { "context" => check.fetch("name"), "integrationId" => check.fetch("appId") }
+    end
+    checks = exact_array(
+      status_parameters["requiredStatusChecks"],
+      label,
+      length: expected_checks.length
+    ).map { |value| exact_object(value, label, %w[context integrationId]) }
     reject!(label) unless status_parameters["strictRequiredStatusChecksPolicy"] == true &&
                           status_parameters["doNotEnforceOnCreate"] == false &&
-                          check["context"] == REQUIRED_CHECK_NAME &&
-                          check["integrationId"] == GITHUB_ACTIONS_APP_ID
+                          checks == expected_checks
   end
 
   def validate_tag_rulesets(values, policy)
@@ -601,15 +622,38 @@ module RemoteControlsPolicy
     exact_object(value, "CI evidence", %w[checkRuns commitSha jobs workflowRuns])
     reject!("CI evidence") unless value["commitSha"] == expected_commit
     expected_ci = policy.dig(:release, "ci")
+    expected_checks = policy_ci_checks(policy)
+    expected_check_names = expected_checks.map { |check| check.fetch("name") }
+    expected_apps_by_name = expected_checks.to_h do |check|
+      [check.fetch("name"), check.fetch("appId")]
+    end
 
-    check = exact_object(
-      complete_single_item(value["checkRuns"], "CI check runs"),
-      "required CI check",
-      %w[appId checkSuiteId conclusion headSha id name status]
-    )
-    %w[id appId checkSuiteId].each { |key| positive_integer(check[key], "required CI check") }
-    %w[name status conclusion].each { |key| exact_string(check[key], "required CI check") }
-    sha(check["headSha"], "required CI check")
+    check_collection = exact_object(value["checkRuns"], "CI check runs", %w[complete items])
+    reject!("CI check runs") unless check_collection["complete"] == true
+    checks = exact_array(
+      check_collection["items"],
+      "CI check runs",
+      length: expected_checks.length
+    ).map do |item|
+      check = exact_object(
+        item,
+        "required CI check",
+        %w[appId checkSuiteId conclusion headSha id name status]
+      )
+      %w[id appId checkSuiteId].each do |key|
+        positive_integer(check[key], "required CI check")
+      end
+      %w[name status conclusion].each do |key|
+        exact_string(check[key], "required CI check")
+      end
+      sha(check["headSha"], "required CI check")
+      check
+    end
+    reject!("CI check runs") unless checks.map { |check| check["name"] }.sort == expected_check_names
+    reject!("CI check runs") unless checks.map { |check| check["id"] }.uniq.length == checks.length
+    check_suite_ids = checks.map { |check| check["checkSuiteId"] }.uniq
+    reject!("CI check runs") unless check_suite_ids.length == 1
+    check_suite_id = check_suite_ids.first
 
     workflow_runs = exact_object(value["workflowRuns"], "CI workflow runs", %w[complete items])
     reject!("CI workflow runs") unless workflow_runs["complete"] == true
@@ -627,7 +671,7 @@ module RemoteControlsPolicy
       end
       sha(run["headSha"], "CI workflow run")
       reject!("CI workflow run") unless run["workflowId"] == expected_ci.dig("workflow", "id") &&
-                                         run["checkSuiteId"] == check["checkSuiteId"] &&
+                                         run["checkSuiteId"] == check_suite_id &&
                                          run["path"] == CI_RUN_PATH &&
                                          run["event"] == "push" &&
                                          run["headBranch"] == DEFAULT_BRANCH &&
@@ -643,32 +687,47 @@ module RemoteControlsPolicy
     reject!("required CI workflow run") unless run["status"] == "completed" &&
                                                run["conclusion"] == "success"
 
-    job = exact_object(
-      complete_single_item(value["jobs"], "CI jobs"),
-      "required CI job",
-      %w[checkRunId conclusion headBranch headSha id name runAttempt runId status workflowName]
-    )
-    %w[id runId runAttempt checkRunId].each { |key| positive_integer(job[key], "required CI job") }
-    %w[name workflowName headBranch status conclusion].each do |key|
-      exact_string(job[key], "required CI job")
+    job_collection = exact_object(value["jobs"], "CI jobs", %w[complete items])
+    reject!("CI jobs") unless job_collection["complete"] == true
+    jobs = exact_array(
+      job_collection["items"],
+      "CI jobs",
+      length: expected_checks.length
+    ).map do |item|
+      job = exact_object(
+        item,
+        "required CI job",
+        %w[checkRunId conclusion headBranch headSha id name runAttempt runId status workflowName]
+      )
+      %w[id runId runAttempt checkRunId].each do |key|
+        positive_integer(job[key], "required CI job")
+      end
+      %w[name workflowName headBranch status conclusion].each do |key|
+        exact_string(job[key], "required CI job")
+      end
+      sha(job["headSha"], "required CI job")
+      job
     end
-    sha(job["headSha"], "required CI job")
-    reject!("required CI job") unless job["runId"] == run["id"] &&
-                                      job["runAttempt"] == run["runAttempt"] &&
-                                      job["name"] == expected_ci["name"] &&
-                                      job["workflowName"] == CI_WORKFLOW_NAME &&
-                                      job["headBranch"] == DEFAULT_BRANCH &&
-                                      job["headSha"] == expected_commit &&
-                                      job["status"] == "completed" &&
-                                      job["conclusion"] == "success"
+    reject!("CI jobs") unless jobs.map { |job| job["name"] }.sort == expected_check_names
+    reject!("CI jobs") unless jobs.map { |job| job["id"] }.uniq.length == jobs.length
+    checks_by_name = checks.to_h { |check| [check["name"], check] }
+    jobs.each do |job|
+      reject!("required CI job") unless job["runId"] == run["id"] &&
+                                         job["runAttempt"] == run["runAttempt"] &&
+                                         job["workflowName"] == CI_WORKFLOW_NAME &&
+                                         job["headBranch"] == DEFAULT_BRANCH &&
+                                         job["headSha"] == expected_commit &&
+                                         job["status"] == "completed" &&
+                                         job["conclusion"] == "success"
 
-    reject!("required CI check") unless check["id"] == job["checkRunId"] &&
-                                           check["name"] == job["name"] &&
-                                           check["appId"] == expected_ci["appId"] &&
-                                           check["checkSuiteId"] == run["checkSuiteId"] &&
-                                           check["headSha"] == job["headSha"] &&
-                                           check["status"] == job["status"] &&
-                                           check["conclusion"] == job["conclusion"]
+      check = checks_by_name.fetch(job["name"])
+      reject!("required CI check") unless check["id"] == job["checkRunId"] &&
+                                             check["appId"] == expected_apps_by_name.fetch(job["name"]) &&
+                                             check["checkSuiteId"] == run["checkSuiteId"] &&
+                                             check["headSha"] == job["headSha"] &&
+                                             check["status"] == job["status"] &&
+                                             check["conclusion"] == job["conclusion"]
+    end
   end
 
   def validate_evidence(value, policy, expected_commit:, expected_workflow_blob:, expected_ci_workflow_blob:)
@@ -746,9 +805,21 @@ module RemoteControlsPolicy
       expected_name: PUBLICATION_WORKFLOW_NAME,
       expected_path: PUBLICATION_WORKFLOW_PATH
     )
-    ci = exact_object(value["ci"], "v2 policy CI", %w[appId name workflow])
-    reject!("v2 policy CI") unless ci["name"] == REQUIRED_CHECK_NAME &&
-                                    ci["appId"] == GITHUB_ACTIONS_APP_ID
+    ci = exact_object(value["ci"], "v2 policy CI", %w[checks workflow])
+    checks = exact_array(
+      ci["checks"],
+      "v2 policy CI checks",
+      length: REQUIRED_CHECK_NAMES.length
+    ).map do |item|
+      check = exact_object(item, "v2 policy CI check", %w[appId name])
+      exact_string(check["name"], "v2 policy CI check", max_bytes: 256)
+      positive_integer(check["appId"], "v2 policy CI check")
+      check
+    end
+    expected_checks = REQUIRED_CHECK_NAMES.map do |name|
+      { "name" => name, "appId" => GITHUB_ACTIONS_APP_ID }
+    end
+    reject!("v2 policy CI checks") unless checks == expected_checks
     ci_workflow = validate_policy_workflow_v2(
       ci["workflow"],
       "v2 CI workflow",

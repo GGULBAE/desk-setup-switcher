@@ -32,8 +32,16 @@
       "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     },
     "ci": {
-      "name": "Verify macOS app",
-      "appId": 15368,
+      "checks": [
+        {
+          "name": "Verify macOS app",
+          "appId": 15368
+        },
+        {
+          "name": "Verify public site and release assets",
+          "appId": 15368
+        }
+      ],
       "workflow": {
         "id": 7000,
         "name": "CI",

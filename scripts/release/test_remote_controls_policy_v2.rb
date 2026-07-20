@@ -172,6 +172,8 @@ class RemoteControlsPolicyV2Test
       "binds publication workflow name" => lambda { |v| v["release"]["publicationWorkflow"]["name"] = "Other" },
       "binds publication workflow path" => lambda { |v| v["release"]["publicationWorkflow"]["path"] = ".github/workflows/other.yml" },
       "binds publication workflow blob" => lambda { |v| v["release"]["publicationWorkflow"]["blobSha"] = "0" * 40 },
+      "requires both reviewed CI checks" => lambda { |v| v["release"]["ci"]["checks"].pop },
+      "binds the public-surface CI app" => lambda { |v| v["release"]["ci"]["checks"][1]["appId"] = 1 },
       "binds publisher numeric identity" => lambda { |v| v["actors"]["publisher"]["id"] = 9999 },
       "requires independent reviewer separation" => lambda { |v| v["actors"]["reviewer"] = v["actors"]["publisher"].dup },
       "requires exactly two manual controls" => lambda { |v| v["manualEvidence"]["items"].pop },
@@ -202,6 +204,25 @@ class RemoteControlsPolicyV2Test
       "separates publication secrets from signing secrets" => lambda { |v| v["environments"]["releasePublication"]["secrets"]["names"] << "DEVELOPER_ID_CERTIFICATE_BASE64" },
       "requires publication verification variables" => lambda { |v| v["environments"]["releasePublication"]["variables"]["names"].pop },
       "forbids repository admin-token shadowing" => lambda { |v| v["repositoryConfiguration"]["secrets"]["names"] = ["RELEASE_ADMIN_READ_TOKEN"] },
+      "requires both master status checks" => lambda do |v|
+        v["rulesets"]["master"][0]["rules"].find do |rule|
+          rule["type"] == "required_status_checks"
+        end["parameters"]["requiredStatusChecks"].pop
+      end,
+      "requires both completed CI jobs" => lambda { |v| v["ci"]["jobs"]["items"].pop },
+      "requires the public-surface CI job to succeed" => lambda do |v|
+        v["ci"]["jobs"]["items"][1]["conclusion"] = "failure"
+      end,
+      "requires both CI check runs" => lambda { |v| v["ci"]["checkRuns"]["items"].pop },
+      "requires the public-surface GitHub Actions app" => lambda do |v|
+        v["ci"]["checkRuns"]["items"][1]["appId"] = 1
+      end,
+      "binds both checks to one workflow suite" => lambda do |v|
+        v["ci"]["checkRuns"]["items"][1]["checkSuiteId"] = 9002
+      end,
+      "cross-binds each CI job to its named check" => lambda do |v|
+        v["ci"]["jobs"]["items"][1]["checkRunId"] = 11001
+      end,
       "requires distinct manual evidence digests" => lambda do |v|
         v["manualEvidence"]["items"][0]["sha256"] =
           v["manualEvidence"]["items"][1]["sha256"]

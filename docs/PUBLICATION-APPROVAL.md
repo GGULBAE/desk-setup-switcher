@@ -45,9 +45,10 @@ configured and verified read-only:
   begins.
 
 The v2 lifecycle policy and offline normalizer now bind all three active
-workflows, both environments, the operator/reviewer/publisher identities, the
-admin-read secret name, repository-shadow exclusions, and the exact paths,
-controls, and schema of two manual evidence records. Each phase manifest—not
+workflows, both required CI check runs/jobs from one successful check suite,
+both environments, the operator/reviewer/publisher identities, the admin-read
+secret name, repository-shadow exclusions, and the exact paths, controls, and
+schema of two manual evidence records. Each phase manifest—not
 the long-lived policy—binds the fresh record-byte digests. The checked-in
 operational policy remains `configured:false`; no live
 two-pass record exists. Until it is reviewed, configured, merged, and passed
@@ -353,8 +354,8 @@ underlying Settings screenshots or token-scope record.
     normalized manifest after two identical complete observations.
 13. Create one direct-successor commit that adds exactly
     `remote-controls-pre-publication.json` and `publication-approval.json`.
-    Review it, wait for its exact master-push `Verify macOS app` CI job to pass,
-    and keep the freeze active.
+    Review it, wait for its exact master-push `Verify macOS app` and `Verify
+    public site and release assets` CI jobs to pass, and keep the freeze active.
 14. Confirm the canonical UTC chronology `final manuals observedAt ≤ final E
     collectedAt ≤ pre manuals observedAt ≤ pre manifest collectedAt ≤
     approval approvedAt`, then dispatch `Publish
@@ -366,7 +367,8 @@ underlying Settings screenshots or token-scope record.
     never use GitHub's rerun command for publication.
 16. The workflow requires one repository Release—the named draft—verifies its
     metadata and all nine assets twice, confirms immutable Releases are enabled,
-    validates the approval commit's exact successful master-push CI, downloads
+    validates both named jobs from the approval commit's exact successful
+    master-push CI, downloads
     every asset before mutation, performs the exact-ID PATCH, confirms
     immutability, and downloads and verifies every public asset again. A later
     run never adopts a pre-existing public Release. Only the same live process

@@ -2,7 +2,7 @@
 
 Original observation: 2026-07-18 16:04 KST
 
-Latest read-only recheck: 2026-07-20 14:00 KST
+Latest read-only recheck: 2026-07-20 20:19 KST
 
 ## Outcome
 
@@ -28,14 +28,16 @@ decisions exist.
 | Boundary | Rechecked value |
 | --- | --- |
 | Remote default branch | `master` at `1489b7fcb41ffa7e55a43ed65e6befc538838140`; still the ancestor of the local branch |
-| Audited local release-control baseline | `8951f2eff50a5f95657ff9f11a34eebb3bd0203e`; 26 commits ahead of remote `master` before this documentation-only recheck amendment |
+| Audited earlier release-control baseline | `8951f2eff50a5f95657ff9f11a34eebb3bd0203e`; 26 commits ahead of remote `master` before its documentation-only recheck amendment |
+| Pre-repair local branch tip | `01db3ac3eb74653302fa35386044c114e27bdedd`; 29 commits ahead of remote `master` before the two-CI-job gate repair and this recheck amendment; the three reviewed workflow blobs below were unchanged |
 | Local reviewed workflow blobs | CI `ab5228895a4da48e8b88ef792e1e043ce00ad938`; candidate/draft `8823e73221d6af038d3469880fb0b8e7a36140e1`; publication `b380c279d1e222ee7ea1bd5a941ef30ee6eb5079` |
 | Effective remote workflows | CI `311269011` active; historical Release `311269012` active; no publication workflow exists remotely |
 | Effective remote workflow blobs | CI `7ba41d81c2e5d917d35d598c68a0791ea97081fc`; unsafe Release `0648b71f683fa0bdcc430d02a7e16d32e0ee0c42` |
 | Protections and release gates | No `master` protection, ruleset, or environment; immutable Releases and private vulnerability reporting disabled |
 | Actions and security | All Actions allowed and full-SHA enforcement disabled; default workflow token read-only and PR-review approval disabled; secret scanning, push protection, and Dependabot security updates enabled |
 | Names and public boundary | Repository secret/variable name lists empty; environment credential-name lists unavailable because no environment exists; no tag or Release; one administrator collaborator; stale mouse/keyboard description, no topics or Homepage, Discussions disabled, and no `needs-triage` label |
-| Current local closure | `make verify` passed 2,940 non-live checks/assertions at the audited baseline; unsigned development-evidence DMG SHA-256 `5e9581f1174adabcd729019ce91653c105d1d8db90d200bcfdc86d9e5d136729`; not installed, launched, uploaded, or published |
+| Pre-repair local closure | At `01db3ac`, `make verify` passed 2,961 non-live checks/assertions; unsigned development-evidence DMG SHA-256 `0e37ca3c2bb9826cb57b227660a10376ae483497ad5b035e81e3fb3725202681`; not installed, launched, uploaded, or published |
+| Exact-two-check repair closure | Current branch state passed `make verify` with 3,046 non-live checks/assertions, including 178 v2 policy, 69 v2 collector, 129 collector-wrapper, and 424 publisher assertions; unsigned development-evidence DMG SHA-256 `6bd85f129d4b34f1fb5bd5da42336f23459221a932412fdf704ab227f5805ffb`; not installed, launched, uploaded, or published |
 
 The recheck changes no conclusion below: do not push a `v*` tag, dispatch a
 release workflow, or treat the local mock/structural evidence as a protected
@@ -134,13 +136,16 @@ or promotional post unless that action is named separately.
 1. **Contain the old publisher.** Manually disable the workflow identified by
    `.github/workflows/release.yml`, verify its state is `disabled_manually`, and
    keep the global `v*` tag freeze.
-2. **Prepare protections without secrets.** Create an active `master` ruleset
-   requiring a pull request and the GitHub Actions check `Verify macOS app`
-   (GitHub Actions app ID `15368`), conversation resolution, and blocked force
-   pushes/deletion. Require one PR approval only if a second trusted reviewer is
-   appointed; otherwise use zero required approvals and document the weaker
-   one-maintainer path. Do not require signed commits for this integration
-   because the reviewed pending commits are unsigned.
+2. **Prepare bootstrap protections without secrets.** Create an active `master`
+   ruleset requiring a pull request and the already-observed GitHub Actions
+   check `Verify macOS app` (GitHub Actions app ID `15368`), conversation
+   resolution, and blocked force pushes/deletion. The new `Verify public site
+   and release assets` job has no remote check history yet, so this is a
+   temporary containment rule and authorizes no merge. Require one PR approval
+   only if a second trusted reviewer is appointed; otherwise use zero required
+   approvals and document the weaker one-maintainer path. Do not require signed
+   commits for this integration because the reviewed pending commits are
+   unsigned.
 3. **Protect tags without a mutable-tag bypass.** Create one active `v*`
    creation ruleset whose only bypass is the approved release-operator User,
    plus a second active `v*` ruleset that blocks update and deletion with no
@@ -153,13 +158,18 @@ or promotional post unless that action is named separately.
    read-back proves the protection.
 5. **Push code only to a feature branch.** After local verification and explicit
    approval for that push, record and push the exact current
-   `codex/public-beta-release` HEAD. It must contain audited release-control
-   baseline `8951f2e` and this read-only recheck amendment. Use
+   `codex/public-beta-release` HEAD. It must contain pre-repair tip `01db3ac`,
+   the exact-two-check gate repair, and this read-only recheck closure. Use
    `--no-follow-tags`; do not update `master` directly.
-6. **Open and verify a PR.** Target `master`, let the PR run the updated read-only
-   CI, and require `Verify macOS app` to pass with `make verify` plus the complete
-   history/asset audit. Preserve the reviewed commit ancestry with a merge commit
-   if the evidence continues to name those commit IDs.
+6. **Open, strengthen, and verify a PR.** Target `master` and let the PR run both
+   updated read-only jobs. Read back the new `Verify public site and release
+   assets` check and its GitHub Actions app ID, then update the still-active
+   `master` ruleset before merge so its exact required-check set is `Verify macOS
+   app` plus `Verify public site and release assets`, both from app ID `15368`.
+   Read back the effective rule and require both jobs to pass; the first runs
+   `make verify` plus the complete history/asset audit and the second verifies
+   the site and release media. Preserve the reviewed commit ancestry with a
+   merge commit if the evidence continues to name those commit IDs.
 7. **Prove the merged default branch.** Wait for post-merge CI, then read the
    workflow back from GitHub while it remains disabled. Confirm
    `workflow_dispatch` is its only trigger, the old unsigned publisher is absent,
@@ -185,7 +195,7 @@ or promotional post unless that action is named separately.
     Populate every authoritative-policy field from reviewed read-only evidence:
     repository numeric/node identity and approved metadata/state; CI, candidate,
     and publication workflow IDs/names/paths/blobs; both release environments;
-    release and CI-check identity; actor
+    release and both CI-check identities; actor
     IDs/logins/types, and the approval mode/count/self-review setting. Do not copy
     synthetic fixture identities. Review and merge that policy with all three
     candidate/draft, CI, and publication workflow blobs it names,
@@ -309,13 +319,15 @@ actions.
 The local branch now also carries an explicit `make verify-remote-controls`
 final-pre-tag verifier. Its deterministic fixtures test the intended ready
 state, while the authoritative policy remains intentionally unconfigured until
-its complete repository, release-workflow, CI-workflow, operator, reviewer, and
-approval identity is reviewed;
+its complete repository, candidate/draft-workflow, CI-workflow,
+publication-workflow, operator, reviewer, publisher, and approval identity is
+reviewed;
 therefore a live invocation must fail before its first GitHub request today. The
 wrapper performs authenticated GETs and projects variable responses to names
 before evidence is written; the collector consumes only those name projections,
-requires authenticated draft visibility, cross-binds the required check to the
-pinned CI workflow's exact successful run/job, and collects all release-critical
+requires authenticated draft visibility, cross-binds both distinct required
+checks to the pinned CI workflow's exact two successful jobs in one run/check
+suite, and collects all release-critical
 remote observations twice before requiring normalized equality. Only names are
 emitted, persisted, normalized, compared, or recorded, and no credential value
 is retained in evidence. Even a future API pass

@@ -48,6 +48,8 @@ make verify
 
 Its DMG is an ad-hoc-signed development artifact, not a supported download, and must not be presented as an official release. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and [distribution policy](docs/DISTRIBUTION.md) for the future signed release path.
 
+The proposed protected-remote gate treats both CI jobs—**Verify macOS app** and **Verify public site and release assets**—as mandatory and binds their check runs and jobs to the same successful `master` push. That policy remains local and unconfigured until the documented GitHub controls are approved and read back.
+
 ## Privacy and safety
 
 - Profiles, backups, and diagnostics stay on the Mac. The app has no account, cloud sync, app-owned server, telemetry, analytics, ads, or automatic profile switching.

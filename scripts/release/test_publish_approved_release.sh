@@ -438,7 +438,8 @@ if endpoint == "/repos/#{repository}/actions/workflows/7000/runs?head_sha=#{appr
 end
 
 if endpoint == "/repos/#{repository}/actions/runs/8201/attempts/1/jobs?per_page=100"
-  conclusion = scenario == "approval-ci-job-failed" ? "failure" : "success"
+  primary_conclusion = scenario == "approval-ci-job-failed" ? "failure" : "success"
+  public_conclusion = scenario == "approval-public-ci-job-failed" ? "failure" : "success"
   jobs = [
     {
       "id" => 10_201,
@@ -449,7 +450,7 @@ if endpoint == "/repos/#{repository}/actions/runs/8201/attempts/1/jobs?per_page=
       "head_branch" => "master",
       "head_sha" => approval_commit,
       "status" => "completed",
-      "conclusion" => conclusion,
+      "conclusion" => primary_conclusion,
       "check_run_url" => "https://api.github.com/repos/#{repository}/check-runs/10201"
     },
     {
@@ -461,11 +462,17 @@ if endpoint == "/repos/#{repository}/actions/runs/8201/attempts/1/jobs?per_page=
       "head_branch" => "master",
       "head_sha" => approval_commit,
       "status" => "completed",
-      "conclusion" => "success",
+      "conclusion" => public_conclusion,
       "check_run_url" => "https://api.github.com/repos/#{repository}/check-runs/10202"
     }
   ]
-  puts JSON.generate("total_count" => jobs.length, "items" => jobs)
+  jobs.pop if scenario == "approval-ci-job-missing"
+  if scenario == "approval-ci-job-duplicate-id"
+    jobs.fetch(1)["id"] = jobs.fetch(0).fetch("id")
+    jobs.fetch(1)["check_run_url"] = jobs.fetch(0).fetch("check_run_url")
+  end
+  total_count = scenario == "approval-ci-job-float-count" ? 2.0 : jobs.length
+  puts JSON.generate("total_count" => total_count, "items" => jobs)
   exit 0
 end
 
@@ -1246,6 +1253,10 @@ run_scenario manual-token-overlong failure 0
 run_scenario approval-ci-failed failure 0
 run_scenario approval-ci-ambiguous failure 0
 run_scenario approval-ci-job-failed failure 0
+run_scenario approval-public-ci-job-failed failure 0
+run_scenario approval-ci-job-missing failure 0
+run_scenario approval-ci-job-duplicate-id failure 0
+run_scenario approval-ci-job-float-count failure 0
 run_scenario draft-null failure 0
 run_scenario immutable-null failure 0
 run_scenario preexisting-public-first-attempt failure 0

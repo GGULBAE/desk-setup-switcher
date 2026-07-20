@@ -451,24 +451,28 @@ verify_approval_commit_ci() {
       commit = ARGV.fetch(3)
       raise unless value.is_a?(Hash) && value.keys.sort == %w[items total_count]
       items = value.fetch("items")
-      raise unless value.fetch("total_count").is_a?(Integer) &&
-        value.fetch("total_count").positive? && items.is_a?(Array) &&
-        items.length == value.fetch("total_count")
-      matches = items.select { |job| job.is_a?(Hash) && job["name"] == "Verify macOS app" }
-      raise unless matches.length == 1
-      job = matches.fetch(0)
-      raise unless job.keys.sort ==
-        %w[check_run_url conclusion head_branch head_sha id name run_attempt run_id status workflow_name]
-      raise unless job.fetch("id").is_a?(Integer) && job.fetch("id").positive?
-      raise unless job.fetch("run_id") == run_id && job.fetch("run_attempt") == attempt
-      raise unless job.fetch("workflow_name") == "CI" && job.fetch("head_branch") == "master" &&
-        job.fetch("head_sha") == commit
-      raise unless job.fetch("status") == "completed" && job.fetch("conclusion") == "success"
-      raise unless job.fetch("check_run_url") ==
-        "https://api.github.com/repos/GGULBAE/desk-setup-switcher/check-runs/#{job.fetch("id")}"
+      total_count = value.fetch("total_count")
+      expected_names = ["Verify macOS app", "Verify public site and release assets"].sort
+      raise unless total_count.is_a?(Integer) && total_count.positive? &&
+        total_count == expected_names.length &&
+        items.is_a?(Array) && items.length == expected_names.length
+      raise unless items.map { |job| job.is_a?(Hash) ? job["name"] : nil }.sort == expected_names
+      job_ids = items.map { |job| job.is_a?(Hash) ? job["id"] : nil }
+      raise unless job_ids.uniq.length == expected_names.length
+      items.each do |job|
+        raise unless job.keys.sort ==
+          %w[check_run_url conclusion head_branch head_sha id name run_attempt run_id status workflow_name]
+        raise unless job.fetch("id").is_a?(Integer) && job.fetch("id").positive?
+        raise unless job.fetch("run_id") == run_id && job.fetch("run_attempt") == attempt
+        raise unless job.fetch("workflow_name") == "CI" &&
+          job.fetch("head_branch") == "master" && job.fetch("head_sha") == commit
+        raise unless job.fetch("status") == "completed" && job.fetch("conclusion") == "success"
+        raise unless job.fetch("check_run_url") ==
+          "https://api.github.com/repos/GGULBAE/desk-setup-switcher/check-runs/#{job.fetch("id")}"
+      end
     ' "$approval_workflow_jobs" "$workflow_run_id" "$workflow_run_attempt" \
         "$RELEASE_APPROVAL_RECORD_COMMIT" 2>"$parse_error" || {
-        release_die "The approval commit named CI job did not succeed exactly."
+        release_die "The approval commit required CI jobs did not succeed exactly."
     }
 }
 
