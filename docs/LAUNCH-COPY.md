@@ -53,7 +53,7 @@ Do not add `intel`, `homebrew`, `app-store`, `automatic-switching`, `accessibili
 ### Homepage
 
 - **Before approval:** leave Homepage blank. Do not use a local URL, preview deployment, Actions artifact, unsigned DMG, or direct object-storage URL.
-- **Approval placeholder:** record the final deployed HTTPS origin as `APPROVED_SITE_URL` in the release approval record. This token is an instruction, not a URL to publish.
+- **Approval placeholder:** record the final HTTPS origin as `APPROVED_SITE_URL` in the separately reviewed tracked site-origin record. The release approval record deliberately grants no site authority. This token is an instruction, not a URL to publish.
 - **After approval:** replace the blank Homepage field with that exact origin only after the bilingual site, canonical release link, privacy/security links, and no-tracking checks pass on the deployed site.
 
 ### Social preview
@@ -104,7 +104,7 @@ Never attach, link, or rename the current ad-hoc DMG in a holding post.
 
 ## Publish-only launch drafts
 
-The drafts in this section are locked until `APPROVED_RELEASE_URL`, `APPROVED_SITE_URL`, and `FINAL_DMG_SHA256` have been replaced from the protected approval record. Never substitute the current unsigned-development hash. Remove all instruction lines and unused capability variants before posting. The workflow-ready version-specific English/Korean copy lives in the [`v0.1.0` Release notes](releases/v0.1.0.md); it contains no completion evidence and does not claim that signing or publication passed.
+The drafts in this section are locked until `APPROVED_RELEASE_URL`, `APPROVED_SITE_URL`, and `FINAL_DMG_SHA256` have been replaced from their separately approved release/site evidence. Never substitute the current unsigned-development hash. Remove all instruction lines and unused capability variants before posting. The workflow-ready version-specific English/Korean copy lives in the [`v0.1.0` Release notes](releases/v0.1.0.md); it contains no completion evidence and does not claim that signing or publication passed.
 
 ### GitHub Release notes
 
@@ -213,8 +213,12 @@ Do not apply metadata or publish copy until every applicable box has recorded ev
 - [ ] A public read-only query and maintainer decision show zero unresolved P0/P1 issues, and the security responder records only a yes/no no-confidential-blocker sign-off.
 - [ ] The final support matrix states the exact Display/Audio/Network hardware-mutation evidence or preserves the explicit mock-verified limitation.
 - [ ] The canonical [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases) contains the approved immutable assets and curated English/Korean notes.
-- [ ] The bilingual site is deployed at its final HTTPS origin, passes its no-cookie/no-tracking checks, and any download link points only to the canonical release.
-- [ ] After the immutable `v0.1.0` Release is public, the reviewed `site/release-publication.json` change sets `state` to `published` and its URL to exactly `https://github.com/GGULBAE/desk-setup-switcher/releases/tag/v0.1.0`; no component or copy rewrite accompanies that activation.
+- [ ] The immutable Release body is self-contained: it links no branch-lifecycle document and permits only the tag-pinned distribution procedure plus the exact public-support and private-advisory action routes.
+- [ ] The final HTTPS site origin and deployment configuration are separately approved. The tracked site-origin record remains `holding`/null before that approval, and a public build must reject any `NEXT_PUBLIC_SITE_URL` that is not the exact approved origin.
+- [ ] Before Release publication, prepare and review locally—but do not push or merge—a bounded public-copy finalization patch and record its base commit, tree digest, and file allowlist. It contains no component-code rewrite.
+- [ ] After the immutable `v0.1.0` Release and assets are visibly public and reverified, publish that prepared patch for review. It sets `site/release-publication.json` to the exact canonical Release URL, sets the separately approved site-origin record, and synchronizes README, the English/Korean guide index and user guides, PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and directly required status records. If `master` moved or the tree differs, stop and re-review instead of rebasing silently.
+- [ ] Both required CI jobs pass on the finalization review head. Merge through the protected branch, read back the exact `master` SHA and tree digest, then require one `master`-push CI run on that exact SHA with exactly **Verify macOS app** and **Verify public site and release assets** successful.
+- [ ] Only after that exact `master` run passes is the bilingual site deployed. A clean session proves the approved canonical/`og:url` metadata, no-cookie/no-tracking boundary, current support/security routes, and that every download link points only to the canonical Release.
 - [ ] The screenshot, silent-captioned demo, social preview, captions, and provenance use synthetic or sanitized data and match actual behavior.
 - [ ] Private vulnerability reporting is enabled and tested; public support and security links resolve to the intended routes.
 - [ ] `APPROVED_RELEASE_URL`, `APPROVED_SITE_URL`, and `FINAL_DMG_SHA256` are replaced in the copies selected for publication. No instruction line or unused variant remains.

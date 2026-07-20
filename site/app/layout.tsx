@@ -7,8 +7,14 @@ if (!siteURL) {
   throw new Error("NEXT_PUBLIC_SITE_URL is required");
 }
 
+const metadataBase = new URL(siteURL);
+const canonicalURL = new URL("/", metadataBase).toString();
+
 export const metadata: Metadata = {
-  metadataBase: new URL(siteURL),
+  metadataBase,
+  alternates: {
+    canonical: canonicalURL,
+  },
   title: {
     default: "Desk Setup Switcher — Capture, review, and apply your desk settings",
     template: "%s · Desk Setup Switcher",
@@ -32,6 +38,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
+    url: canonicalURL,
     locale: "en_US",
     alternateLocale: "ko_KR",
     title: "Desk Setup Switcher — Bring your desk back, deliberately.",

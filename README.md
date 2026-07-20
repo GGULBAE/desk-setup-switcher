@@ -50,6 +50,8 @@ Its DMG is an ad-hoc-signed development artifact, not a supported download, and 
 
 The proposed protected-remote gate treats both CI jobs—**Verify macOS app** and **Verify public site and release assets**—as mandatory and binds their check runs and jobs to the same successful `master` push. That policy remains local and unconfigured until the documented GitHub controls are approved and read back.
 
+The historical remote **Release** workflow is still active and unsafe for any `v*` tag. A local fail-closed containment helper now separates a GET-only two-observation plan receipt from a separately approved apply step that can send one exact disable request and never re-enable, dispatch, tag, or publish. Its deterministic mock tests are local evidence only: the helper has not been run against GitHub, and no remote setting changed.
+
 ## Privacy and safety
 
 - Profiles, backups, and diagnostics stay on the Mac. The app has no account, cloud sync, app-owned server, telemetry, analytics, ads, or automatic profile switching.

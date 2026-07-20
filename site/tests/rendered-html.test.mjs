@@ -9,6 +9,7 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 const originGatePath = fileURLToPath(new URL("scripts/verify-site-origin.mjs", root));
+const originGateModule = await import(new URL("scripts/verify-site-origin.mjs", root));
 const publicationModule = await import(new URL("lib/release-publication.mjs", root));
 const publicationFileModule = await import(new URL("scripts/verify-release-publication.mjs", root));
 const releaseCopyModule = await import(new URL("lib/release-copy.mjs", root));
@@ -22,13 +23,13 @@ const expectedReleaseState = process.env.EXPECTED_RELEASE_STATE === "current"
 
 assert.match(expectedReleaseState ?? "", /^(holding|published)$/);
 
-function runOriginGate(origin, { allowLocal = false } = {}) {
+function runOriginGate(origin, { allowLocal = false, gatePath = originGatePath } = {}) {
   const env = { ...process.env };
   delete env.NEXT_PUBLIC_SITE_URL;
   delete env.ALLOW_LOCAL_SITE_ORIGIN;
   if (origin !== undefined) env.NEXT_PUBLIC_SITE_URL = origin;
   if (allowLocal) env.ALLOW_LOCAL_SITE_ORIGIN = "1";
-  return spawnSync(process.execPath, [originGatePath], {
+  return spawnSync(process.execPath, [gatePath], {
     cwd: fileURLToPath(root),
     env,
     encoding: "utf8",
@@ -70,6 +71,8 @@ test("renders the complete public-beta landing page without setting cookies", as
 
   const html = await response.text();
   assert.match(html, /<title>Desk Setup Switcher — Capture, review, and apply your desk settings<\/title>/i);
+  assert.match(html, /<link rel="canonical" href="http:\/\/localhost:3000\/"\/>/i);
+  assert.match(html, /<meta property="og:url" content="http:\/\/localhost:3000\/"\/>/i);
   assert.match(html, /Bring your desk back, deliberately\./);
   assert.match(html, /Capture/);
   assert.match(html, /Edit/);
@@ -78,16 +81,25 @@ test("renders the complete public-beta landing page without setting cookies", as
   assert.match(html, /No cloud/);
   assert.match(html, /No telemetry/);
   if (expectedReleaseState === "holding") {
+    assert.match(html, /Open-source macOS public beta candidate/);
     assert.match(html, /There is no supported public download today\./);
+    assert.match(html, /Planned v0\.1\.0 platform: Apple Silicon with a macOS 14 deployment target/);
+    assert.match(html, /Exact-candidate lifecycle testing on Sonoma remains a release gate/);
+    assert.match(html, /private vulnerability reporting must be enabled and tested before release/);
     assert.doesNotMatch(html, /releases\/tag\/v0\.1\.0/);
+    assert.doesNotMatch(html, /v0\.1\.0 support: Apple Silicon on macOS 14 or later/);
   } else {
+    assert.match(html, /Open-source macOS public beta<\/p>/);
+    assert.doesNotMatch(html, /Open-source macOS public beta candidate/);
     assert.match(html, /Download v0\.1\.0/);
     assert.match(html, /href="https:\/\/github\.com\/GGULBAE\/desk-setup-switcher\/releases\/tag\/v0\.1\.0"/);
     assert.match(html, /Download the signed public beta\./);
+    assert.match(html, /v0\.1\.0 support: Apple Silicon on macOS 14 or later/);
+    assert.match(html, /private vulnerability reporting route in SECURITY\.md/);
     assert.doesNotMatch(html, /There is no supported public download today\./);
+    assert.doesNotMatch(html, /Exact-candidate lifecycle testing on Sonoma remains a release gate/);
+    assert.doesNotMatch(html, /private vulnerability reporting must be enabled and tested before release/);
   }
-  assert.match(html, /Planned v0\.1\.0 platform: Apple Silicon with a macOS 14 deployment target/);
-  assert.match(html, /Exact-candidate lifecycle testing on Sonoma remains a release gate/);
   assert.match(html, /Current-source group\/base live-read/);
   assert.match(html, /item-level read unclaimed/);
   assert.match(html, /apply\/rollback mock-only/);
@@ -211,6 +223,8 @@ test("keeps the site account-free, local-content-only, and free of starter capab
   assert.doesNotMatch(browserSource, /<script[^>]+src=["']https?:\/\//i);
   assert.match(landing, /내 책상 설정을, 내가 확인하고 되돌립니다/);
   assert.match(landing, /텔레메트리 없음/);
+  assert.match(landing, /homeLabel: "Desk Setup Switcher 홈"/);
+  assert.match(landing, /aria-label=\{text\.homeLabel\}/);
   assert.match(landing, /userGuidePath: "docs\/guides\/USER-GUIDE\.md"/);
   assert.match(landing, /userGuidePath: "docs\/guides\/USER-GUIDE\.ko\.md"/);
   assert.match(landing, /href=\{`\$\{repositoryURL\}\/blob\/master\/\$\{text\.userGuidePath\}`\}/);
@@ -291,7 +305,7 @@ test("ships three sanitized screens and bilingual caption files", async () => {
   assert.match(korean, /Review & Apply/);
 });
 
-test("rejects non-public production origins and narrowly allows explicit local builds", () => {
+test("site origin approval fails closed and narrowly allows explicit local builds", async () => {
   const rejected = [
     undefined,
     "http://desksetup.app",
@@ -333,7 +347,96 @@ test("rejects non-public production origins and narrowly allows explicit local b
 
   assert.notEqual(runOriginGate("https://localhost", { allowLocal: true }).status, 0);
   assert.notEqual(runOriginGate("https://desksetup.app", { allowLocal: true }).status, 0);
-  assert.equal(runOriginGate("https://desksetup.app").status, 0);
+
+  const trackedApproval = await originGateModule.validateSitePublicationFile(
+    fileURLToPath(new URL("site-publication.json", root)),
+  );
+  assert.deepEqual(trackedApproval, {
+    schemaVersion: "desk-setup-switcher.site-origin/v1",
+    state: "holding",
+    siteURL: null,
+  });
+  assert.notEqual(runOriginGate("https://desksetup.app").status, 0);
+  const buildScript = JSON.parse(await readFile(new URL("package.json", root), "utf8")).scripts.build;
+  assert.ok(
+    buildScript.indexOf("verify-site-origin.mjs") < buildScript.indexOf("node_modules/vinext"),
+    "the approved-origin gate must run before the renderer consumes NEXT_PUBLIC_SITE_URL",
+  );
+
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "desk-setup-site-origin-"));
+  const scriptsDirectory = join(temporaryDirectory, "scripts");
+  const fixtureGatePath = join(scriptsDirectory, "verify-site-origin.mjs");
+  const fixturePublicationPath = join(temporaryDirectory, "site-publication.json");
+  try {
+    await mkdir(scriptsDirectory, { recursive: true });
+    await writeFile(fixtureGatePath, await readFile(originGatePath, "utf8"), {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+
+    const approved = {
+      schemaVersion: "desk-setup-switcher.site-origin/v1",
+      state: "approved",
+      siteURL: "https://desksetup.app",
+    };
+    await writeFile(fixturePublicationPath, `${JSON.stringify(approved)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    assert.equal(
+      runOriginGate("https://desksetup.app", { gatePath: fixtureGatePath }).status,
+      0,
+    );
+    for (const origin of [
+      "https://otherdesk.app",
+      "https://desksetup.app/",
+      "https://DESKSETUP.app",
+    ]) {
+      assert.notEqual(
+        runOriginGate(origin, { gatePath: fixtureGatePath }).status,
+        0,
+        `expected approved-origin gate to reject ${origin}`,
+      );
+    }
+
+    const malformedRecords = [
+      "{not-json}\n",
+      '{"schemaVersion":"desk-setup-switcher.site-origin/v1","state":"holding","state":"approved","siteURL":"https://desksetup.app"}\n',
+      `${JSON.stringify({ ...approved, extra: true })}\n`,
+      `${JSON.stringify({ ...approved, siteURL: "https://desksetup.app/" })}\n`,
+      `${JSON.stringify({ ...approved, siteURL: "https://desk-setup-switcher.invalid" })}\n`,
+      `${JSON.stringify({ ...approved, state: "holding" })}\n`,
+    ];
+    for (const source of malformedRecords) {
+      await writeFile(fixturePublicationPath, source, { encoding: "utf8", mode: 0o600 });
+      assert.notEqual(
+        runOriginGate("https://desksetup.app", { gatePath: fixtureGatePath }).status,
+        0,
+        `expected site publication record to fail: ${source}`,
+      );
+    }
+    assert.notEqual(
+      runOriginGate("http://localhost:3000", {
+        allowLocal: true,
+        gatePath: fixtureGatePath,
+      }).status,
+      0,
+      "local builds must still strictly validate the tracked site publication record",
+    );
+
+    await writeFile(fixturePublicationPath, `${JSON.stringify(approved)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    const symlinkPath = join(temporaryDirectory, "site-publication-symlink.json");
+    const hardlinkPath = join(temporaryDirectory, "site-publication-hardlink.json");
+    await symlink(fixturePublicationPath, symlinkPath);
+    await assert.rejects(originGateModule.validateSitePublicationFile(symlinkPath));
+    await link(fixturePublicationPath, hardlinkPath);
+    await assert.rejects(originGateModule.validateSitePublicationFile(hardlinkPath));
+  } finally {
+    await rm(temporaryDirectory, { force: true, recursive: true });
+  }
 });
 
 test("release publication metadata fails closed and pins the canonical release", async () => {
@@ -394,18 +497,34 @@ test("release holding and published copy stays bilingual", () => {
   const koreanHolding = releasePresentation("ko", false);
   const koreanPublished = releasePresentation("ko", true);
 
+  assert.equal(englishHolding.eyebrow, "Open-source macOS public beta candidate");
+  assert.equal(englishPublished.eyebrow, "Open-source macOS public beta");
   assert.match(englishHolding.actionLabel, /complete release gate passes/);
   assert.equal(englishPublished.actionLabel, "Download v0.1.0");
   assert.equal(englishHolding.installTitle, "A trusted download, once the gate passes.");
   assert.equal(englishPublished.installTitle, "Download the signed public beta.");
   assert.match(englishHolding.installBody, /There is no supported public download today\./);
   assert.match(englishPublished.installBody, /canonical GitHub Release/);
+  assert.match(englishHolding.supportNote, /lifecycle testing on Sonoma remains a release gate/);
+  assert.match(englishPublished.supportNote, /v0\.1\.0 support: Apple Silicon on macOS 14 or later/);
+  assert.doesNotMatch(englishPublished.supportNote, /planned|remains a release gate/i);
+  assert.match(englishHolding.contributeBody, /private vulnerability reporting must be enabled and tested before release/);
+  assert.match(englishPublished.contributeBody, /private vulnerability reporting route in SECURITY\.md/);
+  assert.doesNotMatch(englishPublished.contributeBody, /must be enabled|before release/i);
+  assert.equal(koreanHolding.eyebrow, "오픈소스 macOS 공개 베타 후보");
+  assert.equal(koreanPublished.eyebrow, "오픈소스 macOS 공개 베타");
   assert.match(koreanHolding.actionLabel, /릴리스 관문을 통과한 뒤/);
   assert.equal(koreanPublished.actionLabel, "v0.1.0 다운로드");
   assert.equal(koreanHolding.installTitle, "검증 관문을 통과한 다운로드만 제공합니다.");
   assert.equal(koreanPublished.installTitle, "서명된 public beta를 다운로드하세요.");
   assert.match(koreanHolding.installBody, /현재 지원되는 공개 다운로드는 없습니다\./);
   assert.match(koreanPublished.installBody, /공식 GitHub Release에서만 제공합니다\./);
+  assert.match(koreanHolding.supportNote, /수명주기 검증을 통과해야 출시/);
+  assert.match(koreanPublished.supportNote, /v0\.1\.0 지원 환경: Apple Silicon 기반 macOS 14 이상/);
+  assert.doesNotMatch(koreanPublished.supportNote, /예정 환경|통과해야 출시/);
+  assert.match(koreanHolding.contributeBody, /비공개 취약점 신고 기능은 출시 전에 활성화하고 검증/);
+  assert.match(koreanPublished.contributeBody, /SECURITY\.md의 비공개 취약점 신고 경로/);
+  assert.doesNotMatch(koreanPublished.contributeBody, /출시 전에 활성화/);
   assert.throws(() => releasePresentation("ja", false));
   assert.throws(() => releasePresentation("ko", "published"));
 });

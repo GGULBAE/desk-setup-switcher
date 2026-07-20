@@ -170,10 +170,13 @@ Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPL
 ## Public surface and approval
 
 - [ ] The final support matrix preserves exact verification levels and Apple Silicon-only support.
-- [ ] README, English/Korean guides, SECURITY, SUPPORT, privacy, checksums, site, and release notes agree.
+- [ ] Before publication, the immutable Release body is self-contained and contains no branch-lifecycle document link; only the tag-pinned distribution procedure and exact support/advisory action routes are allowed.
+- [ ] Before publication, the bounded public-copy finalization patch is reviewed locally but unpushed/unmerged, with its exact `master` base, resulting tree digest, and file allowlist recorded. After the immutable Release is visibly public, the unchanged patch synchronizes both publication records, README, the English/Korean guide index and guides, PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and directly required status records.
+- [ ] The finalization review head passes both exact CI jobs. Its protected merge is read back from `master`, has the reviewed tree digest, and one `master`-push run on that exact SHA passes exactly **Verify macOS app** and **Verify public site and release assets** before deployment.
+- [ ] README, English/Korean guides, SECURITY, SUPPORT, PRIVACY, SUPPORT-MATRIX, checksums, both site publication records, the rendered site, and release notes agree, with no stale holding or disabled-private-reporting claim.
 - [ ] The bilingual site passes deployed no-tracking/no-cookie and clean-session link checks.
 - [ ] Repository description, topics, Homepage, and social preview match the approved copy.
-- [ ] The release approver explicitly approves the final artifact, tag, notes, and Release publication. Site activation remains a separate reviewed `site/release-publication.json` change and separate final user approval.
+- [ ] The release approver explicitly approves the final artifact, tag, notes, and Release publication. The synchronized public-copy finalization patch, exact HTTPS site-origin record, site deployment, and promotion remain separate final user approvals.
 - [ ] Clean A contains the final manual records and all three reviewed workflow blobs; exact-A CI passed before E was collected.
 - [ ] Final external E was created once at mode 0600, and B is A's direct single-parent child whose only change adds the unchanged E bytes at the fixed path as `100644`.
 - [ ] The tag is annotated and targets A; its direct object SHA, peeled commit, and exact E-digest message are recorded. The object was created locally before B, was not pushed then, and did not move.

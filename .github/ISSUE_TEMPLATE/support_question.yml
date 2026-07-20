@@ -12,7 +12,7 @@ body:
     id: version
     attributes:
       label: Version, release URL, or commit
-      description: State where the app came from. There is no supported public release until v0.1.0 is published.
+      description: State where the app came from. Supported downloads come only from versioned GitHub Releases; local and CI artifacts are unsupported.
       placeholder: v0.1.0 from GitHub Releases, or commit SHA
     validations:
       required: true

@@ -37,7 +37,7 @@ decisions exist.
 | Actions and security | All Actions allowed and full-SHA enforcement disabled; default workflow token read-only and PR-review approval disabled; secret scanning, push protection, and Dependabot security updates enabled |
 | Names and public boundary | Repository secret/variable name lists empty; environment credential-name lists unavailable because no environment exists; no tag or Release; one administrator collaborator; stale mouse/keyboard description, no topics or Homepage, Discussions disabled, and no `needs-triage` label |
 | Pre-repair local closure | At `01db3ac`, `make verify` passed 2,961 non-live checks/assertions; unsigned development-evidence DMG SHA-256 `0e37ca3c2bb9826cb57b227660a10376ae483497ad5b035e81e3fb3725202681`; not installed, launched, uploaded, or published |
-| Exact-two-check repair closure | Current branch state passed `make verify` with 3,046 non-live checks/assertions, including 178 v2 policy, 69 v2 collector, 129 collector-wrapper, and 424 publisher assertions; unsigned development-evidence DMG SHA-256 `6bd85f129d4b34f1fb5bd5da42336f23459221a932412fdf704ab227f5805ffb`; not installed, launched, uploaded, or published |
+| Public-surface and containment closure | Current branch state passed `make verify` with 3,199 non-live checks/assertions, including 178 v2 policy, 69 v2 collector, 129 collector-wrapper, 424 publisher, 152 legacy-workflow-containment, and 203 shell/workflow guard assertions; unsigned development-evidence DMG SHA-256 `6cd2a3d512c9656d71fa916d3a3a0460894f8351d335fb7217ded4920b808805`; not installed, launched, uploaded, or published; the containment helper did not contact GitHub |
 
 The recheck changes no conclusion below: do not push a `v*` tag, dispatch a
 release workflow, or treat the local mock/structural evidence as a protected
@@ -133,9 +133,17 @@ Every numbered phase below requires explicit approval before it changes GitHub.
 No phase authorizes a tag, signed workflow run, public Release, site deployment,
 or promotional post unless that action is named separately.
 
-1. **Contain the old publisher.** Manually disable the workflow identified by
-   `.github/workflows/release.yml`, verify its state is `disabled_manually`, and
-   keep the global `v*` tag freeze.
+1. **Contain the old publisher.** Keep the global `v*` tag freeze. First run the
+   local GET-only `plan-legacy-workflow-containment` target with the exact remote
+   `master` SHA and an absent external receipt path under an owner-mode-0700
+   directory; review its mode-0600 receipt and digest. Under a new explicit
+   approval, provide that exact receipt/digest/SHA, the mutation opt-in, and the
+   exact typed workflow-ID/SHA confirmation to
+   `apply-legacy-workflow-containment`. It may send one fixed disable PUT only;
+   require its mode-0600 success receipt to show stable pre/post observations
+   and `disabled_manually`. An already-disabled result must record zero PUT.
+   Any exit 75 or missing result is ambiguous incident evidence: do not retry or
+   enable; preserve the tag freeze and perform a separate read-only review.
 2. **Prepare bootstrap protections without secrets.** Create an active `master`
    ruleset requiring a pull request and the already-observed GitHub Actions
    check `Verify macOS app` (GitHub Actions app ID `15368`), conversation
@@ -277,6 +285,10 @@ The first option provides the stronger trust boundary.
 
 - If PR CI fails, do not merge. Close the PR or delete only its feature branch;
   keep the tag freeze and disabled old workflow.
+- If containment apply exits 75, is interrupted after the PUT attempt, or lacks
+  a success receipt, do not retry and never enable the workflow. Preserve the
+  plan, logs, and remote state; use an independently authorized read-only check
+  to determine the actual state while the `v*` tag freeze remains in force.
 - If a ruleset or environment policy deadlocks, correct or disable that new
   control before storing credentials. Never test recovery with `v*`.
 - If post-merge CI fails, fix forward through another PR. Do not force-push
@@ -311,7 +323,9 @@ The first option provides the stronger trust boundary.
 ## Approval boundary prepared by this audit
 
 The next safe external action is not a release. It is an explicitly approved
-remote-containment and PR-preparation phase covering only steps 1–6 above. It
+remote-containment and PR-preparation phase covering only steps 1–6 above. The
+locally mock-tested plan/apply helper narrows step 1 but grants no authority by
+itself. This phase
 must name the reviewer policy and must continue to prohibit all tag, Release,
 site, signing/notarization, installation, live hardware mutation, and promotion
 actions.

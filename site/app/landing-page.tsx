@@ -10,13 +10,13 @@ const content = {
   en: {
     languageName: "English",
     switchLabel: "Language",
+    homeLabel: "Desk Setup Switcher home",
     nav: [
       ["How it works", "flow"],
       ["Support", "support"],
       ["Privacy", "privacy"],
       ["FAQ", "faq"],
     ],
-    eyebrow: "Open-source macOS public beta candidate",
     title: "Bring your desk back, deliberately.",
     summary:
       "Capture display, audio, and network settings. Edit only what matters. Review every proposed change before anything happens.",
@@ -82,8 +82,6 @@ const content = {
         evidence: "Current-source group/base live-read · service-IPv4 item read unclaimed · apply/rollback mock-only",
       },
     ],
-    supportNote:
-      "Planned v0.1.0 platform: Apple Silicon with a macOS 14 deployment target. Exact-candidate lifecycle testing on Sonoma remains a release gate. The packaged Intel slice is not a physical Intel support claim.",
     safetyEyebrow: "Safety before speed",
     safetyTitle: "High-risk changes get a recovery step.",
     safetyBody:
@@ -121,8 +119,6 @@ const content = {
       ["Is Intel supported?", "Not in the initial beta. The build contains an x86_64 slice, but physical Intel install and runtime verification are still missing."],
     ],
     contributeTitle: "Small product. Public evidence.",
-    contributeBody:
-      "Contributions are welcome when they preserve the local-only, explicit-apply, public-API safety boundary. Follow the current SECURITY.md instructions for sensitive reports; private vulnerability reporting must be enabled and tested before release.",
     contribute: "Contributing guide",
     security: "Security reporting",
     userGuide: "User guide",
@@ -137,13 +133,13 @@ const content = {
   ko: {
     languageName: "한국어",
     switchLabel: "언어",
+    homeLabel: "Desk Setup Switcher 홈",
     nav: [
       ["사용 흐름", "flow"],
       ["지원 범위", "support"],
       ["개인정보", "privacy"],
       ["자주 묻는 질문", "faq"],
     ],
-    eyebrow: "오픈소스 macOS 공개 베타 후보",
     title: "내 책상 설정을, 내가 확인하고 되돌립니다.",
     summary:
       "디스플레이·오디오·네트워크 설정을 캡처하고 필요한 값만 편집하세요. 실제 변경 전에는 항상 모든 변경 내용을 검토합니다.",
@@ -209,8 +205,6 @@ const content = {
         evidence: "현재 소스 그룹/기본 실기 읽기 · 서비스 IPv4 개별 읽기 미주장 · 적용/롤백 mock 전용",
       },
     ],
-    supportNote:
-      "v0.1.0 예정 환경: macOS 14 deployment target의 Apple Silicon. Sonoma에서 exact candidate 수명주기 검증을 통과해야 출시할 수 있습니다. 패키지의 Intel slice는 실제 Intel 지원을 뜻하지 않습니다.",
     safetyEyebrow: "속도보다 안전",
     safetyTitle: "위험한 변경에는 복구 단계를 둡니다.",
     safetyBody:
@@ -248,8 +242,6 @@ const content = {
       ["Intel Mac도 지원하나요?", "초기 베타에서는 지원하지 않습니다. x86_64 slice는 있지만 실제 Intel 설치·실행 검증이 없습니다."],
     ],
     contributeTitle: "작은 제품, 공개된 검증.",
-    contributeBody:
-      "로컬 전용·명시적 적용·공개 API 안전 경계를 지키는 기여를 환영합니다. 민감한 신고는 현재 SECURITY.md 안내를 따르세요. 비공개 취약점 신고 기능은 출시 전에 활성화하고 검증해야 합니다.",
     contribute: "기여 가이드",
     security: "보안 신고",
     userGuide: "사용 가이드",
@@ -273,7 +265,7 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
   return (
     <div className="site-shell" lang={language}>
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="Desk Setup Switcher home">
+        <a className="brand" href="#top" aria-label={text.homeLabel}>
           <Image src="/app-icon.svg" alt="" width={30} height={30} unoptimized />
           <span>Desk Setup Switcher</span>
         </a>
@@ -301,7 +293,7 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
       <main id="top">
         <section className="hero section-wrap">
           <div className="hero-copy">
-            <p className="eyebrow">{text.eyebrow}</p>
+            <p className="eyebrow">{release.eyebrow}</p>
             <h1>{text.title}</h1>
             <p className="hero-summary">{text.summary}</p>
             <ul className="trust-list" aria-label={language === "en" ? "Privacy promises" : "개인정보 보호 원칙"}>
@@ -385,7 +377,7 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
                 </article>
               ))}
             </div>
-            <p className="support-note">{text.supportNote}</p>
+            <p className="support-note">{release.supportNote}</p>
           </div>
         </section>
 
@@ -474,7 +466,7 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
             <div>
               <p className="eyebrow">Open source</p>
               <h2>{text.contributeTitle}</h2>
-              <p>{text.contributeBody}</p>
+              <p>{release.contributeBody}</p>
             </div>
             <div className="contribute-links">
               <a href={`${repositoryURL}/blob/master/CONTRIBUTING.md`}>{text.contribute}</a>

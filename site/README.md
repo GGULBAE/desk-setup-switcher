@@ -23,23 +23,43 @@ runs that same command in a dedicated public-surface job. Neither Homebrew nor
 FFmpeg is an application or site runtime dependency.
 
 Copy `.env.example` to the gitignored `.env.local` and replace its placeholder
-`NEXT_PUBLIC_SITE_URL` with the final HTTPS origin before an approved
-deployment. The build loads that file without evaluating it as shell code.
-`npm run build` fails when the origin is missing, local, IP-literal,
-non-HTTPS, non-canonical, reserved/placeholder, or not a fully qualified DNS
-name. `npm run build:local` and `npm run verify` opt into exact HTTP loopback
-origins only for local metadata checks.
+`NEXT_PUBLIC_SITE_URL` only after the final HTTPS origin has been approved in
+[`site-publication.json`](site-publication.json). The build loads that file
+without evaluating it as shell code. `npm run build` fails unless the record is
+`approved` and `NEXT_PUBLIC_SITE_URL` is byte-for-byte equal to its exact clean
+origin; missing, local, IP-literal, non-HTTPS, non-canonical,
+reserved/placeholder, arbitrary, and mismatched origins all fail closed.
+`npm run build:local` and `npm run verify` bypass the publication approval only
+for explicit HTTP loopback origins used by local metadata checks; they still
+strictly parse and validate the tracked record on every build.
 
 `npm run verify` builds the Cloudflare Worker-compatible Sites output, lints the source, renders the page, checks the honest release/support copy and security headers, verifies that no cookie is set, scans application source and the built client for tracking/storage boundaries, and requires all public screenshots, video, and bilingual captions.
 
-[`release-publication.json`](release-publication.json) is the only launch-state
-switch. It is schema-checked during every build. `holding` requires a null URL;
+[`release-publication.json`](release-publication.json) is the site's only
+rendering-state switch. It is schema-checked during every build. `holding` requires a null URL;
 `published` accepts only the exact canonical `v0.1.0` GitHub Release URL. The
 verification command renders and checks both states before rebuilding the
 currently tracked state. If an intermediate state check fails, it still attempts
-that restoration and removes `dist` if restoration cannot complete. Launch
-activation is therefore a reviewed data-only change instead of an untested
-component rewrite or a reusable synthetic build artifact.
+that restoration and removes `dist` if restoration cannot complete.
+
+The overall public launch is deliberately broader than that one site-data
+switch. The same public-surface gate cross-binds the release and site-origin
+records and checks README, the English/Korean guide index and user guides,
+PRIVACY, SUPPORT-MATRIX, `SECURITY.md`, `SUPPORT.md`, and lifecycle-neutral
+support-form copy. The immutable Release body is self-contained and never
+depends on a mutable branch document. After that Release is visibly public, the
+locally pre-reviewed public-copy patch may be published for protected review;
+its review tree and merged `master` tree must match, and both required CI jobs
+must pass on the review head and exact final `master` SHA before deployment.
+Component code is not rewritten during that transition.
+
+[`site-publication.json`](site-publication.json) is a separate canonical-origin
+approval record; it does not change release copy. Its exact three-key
+`desk-setup-switcher.site-origin/v1` schema permits only `holding` with a null
+`siteURL`, or `approved` with one exact clean public HTTPS origin. The strict
+reader rejects duplicate or extra keys, malformed JSON, non-canonical UTF-8,
+and linked files. Because the origin gate runs before the site build, only the
+approved value can become the production canonical and Open Graph URL.
 
 The application-authored site code does not persist product or visitor data in
 browser storage. The bundled vinext router contains two framework-owned,

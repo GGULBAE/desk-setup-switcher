@@ -154,11 +154,17 @@ These deterministic safeguards do not constitute live TCC or hardware evidence.
    checksum, SBOM, attestation/provenance, and redownload identity evidence.
 3. Complete clean-quarantine install/upgrade/uninstall and three external Apple
    Silicon beta reports with no unresolved P0/P1 issue.
-4. Merge and publish the guides, support forms, and security policy to the
-   default branch before deploying the site, then verify every public link from
-   a clean session. Run the bounded manual site/browser and final bilingual copy
-   review, set the approved HTTPS metadata origin and canonical release URL,
-   then rerun every local and remote gate.
+4. Keep the immutable Release notes self-contained and prepare the bounded
+   public-copy finalization patch locally before publication without pushing or
+   merging it. After the Release is visibly public, publish the unchanged patch
+   for protected review; synchronize the exact release/site publication state,
+   README, English/Korean guides, PRIVACY, SUPPORT-MATRIX, SUPPORT, SECURITY,
+   and required status records. Require both CI jobs on the review head, verify
+   the protected merge has the same tree, and require both jobs again on the
+   exact `master` SHA before deploying the site. Then verify
+   every public link, canonical/`og:url` value, language path, caption, and
+   no-cookie/no-tracking boundary from a clean session and rerun the remaining
+   local and remote gates.
 5. Ask the maintainer for explicit approval of the artifact, tag, release
    notes, site publication, repository metadata, social preview, and each
    promotional post before any public mutation.

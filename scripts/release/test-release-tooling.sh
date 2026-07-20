@@ -92,6 +92,9 @@ pass
 "$RELEASE_SCRIPTS_DIR/test_publish_approved_release.sh"
 pass
 
+"$RELEASE_SCRIPTS_DIR/test_legacy_workflow_containment.sh"
+pass
+
 ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-entitlements \
     --plist Config/ReleaseEntitlements.plist
 pass

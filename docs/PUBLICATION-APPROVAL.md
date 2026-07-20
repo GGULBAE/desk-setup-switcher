@@ -287,10 +287,12 @@ has exactly these keys and no duplicates or extensions:
 `independent-review` requires different approver and publisher logins.
 `one-maintainer` requires the same login and is an explicit governance
 limitation, not a two-person review claim. `releasePublication` must be true.
-This record grants no site-publication
-authority. Site activation remains a later, separate, reviewed
-`site/release-publication.json` change after the immutable Release is visibly
-public and still requires the user's final approval.
+This record grants no site-publication authority. The final HTTPS origin lives
+in a separate tracked site-origin record and requires separate user approval.
+Site activation remains a later public-copy finalization change after the
+immutable Release is visibly public; it changes the two tracked publication
+records and the bounded public-document/status set together, changes no
+component code, and still requires the user's final approval.
 
 The validator proves the record's exact shape, identifiers, digests, booleans,
 actors, and time window. It does **not** interpret the documents named by the
@@ -374,15 +376,35 @@ underlying Settings screenshots or token-scope record.
     run never adopts a pre-existing public Release. Only the same live process
     that sent the PATCH may resolve a missing/malformed PATCH response by an
     immediate exact public-state read.
-17. Only after the canonical public URL and assets pass the clean-link check may
-    a separate reviewed change switch the site state from `holding` to
-    `published`. Deployment and announcements still require the user's final
-    approval.
+17. Before dispatching publication, prepare and review a bounded public-copy
+    finalization patch locally, but do not push or merge it. Record its exact
+    `master` base, resulting Git tree digest, and closed file allowlist. The
+    patch must include the release/site publication records, README, both guide
+    indexes/guides, PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and only the
+    directly required roadmap/completion/status records. It changes no site
+    component code, and the immutable Release body must already be
+    self-contained with no branch-lifecycle document link.
 18. Keep the freeze through the workflow's final public download verification.
     After success, revoke the release-specific fine-grained PAT and remove or
     rotate `RELEASE_ADMIN_READ_TOKEN`. Record only a read-only Settings
     confirmation that the old credential is no longer active; never log its
     value. End the freeze only after this cleanup evidence is retained.
+19. After the canonical Release URL and all assets are visibly public and
+    verified, re-read `origin/master`. If it differs from the recorded base,
+    stop and regenerate/re-review the patch; do not silently rebase it. Publish
+    the prepared patch for protected review only now. Its review-head tree must
+    equal the recorded tree, pass `make verify-public-surface`, and pass exactly
+    the two required CI jobs.
+20. Merge through the protected branch. Read back the final `master` SHA and
+    require its Git tree to equal the reviewed tree. Then require one
+    `master`-push CI run bound to that exact SHA whose only required jobs are
+    successful **Verify macOS app** and **Verify public site and release
+    assets**. A pull-request run on a different SHA is not master evidence.
+21. Only after that exact master run passes may the separately approved site deploy.
+    Verify canonical and Open Graph URLs, support/security routes, download
+    identity, language switching, captions, and the no-cookie/no-tracking
+    boundary from a clean session. Deployment and every announcement retain
+    separate final user approval.
 
 Any ambiguity observed before the PATCH prevents the mutation. GitHub provides
 no compare-and-swap Release publish operation, so a change inside the final
