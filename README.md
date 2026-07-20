@@ -26,7 +26,7 @@ Inspect every proposed change and omission. Nothing changes until you explicitly
 
 ![Synthetic apply preview showing planned changes and the protected-change warning](site/public/screenshots/review.png)
 
-These screenshots use synthetic data and a non-mutating demo state. They show the intended product flow, not live hardware-mutation evidence. The [static demo-site source](site/README.md) is available in the repository but is not a public download channel.
+These screenshots use synthetic data and a non-mutating demo state. They were regenerated from one recorded application-source commit and are pinned by the [release-asset provenance record](docs/RELEASE-ASSET-PROVENANCE.md). They show the intended product flow, not live hardware-mutation evidence. The [static demo-site source](site/README.md) is available in the repository but is not a public download channel.
 
 ## One-minute quick start
 

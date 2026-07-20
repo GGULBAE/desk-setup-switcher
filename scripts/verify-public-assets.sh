@@ -16,7 +16,7 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "required command is unavailable: $1"
 }
 
-for command_name in awk cmp ffmpeg ffprobe grep sed shasum sips stat strings; do
+for command_name in awk cmp ffmpeg ffprobe grep ruby sed shasum sips stat strings; do
     require_command "$command_name"
 done
 
@@ -32,15 +32,17 @@ expected_assets=(
 )
 
 expected_sources=(
-    "docs/evidence/p2-ui-refinement-2026-07-17/settings/13-display-en-light.png"
-    "docs/evidence/p2-ui-refinement-2026-07-17/tray/01-empty-en-light.png"
+    "docs/evidence/public-release-assets/f27c3f2/capture/01-empty-en-light.ax.txt"
+    "docs/evidence/public-release-assets/f27c3f2/capture/01-empty-en-light.png"
+    "docs/evidence/public-release-assets/f27c3f2/edit/13-display-en-light.ax.txt"
+    "docs/evidence/public-release-assets/f27c3f2/edit/13-display-en-light.png"
+    "docs/evidence/public-release-assets/f27c3f2/review/23-apply-preview-en-initial.ax.txt"
+    "docs/evidence/public-release-assets/f27c3f2/review/23-apply-preview-en-initial.png"
+    "docs/evidence/public-release-assets/f27c3f2/review/24-apply-preview-ko-refreshed.ax.txt"
+    "docs/evidence/public-release-assets/f27c3f2/review/24-apply-preview-ko-refreshed.png"
+    "docs/evidence/public-release-assets/f27c3f2/review/25-apply-preview-ko-minimum-large-text.ax.txt"
+    "docs/evidence/public-release-assets/f27c3f2/review/25-apply-preview-ko-minimum-large-text.png"
     "docs/evidence/public-release-assets/og-background-imagegen.png"
-    "docs/evidence/public-release-assets/workflow/23-apply-preview-en-initial.ax.txt"
-    "docs/evidence/public-release-assets/workflow/23-apply-preview-en-initial.png"
-    "docs/evidence/public-release-assets/workflow/24-apply-preview-ko-refreshed.ax.txt"
-    "docs/evidence/public-release-assets/workflow/24-apply-preview-ko-refreshed.png"
-    "docs/evidence/public-release-assets/workflow/25-apply-preview-ko-minimum-large-text.ax.txt"
-    "docs/evidence/public-release-assets/workflow/25-apply-preview-ko-minimum-large-text.png"
 )
 
 for relative_path in "${expected_assets[@]}"; do
@@ -57,11 +59,12 @@ image_property() {
         awk -F': ' -v property="$property" '$1 ~ property { print $2; exit }'
 }
 
-verify_png() {
-    local relative_path="$1"
-    local expected_width="$2"
-    local expected_height="$3"
-    local image_path="$PUBLIC_DIR/$relative_path"
+verify_png_properties() {
+    local image_path="$1"
+    local label="$2"
+    local expected_width="$3"
+    local expected_height="$4"
+    local expected_alpha="$5"
     local actual_width actual_height actual_format actual_alpha actual_profile
 
     actual_width="$(image_property "$image_path" pixelWidth)"
@@ -71,17 +74,80 @@ verify_png() {
     actual_profile="$(image_property "$image_path" profile)"
 
     [[ "$actual_width" == "$expected_width" && "$actual_height" == "$expected_height" ]] ||
-        fail "$relative_path is ${actual_width:-unknown}x${actual_height:-unknown}; expected ${expected_width}x${expected_height}"
-    [[ "$actual_format" == "png" ]] || fail "$relative_path is not encoded as PNG"
-    [[ "$actual_alpha" == "no" ]] || fail "$relative_path must be opaque"
+        fail "$label is ${actual_width:-unknown}x${actual_height:-unknown}; expected ${expected_width}x${expected_height}"
+    [[ "$actual_format" == "png" ]] || fail "$label is not encoded as PNG"
+    [[ "$actual_alpha" == "$expected_alpha" ]] ||
+        fail "$label hasAlpha is ${actual_alpha:-unknown}; expected $expected_alpha"
     [[ "$actual_profile" == "<nil>" ]] ||
-        fail "$relative_path must not embed an ICC profile (found: ${actual_profile:-unknown})"
+        fail "$label must not embed an ICC profile (found: ${actual_profile:-unknown})"
 }
 
-verify_png "screenshots/capture.png" 368 260
-verify_png "screenshots/edit.png" 900 568
-verify_png "screenshots/review.png" 620 500
-verify_png "og.png" 1280 640
+verify_png_properties "$PUBLIC_DIR/screenshots/capture.png" "screenshots/capture.png" 368 260 no
+verify_png_properties "$PUBLIC_DIR/screenshots/edit.png" "screenshots/edit.png" 900 568 no
+verify_png_properties "$PUBLIC_DIR/screenshots/review.png" "screenshots/review.png" 620 500 no
+verify_png_properties "$PUBLIC_DIR/og.png" "og.png" 1280 640 no
+
+SOURCE_FIXTURE_ROOT="$ROOT_DIR/docs/evidence/public-release-assets/f27c3f2"
+verify_png_properties \
+    "$SOURCE_FIXTURE_ROOT/capture/01-empty-en-light.png" \
+    "f27c3f2/capture/01-empty-en-light.png" 368 260 yes
+verify_png_properties \
+    "$SOURCE_FIXTURE_ROOT/edit/13-display-en-light.png" \
+    "f27c3f2/edit/13-display-en-light.png" 900 568 no
+verify_png_properties \
+    "$SOURCE_FIXTURE_ROOT/review/23-apply-preview-en-initial.png" \
+    "f27c3f2/review/23-apply-preview-en-initial.png" 620 500 yes
+verify_png_properties \
+    "$SOURCE_FIXTURE_ROOT/review/24-apply-preview-ko-refreshed.png" \
+    "f27c3f2/review/24-apply-preview-ko-refreshed.png" 620 500 yes
+verify_png_properties \
+    "$SOURCE_FIXTURE_ROOT/review/25-apply-preview-ko-minimum-large-text.png" \
+    "f27c3f2/review/25-apply-preview-ko-minimum-large-text.png" 520 360 yes
+
+metadata_stripped_pngs=(
+    "$PUBLIC_DIR/screenshots/capture.png"
+    "$PUBLIC_DIR/screenshots/edit.png"
+    "$PUBLIC_DIR/screenshots/review.png"
+    "$PUBLIC_DIR/og.png"
+    "$SOURCE_FIXTURE_ROOT/capture/01-empty-en-light.png"
+    "$SOURCE_FIXTURE_ROOT/edit/13-display-en-light.png"
+    "$SOURCE_FIXTURE_ROOT/review/23-apply-preview-en-initial.png"
+    "$SOURCE_FIXTURE_ROOT/review/24-apply-preview-ko-refreshed.png"
+    "$SOURCE_FIXTURE_ROOT/review/25-apply-preview-ko-minimum-large-text.png"
+)
+if ! ruby - "${metadata_stripped_pngs[@]}" <<'RUBY'
+signature = "\x89PNG\r\n\x1a\n".b
+allowed_chunks = %w[IHDR PLTE IDAT IEND]
+
+ARGV.each do |path|
+  data = File.binread(path)
+  raise "#{path}: invalid PNG signature" unless data.start_with?(signature)
+
+  offset = signature.bytesize
+  chunks = []
+  loop do
+    raise "#{path}: truncated PNG chunk" if offset + 12 > data.bytesize
+
+    length = data.byteslice(offset, 4).unpack1("N")
+    chunk_end = offset + 12 + length
+    raise "#{path}: truncated PNG chunk payload" if chunk_end > data.bytesize
+
+    chunk_type = data.byteslice(offset + 4, 4)
+    raise "#{path}: unexpected PNG chunk #{chunk_type.inspect}" unless allowed_chunks.include?(chunk_type)
+
+    chunks << chunk_type
+    offset = chunk_end
+    break if chunk_type == "IEND"
+  end
+
+  raise "#{path}: IHDR must be first" unless chunks.first == "IHDR"
+  raise "#{path}: PNG must contain image data" unless chunks.include?("IDAT")
+  raise "#{path}: trailing bytes after IEND" unless offset == data.bytesize
+end
+RUBY
+then
+    fail "normalized source and public PNGs must contain only critical chunks and no trailing data"
+fi
 
 og_size="$(stat -f '%z' "$PUBLIC_DIR/og.png")"
 [[ "$og_size" -le 1048576 ]] || fail "og.png must remain at or below 1 MiB"
@@ -95,6 +161,12 @@ sensitive_pattern='(/Users/[^/[:space:]]+|/home/[^/[:space:]]+|AKIA[0-9A-Z]{16}|
 for relative_path in "${expected_assets[@]}"; do
     if LC_ALL=C strings -a "$PUBLIC_DIR/$relative_path" | grep -Eiq "$sensitive_pattern"; then
         fail "potential private data or device-specific metadata found in site/public/$relative_path"
+    fi
+done
+
+for relative_path in "${expected_sources[@]}"; do
+    if LC_ALL=C strings -a "$ROOT_DIR/$relative_path" | grep -Eiq "$sensitive_pattern"; then
+        fail "potential private data or device-specific metadata found in $relative_path"
     fi
 done
 

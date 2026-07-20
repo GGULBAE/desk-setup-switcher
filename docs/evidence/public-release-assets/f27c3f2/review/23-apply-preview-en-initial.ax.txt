@@ -1,0 +1,10 @@
+source=ApplyPreviewView in attached offscreen NSWindow
+synthetic-apply-preview=true
+fixture=23-apply-preview-en-initial
+language=en
+viewport=620x500
+review-reason=initial
+mode=normal
+large-text=false
+live-display-audio-network-mutations=false
+role=AXGroup
