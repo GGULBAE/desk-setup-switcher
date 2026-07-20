@@ -207,6 +207,24 @@ case "${1:-}" in
             "$MOCK_CONTROLS_RELATIVE")
                 [[ "$2" == "$MOCK_APPROVAL_COMMIT" ]] || exit 89
                 printf '100644 blob %040d\t%s\n' 7 "$MOCK_CONTROLS_RELATIVE" ;;
+            "$MOCK_CANDIDATE_INVENTORY_RELATIVE")
+                [[ "$2" == "$MOCK_APPROVAL_COMMIT" ]] || exit 89
+                printf '100644 blob %040d\t%s\n' 17 "$MOCK_CANDIDATE_INVENTORY_RELATIVE" ;;
+            "$MOCK_PREDECESSOR_LINEAGE_RELATIVE")
+                [[ "$2" == "$MOCK_APPROVAL_COMMIT" ]] || exit 89
+                printf '100644 blob %040d\t%s\n' 12 "$MOCK_PREDECESSOR_LINEAGE_RELATIVE" ;;
+            "$MOCK_EXTERNAL_BETA_SET_RELATIVE")
+                [[ "$2" == "$MOCK_APPROVAL_COMMIT" ]] || exit 89
+                printf '100644 blob %040d\t%s\n' 13 "$MOCK_EXTERNAL_BETA_SET_RELATIVE" ;;
+            "$MOCK_EXTERNAL_BETA_01_RELATIVE")
+                [[ "$2" == "$MOCK_APPROVAL_COMMIT" ]] || exit 89
+                printf '100644 blob %040d\t%s\n' 14 "$MOCK_EXTERNAL_BETA_01_RELATIVE" ;;
+            "$MOCK_EXTERNAL_BETA_02_RELATIVE")
+                [[ "$2" == "$MOCK_APPROVAL_COMMIT" ]] || exit 89
+                printf '100644 blob %040d\t%s\n' 15 "$MOCK_EXTERNAL_BETA_02_RELATIVE" ;;
+            "$MOCK_EXTERNAL_BETA_03_RELATIVE")
+                [[ "$2" == "$MOCK_APPROVAL_COMMIT" ]] || exit 89
+                printf '100644 blob %040d\t%s\n' 16 "$MOCK_EXTERNAL_BETA_03_RELATIVE" ;;
             "$MOCK_POLICY_RELATIVE")
                 [[ "$2" == "$MOCK_APPROVAL_COMMIT" ]] || exit 89
                 printf '100644 blob %040d\t%s\n' 8 "$MOCK_POLICY_RELATIVE" ;;
@@ -223,6 +241,12 @@ case "${1:-}" in
         case "$2" in
             "$MOCK_APPROVAL_COMMIT:$MOCK_APPROVAL_RELATIVE") exec /bin/cat "$MOCK_APPROVAL_SOURCE" ;;
             "$MOCK_APPROVAL_COMMIT:$MOCK_CONTROLS_RELATIVE") exec /bin/cat "$MOCK_CONTROLS_SOURCE" ;;
+            "$MOCK_APPROVAL_COMMIT:$MOCK_CANDIDATE_INVENTORY_RELATIVE") exec /bin/cat "$MOCK_CANDIDATE_INVENTORY_SOURCE" ;;
+            "$MOCK_APPROVAL_COMMIT:$MOCK_PREDECESSOR_LINEAGE_RELATIVE") exec /bin/cat "$MOCK_PREDECESSOR_LINEAGE_SOURCE" ;;
+            "$MOCK_APPROVAL_COMMIT:$MOCK_EXTERNAL_BETA_SET_RELATIVE") exec /bin/cat "$MOCK_EXTERNAL_BETA_SET_SOURCE" ;;
+            "$MOCK_APPROVAL_COMMIT:$MOCK_EXTERNAL_BETA_01_RELATIVE") exec /bin/cat "$MOCK_EXTERNAL_BETA_01_SOURCE" ;;
+            "$MOCK_APPROVAL_COMMIT:$MOCK_EXTERNAL_BETA_02_RELATIVE") exec /bin/cat "$MOCK_EXTERNAL_BETA_02_SOURCE" ;;
+            "$MOCK_APPROVAL_COMMIT:$MOCK_EXTERNAL_BETA_03_RELATIVE") exec /bin/cat "$MOCK_EXTERNAL_BETA_03_SOURCE" ;;
             "$MOCK_APPROVAL_COMMIT:$MOCK_POLICY_RELATIVE") exec /bin/cat "$MOCK_POLICY_SOURCE" ;;
             "$MOCK_APPROVAL_COMMIT:$MOCK_CANDIDATE_MANUAL_RELATIVE") exec /bin/cat "$MOCK_CANDIDATE_MANUAL_SOURCE" ;;
             "$MOCK_APPROVAL_COMMIT:$MOCK_PUBLICATION_MANUAL_RELATIVE") exec /bin/cat "$MOCK_PUBLICATION_MANUAL_SOURCE" ;;
@@ -597,13 +621,24 @@ write_approval_record() {
     local observed_master="$4"
     local remote_controls_sha="$5"
     local approved_at="$6"
+    local release_manifest_sha="$7"
+    local final_dmg_provenance_sha="$8"
+    local candidate_inventory_sha="$9"
+    local predecessor_lineage_sha="${10}"
+    local external_beta_set_sha="${11}"
+    local external_beta_01_sha="${12}"
+    local external_beta_02_sha="${13}"
+    local external_beta_03_sha="${14}"
     local recorded_dmg_sha="$final_dmg_sha"
     [[ "$scenario" != approval-mismatch ]] || recorded_dmg_sha="$(printf '9%.0s' {1..64})"
     "$real_ruby" -rjson -rtime -e '
-      output, final_dmg_sha, observed_master, remote_controls_sha, scenario, approved_at = ARGV
+      output, final_dmg_sha, observed_master, remote_controls_sha, scenario, approved_at,
+        release_manifest_sha, final_dmg_provenance_sha, candidate_inventory_sha,
+        predecessor_lineage_sha, external_beta_set_sha, external_beta_01_sha,
+        external_beta_02_sha, external_beta_03_sha = ARGV
       now = Time.iso8601(approved_at)
       value = {
-        "schemaVersion" => "desk-setup-switcher.publication-approval/v1",
+        "schemaVersion" => "desk-setup-switcher.publication-approval/v2",
         "subject" => {
           "repository" => "GGULBAE/desk-setup-switcher",
           "tag" => "v0.1.0",
@@ -628,12 +663,21 @@ write_approval_record() {
           "publicSurfaceReady" => true
         },
         "evidence" => {
+          "candidateInventorySHA256" => candidate_inventory_sha,
           "releaseEvidenceSHA256" => "c" * 64,
-          "cleanLifecycleSHA256" => "d" * 64,
-          "externalBetaReportSHA256" => ["e" * 64, "f" * 64, "1" * 64],
+          "cleanLifecycleSHA256" => external_beta_01_sha,
+          "externalBetaSetSHA256" => external_beta_set_sha,
+          "externalBetaReportSHA256" => [
+            external_beta_01_sha,
+            external_beta_02_sha,
+            external_beta_03_sha
+          ],
+          "finalDMGProvenanceSHA256" => final_dmg_provenance_sha,
+          "predecessorLineageSHA256" => predecessor_lineage_sha,
           "publicBlockerQuerySHA256" => "2" * 64,
           "confidentialBlockerSignoffSHA256" => "3" * 64,
           "publicSurfaceSHA256" => "4" * 64,
+          "releaseManifestSHA256" => release_manifest_sha,
           "remoteControlsEvidenceSHA256" => remote_controls_sha
         },
         "approval" => {
@@ -647,7 +691,10 @@ write_approval_record() {
         }
       }
       File.binwrite(output, JSON.generate(value) + "\n")
-    ' "$destination" "$recorded_dmg_sha" "$observed_master" "$remote_controls_sha" "$scenario" "$approved_at"
+    ' "$destination" "$recorded_dmg_sha" "$observed_master" "$remote_controls_sha" \
+        "$scenario" "$approved_at" "$release_manifest_sha" "$final_dmg_provenance_sha" \
+        "$candidate_inventory_sha" "$predecessor_lineage_sha" "$external_beta_set_sha" \
+        "$external_beta_01_sha" "$external_beta_02_sha" "$external_beta_03_sha"
 }
 
 run_scenario() {
@@ -667,6 +714,12 @@ run_scenario() {
     local expected_assets="$runner_temp/expected-assets.txt"
     local approval_record="$runner_temp/approval.json"
     local remote_controls_record="$runner_temp/remote-controls-pre-publication.json"
+    local candidate_inventory_record="$runner_temp/candidate-inventory.json"
+    local predecessor_lineage_record="$runner_temp/predecessor-lineage.json"
+    local external_beta_set_record="$runner_temp/external-beta-set.json"
+    local external_beta_01_record="$runner_temp/external-beta-01.json"
+    local external_beta_02_record="$runner_temp/external-beta-02.json"
+    local external_beta_03_record="$runner_temp/external-beta-03.json"
     local remote_controls_policy="$runner_temp/remote-controls-policy.json"
     local candidate_manual_record="$runner_temp/release-candidate-admin-bypass.json"
     local publication_manual_record="$runner_temp/release-publication-admin-token-scope.json"
@@ -705,6 +758,325 @@ run_scenario() {
         ' "$first_asset"
     fi
     final_dmg_sha="$(shasum -a 256 "$source_directory/Desk-Setup-Switcher-0.1.0.dmg" | awk '{print $1}')"
+    "$real_ruby" -rjson -rdigest -rtime -e '
+      manifest_path, dmg_path, created_at_text, release_policy_path = ARGV
+      require release_policy_path
+      created_at = Time.iso8601(created_at_text) - 7 * 86_400
+      dmg_name = File.basename(dmg_path)
+      dmg_bytes = File.binread(dmg_path)
+      dmg_sha = Digest::SHA256.hexdigest(dmg_bytes)
+      verification_output = {
+        "appCodesign" => "valid on disk\nsatisfies its designated requirement\n",
+        "dmgCodesign" => "valid on disk\nsatisfies its designated requirement\n",
+        "spctlApp" => "accepted\nsource=Notarized Developer ID\n",
+        "spctlDMG" => "accepted\nsource=Notarized Developer ID\n",
+        "staplerValidate" => "The validate action worked!\n"
+      }
+      manifest = {
+        "schemaVersion" => "desk-setup-switcher.release-evidence/v1",
+        "generator" => "scripts/release/release_policy.rb",
+        "release" => {
+          "version" => "0.1.0",
+          "tag" => "v0.1.0",
+          "commit" => "a" * 40,
+          "namespace" => "https://github.com/GGULBAE/desk-setup-switcher/release-evidence/v0.1.0/#{dmg_sha}",
+          "created" => created_at.utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+          "buildNumber" => "1",
+          "run" => {
+            "id" => 8001,
+            "attempt" => 1,
+            "url" => "https://github.com/GGULBAE/desk-setup-switcher/actions/runs/8001"
+          }
+        },
+        "toolchain" => { "swift" => "synthetic-6.0" },
+        "application" => {
+          "bundleIdentifier" => "io.github.ggullbae.DeskSetupSwitcher",
+          "teamIdentifier" => "ABCDE12345",
+          "authority" => "Developer ID Application: Synthetic Release (ABCDE12345)",
+          "cdhashes" => { "arm64" => "1" * 40, "x86_64" => "2" * 40 },
+          "executable" => {
+            "name" => "DeskSetupSwitcher",
+            "sha256" => "3" * 64,
+            "size" => 1
+          },
+          "designatedRequirement" => {
+            "normalized" => "designated => identifier \"io.github.ggullbae.DeskSetupSwitcher\" and certificate leaf[subject.OU] = ABCDE12345"
+          },
+          "effectiveEntitlements" => { "state" => "absent", "keys" => [] },
+          "bundleManifest" => {
+            "schemaVersion" => "desk-setup-switcher.app-bundle/v1",
+            "rootName" => "Desk Setup Switcher.app",
+            "entryCount" => 1,
+            "canonicalSha256" => "4" * 64
+          }
+        },
+        "lineage" => {
+          "preNotaryDmg" => { "sha256" => "5" * 64, "size" => dmg_bytes.bytesize },
+          "notary" => {
+            "id" => "12345678-1234-4234-8234-123456789abc",
+            "status" => "Accepted",
+            "archiveFilename" => dmg_name,
+            "submittedSha256" => "5" * 64,
+            "logSha256" => "6" * 64,
+            "logSize" => 1
+          },
+          "finalStapledDmg" => {
+            "name" => dmg_name,
+            "sha256" => dmg_sha,
+            "size" => dmg_bytes.bytesize
+          }
+        },
+        "verifications" => verification_output.keys.sort.map do |name|
+          output = verification_output.fetch(name)
+          {
+            "name" => name,
+            "sha256" => Digest::SHA256.hexdigest(output.b),
+            "size" => output.bytesize,
+            "result" => "pass",
+            "output" => output
+          }
+        end,
+        "assets" => [
+          { "name" => dmg_name, "sha256" => dmg_sha, "size" => dmg_bytes.bytesize }
+        ]
+      }
+      ReleasePolicy.validate_release_manifest_data(manifest)
+      File.binwrite(manifest_path, JSON.generate(manifest) + "\n")
+    ' "$source_directory/release-manifest.json" \
+        "$source_directory/Desk-Setup-Switcher-0.1.0.dmg" "$mock_now" \
+        "$ROOT_DIR/scripts/release/release_policy.rb"
+    cp "$source_directory/release-manifest.json" "$remote_directory/release-manifest.json"
+    "$real_ruby" -rjson -rdigest -rtime -e '
+      inventory_path, lineage_path, set_path, beta_01_path, beta_02_path,
+        beta_03_path, manifest_path, provenance_path, final_dmg_sha, scenario,
+        now_text = ARGV
+      manifest_bytes = File.binread(manifest_path)
+      manifest = JSON.parse(manifest_bytes, create_additions: false)
+      provenance_bytes = File.binread(provenance_path)
+      now = Time.iso8601(now_text)
+      release = manifest.fetch("release")
+      application = manifest.fetch("application")
+      final_dmg = manifest.fetch("lineage").fetch("finalStapledDmg")
+      release_manifest_sha = Digest::SHA256.hexdigest(manifest_bytes)
+      provenance_sha = Digest::SHA256.hexdigest(provenance_bytes)
+      candidate = {
+        "repository" => "GGULBAE/desk-setup-switcher",
+        "tag" => release.fetch("tag"),
+        "commit" => release.fetch("commit"),
+        "version" => release.fetch("version"),
+        "buildNumber" => Integer(release.fetch("buildNumber"), 10),
+        "bundleIdentifier" => application.fetch("bundleIdentifier"),
+        "profileSchemaVersion" => 1,
+        "candidateOriginRunId" => 8001,
+        "candidateOriginRunAttempt" => 1,
+        "candidateArtifactId" => 9001,
+        "candidateArtifactSHA256" => "b" * 64,
+        "finalDMGSHA256" => final_dmg_sha,
+        "releaseManifestSHA256" => release_manifest_sha
+      }
+      inventory_items = []
+      if scenario == "predecessor-build-reuse"
+        inventory_items << {
+          "outcome" => "not-retained",
+          "version" => "0.0.9",
+          "buildNumber" => 1,
+          "commit" => "9" * 40,
+          "candidateOriginRunId" => 7999,
+          "candidateOriginRunAttempt" => 1,
+          "runConclusion" => "failure",
+          "completedAt" => (now - 6 * 86_400).utc.iso8601,
+          "distributionState" => "not-distributed",
+          "reason" => "build-failed"
+        }
+      end
+      inventory = {
+        "schemaVersion" => scenario == "candidate-inventory-schema-invalid" ?
+          "desk-setup-switcher.candidate-inventory/v0" :
+          "desk-setup-switcher.candidate-inventory/v1",
+        "subject" => {
+          "repository" => "GGULBAE/desk-setup-switcher",
+          "workflowPath" => ".github/workflows/release.yml",
+          "operation" => "build-candidate",
+          "currentCandidateRunId" => 8001,
+          "currentCandidateBuildNumber" => 1
+        },
+        "collection" => {
+          "collectedAt" => (now - 5 * 86_400).utc.iso8601,
+          "reviewedAt" => (now - 102 * 3_600).utc.iso8601,
+          "reviewMode" => "protected-complete-history-review",
+          "reviewerRole" => "release-approver",
+          "allPagesReviewed" => true,
+          "sourceEvidenceSHA256" => "7" * 64
+        },
+        "items" => inventory_items
+      }
+      File.binwrite(inventory_path, JSON.generate(inventory) + "\n")
+      inventory_sha = Digest::SHA256.file(inventory_path).hexdigest
+      lineage = {
+        "schemaVersion" => "desk-setup-switcher.predecessor-lineage/v2",
+        "candidate" => candidate,
+        "candidateInventorySHA256" => inventory_sha,
+        "upgradePredecessor" => {
+          "state" => "none",
+          "reason" => "first-public-beta-no-installable-predecessor",
+          "candidateInventorySHA256" => inventory_sha,
+          "cleanInstallEvidenceSHA256" => "b" * 64,
+          "schema0MigrationEvidenceSHA256" => "c" * 64
+        }
+      }
+      File.binwrite(lineage_path, JSON.generate(lineage) + "\n")
+      lineage_sha = Digest::SHA256.file(lineage_path).hexdigest
+
+      report_codes = %w[beta-01 beta-02 beta-03]
+      report_paths = [beta_01_path, beta_02_path, beta_03_path]
+      reports = report_codes.each_with_index.map do |code, index|
+        started_at = now - (4 - index) * 86_400
+        completed_at = started_at + 3_600
+        subject = candidate.merge(
+          "finalDMGName" => final_dmg.fetch("name"),
+          "provenanceBundleName" => "Desk-Setup-Switcher-#{candidate.fetch("version")}.provenance.sigstore.json",
+          "provenanceBundleSHA256" => provenance_sha,
+          "provenanceSubjectSHA256" => final_dmg_sha,
+          "predecessorLineageSHA256" => lineage_sha
+        )
+        subject.delete("candidateOriginRunAttempt")
+        subject["candidateOriginRunAttempt"] = 1
+        report = {
+          "schemaVersion" => "desk-setup-switcher.external-beta/v1",
+          "report" => {
+            "reportCode" => code,
+            "startedAt" => started_at.utc.iso8601,
+            "completedAt" => completed_at.utc.iso8601
+          },
+          "subject" => subject,
+          "environment" => {
+            "architecture" => "arm64",
+            "macOSVersion" => index.zero? ? "14.6.1" : "15.#{index - 1}",
+            "hardwareClass" => "apple-silicon",
+            "cleanBasis" => index.zero? ? "clean-mac" : "clean-local-account",
+            "coverageRole" => index.zero? ? "sonoma-full-lifecycle" : "additional-apple-silicon"
+          },
+          "independence" => {
+            "externalTester" => true,
+            "notReleaseOperator" => true,
+            "notReleaseApprover" => true,
+            "noRepositoryWriteAccess" => true,
+            "noReleaseSecretAccess" => true
+          },
+          "acquisition" => {
+            "channel" => "protected-workflow-browser",
+            "browserDownloaded" => true,
+            "normalArchiveExtraction" => true,
+            "quarantinePresent" => true,
+            "quarantineManufactured" => false,
+            "quarantineRemoved" => false,
+            "quarantineEvidenceSHA256" => (index + 1).to_s * 64,
+            "checksumPass" => true,
+            "provenancePass" => true,
+            "gatekeeperPass" => true,
+            "openAnywayUsed" => false
+          },
+          "lifecycle" => {
+            "firstLaunchPass" => true,
+            "loginItemDefaultOffPass" => true,
+            "threeStepFlowPass" => true,
+            "stoppedBeforeApply" => true,
+            "schema0MigrationPass" => true,
+            "backupRecoveryPass" => true,
+            "importExportPass" => true,
+            "diagnosticsPass" => true,
+            "uninstallPass" => true,
+            "localDataRemovalPass" => true,
+            "hardwareMutationPerformed" => false,
+            "upgrade" => {
+              "state" => "not-applicable",
+              "reason" => "first-public-beta-no-installable-predecessor"
+            }
+          },
+          "issues" => {
+            "unresolvedP0" => 0,
+            "unresolvedP1" => 0,
+            "allFailuresTracked" => true,
+            "blockerEvidenceSHA256" => (index + 4).to_s * 64
+          },
+          "attestation" => {
+            "candidateIdentityConfirmed" => true,
+            "privacyReviewed" => true,
+            "reportComplete" => true,
+            "testerAttested" => true,
+            "noHardwareMutationClaim" => true
+          }
+        }
+        report
+      end
+      case scenario
+      when "beta-wrong-candidate"
+        reports.fetch(1).fetch("subject")["commit"] = "9" * 40
+      when "beta-duplicate-code"
+        reports.fetch(1).fetch("report")["reportCode"] = "beta-01"
+      when "beta-missing-sonoma"
+        environment = reports.fetch(0).fetch("environment")
+        environment["macOSVersion"] = "15.0"
+        environment["coverageRole"] = "additional-apple-silicon"
+      when "beta-lifecycle-failed"
+        reports.fetch(1).fetch("lifecycle")["diagnosticsPass"] = false
+      when "beta-quarantine-invalid"
+        reports.fetch(2).fetch("acquisition")["quarantineRemoved"] = true
+      when "beta-independent-false"
+        reports.fetch(1).fetch("independence")["noRepositoryWriteAccess"] = false
+      when "beta-provenance-mismatch"
+        reports.fetch(2).fetch("subject")["provenanceBundleSHA256"] = "0" * 64
+      end
+      reports.each_with_index do |report, index|
+        File.binwrite(report_paths.fetch(index), JSON.generate(report) + "\n")
+      end
+      report_digests = report_paths.map { |path| Digest::SHA256.file(path).hexdigest }
+      set_subject = reports.fetch(0).fetch("subject")
+      beta_set = {
+        "schemaVersion" => "desk-setup-switcher.external-beta-set/v1",
+        "subject" => set_subject,
+        "reports" => report_codes.each_with_index.map do |code, index|
+          { "reportCode" => code, "reportSHA256" => report_digests.fetch(index) }
+        end,
+        "independence" => {
+          "reviewMode" => "protected-release-review",
+          "reviewerRole" => "release-approver",
+          "reviewedAt" => (now - 86_400).utc.iso8601,
+          "protectedReviewEvidenceSHA256" => "d" * 64,
+          "privateRosterBundleSHA256" => "e" * 64,
+          "bindings" => report_codes.each_with_index.map do |code, index|
+            {
+              "reportCode" => code,
+              "reportSHA256" => report_digests.fetch(index),
+              "privateRosterEntryCommitmentSHA256" => (index + 7).to_s * 64
+            }
+          end,
+          "assertions" => {
+            "threeDistinctNaturalPersons" => true,
+            "allExternalToReleaseTeam" => true,
+            "noneIsReleaseOperator" => true,
+            "noneIsReleaseApprover" => true,
+            "noneHasPushReleaseEnvironmentOrSecretAccess" => true
+          }
+        },
+        "coverage" => {
+          "acceptedReportCount" => 3,
+          "sonomaGateReportCode" => "beta-01",
+          "allAppleSilicon" => true,
+          "allSupportedOS" => true,
+          "allMandatoryLifecyclePassed" => true
+        },
+        "createdAt" => (now - 12 * 3_600).utc.iso8601
+      }
+      if scenario == "beta-set-binding-mismatch"
+        beta_set.fetch("independence").fetch("bindings").fetch(0)["reportSHA256"] = "0" * 64
+      end
+      File.binwrite(set_path, JSON.generate(beta_set) + "\n")
+    ' "$candidate_inventory_record" "$predecessor_lineage_record" "$external_beta_set_record" \
+        "$external_beta_01_record" "$external_beta_02_record" "$external_beta_03_record" \
+        "$source_directory/release-manifest.json" \
+        "$source_directory/Desk-Setup-Switcher-0.1.0.provenance.sigstore.json" \
+        "$final_dmg_sha" "$scenario" "$mock_now"
     FIXTURE_SCENARIO="$scenario" "$real_ruby" -rjson -rtime -e '
       candidate_path, publication_path, final_candidate_path, final_publication_path, now_text,
         scenario = ARGV
@@ -888,11 +1260,30 @@ run_scenario() {
         "$mock_now"
     final_pre_tag_evidence_sha="$(shasum -a 256 "$final_pre_tag_evidence_record" | awk '{print $1}')"
     remote_controls_sha="$(shasum -a 256 "$remote_controls_record" | awk '{print $1}')"
+    release_manifest_sha="$(shasum -a 256 "$source_directory/release-manifest.json" | awk '{print $1}')"
+    final_dmg_provenance_sha="$(
+        shasum -a 256 "$source_directory/Desk-Setup-Switcher-0.1.0.provenance.sigstore.json" \
+            | awk '{print $1}'
+    )"
+    candidate_inventory_sha="$(shasum -a 256 "$candidate_inventory_record" | awk '{print $1}')"
+    predecessor_lineage_sha="$(shasum -a 256 "$predecessor_lineage_record" | awk '{print $1}')"
+    external_beta_set_sha="$(shasum -a 256 "$external_beta_set_record" | awk '{print $1}')"
+    external_beta_01_sha="$(shasum -a 256 "$external_beta_01_record" | awk '{print $1}')"
+    external_beta_02_sha="$(shasum -a 256 "$external_beta_02_record" | awk '{print $1}')"
+    external_beta_03_sha="$(shasum -a 256 "$external_beta_03_record" | awk '{print $1}')"
     write_approval_record \
         "$approval_record" "$final_dmg_sha" "$scenario" "$observed_master" "$remote_controls_sha" \
-        "$mock_now"
+        "$mock_now" "$release_manifest_sha" "$final_dmg_provenance_sha" \
+        "$candidate_inventory_sha" "$predecessor_lineage_sha" "$external_beta_set_sha" \
+        "$external_beta_01_sha" "$external_beta_02_sha" "$external_beta_03_sha"
     if [[ "$scenario" == controls-digest-mismatch ]]; then
         printf ' \n' >>"$remote_controls_record"
+    fi
+    if [[ "$scenario" == beta-report-byte-mismatch ]]; then
+        printf ' ' >>"$external_beta_01_record"
+    fi
+    if [[ "$scenario" == candidate-inventory-byte-mismatch ]]; then
+        printf ' ' >>"$candidate_inventory_record"
     fi
     approval_sha="$(shasum -a 256 "$approval_record" | awk '{print $1}')"
     printf '0\n' >"$state_directory/master-reads"
@@ -945,6 +1336,18 @@ run_scenario() {
         "MOCK_APPROVAL_SOURCE=$approval_record"
         "MOCK_CONTROLS_RELATIVE=docs/evidence/releases/v0.1.0/remote-controls-pre-publication.json"
         "MOCK_CONTROLS_SOURCE=$remote_controls_record"
+        "MOCK_CANDIDATE_INVENTORY_RELATIVE=docs/evidence/releases/v0.1.0/candidate-inventory.json"
+        "MOCK_CANDIDATE_INVENTORY_SOURCE=$candidate_inventory_record"
+        "MOCK_PREDECESSOR_LINEAGE_RELATIVE=docs/evidence/releases/v0.1.0/predecessor-lineage.json"
+        "MOCK_PREDECESSOR_LINEAGE_SOURCE=$predecessor_lineage_record"
+        "MOCK_EXTERNAL_BETA_SET_RELATIVE=docs/evidence/releases/v0.1.0/external-beta-set.json"
+        "MOCK_EXTERNAL_BETA_SET_SOURCE=$external_beta_set_record"
+        "MOCK_EXTERNAL_BETA_01_RELATIVE=docs/evidence/releases/v0.1.0/external-beta-01.json"
+        "MOCK_EXTERNAL_BETA_01_SOURCE=$external_beta_01_record"
+        "MOCK_EXTERNAL_BETA_02_RELATIVE=docs/evidence/releases/v0.1.0/external-beta-02.json"
+        "MOCK_EXTERNAL_BETA_02_SOURCE=$external_beta_02_record"
+        "MOCK_EXTERNAL_BETA_03_RELATIVE=docs/evidence/releases/v0.1.0/external-beta-03.json"
+        "MOCK_EXTERNAL_BETA_03_SOURCE=$external_beta_03_record"
         "MOCK_POLICY_RELATIVE=scripts/release/remote-controls-policy.json"
         "MOCK_POLICY_SOURCE=$remote_controls_policy"
         "MOCK_CANDIDATE_MANUAL_RELATIVE=docs/evidence/releases/v0.1.0/release-candidate-admin-bypass.json"
@@ -1169,6 +1572,19 @@ run_scenario() {
     pass
     unset incident_only
 
+    case "$scenario" in
+        candidate-inventory-byte-mismatch|candidate-inventory-schema-invalid|predecessor-build-reuse|\
+        beta-report-byte-mismatch|beta-wrong-candidate|beta-duplicate-code|beta-missing-sonoma|\
+        beta-lifecycle-failed|beta-quarantine-invalid|beta-independent-false|\
+        beta-provenance-mismatch|beta-set-binding-mismatch)
+            grep -q 'The external-beta or predecessor-lineage evidence is invalid.' "$stderr_path" || {
+                printf 'Scenario %s did not fail at the external-beta gate.\n' "$scenario" >&2
+                return 1
+            }
+            pass
+            ;;
+    esac
+
     if [[ "$expected_patch_count" -gt 0 ]]; then
         "$real_ruby" -rjson -e '
           calls = File.readlines(ARGV.fetch(0), chomp: true).map { |line| JSON.parse(line) }
@@ -1231,6 +1647,18 @@ run_scenario approval-extra-path failure 0
 run_scenario release-critical-drift failure 0
 run_scenario controls-evidence-invalid failure 0
 run_scenario controls-digest-mismatch failure 0
+run_scenario candidate-inventory-byte-mismatch failure 0
+run_scenario candidate-inventory-schema-invalid failure 0
+run_scenario beta-report-byte-mismatch failure 0
+run_scenario beta-wrong-candidate failure 0
+run_scenario beta-duplicate-code failure 0
+run_scenario beta-missing-sonoma failure 0
+run_scenario beta-lifecycle-failed failure 0
+run_scenario beta-quarantine-invalid failure 0
+run_scenario beta-independent-false failure 0
+run_scenario beta-provenance-mismatch failure 0
+run_scenario predecessor-build-reuse failure 0
+run_scenario beta-set-binding-mismatch failure 0
 run_scenario final-evidence-two-introductions failure 0
 run_scenario final-evidence-merge-introduction failure 0
 run_scenario final-evidence-second-parent failure 0

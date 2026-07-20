@@ -6,7 +6,7 @@ require "optparse"
 require "time"
 
 module DeskSetupPublicationPolicy
-  SCHEMA = "desk-setup-switcher.publication-approval/v1"
+  SCHEMA = "desk-setup-switcher.publication-approval/v2"
   MAX_JSON_BYTES = 131_072
   MINIMUM_REMAINING_SECONDS = 300
   SHA256 = /\A[0-9a-f]{64}\z/
@@ -115,7 +115,9 @@ module DeskSetupPublicationPolicy
     exact_positive_integer(subject["releaseId"], "release ID")
     exact_positive_integer(subject["candidateOriginRunId"], "candidate origin run ID")
     exact_positive_integer(subject["candidateArtifactId"], "candidate artifact ID")
-    fail_policy!("candidate origin attempt differs") unless subject["candidateOriginRunAttempt"] == 1
+    fail_policy!("candidate origin attempt differs") unless
+      subject["candidateOriginRunAttempt"].is_a?(Integer) &&
+      subject["candidateOriginRunAttempt"] == 1
     exact_sha256(subject["candidateArtifactSHA256"], "candidate artifact digest")
     exact_sha256(subject["finalDMGSHA256"], "final DMG digest")
     fail_policy!("repository identity differs") unless subject["repository"] == expected.fetch(:repository)
@@ -141,17 +143,34 @@ module DeskSetupPublicationPolicy
     evidence = exact_object(
       record["evidence"],
       "approval evidence",
-      %w[cleanLifecycleSHA256 confidentialBlockerSignoffSHA256 externalBetaReportSHA256 publicBlockerQuerySHA256 publicSurfaceSHA256 releaseEvidenceSHA256 remoteControlsEvidenceSHA256]
+      %w[candidateInventorySHA256 cleanLifecycleSHA256 confidentialBlockerSignoffSHA256 externalBetaReportSHA256 externalBetaSetSHA256 finalDMGProvenanceSHA256 predecessorLineageSHA256 publicBlockerQuerySHA256 publicSurfaceSHA256 releaseEvidenceSHA256 releaseManifestSHA256 remoteControlsEvidenceSHA256]
     )
-    %w[cleanLifecycleSHA256 confidentialBlockerSignoffSHA256 publicBlockerQuerySHA256 publicSurfaceSHA256 releaseEvidenceSHA256 remoteControlsEvidenceSHA256].each do |name|
+    %w[candidateInventorySHA256 cleanLifecycleSHA256 confidentialBlockerSignoffSHA256 externalBetaSetSHA256 finalDMGProvenanceSHA256 predecessorLineageSHA256 publicBlockerQuerySHA256 publicSurfaceSHA256 releaseEvidenceSHA256 releaseManifestSHA256 remoteControlsEvidenceSHA256].each do |name|
       exact_sha256(evidence[name], "approval evidence #{name}")
     end
+    fail_policy!("candidate inventory digest differs") unless
+      evidence["candidateInventorySHA256"] == expected.fetch(:candidate_inventory_sha256)
     fail_policy!("remote-controls manifest digest differs") unless
       evidence["remoteControlsEvidenceSHA256"] == expected.fetch(:remote_controls_manifest_sha256)
+    fail_policy!("external beta set digest differs") unless
+      evidence["externalBetaSetSHA256"] == expected.fetch(:external_beta_set_sha256)
+    fail_policy!("final DMG provenance digest differs") unless
+      evidence["finalDMGProvenanceSHA256"] == expected.fetch(:final_dmg_provenance_sha256)
+    fail_policy!("predecessor lineage digest differs") unless
+      evidence["predecessorLineageSHA256"] == expected.fetch(:predecessor_lineage_sha256)
+    fail_policy!("release manifest digest differs") unless
+      evidence["releaseManifestSHA256"] == expected.fetch(:release_manifest_sha256)
     beta_digests = evidence["externalBetaReportSHA256"]
     fail_policy!("exactly three external beta evidence digests are required") unless beta_digests.is_a?(Array) && beta_digests.length == 3
     beta_digests.each_with_index { |digest, index| exact_sha256(digest, "external beta digest #{index + 1}") }
     fail_policy!("external beta evidence digests are not unique") unless beta_digests.uniq.length == beta_digests.length
+    fail_policy!("external beta evidence digests differ") unless
+      beta_digests == expected.fetch(:external_beta_report_sha256)
+    sonoma_digest = expected.fetch(:sonoma_beta_report_sha256)
+    fail_policy!("clean lifecycle digest differs from the Sonoma beta report") unless
+      evidence["cleanLifecycleSHA256"] == sonoma_digest
+    fail_policy!("Sonoma beta report is not one of the external beta reports") unless
+      beta_digests.include?(sonoma_digest)
 
     approval = exact_object(
       record["approval"],
@@ -210,9 +229,18 @@ module DeskSetupPublicationPolicy
       value.on("--candidate-run-id ID") { |item| options[:candidate_run_id] = item }
       value.on("--candidate-artifact-id ID") { |item| options[:candidate_artifact_id] = item }
       value.on("--candidate-artifact-sha256 SHA") { |item| options[:candidate_artifact_sha256] = item }
+      value.on("--candidate-inventory-sha256 SHA") { |item| options[:candidate_inventory_sha256] = item }
       value.on("--final-dmg-sha256 SHA") { |item| options[:final_dmg_sha256] = item }
       value.on("--remote-controls-observed-master SHA") { |item| options[:remote_controls_observed_master] = item }
       value.on("--remote-controls-manifest-sha256 SHA") { |item| options[:remote_controls_manifest_sha256] = item }
+      value.on("--external-beta-set-sha256 SHA") { |item| options[:external_beta_set_sha256] = item }
+      value.on("--external-beta-report-sha256 SHA") do |item|
+        (options[:external_beta_report_sha256] ||= []) << item
+      end
+      value.on("--sonoma-beta-report-sha256 SHA") { |item| options[:sonoma_beta_report_sha256] = item }
+      value.on("--final-dmg-provenance-sha256 SHA") { |item| options[:final_dmg_provenance_sha256] = item }
+      value.on("--predecessor-lineage-sha256 SHA") { |item| options[:predecessor_lineage_sha256] = item }
+      value.on("--release-manifest-sha256 SHA") { |item| options[:release_manifest_sha256] = item }
       value.on("--approval-sha256 SHA") { |item| options[:approval_sha256] = item }
       value.on("--approver-login LOGIN") { |item| options[:approver_login] = item }
       value.on("--publisher-login LOGIN") { |item| options[:publisher_login] = item }
@@ -222,7 +250,7 @@ module DeskSetupPublicationPolicy
     parser.parse!(argv)
     fail_policy!("unexpected arguments") unless argv.empty?
 
-    required = %i[json repository tag commit release_id candidate_run_id candidate_artifact_id candidate_artifact_sha256 final_dmg_sha256 remote_controls_observed_master remote_controls_manifest_sha256 approval_sha256 approver_login publisher_login approval_mode verified_at]
+    required = %i[json repository tag commit release_id candidate_run_id candidate_artifact_id candidate_artifact_sha256 candidate_inventory_sha256 final_dmg_sha256 remote_controls_observed_master remote_controls_manifest_sha256 external_beta_set_sha256 external_beta_report_sha256 sonoma_beta_report_sha256 final_dmg_provenance_sha256 predecessor_lineage_sha256 release_manifest_sha256 approval_sha256 approver_login publisher_login approval_mode verified_at]
     missing = required.reject { |name| options.key?(name) }
     fail_policy!("required approval inputs are missing") unless missing.empty?
     fail_policy!("release commit is invalid") unless COMMIT.match?(options.fetch(:commit))
@@ -232,10 +260,21 @@ module DeskSetupPublicationPolicy
       options[name] = Integer(text, 10)
     end
     exact_sha256(options.fetch(:candidate_artifact_sha256), "expected candidate artifact digest")
+    exact_sha256(options.fetch(:candidate_inventory_sha256), "expected candidate inventory digest")
     exact_sha256(options.fetch(:final_dmg_sha256), "expected final DMG digest")
     fail_policy!("expected remote-controls observed master is invalid") unless
       COMMIT.match?(options.fetch(:remote_controls_observed_master))
     exact_sha256(options.fetch(:remote_controls_manifest_sha256), "expected remote-controls manifest digest")
+    exact_sha256(options.fetch(:external_beta_set_sha256), "expected external beta set digest")
+    beta_digests = options.fetch(:external_beta_report_sha256)
+    fail_policy!("exactly three expected external beta report digests are required") unless beta_digests.length == 3
+    beta_digests.each_with_index do |digest, index|
+      exact_sha256(digest, "expected external beta report digest #{index + 1}")
+    end
+    exact_sha256(options.fetch(:sonoma_beta_report_sha256), "expected Sonoma beta report digest")
+    exact_sha256(options.fetch(:final_dmg_provenance_sha256), "expected final DMG provenance digest")
+    exact_sha256(options.fetch(:predecessor_lineage_sha256), "expected predecessor lineage digest")
+    exact_sha256(options.fetch(:release_manifest_sha256), "expected release manifest digest")
     exact_sha256(options.fetch(:approval_sha256), "expected approval record digest")
     exact_string(options.fetch(:approver_login), "expected approver login")
     exact_string(options.fetch(:publisher_login), "expected publisher login")

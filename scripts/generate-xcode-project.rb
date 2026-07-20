@@ -101,7 +101,7 @@ app_bundle_name = "#{app_name}.app"
 
 abort "Invalid CFBundleIdentifier: #{bundle_identifier}" unless bundle_identifier.match?(/\A[A-Za-z0-9][A-Za-z0-9-]*(?:\.[A-Za-z0-9][A-Za-z0-9-]*)+\z/)
 abort "Invalid CFBundleShortVersionString: #{marketing_version}" unless marketing_version.match?(/\A\d+(?:\.\d+){0,2}\z/)
-abort "Invalid CFBundleVersion: #{build_number}" unless build_number.match?(/\A\d+(?:\.\d+){0,2}\z/)
+abort "Invalid CFBundleVersion: #{build_number}" unless build_number.match?(/\A[1-9][0-9]*\z/)
 abort "Invalid LSMinimumSystemVersion: #{minimum_system_version}" unless minimum_system_version.match?(/\A\d+(?:\.\d+){0,2}\z/)
 abort "CFBundlePackageType must be APPL." unless info_plist["CFBundlePackageType"] == "APPL"
 abort "LSUIElement must be true for a menu-bar-only app." unless info_plist["LSUIElement"] == true

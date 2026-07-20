@@ -80,6 +80,9 @@ pass
 ruby "$RELEASE_SCRIPTS_DIR/test_publication_policy.rb"
 pass
 
+ruby "$RELEASE_SCRIPTS_DIR/test_external_beta_policy.rb"
+pass
+
 "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector.sh"
 pass
 
@@ -561,6 +564,7 @@ verify_candidate="$RELEASE_SCRIPTS_DIR/verify-candidate.sh"
 verify_downloaded="$RELEASE_SCRIPTS_DIR/verify-downloaded-candidate.sh"
 publication_helper="$RELEASE_SCRIPTS_DIR/publish-approved-release.sh"
 publication_policy="$RELEASE_SCRIPTS_DIR/publication_policy.rb"
+external_beta_policy="$RELEASE_SCRIPTS_DIR/external_beta_policy.rb"
 assert_contains "$workflow" "workflow_dispatch:"
 assert_contains "$workflow" "environment: release-candidate"
 assert_contains "$workflow" "DESK_SETUP_RELEASE_MUTATIONS: \"1\""
@@ -691,7 +695,7 @@ pass
 pass
 
 ruby -e '
-  helper, policy = ARGV.map { |path| File.read(path) }
+  helper, policy, beta_policy = ARGV.map { |path| File.read(path) }
   abort "publication helper must contain exactly one PATCH callsite" unless
     helper.scan(/--method PATCH/).length == 1
   abort "publication helper mutation endpoint differs" unless
@@ -717,13 +721,41 @@ ruby -e '
   abort "publication helper does not bind the direct approval successor" unless
     helper.include?(%q{git rev-list --parents -n 1 "$RELEASE_APPROVAL_RECORD_COMMIT"}) &&
       helper.include?(%q{remote-controls-pre-publication.json})
+  beta_paths = %w[
+    candidate-inventory.json predecessor-lineage.json external-beta-set.json
+    external-beta-01.json external-beta-02.json external-beta-03.json
+  ]
+  abort "publication helper lacks the fixed beta/lineage evidence paths" unless
+    beta_paths.all? { |path| helper.include?(%Q{docs/evidence/releases/$RELEASE_TAG/#{path}}) }
+  abort "publication helper provenance name differs" unless
+    helper.include?(%q{provenance_name="Desk-Setup-Switcher-$VERSION.provenance.sigstore.json"})
+  abort "publication helper does not run actual-byte beta validation" unless
+    helper.include?(%q{external_beta_policy.rb" verify-set}) &&
+      helper.include?(%q{--release-manifest "$candidate_snapshot/release-manifest.json"}) &&
+      helper.include?(%q{--candidate-inventory "$candidate_inventory_evidence"}) &&
+      helper.scan(/--report "\$\{external_beta_report_evidence\[[012]\]\}"/).length == 3
+  abort "publication helper does not retain the exact two-path approval diff" unless
+    helper.include?(%q{expected = ["A\t#{approval_path}", "A\t#{controls_path}"].sort})
   abort "release-only approval schema still contains site publication authority" if
     policy.include?(%q{sitePublication})
   abort "publication policy lacks a safe generic failure boundary" unless
     policy.include?("rescue StandardError") &&
       policy.include?("Publication policy error: approval verification failed safely.")
-' "$publication_helper" "$publication_policy"
+  abort "external beta policy lacks descriptor-bound reads" unless
+    beta_policy.include?("File::NOFOLLOW") &&
+      beta_policy.include?("before.nlink == 1") &&
+      beta_policy.include?("changed during descriptor-bound read")
+  abort "external beta policy does not validate the restored manifest" unless
+    beta_policy.include?("ReleasePolicy.validate_release_manifest_data(manifest)")
+  abort "external beta policy contains process, network, or file mutation primitives" if
+    beta_policy.match?(/(?:`|%x\{|\bsystem\s*\(|\bexec\s*\(|IO\.popen|Open3|Net::HTTP|TCPSocket|UDPSocket|File\.(?:write|binwrite|delete|unlink|rename|chmod|chown))/)
+  abort "external beta policy lacks a safe generic failure boundary" unless
+    beta_policy.include?("rescue StandardError") &&
+      beta_policy.include?("External beta policy error: evidence verification failed safely.")
+' "$publication_helper" "$publication_policy" "$external_beta_policy"
 pass
+
+assert_before "$publication_helper" 'external_beta_policy.rb" verify-set' '--method PATCH'
 
 ruby -ryaml -rjson -e '
   workflow = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: true)

@@ -130,6 +130,15 @@ same_github_login() {
     release_die "RELEASE_APPROVAL_RECORD_PATH does not identify the fixed approval record."
 }
 remote_controls_evidence_path="docs/evidence/releases/$RELEASE_TAG/remote-controls-pre-publication.json"
+candidate_inventory_evidence_path="docs/evidence/releases/$RELEASE_TAG/candidate-inventory.json"
+predecessor_lineage_evidence_path="docs/evidence/releases/$RELEASE_TAG/predecessor-lineage.json"
+external_beta_set_evidence_path="docs/evidence/releases/$RELEASE_TAG/external-beta-set.json"
+external_beta_report_evidence_paths=(
+    "docs/evidence/releases/$RELEASE_TAG/external-beta-01.json"
+    "docs/evidence/releases/$RELEASE_TAG/external-beta-02.json"
+    "docs/evidence/releases/$RELEASE_TAG/external-beta-03.json"
+)
+profile_schema_version=1
 remote_controls_policy_path="scripts/release/remote-controls-policy.json"
 candidate_manual_evidence_path="docs/evidence/releases/$RELEASE_TAG/release-candidate-admin-bypass.json"
 publication_manual_evidence_path="docs/evidence/releases/$RELEASE_TAG/release-publication-admin-token-scope.json"
@@ -203,6 +212,7 @@ tracked_notes="$(git ls-files --error-unmatch -- "$RELEASE_NOTES_PATH")" || {
 }
 
 dmg_name="Desk-Setup-Switcher-$VERSION.dmg"
+provenance_name="Desk-Setup-Switcher-$VERSION.provenance.sigstore.json"
 asset_names=(
     "$dmg_name"
     "$dmg_name.sha256"
@@ -210,7 +220,7 @@ asset_names=(
     release-manifest.json
     notary-result.json
     notary-log.json
-    "Desk-Setup-Switcher-$VERSION.provenance.sigstore.json"
+    "$provenance_name"
     "Desk-Setup-Switcher-$VERSION.sbom.sigstore.json"
     release-manifest.provenance.sigstore.json
 )
@@ -240,6 +250,22 @@ approval_diff="$temporary_root/approval-diff.txt"
 approval_parent="$temporary_root/approval-parent.txt"
 remote_controls_evidence="$temporary_root/remote-controls-pre-publication.json"
 remote_controls_tree="$temporary_root/remote-controls-tree.txt"
+candidate_inventory_evidence="$temporary_root/candidate-inventory.json"
+candidate_inventory_tree="$temporary_root/candidate-inventory-tree.txt"
+predecessor_lineage_evidence="$temporary_root/predecessor-lineage.json"
+predecessor_lineage_tree="$temporary_root/predecessor-lineage-tree.txt"
+external_beta_set_evidence="$temporary_root/external-beta-set.json"
+external_beta_set_tree="$temporary_root/external-beta-set-tree.txt"
+external_beta_report_evidence=(
+    "$temporary_root/external-beta-01.json"
+    "$temporary_root/external-beta-02.json"
+    "$temporary_root/external-beta-03.json"
+)
+external_beta_report_trees=(
+    "$temporary_root/external-beta-01-tree.txt"
+    "$temporary_root/external-beta-02-tree.txt"
+    "$temporary_root/external-beta-03-tree.txt"
+)
 remote_controls_policy="$temporary_root/remote-controls-policy.json"
 remote_controls_policy_tree="$temporary_root/remote-controls-policy-tree.txt"
 candidate_manual_evidence="$temporary_root/release-candidate-admin-bypass.json"
@@ -767,9 +793,11 @@ git cat-file -e "$RELEASE_APPROVAL_RECORD_COMMIT^{commit}" 2>"$parse_error" || {
     release_die "The approval-record commit is unavailable after the exact default-branch fetch."
 }
 
-# The reviewed controls snapshot is produced against the pre-approval master.
-# The approval commit must be its single direct successor and may add exactly
-# the snapshot plus the approval record—nothing executable or release-critical.
+# The candidate inventory, predecessor lineage, beta set, and three reports
+# already exist on the reviewed pre-approval master. The fresh controls snapshot
+# is produced against that commit. Its single direct successor may add exactly
+# the snapshot plus the approval record—nothing executable or release-critical,
+# including no rewrite of the evidence being approved.
 git rev-list --parents -n 1 "$RELEASE_APPROVAL_RECORD_COMMIT" >"$approval_parent" 2>"$parse_error" || {
     release_die "The approval-record commit ancestry could not be read."
 }
@@ -898,6 +926,31 @@ materialize_exact_blob \
     "$remote_controls_tree" "$remote_controls_evidence" || {
     release_die "The pre-publication controls evidence is not one ordinary tracked blob."
 }
+materialize_exact_blob \
+    "$RELEASE_APPROVAL_RECORD_COMMIT" "$candidate_inventory_evidence_path" \
+    "$candidate_inventory_tree" "$candidate_inventory_evidence" || {
+    release_die "The candidate-inventory evidence is not one ordinary tracked blob."
+}
+materialize_exact_blob \
+    "$RELEASE_APPROVAL_RECORD_COMMIT" "$predecessor_lineage_evidence_path" \
+    "$predecessor_lineage_tree" "$predecessor_lineage_evidence" || {
+    release_die "The predecessor-lineage evidence is not one ordinary tracked blob."
+}
+materialize_exact_blob \
+    "$RELEASE_APPROVAL_RECORD_COMMIT" "$external_beta_set_evidence_path" \
+    "$external_beta_set_tree" "$external_beta_set_evidence" || {
+    release_die "The external-beta set evidence is not one ordinary tracked blob."
+}
+for evidence_index in 0 1 2; do
+    materialize_exact_blob \
+        "$RELEASE_APPROVAL_RECORD_COMMIT" \
+        "${external_beta_report_evidence_paths[$evidence_index]}" \
+        "${external_beta_report_trees[$evidence_index]}" \
+        "${external_beta_report_evidence[$evidence_index]}" || {
+        release_die "An external-beta report is not one ordinary tracked blob."
+    }
+done
+unset evidence_index
 materialize_exact_blob \
     "$RELEASE_APPROVAL_RECORD_COMMIT" "$remote_controls_policy_path" \
     "$remote_controls_policy_tree" "$remote_controls_policy" || {
@@ -1181,7 +1234,7 @@ verify_manual_controls_now() {
 }
 verify_evidence_approval_ordering() {
     ruby -rjson -rtime -e '
-      approval_path, final_path, pre_path, *manual_paths = ARGV
+      approval_path, final_path, pre_path, beta_created_at_text, *manual_paths = ARGV
       approval = JSON.parse(File.binread(approval_path), allow_nan: false, create_additions: false)
       approved_at_text = approval.fetch("approval").fetch("approvedAt")
       approved_at = Time.iso8601(approved_at_text)
@@ -1193,6 +1246,8 @@ verify_evidence_approval_ordering() {
         raise unless collected_at_text == collected_at.utc.iso8601
         collected_at
       end
+      beta_created_at = Time.iso8601(beta_created_at_text)
+      raise unless beta_created_at_text == beta_created_at.utc.iso8601
       manual_times = manual_paths.map do |path|
         manual = JSON.parse(File.binread(path), allow_nan: false, create_additions: false)
         observed_at_text = manual.fetch("observedAt")
@@ -1205,16 +1260,89 @@ verify_evidence_approval_ordering() {
       final_manual = manual_times.drop(2).first(2)
       raise unless final_manual.all? { |time| time <= final_collected }
       raise unless current_manual.all? { |time| final_collected <= time && time <= pre_collected }
-      raise unless pre_collected <= approved_at
+      raise unless beta_created_at <= approved_at && pre_collected <= approved_at
     ' "$approval_record" "$final_pre_tag_evidence" "$remote_controls_evidence" \
+        "$external_beta_set_created_at" \
         "$candidate_manual_evidence" "$publication_manual_evidence" \
         "$final_candidate_manual_evidence" "$final_publication_manual_evidence" \
         >/dev/null 2>"$parse_error" || {
         release_die "The approval predates controls evidence for this release."
     }
 }
+verify_local_publication_evidence_now() {
+    local beta_verification_result beta_verification_fields
+    local beta_report_01_sha256 beta_report_02_sha256 beta_report_03_sha256
+    beta_verification_result="$(ruby "$RELEASE_SCRIPTS_DIR/external_beta_policy.rb" verify-set \
+        --release-manifest "$candidate_snapshot/release-manifest.json" \
+        --provenance-bundle \
+        "$candidate_snapshot/$provenance_name" \
+        --candidate-inventory "$candidate_inventory_evidence" \
+        --predecessor-lineage "$predecessor_lineage_evidence" \
+        --set-manifest "$external_beta_set_evidence" \
+        --report "${external_beta_report_evidence[0]}" \
+        --report "${external_beta_report_evidence[1]}" \
+        --report "${external_beta_report_evidence[2]}" \
+        --repository "$GITHUB_REPOSITORY" \
+        --tag "$RELEASE_TAG" \
+        --commit "$EXPECTED_COMMIT" \
+        --candidate-run-id "$RELEASE_CANDIDATE_RUN_ID" \
+        --candidate-artifact-id "$RELEASE_CANDIDATE_ARTIFACT_ID" \
+        --candidate-artifact-sha256 "$RELEASE_CANDIDATE_ARTIFACT_SHA256" \
+        --final-dmg-sha256 "$RELEASE_FINAL_DMG_SHA256" \
+        --profile-schema-version "$profile_schema_version" \
+        --print-result-json 2>"$parse_error")" || {
+        release_die "The external-beta or predecessor-lineage evidence is invalid."
+    }
+    beta_verification_fields="$(ruby -rjson -rtime -e '
+      value = JSON.parse(STDIN.read, allow_nan: false, create_additions: false)
+      expected = %w[
+        schemaVersion releaseManifestSHA256 finalDMGProvenanceSHA256
+        candidateInventorySHA256 predecessorLineageSHA256 externalBetaSetSHA256
+        externalBetaReportSHA256 sonomaGateReportCode sonomaGateReportSHA256
+        externalBetaSetCreatedAt buildNumber
+      ]
+      raise unless value.is_a?(Hash) && value.keys.sort == expected.sort
+      raise unless value.fetch("schemaVersion") ==
+        "desk-setup-switcher.external-beta-verification/v2"
+      sha = /\A[0-9a-f]{64}\z/
+      scalar_digests = %w[
+        releaseManifestSHA256 finalDMGProvenanceSHA256
+        candidateInventorySHA256 predecessorLineageSHA256 externalBetaSetSHA256
+        sonomaGateReportSHA256
+      ].map { |name| value.fetch(name) }
+      reports = value.fetch("externalBetaReportSHA256")
+      raise unless reports.is_a?(Array) && reports.length == 3 && reports.uniq.length == 3
+      raise unless (scalar_digests + reports).all? { |digest| digest.is_a?(String) && sha.match?(digest) }
+      code = value.fetch("sonomaGateReportCode")
+      index = %w[beta-01 beta-02 beta-03].index(code)
+      raise unless index && value.fetch("sonomaGateReportSHA256") == reports.fetch(index)
+      created_at_text = value.fetch("externalBetaSetCreatedAt")
+      created_at = Time.iso8601(created_at_text)
+      raise unless created_at_text == created_at.utc.iso8601
+      build_number = value.fetch("buildNumber")
+      expected_build = Integer(ARGV.fetch(0), 10)
+      raise unless build_number.is_a?(Integer) && build_number.positive? &&
+        build_number == expected_build
+      STDOUT.write((scalar_digests.first(5) + reports + [code,
+        value.fetch("sonomaGateReportSHA256"), created_at_text]).join(" "))
+    ' "$BUILD_NUMBER" <<<"$beta_verification_result" 2>"$parse_error")" || {
+        release_die "The external-beta verification result is invalid."
+    }
+    IFS=' ' read -r release_manifest_sha256 final_dmg_provenance_sha256 \
+        candidate_inventory_sha256 predecessor_lineage_sha256 external_beta_set_sha256 \
+        beta_report_01_sha256 beta_report_02_sha256 beta_report_03_sha256 \
+        sonoma_beta_report_code sonoma_beta_report_sha256 \
+        external_beta_set_created_at <<<"$beta_verification_fields"
+    external_beta_report_sha256=(
+        "$beta_report_01_sha256"
+        "$beta_report_02_sha256"
+        "$beta_report_03_sha256"
+    )
+    unset beta_report_01_sha256 beta_report_02_sha256 beta_report_03_sha256
+}
 verify_approval_record_now() {
     local verified_at
+    verify_local_publication_evidence_now
     verified_at="$(ruby -rtime -e 'puts Time.now.utc.iso8601')" || {
         release_die "The current publication verification time is unavailable."
     }
@@ -1230,6 +1358,15 @@ verify_approval_record_now() {
         --final-dmg-sha256 "$RELEASE_FINAL_DMG_SHA256" \
         --remote-controls-observed-master "$observed_master" \
         --remote-controls-manifest-sha256 "$remote_controls_manifest_sha256" \
+        --external-beta-set-sha256 "$external_beta_set_sha256" \
+        --external-beta-report-sha256 "${external_beta_report_sha256[0]}" \
+        --external-beta-report-sha256 "${external_beta_report_sha256[1]}" \
+        --external-beta-report-sha256 "${external_beta_report_sha256[2]}" \
+        --sonoma-beta-report-sha256 "$sonoma_beta_report_sha256" \
+        --final-dmg-provenance-sha256 "$final_dmg_provenance_sha256" \
+        --candidate-inventory-sha256 "$candidate_inventory_sha256" \
+        --predecessor-lineage-sha256 "$predecessor_lineage_sha256" \
+        --release-manifest-sha256 "$release_manifest_sha256" \
         --approval-sha256 "$RELEASE_APPROVAL_RECORD_SHA256" \
         --approver-login "$RELEASE_APPROVER_LOGIN" \
         --publisher-login "$RELEASE_PUBLISHER_LOGIN" \

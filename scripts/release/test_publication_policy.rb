@@ -18,9 +18,16 @@ class PublicationPolicyTestSuite
   RUN_ID = 8001
   ARTIFACT_ID = 9001
   ARTIFACT_SHA = "b" * 64
+  CANDIDATE_INVENTORY_SHA = "a" * 64
   DMG_SHA = "c" * 64
   OBSERVED_MASTER = "7" * 40
   REMOTE_CONTROLS_SHA = "6" * 64
+  EXTERNAL_BETA_SET_SHA = "2" * 64
+  SONOMA_BETA_REPORT_SHA = "e" * 64
+  EXTERNAL_BETA_REPORT_SHAS = [SONOMA_BETA_REPORT_SHA, "f" * 64, "1" * 64].freeze
+  FINAL_DMG_PROVENANCE_SHA = "7" * 64
+  PREDECESSOR_LINEAGE_SHA = "8" * 64
+  RELEASE_MANIFEST_SHA = "9" * 64
   APPROVER = "release-reviewer"
   PUBLISHER = "release-publisher"
 
@@ -53,7 +60,7 @@ class PublicationPolicyTestSuite
   def record(mode: "independent-review", approver: APPROVER, publisher: PUBLISHER)
     now = Time.now.utc
     {
-      "schemaVersion" => "desk-setup-switcher.publication-approval/v1",
+      "schemaVersion" => "desk-setup-switcher.publication-approval/v2",
       "subject" => {
         "repository" => REPOSITORY,
         "tag" => TAG,
@@ -78,12 +85,17 @@ class PublicationPolicyTestSuite
         "publicSurfaceReady" => true
       },
       "evidence" => {
+        "candidateInventorySHA256" => CANDIDATE_INVENTORY_SHA,
         "releaseEvidenceSHA256" => "d" * 64,
-        "cleanLifecycleSHA256" => "e" * 64,
-        "externalBetaReportSHA256" => ["f" * 64, "1" * 64, "2" * 64],
+        "cleanLifecycleSHA256" => SONOMA_BETA_REPORT_SHA,
+        "externalBetaSetSHA256" => EXTERNAL_BETA_SET_SHA,
+        "externalBetaReportSHA256" => EXTERNAL_BETA_REPORT_SHAS.dup,
+        "finalDMGProvenanceSHA256" => FINAL_DMG_PROVENANCE_SHA,
+        "predecessorLineageSHA256" => PREDECESSOR_LINEAGE_SHA,
         "publicBlockerQuerySHA256" => "3" * 64,
         "confidentialBlockerSignoffSHA256" => "4" * 64,
         "publicSurfaceSHA256" => "5" * 64,
+        "releaseManifestSHA256" => RELEASE_MANIFEST_SHA,
         "remoteControlsEvidenceSHA256" => REMOTE_CONTROLS_SHA
       },
       "approval" => {
@@ -105,7 +117,9 @@ class PublicationPolicyTestSuite
   end
 
   def arguments(path, value: nil, approver: APPROVER, publisher: PUBLISHER,
-                approval_mode: "independent-review", verified_at: Time.now.utc.iso8601)
+                approval_mode: "independent-review", verified_at: Time.now.utc.iso8601,
+                external_beta_reports: EXTERNAL_BETA_REPORT_SHAS,
+                sonoma_beta_report: SONOMA_BETA_REPORT_SHA)
     digest = value || Digest::SHA256.file(path).hexdigest
     [
       "verify-approval",
@@ -117,9 +131,16 @@ class PublicationPolicyTestSuite
       "--candidate-run-id", RUN_ID.to_s,
       "--candidate-artifact-id", ARTIFACT_ID.to_s,
       "--candidate-artifact-sha256", ARTIFACT_SHA,
+      "--candidate-inventory-sha256", CANDIDATE_INVENTORY_SHA,
       "--final-dmg-sha256", DMG_SHA,
       "--remote-controls-observed-master", OBSERVED_MASTER,
       "--remote-controls-manifest-sha256", REMOTE_CONTROLS_SHA,
+      "--external-beta-set-sha256", EXTERNAL_BETA_SET_SHA,
+      *external_beta_reports.flat_map { |sha| ["--external-beta-report-sha256", sha] },
+      "--sonoma-beta-report-sha256", sonoma_beta_report,
+      "--final-dmg-provenance-sha256", FINAL_DMG_PROVENANCE_SHA,
+      "--predecessor-lineage-sha256", PREDECESSOR_LINEAGE_SHA,
+      "--release-manifest-sha256", RELEASE_MANIFEST_SHA,
       "--approval-sha256", digest,
       "--approver-login", approver,
       "--publisher-login", publisher,
@@ -158,7 +179,7 @@ class PublicationPolicyTestSuite
   end
 
   def test_success
-    run("accepts an exact current independent publication approval") do
+    run("accepts an exact v2 independent publication approval") do
       Dir.mktmpdir do |directory|
         path = write_record(directory)
         assert_success(*arguments(path))
@@ -200,6 +221,11 @@ class PublicationPolicyTestSuite
   def test_subject_and_schema
     {
       "rejects unknown root keys" => ->(value) { value["extra"] = true },
+      "rejects a missing root schema key" => ->(value) { value.delete("schemaVersion") },
+      "rejects the v1 approval schema" => ->(value) { value["schemaVersion"] = "desk-setup-switcher.publication-approval/v1" },
+      "rejects a missing v2 evidence schema key" => ->(value) { value["evidence"].delete("releaseManifestSHA256") },
+      "rejects a missing candidate inventory evidence key" => ->(value) { value["evidence"].delete("candidateInventorySHA256") },
+      "rejects an extra v2 evidence schema key" => ->(value) { value["evidence"]["unexpectedSHA256"] = "0" * 64 },
       "rejects a different repository" => ->(value) { value["subject"]["repository"] = "other/repository" },
       "rejects a different tag" => ->(value) { value["subject"]["tag"] = "v0.1.1" },
       "rejects a different commit" => ->(value) { value["subject"]["commit"] = "9" * 40 },
@@ -207,6 +233,7 @@ class PublicationPolicyTestSuite
       "rejects a different release ID" => ->(value) { value["subject"]["releaseId"] += 1 },
       "rejects a different candidate run" => ->(value) { value["subject"]["candidateOriginRunId"] += 1 },
       "rejects a rerun candidate attempt" => ->(value) { value["subject"]["candidateOriginRunAttempt"] = 2 },
+      "rejects a floating-point candidate attempt" => ->(value) { value["subject"]["candidateOriginRunAttempt"] = 1.0 },
       "rejects a different artifact ID" => ->(value) { value["subject"]["candidateArtifactId"] += 1 },
       "rejects a different artifact digest" => ->(value) { value["subject"]["candidateArtifactSHA256"] = "8" * 64 },
       "rejects a different final DMG" => ->(value) { value["subject"]["finalDMGSHA256"] = "7" * 64 }
@@ -244,6 +271,124 @@ class PublicationPolicyTestSuite
         args[index + 1] = "8" * 64
         assert_failure(*args, forbidden: [directory])
       end
+    end
+  end
+
+  def test_v2_evidence_bindings
+    {
+      "candidateInventorySHA256" => "candidate inventory",
+      "externalBetaSetSHA256" => "external beta set",
+      "finalDMGProvenanceSHA256" => "final DMG provenance",
+      "predecessorLineageSHA256" => "predecessor lineage",
+      "releaseManifestSHA256" => "release manifest"
+    }.each do |field, label|
+      run("binds the trusted #{label} digest") do
+        mutate { |value| value["evidence"][field] = "0" * 64 }
+      end
+    end
+
+    run("binds every ordered external beta report digest") do
+      mutate { |value| value["evidence"]["externalBetaReportSHA256"][2] = "0" * 64 }
+    end
+
+    run("rejects reordered external beta report digests") do
+      mutate { |value| value["evidence"]["externalBetaReportSHA256"].rotate! }
+    end
+
+    run("binds the clean lifecycle digest to the supplied Sonoma report") do
+      Dir.mktmpdir do |directory|
+        path = write_record(directory)
+        assert_failure(
+          *arguments(path, sonoma_beta_report: EXTERNAL_BETA_REPORT_SHAS.fetch(1)),
+          forbidden: [directory]
+        )
+      end
+    end
+
+    run("rejects a duplicated Sonoma beta report") do
+      Dir.mktmpdir do |directory|
+        value = record
+        reports = [SONOMA_BETA_REPORT_SHA, SONOMA_BETA_REPORT_SHA, EXTERNAL_BETA_REPORT_SHAS.fetch(2)]
+        value["evidence"]["externalBetaReportSHA256"] = reports
+        path = write_record(directory, value)
+        assert_failure(*arguments(path, external_beta_reports: reports), forbidden: [directory])
+      end
+    end
+
+    run("rejects a foreign Sonoma digest outside the three beta reports") do
+      Dir.mktmpdir do |directory|
+        value = record
+        reports = [EXTERNAL_BETA_REPORT_SHAS.fetch(1), EXTERNAL_BETA_REPORT_SHAS.fetch(2), "0" * 64]
+        value["evidence"]["externalBetaReportSHA256"] = reports
+        path = write_record(directory, value)
+        assert_failure(*arguments(path, external_beta_reports: reports), forbidden: [directory])
+      end
+    end
+  end
+
+  def test_v2_cli_contract
+    digest_options = {
+      "--candidate-inventory-sha256" => "candidate inventory",
+      "--external-beta-set-sha256" => "external beta set",
+      "--external-beta-report-sha256" => "external beta report",
+      "--sonoma-beta-report-sha256" => "Sonoma beta report",
+      "--final-dmg-provenance-sha256" => "final DMG provenance",
+      "--predecessor-lineage-sha256" => "predecessor lineage",
+      "--release-manifest-sha256" => "release manifest"
+    }
+    digest_options.each do |option, label|
+      run("validates the expected #{label} digest format") do
+        Dir.mktmpdir do |directory|
+          path = write_record(directory)
+          args = arguments(path)
+          args[args.index(option) + 1] = "not-a-digest"
+          assert_failure(*args, forbidden: [directory, "not-a-digest"])
+        end
+      end
+    end
+
+    digest_options.each_key do |option|
+      next if option == "--external-beta-report-sha256"
+
+      run("requires the #{option} option") do
+        Dir.mktmpdir do |directory|
+          path = write_record(directory)
+          args = arguments(path)
+          args.slice!(args.index(option), 2)
+          assert_failure(*args, forbidden: [directory])
+        end
+      end
+    end
+
+    run("rejects only two expected external beta report options") do
+      Dir.mktmpdir do |directory|
+        path = write_record(directory)
+        assert_failure(
+          *arguments(path, external_beta_reports: EXTERNAL_BETA_REPORT_SHAS.first(2)),
+          forbidden: [directory]
+        )
+      end
+    end
+
+    run("rejects four expected external beta report options") do
+      Dir.mktmpdir do |directory|
+        path = write_record(directory)
+        reports = EXTERNAL_BETA_REPORT_SHAS + ["0" * 64]
+        assert_failure(*arguments(path, external_beta_reports: reports), forbidden: [directory])
+      end
+    end
+
+    run("rejects an uppercase expected candidate inventory digest") do
+      Dir.mktmpdir do |directory|
+        path = write_record(directory)
+        args = arguments(path)
+        args[args.index("--candidate-inventory-sha256") + 1] = CANDIDATE_INVENTORY_SHA.upcase
+        assert_failure(*args, forbidden: [directory, CANDIDATE_INVENTORY_SHA.upcase])
+      end
+    end
+
+    run("rejects an uppercase candidate inventory digest in the approval record") do
+      mutate { |value| value["evidence"]["candidateInventorySHA256"] = CANDIDATE_INVENTORY_SHA.upcase }
     end
   end
 
@@ -393,6 +538,8 @@ class PublicationPolicyTestSuite
     test_success
     test_subject_and_schema
     test_gates_and_evidence
+    test_v2_evidence_bindings
+    test_v2_cli_contract
     test_approval_identity_and_time
     test_file_boundary
 

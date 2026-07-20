@@ -27,7 +27,7 @@ The planned `v0.1.0` public-beta baseline fixes these identities:
 | Boundary | Fixed value or policy |
 | --- | --- |
 | App version | `0.1.0` |
-| Build number | `1`; increase for another distributed candidate of the same version |
+| Build number | `1`; increase globally for every new Developer ID candidate; only exact origin-artifact restoration may reuse it |
 | Bundle identifier | `dev.ggulae.desk-setup-switcher` |
 | Keychain service | `dev.ggulae.desk-setup-switcher.secrets` |
 | Deployment target | macOS 14.0 or later |

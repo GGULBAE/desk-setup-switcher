@@ -472,7 +472,7 @@ module ReleasePolicy
 
   def validate_build_number(build_number)
     ensure_single_line(build_number, "build number")
-    unless build_number.match?(/\A[1-9][0-9]*(?:\.[0-9]+){0,2}\z/)
+    unless build_number.match?(/\A[1-9][0-9]*\z/)
       raise PolicyError, "build number is invalid"
     end
     build_number

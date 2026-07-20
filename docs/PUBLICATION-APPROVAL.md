@@ -80,6 +80,10 @@ blob in a reviewed commit that descends from the release tag. At dispatch:
 
 - that approval commit must equal the current remote `master` HEAD and be the
   single direct successor of the manifest's observed `master` commit;
+- the observed pre-approval `master` already contains the immutable
+  `candidate-inventory.json`, `predecessor-lineage.json`, three
+  `external-beta-0N.json` reports, and `external-beta-set.json` bytes being
+  approved;
 - the direct-successor diff must add exactly
   `remote-controls-pre-publication.json` and `publication-approval.json`; the
   release-tag, observed-master, and approval-commit workflow/script trees must
@@ -227,6 +231,12 @@ must preserve this nondecreasing chronology:
 final manuals observedAt ≤ final E collectedAt ≤ pre manuals observedAt ≤ pre manifest collectedAt ≤ approval approvedAt
 ```
 
+The candidate and beta evidence independently preserve:
+
+```text
+candidate manifest created ≤ candidate inventory reviewedAt ≤ each report startedAt ≤ each report completedAt ≤ set reviewedAt ≤ set createdAt ≤ approval approvedAt
+```
+
 When the two manual records in a phase have different observation times, both
 must satisfy the applicable side of the inequality. Equality is accepted; a
 timestamp inversion invalidates the attempt.
@@ -239,7 +249,7 @@ has exactly these keys and no duplicates or extensions:
 
 ```json
 {
-  "schemaVersion": "desk-setup-switcher.publication-approval/v1",
+  "schemaVersion": "desk-setup-switcher.publication-approval/v2",
   "subject": {
     "repository": "GGULBAE/desk-setup-switcher",
     "tag": "v0.1.0",
@@ -264,10 +274,15 @@ has exactly these keys and no duplicates or extensions:
     "publicSurfaceReady": false
   },
   "evidence": {
+    "candidateInventorySHA256": "<actual-candidate-inventory-sha256>",
     "releaseEvidenceSHA256": "<sha256>",
+    "releaseManifestSHA256": "<actual-release-manifest-sha256>",
     "remoteControlsEvidenceSHA256": "<sha256>",
-    "cleanLifecycleSHA256": "<sha256>",
+    "cleanLifecycleSHA256": "<sonoma-report-sha256>",
+    "externalBetaSetSHA256": "<actual-beta-set-sha256>",
     "externalBetaReportSHA256": ["<sha256-1>", "<sha256-2>", "<sha256-3>"],
+    "finalDMGProvenanceSHA256": "<actual-provenance-bundle-sha256>",
+    "predecessorLineageSHA256": "<actual-predecessor-lineage-sha256>",
     "publicBlockerQuerySHA256": "<sha256>",
     "confidentialBlockerSignoffSHA256": "<sha256>",
     "publicSurfaceSHA256": "<sha256>"
@@ -294,10 +309,16 @@ immutable Release is visibly public; it changes the two tracked publication
 records and the bounded public-document/status set together, changes no
 component code, and still requires the user's final approval.
 
-The validator proves the record's exact shape, identifiers, digests, booleans,
-actors, and time window. It does **not** interpret the documents named by the
-evidence digests or prove that their claims are true. Reviewers must inspect
-those protected evidence records before setting a gate to true.
+The approval validator proves the record's exact shape, identifiers, actual
+trusted digests, booleans, actors, ordered report set, Sonoma lifecycle binding,
+and time window. The publication helper first descriptor-reads and semantically
+validates the actual release manifest, provenance bundle bytes, candidate
+inventory, predecessor lineage, three reports, and protected
+independence-review set; then it supplies those calculated values to the
+approval validator. The release approver still owns real-world facts that a
+privacy-safe record cannot independently prove, especially whether the
+protected candidate history is exhaustive and whether the private roster
+represents three distinct external people.
 
 `remoteControlsEvidenceSHA256` is the SHA-256 of the exact
 `remote-controls-pre-publication.json` manifest added beside this approval. The
@@ -344,12 +365,17 @@ underlying Settings screenshots or token-scope record.
    retain its attempt-1 origin artifact identity.
 9. Prepare the exact draft prerelease from that artifact. Do not rerun the
    origin build.
-10. Complete the clean-download lifecycle, three external beta reports, both
-    zero-blocker decisions, and final public-surface review for the same DMG.
+10. Complete the clean-download lifecycle, candidate inventory and predecessor
+    lineage,
+    three closed external beta reports, their protected independence-review
+    set, both zero-blocker decisions, and final public-surface review for the
+    same DMG. Commit the six fixed inventory/lineage/beta blobs on `master`; their bytes
+    must not change in the later approval-only commit.
 11. Create new protected screenshot/review-note bundles, replace both manual
     JSON blobs with fresh `pre-publication` phase challenges and distinct source
-    digests in one reviewed docs-only master commit, and wait for that exact
-    commit's CI. The annotated tag does not move.
+    digests in one reviewed docs-only master commit after the lineage/beta
+    evidence is present, and wait for that exact commit's CI. The annotated tag
+    does not move.
 12. Start the Settings single-writer freeze. From the clean refreshed-manual
     commit, run `scripts/release/verify-remote-controls.sh --phase pre-publication
     --release-commit <peeled-commit> --release-id <id>`. It writes only the
@@ -369,8 +395,9 @@ underlying Settings screenshots or token-scope record.
     never use GitHub's rerun command for publication.
 16. The workflow requires one repository Release—the named draft—verifies its
     metadata and all nine assets twice, confirms immutable Releases are enabled,
-    validates both named jobs from the approval commit's exact successful
-    master-push CI, downloads
+    validates the actual lineage/beta bytes against the restored candidate and
+    approval, validates both named jobs from the approval commit's exact
+    successful master-push CI, downloads
     every asset before mutation, performs the exact-ID PATCH, confirms
     immutability, and downloads and verifies every public asset again. A later
     run never adopts a pre-existing public Release. Only the same live process

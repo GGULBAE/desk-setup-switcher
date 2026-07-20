@@ -46,8 +46,8 @@ if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
     exit 1
 fi
 
-if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
-    echo "CFBundleVersion must contain one to three numeric components: $BUILD_NUMBER" >&2
+if [[ ! "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+    echo "CFBundleVersion must be a positive canonical decimal integer: $BUILD_NUMBER" >&2
     exit 1
 fi
 

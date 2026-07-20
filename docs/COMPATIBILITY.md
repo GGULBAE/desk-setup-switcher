@@ -1,6 +1,6 @@
 # Compatibility and versioning
 
-Last updated: 2026-07-18
+Last updated: 2026-07-20
 
 This document fixes the public compatibility boundary for the planned Desk Setup Switcher `v0.1.0` public beta. It distinguishes the app, its local profile format, and Swift Package targets; they do not share the same compatibility promise.
 
@@ -10,12 +10,14 @@ This document fixes the public compatibility boundary for the planned Desk Setup
 | --- | --- | --- |
 | Release tag | `v0.1.0` | Tags use `v` plus SemVer. A published tag or artifact is never replaced; a correction uses a new patch version. |
 | App version | `CFBundleShortVersionString = 0.1.0` | Must exactly match the release tag without `v`. |
-| Build number | `CFBundleVersion = 1` | Must be a positive integer and increase for every distributed candidate built from the same app version. |
+| Build number | `CFBundleVersion = 1` | Must be a positive canonical decimal integer and increase across every new Developer ID candidate, even when the app version changes. Restoring the exact origin artifact is not a new candidate. |
 | Bundle identifier | `dev.ggulae.desk-setup-switcher` | Stable application identity. Changing it requires an explicit install, local-data, login-item, and Keychain migration plan. |
 | Keychain service namespace | `dev.ggulae.desk-setup-switcher.secrets` | Stable secret-store boundary. It is not a profile field and must not be changed without a credential migration and rollback plan. |
 | Deployment target | macOS 14.0 or later | Raising it is a user-visible compatibility change and must be stated in release notes. |
 
 Before `1.0`, minor versions may change behavior and internal source interfaces. Patch versions must remain focused on compatible fixes, security remediation, and release repair. Release notes must call out profile-format, permission, supported-platform, and behavior changes even when SemVer permits them.
+
+Every protected Developer ID candidate dispatch consumes its build number, including a failed, cancelled, or abandoned candidate. A rebuild, new signing dispatch, changed source/resources/entitlements, or unavailable origin artifact requires a number greater than every recorded candidate. Gaps are allowed; reuse is not. Only byte-for-byte restoration of the same origin run/artifact may retain the number. The release approval gate reads the exact candidate manifest plus the actual-byte [candidate inventory and predecessor lineage](PREDECESSOR-LINEAGE.md); build `0`, leading zeroes, signs, whitespace, and dotted values are rejected. The offline validator checks ordering, uniqueness, identity, and byte bindings; exhaustive remote-history review remains a protected approver responsibility.
 
 ## CPU support
 

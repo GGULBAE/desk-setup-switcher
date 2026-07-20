@@ -11,6 +11,8 @@ require_relative "release_policy"
 
 class ReleasePolicyTestSuite
   SCRIPT = File.expand_path("release_policy.rb", __dir__)
+  COMMON_LIBRARY = File.expand_path("../lib/common.sh", __dir__)
+  PROJECT_GENERATOR = File.expand_path("../generate-xcode-project.rb", __dir__)
   FIXTURES = File.expand_path("fixtures", __dir__)
   AUTHORITY = "Developer ID Application: Synthetic Maintainer (ABCDE12345)"
   TEAM_ID = "ABCDE12345"
@@ -807,6 +809,51 @@ class ReleasePolicyTestSuite
     end
   end
 
+  def test_build_number
+    run("build number accepts positive canonical decimal integers") do
+      %w[1 9 10 999999999999999999999999999999].each do |build_number|
+        assert_equal(build_number, ReleasePolicy.validate_build_number(build_number))
+      end
+    end
+
+    run("build number rejects zero, leading zeroes, dots, signs, and non-strings") do
+      invalid_build_numbers = [
+        "0", "00", "01", "1.0", "1.2.3", ".1", "1.", "-1", "+1",
+        " 1", "1 ", "1\n", "", nil, 1
+      ]
+      invalid_build_numbers.each do |build_number|
+        begin
+          ReleasePolicy.validate_build_number(build_number)
+        rescue ReleasePolicy::PolicyError
+          @assertions += 1
+        else
+          raise TestFailure, "invalid build number was accepted: #{build_number.inspect}"
+        end
+      end
+    end
+
+    run("shared metadata gates use the canonical build-number contract") do
+      source = File.binread(COMMON_LIBRARY)
+      assert(
+        source.include?('if [[ ! "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then'),
+        "shared shell build-number gate drifted from the release policy"
+      )
+      assert(
+        source.include?("CFBundleVersion must be a positive canonical decimal integer"),
+        "shared shell build-number diagnostic omitted the canonical contract"
+      )
+      generator_source = File.binread(PROJECT_GENERATOR)
+      assert(
+        generator_source.include?('build_number.match?(/\A[1-9][0-9]*\z/)'),
+        "Xcode project generator build-number gate drifted from the release policy"
+      )
+      assert(
+        !generator_source.include?('build_number.match?(/\A\d+(?:\.\d+){0,2}\z/)'),
+        "Xcode project generator retained the legacy dotted build-number contract"
+      )
+    end
+  end
+
   def test_mounted_app
     run("mounted-app verifier rechecks identity, CDHash, runtime, timestamp, entitlements, bundle, and DMG") do
       Dir.mktmpdir do |directory|
@@ -939,6 +986,7 @@ class ReleasePolicyTestSuite
     test_strict_json
     test_notary
     test_sbom
+    test_build_number
     test_release_manifest
     test_mounted_app
     test_cli_help

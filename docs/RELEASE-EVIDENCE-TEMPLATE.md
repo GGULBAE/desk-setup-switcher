@@ -144,7 +144,7 @@ Record each result separately. Use synthetic data and the exact final DMG above.
 | Clean first launch and menu-bar-only lifecycle | `<not recorded>` | [ ] |
 | Launch at login is off by default; any optional opt-in is explicit | `<not recorded>` | [ ] |
 | Capture → Edit → Review explanation works without applying a setting | `<not recorded>` | [ ] |
-| Upgrade from recorded predecessor build preserves schema-1 profiles, settings, selection, backups, and consent boundary | `<not recorded>` | [ ] |
+| Upgrade from recorded installable predecessor preserves schema-1 profiles, settings, selection, backups, and consent boundary, or validated first-beta lineage records not applicable | `<not recorded>` | [ ] |
 | Synthetic schema 0→1 migration and last-known-good creation | `<not recorded>` | [ ] |
 | Synthetic primary corruption recovers the last-known-good backup and quarantines safely | `<not recorded>` | [ ] |
 | Import replacement and exclusive/no-overwrite export | `<not recorded>` | [ ] |
@@ -154,7 +154,7 @@ Record each result separately. Use synthetic data and the exact final DMG above.
 
 ## External beta and release blockers
 
-Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPLATE.md), use the same final DMG SHA-256 and final-DMG provenance attestation, run on Apple Silicon within the planned macOS 14+ matrix, preserve real quarantine, and avoid live system-setting mutation unless separately authorized. At least one accepted report must run the full exact-candidate lifecycle on macOS 14 Sonoma.
+Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPLATE.md), use the same final DMG SHA-256 and final-DMG provenance attestation, run on Apple Silicon within the planned macOS 14+ matrix, preserve real quarantine, and avoid live system-setting mutation unless separately authorized. At least one accepted report must run the full exact-candidate lifecycle on macOS 14 Sonoma. The actual-byte candidate inventory, predecessor lineage, three closed JSON reports, and protected independence-review set described in [the lineage contract](PREDECESSOR-LINEAGE.md) must validate against the restored release manifest and provenance bytes; Markdown alone is not accepted evidence.
 
 | Report | Tester record | macOS / coverage role | Final DMG SHA matches | DMG provenance matches | Mandatory lifecycle passes | Open P0/P1 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -163,6 +163,9 @@ Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPL
 | Beta 3 | `<not recorded>` | `<not recorded>` | [ ] | [ ] | [ ] | `<not recorded>` |
 
 - [ ] At least one accepted report records Apple Silicon/macOS 14.x Sonoma and passes every mandatory exact-candidate lifecycle row.
+- [ ] `candidate-inventory.json` records retained and non-retained prior protected runs in strictly increasing, unique build order, requires every completion to predate the current manifest, binds the current run/build, and carries the protected completeness-review receipt digest.
+- [ ] `predecessor-lineage.json` v2 binds the actual inventory bytes and current candidate; the latest installable retained predecessor or the first-beta not-applicable state is consistent.
+- [ ] `external-beta-set.json` binds the actual ordered bytes of `external-beta-01.json` through `external-beta-03.json`, identifies the Sonoma report, and records the protected no-PII independence review for three distinct external people.
 - [ ] A read-only public issue query shows zero unresolved P0/P1 issues for this candidate.
 - [ ] The maintainer records zero unresolved product P0/P1 blockers.
 - [ ] The security responder records only a yes/no statement that no confidential P0/P1 blocker remains; no private count or detail is published.
@@ -184,7 +187,8 @@ Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPL
 - [ ] After the exact draft exists, both manual records are replaced in a reviewed docs-only master commit with new `pre-publication` phase/tag-object/peeled-commit/Release-ID challenges, canonical UTC observations no older than 24 hours, and two new source-artifact digests distinct from each other and both final-pre-tag baselines; exact-commit CI passes.
 - [ ] The exclusive single-writer freeze covers master/tag/Release/assets, rulesets, both environments and bypass/reviewer/deployment settings, workflow state, Actions permissions, secret/variable names, immutable/security/labels/metadata, actor roles, and token configuration from before the two-pass read through the PATCH and post-read.
 - [ ] The fresh two-pass `pre-publication` controls manifest binds the direct tag object, peeled tag commit and Release ID, all three active workflow blobs/routes, both environment deployment/reviewer records, and the two current manual evidence digests.
-- [ ] The closed-schema `publication-approval.json` follows [PUBLICATION-APPROVAL.md](PUBLICATION-APPROVAL.md), binds this exact candidate and pre-publication manifest digest, and is added with that manifest in one reviewed direct-successor commit that changes only those two allowlisted evidence paths, remains inside its maximum 24-hour approval window, and passes the exact approval commit's master-push `Verify macOS app` and `Verify public site and release assets` CI jobs.
+- [ ] Before the final remote-controls snapshot, the reviewed pre-approval master already contains the unchanged candidate inventory, predecessor lineage, three external-beta reports, and external-beta set.
+- [ ] The closed-schema `publication-approval.json` follows [PUBLICATION-APPROVAL.md](PUBLICATION-APPROVAL.md), binds the actual release manifest, final-DMG provenance bundle, candidate inventory, predecessor lineage, beta set, ordered report bytes, Sonoma lifecycle report, and pre-publication controls manifest, and is added with that controls manifest in one reviewed direct-successor commit that changes only those two allowlisted evidence paths, remains inside its maximum 24-hour approval window, and passes the exact approval commit's master-push `Verify macOS app` and `Verify public site and release assets` CI jobs.
 - [ ] Every timestamp is canonical UTC and the records satisfy `final manuals observedAt ≤ final E collectedAt ≤ pre manuals observedAt ≤ pre manifest collectedAt ≤ approval approvedAt`.
 - [ ] The publication workflow, `release-publication` protection/actors, administrator-bypass evidence, and exact fine-grained `RELEASE_ADMIN_READ_TOKEN` contract are bound without exposing a credential value: owner `GGULBAE`, repository selection only `GGULBAE/desk-setup-switcher`, unexpired, no account/organization permissions, and exactly Actions/Administration/Attestations/Contents/Metadata read-only.
 - [ ] A later run refuses an already-public Release. Same-process recovery is limited to the originating PATCH's ambiguous response. `HUP`, `INT`, `QUIT`, `TERM`, workflow cancellation, runner/host loss, unavailable or incomplete logs, and any public or post-process ambiguous state are incident-only.
