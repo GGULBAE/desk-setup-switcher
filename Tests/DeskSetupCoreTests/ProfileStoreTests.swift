@@ -530,16 +530,17 @@ final class ProfileStoreTests: XCTestCase {
     XCTAssertEqual(reloaded, before)
   }
 
-  func testPermissionFailureBeforeAtomicCommitPreservesDestination() throws {
+  func testStagingPreparationFailurePreservesDestinationAndCleansStagingFile() throws {
     let directory = try makeTemporaryDirectory()
     let destination = directory.appendingPathComponent("profiles.json")
     let original = Data("original".utf8)
     try original.write(to: destination)
     let writer = PrivateAtomicFileWriter(
-      createPrivateStagingFile: { _, stagingURL in
-        try Data("partial".utf8).write(to: stagingURL, options: [.withoutOverwriting])
-        throw CocoaError(.fileWriteNoPermission)
-      }
+      testHooks: .init(
+        afterStagingPrepared: { _ in
+          throw CocoaError(.fileWriteNoPermission)
+        }
+      )
     )
 
     XCTAssertThrowsError(try writer.write(Data("replacement".utf8), to: destination))
@@ -552,7 +553,7 @@ final class ProfileStoreTests: XCTestCase {
     )
   }
 
-  func testAtomicReplaceDoesNotFollowDestinationSymlinkInsertedAfterPreflight() throws {
+  func testAtomicWriterDoesNotReplaceDestinationSymlinkInsertedAfterPreflight() throws {
     let directory = try makeTemporaryDirectory()
     let destination = directory.appendingPathComponent("profiles.json")
     let outside = directory.appendingPathComponent("outside.json")
@@ -560,28 +561,183 @@ final class ProfileStoreTests: XCTestCase {
     let replacement = Data("replacement".utf8)
     try sentinel.write(to: outside)
     let writer = PrivateAtomicFileWriter(
-      atomicReplace: { stagingURL, destinationURL in
-        try FileManager.default.createSymbolicLink(
-          at: destinationURL,
-          withDestinationURL: outside
-        )
-        let result = stagingURL.path.withCString { stagingPath in
-          destinationURL.path.withCString { destinationPath in
-            Darwin.rename(stagingPath, destinationPath)
-          }
+      testHooks: .init(
+        afterPrecommitValidation: { _ in
+          try FileManager.default.createSymbolicLink(
+            at: destination,
+            withDestinationURL: outside
+          )
         }
-        guard result == 0 else {
-          throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
-        }
-      }
+      )
     )
 
-    try writer.write(replacement, to: destination)
+    XCTAssertThrowsError(try writer.write(replacement, to: destination)) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .fileChangedDuringRead)
+    }
 
-    XCTAssertEqual(try Data(contentsOf: destination), replacement)
     XCTAssertEqual(try Data(contentsOf: outside), sentinel)
     let values = try destination.resourceValues(forKeys: [.isSymbolicLinkKey])
-    XCTAssertEqual(values.isSymbolicLink, false)
+    XCTAssertEqual(values.isSymbolicLink, true)
+    XCTAssertTrue(try stagingNames(in: directory).isEmpty)
+  }
+
+  func testAtomicWriterRejectsSameUIDParentPathSwapAndCleansAnchoredStagingFile() throws {
+    let container = try makeTemporaryDirectory()
+    let managedDirectory = container.appendingPathComponent("Managed", isDirectory: true)
+    let displacedDirectory = container.appendingPathComponent(
+      "OpenedManaged",
+      isDirectory: true
+    )
+    try FileManager.default.createDirectory(
+      at: managedDirectory,
+      withIntermediateDirectories: false
+    )
+    let destination = managedDirectory.appendingPathComponent("profiles.json")
+    let original = Data("original".utf8)
+    let unexpected = Data("replacement-directory-sentinel".utf8)
+    try original.write(to: destination)
+    let writer = PrivateAtomicFileWriter(
+      testHooks: .init(
+        afterPrecommitValidation: { _ in
+          try FileManager.default.moveItem(
+            at: managedDirectory,
+            to: displacedDirectory
+          )
+          try FileManager.default.createDirectory(
+            at: managedDirectory,
+            withIntermediateDirectories: false
+          )
+          try unexpected.write(to: destination)
+        }
+      )
+    )
+
+    XCTAssertThrowsError(
+      try writer.write(Data("new-value".utf8), to: destination)
+    ) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .fileChangedDuringRead)
+    }
+
+    XCTAssertEqual(try Data(contentsOf: destination), unexpected)
+    XCTAssertEqual(
+      try Data(contentsOf: displacedDirectory.appendingPathComponent("profiles.json")),
+      original
+    )
+    XCTAssertTrue(try stagingNames(in: managedDirectory).isEmpty)
+    XCTAssertTrue(try stagingNames(in: displacedDirectory).isEmpty)
+  }
+
+  func testAtomicWriterRollsBackDestinationLeafSwapWithoutDeletingEitherTarget() throws {
+    let directory = try makeTemporaryDirectory()
+    let destination = directory.appendingPathComponent("profiles.json")
+    let displaced = directory.appendingPathComponent("opened-profiles.json")
+    let replacementSource = directory.appendingPathComponent("replacement.json")
+    let original = Data("original".utf8)
+    let unexpected = Data("same-uid-replacement".utf8)
+    try original.write(to: destination)
+    try unexpected.write(to: replacementSource)
+    let writer = PrivateAtomicFileWriter(
+      testHooks: .init(
+        afterPrecommitValidation: { _ in
+          try FileManager.default.moveItem(at: destination, to: displaced)
+          try FileManager.default.moveItem(at: replacementSource, to: destination)
+        }
+      )
+    )
+
+    XCTAssertThrowsError(
+      try writer.write(Data("new-value".utf8), to: destination)
+    ) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .fileChangedDuringRead)
+    }
+
+    XCTAssertEqual(try Data(contentsOf: destination), unexpected)
+    XCTAssertEqual(try Data(contentsOf: displaced), original)
+    XCTAssertTrue(try stagingNames(in: directory).isEmpty)
+  }
+
+  func testAtomicWriterRollsBackSymlinkLeafSwapWithoutFollowingOrDeletingIt() throws {
+    let directory = try makeTemporaryDirectory()
+    let destination = directory.appendingPathComponent("profiles.json")
+    let displaced = directory.appendingPathComponent("opened-profiles.json")
+    let outside = directory.appendingPathComponent("outside.json")
+    let original = Data("original".utf8)
+    let sentinel = Data("outside-sentinel".utf8)
+    try original.write(to: destination)
+    try sentinel.write(to: outside)
+    let writer = PrivateAtomicFileWriter(
+      testHooks: .init(
+        afterPrecommitValidation: { _ in
+          try FileManager.default.moveItem(at: destination, to: displaced)
+          try FileManager.default.createSymbolicLink(
+            at: destination,
+            withDestinationURL: outside
+          )
+        }
+      )
+    )
+
+    XCTAssertThrowsError(
+      try writer.write(Data("new-value".utf8), to: destination)
+    )
+
+    XCTAssertEqual(try Data(contentsOf: outside), sentinel)
+    XCTAssertEqual(try Data(contentsOf: displaced), original)
+    XCTAssertEqual(
+      try destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink,
+      true
+    )
+    XCTAssertTrue(try stagingNames(in: directory).isEmpty)
+  }
+
+  func testPostCommitFailureRollsBackExistingDestinationAndCleansStagingFile() throws {
+    let directory = try makeTemporaryDirectory()
+    let destination = directory.appendingPathComponent("profiles.json")
+    let original = Data("original".utf8)
+    try original.write(to: destination)
+    let writer = PrivateAtomicFileWriter(
+      testHooks: .init(
+        afterCommit: { _ in
+          throw InjectedFileOperationError.postRenameVerificationFailure
+        }
+      )
+    )
+
+    XCTAssertThrowsError(
+      try writer.write(Data("new-value".utf8), to: destination)
+    ) { error in
+      XCTAssertEqual(
+        error as? InjectedFileOperationError,
+        .postRenameVerificationFailure
+      )
+    }
+
+    XCTAssertEqual(try Data(contentsOf: destination), original)
+    XCTAssertTrue(try stagingNames(in: directory).isEmpty)
+  }
+
+  func testPostCommitFailureRestoresInitiallyMissingDestinationAndCleansStagingFile() throws {
+    let directory = try makeTemporaryDirectory()
+    let destination = directory.appendingPathComponent("profiles.json")
+    let writer = PrivateAtomicFileWriter(
+      testHooks: .init(
+        afterCommit: { _ in
+          throw InjectedFileOperationError.postRenameVerificationFailure
+        }
+      )
+    )
+
+    XCTAssertThrowsError(
+      try writer.write(Data("new-value".utf8), to: destination)
+    ) { error in
+      XCTAssertEqual(
+        error as? InjectedFileOperationError,
+        .postRenameVerificationFailure
+      )
+    }
+
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    XCTAssertTrue(try stagingNames(in: directory).isEmpty)
   }
 
   func testSecureMoveRestoresSourceLeafSwappedBetweenOpenAndRename() throws {
@@ -647,20 +803,29 @@ final class ProfileStoreTests: XCTestCase {
     XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
   }
 
-  func testRenameFailurePreservesDestinationAndCleansPrivateStagingFile() throws {
+  func testPrecommitFailurePreservesDestinationAndCleansPrivateStagingFile() throws {
     let directory = try makeTemporaryDirectory()
     let destination = directory.appendingPathComponent("profiles.json")
     let original = Data("original".utf8)
     try original.write(to: destination)
     let writer = PrivateAtomicFileWriter(
-      atomicReplace: { stagingURL, _ in
-        let attributes = try FileManager.default.attributesOfItem(atPath: stagingURL.path)
-        let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? -1
-        guard permissions == 0o600 else {
-          throw InjectedFileOperationError.unexpectedStagingPermissions
+      testHooks: .init(
+        afterStagingPrepared: { checkpoint in
+          var status = stat()
+          let result = checkpoint.stagingName.withCString { name in
+            Darwin.fstatat(
+              checkpoint.parentDirectoryDescriptor,
+              name,
+              &status,
+              AT_SYMLINK_NOFOLLOW
+            )
+          }
+          guard result == 0, Int(status.st_mode & mode_t(0o777)) == 0o600 else {
+            throw InjectedFileOperationError.unexpectedStagingPermissions
+          }
+          throw InjectedFileOperationError.renameFailure
         }
-        throw InjectedFileOperationError.renameFailure
-      }
+      )
     )
 
     XCTAssertThrowsError(
@@ -957,6 +1122,12 @@ final class ProfileStoreTests: XCTestCase {
   private func permissions(at url: URL) throws -> Int {
     let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
     return (attributes[.posixPermissions] as? NSNumber)?.intValue ?? -1
+  }
+
+  private func stagingNames(in directory: URL) throws -> [String] {
+    try FileManager.default.contentsOfDirectory(atPath: directory.path).filter {
+      $0.hasPrefix(".profiles.json.") && $0.hasSuffix(".tmp")
+    }
   }
 
   private func makeTemporaryDirectory() throws -> URL {

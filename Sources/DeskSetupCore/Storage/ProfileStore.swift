@@ -2,65 +2,308 @@ import Darwin
 import Foundation
 
 struct PrivateAtomicFileWriter: Sendable {
-  typealias CreatePrivateStagingFile = @Sendable (Data, URL) throws -> Void
-  typealias AtomicReplace = @Sendable (URL, URL) throws -> Void
-
-  private let createPrivateStagingFile: CreatePrivateStagingFile
-  private let atomicReplace: AtomicReplace
-
-  init(
-    createPrivateStagingFile: @escaping CreatePrivateStagingFile = { data, url in
-      try PrivateAtomicFileWriter.writePrivateStagingFile(data, to: url)
-    },
-    atomicReplace: @escaping AtomicReplace = { source, destination in
-      try PrivateAtomicFileWriter.replaceAtomically(source, with: destination)
-    }
-  ) {
-    self.createPrivateStagingFile = createPrivateStagingFile
-    self.atomicReplace = atomicReplace
+  struct Checkpoint: Sendable {
+    let parentDirectoryDescriptor: Int32
+    let destinationName: String
+    let stagingName: String
   }
 
-  /// Prepares a private staging file completely before one atomic rename commits it.
-  /// No fallible permission change occurs after the destination has been replaced.
+  struct TestHooks: Sendable {
+    typealias Hook = @Sendable (Checkpoint) throws -> Void
+
+    let afterStagingPrepared: Hook
+    let afterPrecommitValidation: Hook
+    let afterCommit: Hook
+
+    init(
+      afterStagingPrepared: @escaping Hook = { _ in },
+      afterPrecommitValidation: @escaping Hook = { _ in },
+      afterCommit: @escaping Hook = { _ in }
+    ) {
+      self.afterStagingPrepared = afterStagingPrepared
+      self.afterPrecommitValidation = afterPrecommitValidation
+      self.afterCommit = afterCommit
+    }
+  }
+
+  private struct StagingFile {
+    let descriptor: Int32
+    let name: String
+    let identity: SecureFileIdentity
+  }
+
+  private let testHooks: TestHooks
+
+  init(testHooks: TestHooks = .init()) {
+    self.testHooks = testHooks
+  }
+
+  /// Prepares and commits a private file relative to one verified parent FD.
+  /// No production mutation after the parent open resolves the parent path.
   func write(_ data: Data, to destination: URL) throws {
-    let normalizedDestination = destination.standardizedFileURL
-    switch try SecureFileAccess.state(at: normalizedDestination) {
-    case .missing, .regularFile:
-      break
-    case .directory:
+    guard destination.isFileURL else {
       throw ProfileStorageError.unsafeFilesystemObject
     }
-    let stagingURL = normalizedDestination.deletingLastPathComponent().appendingPathComponent(
-      ".\(normalizedDestination.lastPathComponent).\(UUID().uuidString).tmp",
-      isDirectory: false
+    let normalizedDestination = destination.standardizedFileURL
+    let parentURL = normalizedDestination.deletingLastPathComponent()
+    let destinationName = try SecureFileAccess.validatedLeafName(normalizedDestination)
+    let expectedOwnerID = Darwin.geteuid()
+    let parentDescriptor = try SecureFileAccess.openOwnedDirectory(
+      parentURL,
+      expectedOwnerID: expectedOwnerID
     )
-    defer { try? FileManager.default.removeItem(at: stagingURL) }
-
-    try createPrivateStagingFile(data, stagingURL)
-    try atomicReplace(stagingURL, normalizedDestination)
-    Self.synchronizeParentDirectoryBestEffort(
-      normalizedDestination.deletingLastPathComponent()
+    defer {
+      // Directory durability is best effort because a failure after visibility
+      // cannot always be rolled back without risking a concurrently changed leaf.
+      _ = Darwin.fsync(parentDescriptor)
+      _ = Darwin.close(parentDescriptor)
+    }
+    let parentIdentity = try SecureFileAccess.directoryIdentity(
+      descriptor: parentDescriptor,
+      expectedOwnerID: expectedOwnerID
     )
-  }
+    let initialDestination = try SecureFileAccess.managedRegularFileState(
+      in: parentDescriptor,
+      named: destinationName,
+      expectedOwnerID: expectedOwnerID
+    )
 
-  private static func writePrivateStagingFile(_ data: Data, to url: URL) throws {
-    let descriptor = url.path.withCString { path in
-      Darwin.open(
-        path,
-        O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
-        mode_t(0o600)
+    let staging = try Self.createPrivateStagingFile(
+      data,
+      destinationName: destinationName,
+      parentDescriptor: parentDescriptor,
+      expectedOwnerID: expectedOwnerID
+    )
+    defer { _ = Darwin.close(staging.descriptor) }
+    defer {
+      Self.removeOwnedStagingFileIfPresent(
+        parentDescriptor: parentDescriptor,
+        stagingName: staging.name,
+        expectedIdentity: staging.identity,
+        expectedOwnerID: expectedOwnerID
       )
     }
-    guard descriptor >= 0 else {
-      throw posixError(errno)
+
+    let checkpoint = Checkpoint(
+      parentDirectoryDescriptor: parentDescriptor,
+      destinationName: destinationName,
+      stagingName: staging.name
+    )
+    try testHooks.afterStagingPrepared(checkpoint)
+    try Self.verifyParent(
+      parentURL,
+      descriptor: parentDescriptor,
+      expectedIdentity: parentIdentity,
+      expectedOwnerID: expectedOwnerID
+    )
+    try Self.verifyDestination(
+      initialDestination,
+      parentDescriptor: parentDescriptor,
+      destinationName: destinationName,
+      expectedOwnerID: expectedOwnerID
+    )
+
+    // This hook intentionally sits in the otherwise syscall-adjacent test
+    // window. Production callers cannot replace any FD-relative mutation.
+    try testHooks.afterPrecommitValidation(checkpoint)
+
+    switch initialDestination {
+    case .missing:
+      try commitInitiallyMissing(
+        checkpoint,
+        parentURL: parentURL,
+        parentIdentity: parentIdentity,
+        stagingIdentity: staging.identity,
+        expectedOwnerID: expectedOwnerID
+      )
+    case .regularFile(let originalIdentity):
+      try commitReplacingExisting(
+        checkpoint,
+        parentURL: parentURL,
+        parentIdentity: parentIdentity,
+        stagingIdentity: staging.identity,
+        originalIdentity: originalIdentity,
+        expectedOwnerID: expectedOwnerID
+      )
+    }
+  }
+
+  private func commitInitiallyMissing(
+    _ checkpoint: Checkpoint,
+    parentURL: URL,
+    parentIdentity: SecureFileIdentity,
+    stagingIdentity: SecureFileIdentity,
+    expectedOwnerID: uid_t
+  ) throws {
+    let renameResult = checkpoint.stagingName.withCString { stagingName in
+      checkpoint.destinationName.withCString { destinationName in
+        Darwin.renameatx_np(
+          checkpoint.parentDirectoryDescriptor,
+          stagingName,
+          checkpoint.parentDirectoryDescriptor,
+          destinationName,
+          UInt32(RENAME_EXCL)
+        )
+      }
+    }
+    guard renameResult == 0 else {
+      let code = errno
+      if code == EEXIST || code == ENOENT {
+        throw ProfileStorageError.fileChangedDuringRead
+      }
+      throw Self.posixError(code)
     }
 
-    var isOpen = true
+    do {
+      try testHooks.afterCommit(checkpoint)
+      try Self.verifyParent(
+        parentURL,
+        descriptor: checkpoint.parentDirectoryDescriptor,
+        expectedIdentity: parentIdentity,
+        expectedOwnerID: expectedOwnerID
+      )
+      try Self.verifyRegularLeaf(
+        named: checkpoint.destinationName,
+        equals: stagingIdentity,
+        parentDescriptor: checkpoint.parentDirectoryDescriptor,
+        expectedOwnerID: expectedOwnerID
+      )
+      guard
+        try SecureFileAccess.managedRegularFileState(
+          in: checkpoint.parentDirectoryDescriptor,
+          named: checkpoint.stagingName,
+          expectedOwnerID: expectedOwnerID
+        ) == .missing
+      else {
+        throw ProfileStorageError.fileChangedDuringRead
+      }
+    } catch {
+      guard
+        Self.rollbackInitiallyMissingCommitIfSafe(
+          checkpoint,
+          stagingIdentity: stagingIdentity,
+          expectedOwnerID: expectedOwnerID
+        )
+      else {
+        throw ProfileStorageError.fileChangedDuringRead
+      }
+      throw error
+    }
+  }
+
+  private func commitReplacingExisting(
+    _ checkpoint: Checkpoint,
+    parentURL: URL,
+    parentIdentity: SecureFileIdentity,
+    stagingIdentity: SecureFileIdentity,
+    originalIdentity: SecureFileIdentity,
+    expectedOwnerID: uid_t
+  ) throws {
+    let swapResult = Self.swapLeaves(
+      checkpoint.stagingName,
+      checkpoint.destinationName,
+      parentDescriptor: checkpoint.parentDirectoryDescriptor
+    )
+    guard swapResult == 0 else {
+      let code = errno
+      if code == ENOENT {
+        throw ProfileStorageError.fileChangedDuringRead
+      }
+      // There is deliberately no path-based rename fallback. A normal rename
+      // could overwrite a same-UID leaf inserted after the identity check.
+      throw Self.posixError(code)
+    }
+
+    do {
+      try testHooks.afterCommit(checkpoint)
+      try Self.verifyParent(
+        parentURL,
+        descriptor: checkpoint.parentDirectoryDescriptor,
+        expectedIdentity: parentIdentity,
+        expectedOwnerID: expectedOwnerID
+      )
+      try Self.verifyRegularLeaf(
+        named: checkpoint.destinationName,
+        equals: stagingIdentity,
+        parentDescriptor: checkpoint.parentDirectoryDescriptor,
+        expectedOwnerID: expectedOwnerID
+      )
+      try Self.verifyRegularLeaf(
+        named: checkpoint.stagingName,
+        equals: originalIdentity,
+        parentDescriptor: checkpoint.parentDirectoryDescriptor,
+        expectedOwnerID: expectedOwnerID
+      )
+      try Self.removeExpectedRegularLeaf(
+        named: checkpoint.stagingName,
+        identity: originalIdentity,
+        parentDescriptor: checkpoint.parentDirectoryDescriptor,
+        expectedOwnerID: expectedOwnerID
+      )
+    } catch {
+      guard
+        Self.rollbackExistingCommitIfSafe(
+          checkpoint,
+          stagingIdentity: stagingIdentity,
+          expectedOwnerID: expectedOwnerID
+        )
+      else {
+        throw ProfileStorageError.fileChangedDuringRead
+      }
+      throw error
+    }
+  }
+
+  private static func createPrivateStagingFile(
+    _ data: Data,
+    destinationName: String,
+    parentDescriptor: Int32,
+    expectedOwnerID: uid_t
+  ) throws -> StagingFile {
+    var stagingName = ""
+    var descriptor: Int32 = -1
+    for _ in 0..<16 {
+      stagingName = ".\(destinationName).\(UUID().uuidString).tmp"
+      descriptor = stagingName.withCString { name in
+        Darwin.openat(
+          parentDescriptor,
+          name,
+          O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
+          mode_t(0o600)
+        )
+      }
+      if descriptor >= 0 {
+        break
+      }
+      guard errno == EEXIST else {
+        throw posixError(errno)
+      }
+    }
+    guard descriptor >= 0 else {
+      throw posixError(EEXIST)
+    }
+
+    var ownedIdentity: SecureFileIdentity?
+    var keepDescriptor = false
     defer {
-      if isOpen {
+      if !keepDescriptor {
+        if let ownedIdentity {
+          removeOwnedStagingFileIfPresent(
+            parentDescriptor: parentDescriptor,
+            stagingName: stagingName,
+            expectedIdentity: ownedIdentity,
+            expectedOwnerID: expectedOwnerID
+          )
+        }
         _ = Darwin.close(descriptor)
       }
     }
+
+    let createdIdentity = try SecureFileAccess.regularFileIdentity(
+      descriptor: descriptor,
+      expectedOwnerID: expectedOwnerID
+    )
+    ownedIdentity = createdIdentity
 
     guard Darwin.fchmod(descriptor, mode_t(0o600)) == 0 else {
       throw posixError(errno)
@@ -93,44 +336,236 @@ struct PrivateAtomicFileWriter: Sendable {
       }
     }
 
-    // Flush staged bytes before the atomic rename publishes this inode. APFS
-    // supports F_FULLFSYNC; fall back to fsync for other mounted filesystems.
     if Darwin.fcntl(descriptor, F_FULLFSYNC) == -1,
       Darwin.fsync(descriptor) != 0
     {
       throw posixError(errno)
     }
+    let finalIdentity = try SecureFileAccess.regularFileIdentity(
+      descriptor: descriptor,
+      expectedOwnerID: expectedOwnerID
+    )
+    guard finalIdentity == createdIdentity else {
+      throw ProfileStorageError.fileChangedDuringRead
+    }
+    keepDescriptor = true
+    return StagingFile(
+      descriptor: descriptor,
+      name: stagingName,
+      identity: createdIdentity
+    )
+  }
 
-    let closeResult = Darwin.close(descriptor)
-    let closeError = errno
-    isOpen = false
-    guard closeResult == 0 else {
-      throw posixError(closeError)
+  private static func verifyParent(
+    _ parentURL: URL,
+    descriptor: Int32,
+    expectedIdentity: SecureFileIdentity,
+    expectedOwnerID: uid_t
+  ) throws {
+    guard
+      try SecureFileAccess.directoryIdentity(
+        descriptor: descriptor,
+        expectedOwnerID: expectedOwnerID
+      ) == expectedIdentity
+    else {
+      throw ProfileStorageError.fileChangedDuringRead
+    }
+    try SecureFileAccess.verifyDirectoryPathIdentity(
+      parentURL,
+      equals: expectedIdentity,
+      expectedOwnerID: expectedOwnerID
+    )
+  }
+
+  private static func verifyDestination(
+    _ expectedState: SecureManagedLeafState,
+    parentDescriptor: Int32,
+    destinationName: String,
+    expectedOwnerID: uid_t
+  ) throws {
+    guard
+      try SecureFileAccess.managedRegularFileState(
+        in: parentDescriptor,
+        named: destinationName,
+        expectedOwnerID: expectedOwnerID
+      ) == expectedState
+    else {
+      throw ProfileStorageError.fileChangedDuringRead
     }
   }
 
-  private static func replaceAtomically(_ sourceURL: URL, with destinationURL: URL) throws {
-    let result = sourceURL.path.withCString { source in
-      destinationURL.path.withCString { target in
-        Darwin.rename(source, target)
+  private static func verifyRegularLeaf(
+    named name: String,
+    equals expectedIdentity: SecureFileIdentity,
+    parentDescriptor: Int32,
+    expectedOwnerID: uid_t
+  ) throws {
+    guard
+      try SecureFileAccess.managedRegularFileState(
+        in: parentDescriptor,
+        named: name,
+        expectedOwnerID: expectedOwnerID
+      ) == .regularFile(expectedIdentity)
+    else {
+      throw ProfileStorageError.fileChangedDuringRead
+    }
+  }
+
+  private static func removeExpectedRegularLeaf(
+    named name: String,
+    identity: SecureFileIdentity,
+    parentDescriptor: Int32,
+    expectedOwnerID: uid_t
+  ) throws {
+    try verifyRegularLeaf(
+      named: name,
+      equals: identity,
+      parentDescriptor: parentDescriptor,
+      expectedOwnerID: expectedOwnerID
+    )
+
+    // Darwin has no public inode-conditional unlink. A noncooperative process
+    // running as this UID can still swap this unpredictable leaf between the
+    // fstatat check and unlinkat. The same limitation exists between identity
+    // validation and renameatx_np; post-checks and guarded rollback narrow the
+    // observable window, but cannot provide a kernel-level leaf CAS.
+    let result = name.withCString { leaf in
+      Darwin.unlinkat(parentDescriptor, leaf, 0)
+    }
+    guard result == 0 else {
+      if errno == ENOENT {
+        throw ProfileStorageError.fileChangedDuringRead
+      }
+      throw posixError(errno)
+    }
+  }
+
+  private static func rollbackInitiallyMissingCommitIfSafe(
+    _ checkpoint: Checkpoint,
+    stagingIdentity: SecureFileIdentity,
+    expectedOwnerID: uid_t
+  ) -> Bool {
+    guard
+      (try? SecureFileAccess.managedRegularFileState(
+        in: checkpoint.parentDirectoryDescriptor,
+        named: checkpoint.destinationName,
+        expectedOwnerID: expectedOwnerID
+      )) == .regularFile(stagingIdentity),
+      (try? SecureFileAccess.managedRegularFileState(
+        in: checkpoint.parentDirectoryDescriptor,
+        named: checkpoint.stagingName,
+        expectedOwnerID: expectedOwnerID
+      )) == .missing
+    else {
+      return false
+    }
+
+    let result = checkpoint.destinationName.withCString { destinationName in
+      checkpoint.stagingName.withCString { stagingName in
+        Darwin.renameatx_np(
+          checkpoint.parentDirectoryDescriptor,
+          destinationName,
+          checkpoint.parentDirectoryDescriptor,
+          stagingName,
+          UInt32(RENAME_EXCL)
+        )
       }
     }
-    let renameError = errno
-    guard result == 0 else {
-      throw posixError(renameError)
+    guard result == 0 else { return false }
+    return
+      (try? SecureFileAccess.managedRegularFileState(
+        in: checkpoint.parentDirectoryDescriptor,
+        named: checkpoint.destinationName,
+        expectedOwnerID: expectedOwnerID
+      )) == .missing
+      && (try? SecureFileAccess.managedRegularFileState(
+        in: checkpoint.parentDirectoryDescriptor,
+        named: checkpoint.stagingName,
+        expectedOwnerID: expectedOwnerID
+      )) == .regularFile(stagingIdentity)
+  }
+
+  private static func rollbackExistingCommitIfSafe(
+    _ checkpoint: Checkpoint,
+    stagingIdentity: SecureFileIdentity,
+    expectedOwnerID: uid_t
+  ) -> Bool {
+    guard
+      (try? SecureFileAccess.managedRegularFileState(
+        in: checkpoint.parentDirectoryDescriptor,
+        named: checkpoint.destinationName,
+        expectedOwnerID: expectedOwnerID
+      )) == .regularFile(stagingIdentity),
+      case .present(let displacedIdentity) = try? SecureFileAccess.directoryEntryState(
+        in: checkpoint.parentDirectoryDescriptor,
+        named: checkpoint.stagingName,
+        expectedOwnerID: expectedOwnerID
+      )
+    else {
+      return false
+    }
+
+    guard
+      swapLeaves(
+        checkpoint.destinationName,
+        checkpoint.stagingName,
+        parentDescriptor: checkpoint.parentDirectoryDescriptor
+      ) == 0
+    else {
+      return false
+    }
+    return
+      (try? SecureFileAccess.directoryEntryState(
+        in: checkpoint.parentDirectoryDescriptor,
+        named: checkpoint.destinationName,
+        expectedOwnerID: expectedOwnerID
+      )) == .present(displacedIdentity)
+      && (try? SecureFileAccess.managedRegularFileState(
+        in: checkpoint.parentDirectoryDescriptor,
+        named: checkpoint.stagingName,
+        expectedOwnerID: expectedOwnerID
+      )) == .regularFile(stagingIdentity)
+  }
+
+  private static func swapLeaves(
+    _ firstName: String,
+    _ secondName: String,
+    parentDescriptor: Int32
+  ) -> Int32 {
+    firstName.withCString { first in
+      secondName.withCString { second in
+        Darwin.renameatx_np(
+          parentDescriptor,
+          first,
+          parentDescriptor,
+          second,
+          UInt32(RENAME_SWAP)
+        )
+      }
     }
   }
 
-  /// The committed rename cannot be rolled back safely if directory syncing
-  /// fails, so this is a best-effort durability step after atomic visibility.
-  private static func synchronizeParentDirectoryBestEffort(_ directoryURL: URL) {
-    let descriptor = directoryURL.withUnsafeFileSystemRepresentation { path -> Int32 in
-      guard let path else { return -1 }
-      return Darwin.open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+  private static func removeOwnedStagingFileIfPresent(
+    parentDescriptor: Int32,
+    stagingName: String,
+    expectedIdentity: SecureFileIdentity,
+    expectedOwnerID: uid_t
+  ) {
+    guard
+      (try? SecureFileAccess.managedRegularFileState(
+        in: parentDescriptor,
+        named: stagingName,
+        expectedOwnerID: expectedOwnerID
+      )) == .regularFile(expectedIdentity)
+    else {
+      return
     }
-    guard descriptor >= 0 else { return }
-    _ = Darwin.fsync(descriptor)
-    _ = Darwin.close(descriptor)
+    // As with successful old-target cleanup, Darwin offers no public
+    // identity-conditional unlink. The random leaf plus this immediate
+    // identity check narrows, but cannot eliminate, a same-UID race.
+    _ = stagingName.withCString { name in
+      Darwin.unlinkat(parentDescriptor, name, 0)
+    }
   }
 
   private static func posixError(_ code: Int32) -> POSIXError {

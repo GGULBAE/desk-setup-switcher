@@ -21,7 +21,7 @@ Before `1.0`, minor versions may change behavior and internal source interfaces.
 
 The Xcode and package gates currently cross-build a universal `arm64 x86_64` executable, and package inspection confirms both slices. Runtime and install evidence exists on Apple Silicon. Physical Intel execution, clean install, upgrade, profile recovery, and mutation/rollback have not been verified.
 
-Therefore the initial public beta support claim is **Apple Silicon only**. The `x86_64` slice is an unverified convenience artifact, not an Intel support claim. Intel support may be added only after the physical verification matrix is recorded in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
+The planned initial public-beta CPU boundary is **Apple Silicon only**. It becomes a support claim only after the exact-candidate release gates, including the Sonoma lifecycle requirement, pass. The `x86_64` slice is an unverified convenience artifact, not an Intel support claim. Intel support may be added only after the physical verification matrix is recorded in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
 ## Swift Package products
 

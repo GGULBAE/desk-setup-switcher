@@ -242,7 +242,7 @@ The app exports the authoritative persisted document; unsaved editor drafts are 
 - refuses to overwrite any existing destination; and
 - when exporting an `ImportedProfileDocument`, refuses a destination that resolves to the import source.
 
-The current export writer writes directly to the new final path. It synchronizes and removes the file when a reported write fails, but it is not a crash-atomic export: sudden termination or power loss could leave a partial newly created file. If an export is interrupted, delete the incomplete file after inspection and export again to a new destination. This limitation does not change the managed `ProfileStore`, which separately uses a private staging file, atomic rename, a last-known-good backup, and corrupt-file quarantine.
+The current export writer writes directly to the new final path. It synchronizes and removes the file when a reported write fails, but it is not a crash-atomic export: sudden termination or power loss could leave a partial newly created file. If an export is interrupted, delete the incomplete file after inspection and export again to a new destination. This limitation does not change the managed `ProfileStore`, which separately anchors mutations to one verified parent-directory descriptor, commits a private staging file with exclusive rename or atomic swap, verifies and conditionally rolls back the resulting identities, retains a last-known-good backup, and quarantines corrupt files.
 
 ## Privacy and safe sharing
 

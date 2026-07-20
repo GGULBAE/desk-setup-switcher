@@ -31,7 +31,7 @@ The planned `v0.1.0` public-beta baseline fixes these identities:
 | Bundle identifier | `dev.ggulae.desk-setup-switcher` |
 | Keychain service | `dev.ggulae.desk-setup-switcher.secrets` |
 | Deployment target | macOS 14.0 or later |
-| Initial supported CPU | Apple Silicon; the packaged `x86_64` slice is cross-built but physically unverified |
+| Planned initial CPU boundary | Apple Silicon; the packaged `x86_64` slice is cross-built but physically unverified, and support still requires the exact-candidate gates |
 | Profile interchange | `schemaVersion: 1` for the `0.1.x` line |
 | Swift package products | Internal and unstable; not a supported SDK or plug-in API |
 | Versioning | Immutable `v`-prefixed SemVer tags; published assets are repaired with a new patch version |
@@ -65,9 +65,12 @@ Accepted P2 boundaries are intentionally recorded rather than hidden:
 - Export uses an exclusive final-file write and a crash could leave a partial new export; a staged non-overwriting rename is a future hardening pass.
 - Parent-directory sync is best effort, so perfect sudden-power-loss durability is not claimed.
 
+These bullets preserve the 2026-07-18 implementation boundary. The current writer described in the completion ledger later moved managed staging, commit, rollback, cleanup, and sync onto one verified parent-directory descriptor and added deterministic parent-path, regular/symlink leaf replacement, and both post-commit rollback tests. Current residuals include the lack of public inode-conditional rename/unlink and possible private old-leaf staging residue after abrupt interruption between swap and unlink; there is no production path-based mutation fallback.
+
 ### Repository and release controls
 
-- `make audit-public-release` now requires complete Git history and inspects historical source paths plus PNG, JPEG, and icon metadata for high-confidence credential and personal-path patterns without printing matched secret values.
+- `make audit-public-release` now requires complete Git history and inspects historical source paths plus PNG, JPEG, and icon metadata for high-confidence credential and personal-path patterns without printing matched secret values. A later hardening follow-up also scans commit and annotated-tag author, committer, and tagger email metadata without printing identity values.
+- Already-public legacy personal email metadata remains in immutable history; no history rewrite or remote mutation was performed. Only exact reviewed commit SHAs that are ancestors of the fixed public baseline may pass the value-free exception file. Every other commit and annotated tag, including synthetic fixtures, requires a GitHub noreply identity. Replacement refs and grafted history fail closed, and annotated-tag traversal starts from every ref and follows nested tag objects.
 - The local CI proposal fetches full history and runs the public-release audit; it was not yet effective on the remote default branch at this snapshot.
 - The then-local tag-workflow proposal was constrained to an unsigned **draft prerelease candidate** in the named `release` environment. It was not the effective remote workflow and could not establish a supported or canonical release. The effective `origin/master` workflow, inspected read-only on 2026-07-18, can publish an unsigned Release from a `v*` tag and remains a publication blocker.
 - Support, security, privacy, governance, compatibility, contribution, and distribution documents now state the same public-beta boundary.
@@ -92,7 +95,7 @@ Development-only universal DMG SHA-256:
 
 The filename contains `unsigned` and the app has only an ad-hoc integrity signature. This hash does not identify a Developer ID-signed, notarized, stapled, Gatekeeper-verified, supported, or published artifact. The package was not installed or launched in this pass.
 
-The complete-history and asset-metadata audit also passed locally. Historical installed and UI evidence remains historical and must not be presented as evidence for this newly built package.
+The complete-history and asset-metadata audit also passed locally. A later follow-up passed 38 synthetic audit assertions plus the current-history audit, including value-suppressed commit/tag identity enforcement, exact-SHA-only legacy exceptions, all-ref/nested annotated-tag coverage, and replacement-ref/graft rejection. This scoped automation does not OCR historical pixels. Historical installed and UI evidence remains historical and must not be presented as evidence for this newly built package.
 
 ## Remaining public-launch gates
 

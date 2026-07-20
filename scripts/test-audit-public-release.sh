@@ -30,14 +30,19 @@ fail() {
 new_repository() {
     local name="$1"
     local repository="$temporary_root/$name"
-    mkdir -p "$repository/scripts"
+    mkdir -p "$repository/scripts" "$repository/docs"
     cp "$AUDIT_SCRIPT" "$repository/scripts/audit-public-release.sh"
     chmod 0755 "$repository/scripts/audit-public-release.sh"
+    : >"$repository/docs/LEGACY-GIT-IDENTITY-ALLOWLIST.txt"
     git -C "$repository" init -q -b master
     git -C "$repository" config user.name "Synthetic Audit Fixture"
-    git -C "$repository" config user.email "audit-fixture@example.invalid"
+    git -C "$repository" config user.email \
+        "12345+synthetic-audit@users.noreply.github.com"
     printf 'fixture baseline\n' >"$repository/README.md"
-    git -C "$repository" add scripts/audit-public-release.sh README.md
+    git -C "$repository" add \
+        scripts/audit-public-release.sh \
+        docs/LEGACY-GIT-IDENTITY-ALLOWLIST.txt \
+        README.md
     git -C "$repository" commit -q -m "fixture baseline"
     printf '%s\n' "$repository"
 }
@@ -107,6 +112,23 @@ assert_legacy_fails_without_value() {
     pass
 }
 
+assert_identity_fails_without_value() {
+    local repository="$1"
+    local label="$2"
+    local role="$3"
+    local value="$4"
+    run_audit "$repository" "$label"
+    [[ "$last_status" != 0 ]] || fail "$label unexpectedly passed"
+    grep -F -q 'Disallowed Git author, committer, or tagger email metadata found' \
+        "$last_stderr" || fail "$label did not report the identity metadata detector"
+    grep -E -q "^[0-9a-f]{40}:$role$" "$last_stderr" ||
+        fail "$label did not report only the immutable object and role"
+    if grep -F -q -- "$value" "$last_stdout" "$last_stderr"; then
+        fail "$label echoed the matched identity value"
+    fi
+    pass
+}
+
 commit_then_delete() {
     local repository="$1"
     local relative_path="$2"
@@ -144,6 +166,72 @@ printf '\000compressed-bytes-%s\000' "$safe_binary_host" >"$clean_repository/ran
 git -C "$clean_repository" add safe.txt SafeSettings.swift random.png
 git -C "$clean_repository" commit -q -m "add explicit safe fixtures"
 assert_passes "$clean_repository" clean
+
+github_identity_repository="$(new_repository github-noreply-identity)"
+GIT_AUTHOR_NAME='Synthetic GitHub Fixture' \
+GIT_AUTHOR_EMAIL='12345+synthetic@users.noreply.github.com' \
+GIT_COMMITTER_NAME='Synthetic GitHub Fixture' \
+GIT_COMMITTER_EMAIL='noreply@github.com' \
+    git -C "$github_identity_repository" commit -q --allow-empty -m 'allowed noreply identity'
+assert_passes "$github_identity_repository" github-noreply-identity
+
+private_author_probe="$(printf '%s@%s' 'private-author' 'mail.invalid')"
+private_author_repository="$(new_repository private-author-identity)"
+GIT_AUTHOR_NAME='Synthetic Private Author' \
+GIT_AUTHOR_EMAIL="$private_author_probe" \
+GIT_COMMITTER_NAME='Synthetic Audit Fixture' \
+GIT_COMMITTER_EMAIL='12345+synthetic-audit@users.noreply.github.com' \
+    git -C "$private_author_repository" commit -q --allow-empty -m 'private author probe'
+assert_identity_fails_without_value \
+    "$private_author_repository" private-author-identity author-email "$private_author_probe"
+
+private_committer_probe="$(printf '%s@%s' 'private-committer' 'mail.invalid')"
+private_committer_repository="$(new_repository private-committer-identity)"
+GIT_AUTHOR_NAME='Synthetic Audit Fixture' \
+GIT_AUTHOR_EMAIL='12345+synthetic-audit@users.noreply.github.com' \
+GIT_COMMITTER_NAME='Synthetic Private Committer' \
+GIT_COMMITTER_EMAIL="$private_committer_probe" \
+    git -C "$private_committer_repository" commit -q --allow-empty -m 'private committer probe'
+assert_identity_fails_without_value \
+    "$private_committer_repository" private-committer-identity committer-email \
+    "$private_committer_probe"
+
+private_tagger_probe="$(printf '%s@%s' 'private-tagger' 'mail.invalid')"
+private_tagger_repository="$(new_repository private-tagger-identity)"
+GIT_COMMITTER_NAME='Synthetic Private Tagger' \
+GIT_COMMITTER_EMAIL="$private_tagger_probe" \
+    git -C "$private_tagger_repository" tag -a private-identity-probe -m 'private tagger probe'
+assert_identity_fails_without_value \
+    "$private_tagger_repository" private-tagger-identity tagger-email "$private_tagger_probe"
+
+private_custom_ref_probe="$(printf '%s@%s' 'private-custom-ref-tagger' 'mail.invalid')"
+private_custom_ref_repository="$(new_repository private-custom-ref-tagger)"
+GIT_COMMITTER_NAME='Synthetic Private Custom Ref Tagger' \
+GIT_COMMITTER_EMAIL="$private_custom_ref_probe" \
+    git -C "$private_custom_ref_repository" tag -a private-custom-ref -m 'private custom ref tagger probe'
+private_custom_ref_object="$(
+    git -C "$private_custom_ref_repository" rev-parse 'refs/tags/private-custom-ref^{tag}'
+)"
+git -C "$private_custom_ref_repository" update-ref \
+    refs/audit/private-custom-ref "$private_custom_ref_object"
+git -C "$private_custom_ref_repository" tag -d private-custom-ref >/dev/null
+assert_identity_fails_without_value \
+    "$private_custom_ref_repository" private-custom-ref-tagger tagger-email \
+    "$private_custom_ref_probe"
+
+private_nested_tag_probe="$(printf '%s@%s' 'private-nested-tagger' 'mail.invalid')"
+private_nested_tag_repository="$(new_repository private-nested-tagger)"
+GIT_COMMITTER_NAME='Synthetic Private Nested Tagger' \
+GIT_COMMITTER_EMAIL="$private_nested_tag_probe" \
+    git -C "$private_nested_tag_repository" tag -a private-inner -m 'private nested tagger probe'
+GIT_COMMITTER_NAME='Synthetic GitHub Outer Tagger' \
+GIT_COMMITTER_EMAIL='12345+synthetic-audit@users.noreply.github.com' \
+    git -C "$private_nested_tag_repository" tag -a allowed-outer private-inner \
+        -m 'allowed outer tag' 2>/dev/null
+git -C "$private_nested_tag_repository" tag -d private-inner >/dev/null
+assert_identity_fails_without_value \
+    "$private_nested_tag_repository" private-nested-tagger tagger-email \
+    "$private_nested_tag_probe"
 
 # The repository audit test deliberately contains private-looking synthetic
 # probes. Only its exact reviewed blob is exempt; changing the same path must
@@ -380,6 +468,24 @@ grep -F -q 'Git history audit could not inspect repository data' "$last_stderr" 
 if grep -F -q -- "$git_failure_repository" "$last_stdout" "$last_stderr"; then
     fail "injected-git-failure exposed a repository path"
 fi
+pass
+
+replacement_repository="$(new_repository replacement-ref)"
+git -C "$replacement_repository" commit -q --allow-empty -m 'replacement target'
+git -C "$replacement_repository" replace HEAD HEAD^
+run_audit "$replacement_repository" replacement-ref
+[[ "$last_status" != 0 ]] || fail "replacement-ref unexpectedly passed"
+grep -F -q 'rejects Git replacement refs or grafts' "$last_stderr" ||
+    fail "replacement-ref did not fail at the history-override boundary"
+pass
+
+graft_repository="$(new_repository grafted-history)"
+graft_git_directory="$(git -C "$graft_repository" rev-parse --absolute-git-dir)"
+git -C "$graft_repository" rev-parse HEAD >"$graft_git_directory/info/grafts"
+run_audit "$graft_repository" grafted-history
+[[ "$last_status" != 0 ]] || fail "grafted-history unexpectedly passed"
+grep -F -q 'rejects Git replacement refs or grafts' "$last_stderr" ||
+    fail "grafted-history did not fail at the history-override boundary"
 pass
 
 probe_nine="$(printf '%s%s' 'FloorFour-' 'Network')"

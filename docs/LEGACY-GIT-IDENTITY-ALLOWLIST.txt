@@ -1,0 +1,25 @@
+# Reviewed legacy Git identity metadata exceptions.
+#
+# Entries are immutable commit object IDs only. No name, email address, local
+# hostname, or other identity value belongs in this file. The audit accepts an
+# entry only when it is reachable, contains otherwise-disallowed identity
+# metadata, and is an ancestor of the fixed already-public baseline commit.
+0d8f51005d21789545ed404ffe67145f4cb5c75a
+44fba27b1e400a979438ce570160b1f591e995f4
+45dcf56fc10d66252b1d33f9046e0fac4d6aa408
+4e453282cfa3dd5f0d3fc6a4aeb359e6d375ab27
+5f0cabc581efbff44a57431050fd7ee65d78fa76
+600d6f77c6180d4f7d58f950111d7db55393fdb4
+775292151a793cb182d40e0fd6542edef4c64678
+777b910dcca7bb07cb9d8c8abf66760a7c8d073f
+7c9a919110d187bfe3be480b30c40ece08079a65
+8e6d99526f75100fcb0ae17cf521a9956e2c9c23
+917caea0c2265b34f2b5138b4bc85b7be5181895
+9cd391f0acdec828aecbe5d202458cc86808f22b
+a5b54f26253d3ea82f062c8f6966693f3ba8adc3
+aaea0581398b39e35b061968c2b207cb302889cb
+ace7f680c9c0603d598e19e3d2b8d997af78f34d
+b34dfd7dc43b29d49c56824abd021fa30c6fa97b
+b4e5d89c235b174f9dfc4fc117fb77aa74029820
+d30368a3197a9de075661692e9f905847005e14b
+d9369d56e68653eb34cc6d0270fe19d4fb89c891

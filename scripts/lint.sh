@@ -73,5 +73,17 @@ ruby -e '
   abort bad.join("\n") unless bad.empty?
 '
 
+ruby -e '
+  support = File.read("SUPPORT.md")
+  abort "SUPPORT.md must label the platform boundary as planned" unless
+    support.include?("## Planned public-beta support boundary")
+  abort "SUPPORT.md must retain the Sonoma exact-candidate gate" unless
+    support.include?("This is not yet a supported-runtime claim") &&
+      support.include?("exact signed candidate") &&
+      support.include?("Apple Silicon/macOS 14 Sonoma")
+  abort "SUPPORT.md regressed to an unverified Apple Silicon support claim" if
+    support.include?("initial public beta is supported on Apple Silicon")
+'
+
 git diff --check
 git diff --cached --check

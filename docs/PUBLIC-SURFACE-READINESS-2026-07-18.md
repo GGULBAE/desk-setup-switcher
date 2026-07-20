@@ -2,6 +2,11 @@
 
 Date: 2026-07-18
 
+> Historical snapshot: the verification counts and development-package hash
+> below describe the 2026-07-18 audit tree. They are superseded by the current
+> [completion criteria and evidence ledger](COMPLETION-CRITERIA.md); do not use
+> this snapshot as current release evidence.
+
 ## Outcome
 
 The local user-facing open-source surface is prepared for the Desk Setup

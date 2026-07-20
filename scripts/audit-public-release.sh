@@ -6,6 +6,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cd "$ROOT_DIR"
 
+# Replacement refs and legacy grafts can make ordinary revision/object reads
+# inspect substituted history rather than the objects that would be pushed.
+# Disable replacement semantics for every Git subprocess, then reject either
+# override mechanism instead of auditing an ambiguous object graph.
+export GIT_NO_REPLACE_OBJECTS=1
+
 set +e
 shallow_repository="$(git rev-parse --is-shallow-repository 2>/dev/null)"
 git_status=$?
@@ -20,10 +26,27 @@ if [[ "$shallow_repository" == "true" ]]; then
     exit 1
 fi
 
+set +e
+replacement_refs="$(git for-each-ref --format='%(refname)' refs/replace 2>/dev/null)"
+replacement_status=$?
+grafts_path="$(git rev-parse --git-path info/grafts 2>/dev/null)"
+grafts_status=$?
+set -e
+if [[ "$replacement_status" != 0 || "$grafts_status" != 0 ]]; then
+    echo "Public-release Git history audit could not inspect repository data." >&2
+    exit 1
+fi
+if [[ -n "$replacement_refs" || -e "$grafts_path" || -L "$grafts_path" ]]; then
+    echo "Public-release history audit rejects Git replacement refs or grafts." >&2
+    exit 1
+fi
+
 secret_hits="$(mktemp "${TMPDIR:-/tmp}/desk-setup-secret-hits.XXXXXX")"
 home_path_hits="$(mktemp "${TMPDIR:-/tmp}/desk-setup-home-hits.XXXXXX")"
 image_hits="$(mktemp "${TMPDIR:-/tmp}/desk-setup-image-hits.XXXXXX")"
 privacy_hits="$(mktemp "${TMPDIR:-/tmp}/desk-setup-privacy-hits.XXXXXX")"
+identity_hits="$(mktemp "${TMPDIR:-/tmp}/desk-setup-identity-hits.XXXXXX")"
+tag_object_ids="$(mktemp "${TMPDIR:-/tmp}/desk-setup-tag-objects.XXXXXX")"
 git_scan_output="$(mktemp "${TMPDIR:-/tmp}/desk-setup-git-scan.XXXXXX")"
 git_scan_aux="$(mktemp "${TMPDIR:-/tmp}/desk-setup-git-scan-aux.XXXXXX")"
 
@@ -33,6 +56,8 @@ cleanup() {
         "$home_path_hits" \
         "$image_hits" \
         "$privacy_hits" \
+        "$identity_hits" \
+        "$tag_object_ids" \
         "$git_scan_output" \
         "$git_scan_aux"
 }
@@ -64,6 +89,143 @@ capture_git_command() {
         fail_git_history_audit
     fi
 }
+
+# Commit and annotated-tag identity metadata is part of public Git history even
+# when no file contains the address. Keep raw names and addresses in process
+# memory only. Findings contain an immutable object ID and a fixed role label.
+# Existing personal metadata was already public at the recorded baseline; only
+# its exact reviewed commit objects may pass. New commit or tag objects fail.
+legacy_identity_allowlist="$ROOT_DIR/docs/LEGACY-GIT-IDENTITY-ALLOWLIST.txt"
+legacy_identity_public_baseline="1489b7fcb41ffa7e55a43ed65e6befc538838140"
+if ! ruby -ropen3 -rset -e '
+  root, allowlist_path, baseline, findings_path, tag_objects_path = ARGV
+  begin
+    raise unless File.file?(allowlist_path) && !File.symlink?(allowlist_path)
+
+    expected_allowlist_comments = [
+      "# Reviewed legacy Git identity metadata exceptions.",
+      "#",
+      "# Entries are immutable commit object IDs only. No name, email address, local",
+      "# hostname, or other identity value belongs in this file. The audit accepts an",
+      "# entry only when it is reachable, contains otherwise-disallowed identity",
+      "# metadata, and is an ancestor of the fixed already-public baseline commit."
+    ].freeze
+    allowlisted = []
+    allowlist_comments = []
+    saw_allowlist_entry = false
+    File.binread(allowlist_path).each_line do |raw_line|
+      line = raw_line.strip
+      next if line.empty?
+      if line.start_with?("#")
+        raise if saw_allowlist_entry
+        allowlist_comments << line
+        next
+      end
+      raise unless line.match?(/\A[0-9a-f]{40}\z/)
+      saw_allowlist_entry = true
+      allowlisted << line
+    end
+    raise unless allowlisted.uniq.length == allowlisted.length
+    if allowlisted.empty?
+      raise unless allowlist_comments.empty?
+    else
+      raise unless allowlist_comments == expected_allowlist_comments
+    end
+    allowlisted = allowlisted.to_set
+
+    git = lambda do |*arguments|
+      stdout, _stderr, status = Open3.capture3("git", "-C", root, *arguments)
+      raise unless status.success?
+      stdout.b
+    end
+    identity_email = lambda do |object, header|
+      metadata = object.split(/\r?\n\r?\n/n, 2).first.to_s
+      matches = metadata.lines.grep(/\A#{Regexp.escape(header)} /)
+      raise unless matches.length == 1
+      match = matches.first.match(/\A#{Regexp.escape(header)} .* <([^<>\r\n]*)> -?\d+ [+-]\d{4}\r?\n?\z/n)
+      raise unless match
+      match[1]
+    end
+
+    commits = git.call("rev-list", "--all").lines.map(&:strip)
+    raise unless commits.all? { |sha| sha.match?(/\A[0-9a-f]{40}\z/) }
+    commit_set = commits.to_set
+    allowed_email = lambda do |email|
+      normalized = email.to_s
+      normalized.match?(
+        /\A(?:[^@\s<>]+@users\.noreply\.github\.com|noreply@github\.com)\z/i
+      )
+    end
+    unless allowlisted.empty?
+      raise unless commit_set.include?(baseline)
+      raise unless git.call("cat-file", "-t", baseline).strip == "commit"
+    end
+
+    findings = []
+    observed_legacy = Set.new
+    commits.each do |sha|
+      object = git.call("cat-file", "commit", sha)
+      identities = {
+        "author-email" => identity_email.call(object, "author"),
+        "committer-email" => identity_email.call(object, "committer")
+      }
+      identities.each do |role, email|
+        next if allowed_email.call(email)
+        if allowlisted.include?(sha)
+          observed_legacy << sha
+        else
+          findings << "#{sha}:#{role}"
+        end
+      end
+    end
+
+    allowlisted.each do |sha|
+      raise unless commit_set.include?(sha) && observed_legacy.include?(sha)
+      _stdout, _stderr, status = Open3.capture3(
+        "git", "-C", root, "merge-base", "--is-ancestor", sha, baseline
+      )
+      raise unless status.success?
+    end
+
+    # Start at every ref, not only refs/tags. A reachable annotated-tag object
+    # retains public tagger metadata even when a custom ref names it.
+    tag_roots = git.call(
+      "for-each-ref", "--format=%(objecttype) %(objectname)"
+    ).lines.map(&:strip)
+    pending_tags = tag_roots.filter_map do |line|
+      type, sha = line.split(" ", 2)
+      raise unless %w[commit tag tree blob].include?(type) && sha&.match?(/\A[0-9a-f]{40}\z/)
+      sha if type == "tag"
+    end
+    visited_tags = Set.new
+    until pending_tags.empty?
+      sha = pending_tags.pop
+      next unless visited_tags.add?(sha)
+      object = git.call("cat-file", "tag", sha)
+      tagger_email = identity_email.call(object, "tagger")
+      findings << "#{sha}:tagger-email" unless allowed_email.call(tagger_email)
+
+      target = object[/\Aobject ([0-9a-f]{40})\r?$/n, 1]
+      target_type = object[/^type (commit|tag|tree|blob)\r?$/n, 1]
+      raise unless target && target_type
+      pending_tags << target if target_type == "tag"
+    end
+
+    File.open(tag_objects_path, "wb", 0o600) do |file|
+      visited_tags.to_a.sort.each { |sha| file.puts(sha) }
+    end
+
+    File.open(findings_path, "wb", 0o600) do |file|
+      findings.uniq.sort.each { |finding| file.puts(finding) }
+    end
+  rescue StandardError
+    exit 2
+  end
+' "$ROOT_DIR" "$legacy_identity_allowlist" "$legacy_identity_public_baseline" \
+    "$identity_hits" "$tag_object_ids"; then
+    echo "Public-release Git identity metadata scanner failed closed." >&2
+    exit 1
+fi
 
 # Legacy credential/home/image collectors predate value-aware findings. Always
 # render their path field as an opaque digest so a credential-shaped filename,
@@ -292,12 +454,10 @@ while IFS= read -r commit; do
 done <"$git_scan_aux"
 
 # Annotated tag messages are separate Git objects and are not returned as commit
-# bodies. Scan message bodies without ever placing them in a shell variable or log.
-capture_git_command \
-    "$git_scan_aux" \
-    for-each-ref --format='%(objecttype) %(objectname)' refs/tags
-while read -r object_type object; do
-    [[ "$object_type" == "tag" && "$object" =~ ^[0-9a-f]{40,64}$ ]] || continue
+# bodies. The identity pass supplies every all-ref/nested tag object ID. Scan
+# bodies without ever placing them in a shell variable or log.
+while IFS= read -r object; do
+    [[ "$object" =~ ^[0-9a-f]{40,64}$ ]] || fail_git_history_audit
     tag_message() {
         git cat-file tag "$object" 2>/dev/null | awk 'body { print } /^$/ { body = 1 }'
     }
@@ -329,7 +489,7 @@ while read -r object_type object; do
     if [[ "${pipeline_status[1]}" == 0 ]]; then
         printf '%s:%s\n' "$object" 'tag-message' >>"$home_path_hits"
     fi
-done <"$git_scan_aux"
+done <"$tag_object_ids"
 
 # Inspect tracked working-tree images and every historical image blob. strings
 # is intentionally used as a conservative metadata/path detector; image pixels
@@ -427,7 +587,7 @@ done <"$git_scan_output"
 # Documentation address blocks and explicitly marked synthetic fixture context
 # are allowed, while private/link-local/global host literals fail closed.
 if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
-  root, output_path = ARGV
+  root, output_path, tag_objects_path = ARGV
   begin
 
   TEXT_EXTENSIONS = Set.new(%w[
@@ -513,6 +673,9 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
     ["ed3d0a9967e58535b121e2ab881d2dbb25f44a9e", "scripts/test-audit-public-release.sh", "device-identifier"],
     ["ed3d0a9967e58535b121e2ab881d2dbb25f44a9e", "scripts/test-audit-public-release.sh", "ip-host"],
     ["ed3d0a9967e58535b121e2ab881d2dbb25f44a9e", "scripts/test-audit-public-release.sh", "ssid"],
+    ["7eb44a7aca5edd094867368a122cff670949f015", "scripts/test-audit-public-release.sh", "device-identifier"],
+    ["7eb44a7aca5edd094867368a122cff670949f015", "scripts/test-audit-public-release.sh", "ip-host"],
+    ["7eb44a7aca5edd094867368a122cff670949f015", "scripts/test-audit-public-release.sh", "ssid"],
   ]).freeze
   SAFE_VALUE_WORDS = /(?:\A|[^a-z0-9])(?:demo|example|fake|fixture|mock|placeholder|redacted|sample|synthetic|test(?:ing)?)(?:\z|[^a-z0-9])/i
   SAFE_CONTEXT_WORDS = /(?:\b(?:documentation[- ]only|e\.g\.|example data|for example|mock fixture|redacted fixture|synthetic(?: data| fixture| value)?|test fixture)\b|예시?\s*[:：]?)/i
@@ -852,16 +1015,10 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
     object = line.strip
     message_objects[object] = "COMMIT_MESSAGE" if object.match?(/\A[0-9a-f]{40,64}\z/)
   end
-  git_capture(
-    root,
-    "for-each-ref",
-    "--format=%(objecttype) %(objectname)",
-    "refs/tags"
-  ).each_line do |line|
-    object_type, object = line.strip.split(" ", 2)
-    if object_type == "tag" && object&.match?(/\A[0-9a-f]{40,64}\z/)
-      message_objects[object] = "TAG_MESSAGE"
-    end
+  File.binread(tag_objects_path).each_line do |line|
+    object = line.strip
+    raise unless object.match?(/\A[0-9a-f]{40,64}\z/)
+    message_objects[object] = "TAG_MESSAGE"
   end
 
   unless message_objects.empty?
@@ -898,7 +1055,7 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
   rescue StandardError
     exit 2
   end
-' "$ROOT_DIR" "$privacy_hits"; then
+' "$ROOT_DIR" "$privacy_hits" "$tag_object_ids"; then
     echo "Public-release privacy scanner failed closed." >&2
     exit 1
 fi
@@ -920,6 +1077,12 @@ fi
 if [[ -s "$home_path_hits" ]]; then
     echo "Concrete personal home path found in Git history (values suppressed):" >&2
     render_opaque_finding_metadata <"$home_path_hits" >&2
+    exit 1
+fi
+
+if [[ -s "$identity_hits" ]]; then
+    echo "Disallowed Git author, committer, or tagger email metadata found (values suppressed):" >&2
+    sort -u "$identity_hits" >&2
     exit 1
 fi
 

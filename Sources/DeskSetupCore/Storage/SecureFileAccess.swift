@@ -145,6 +145,23 @@ enum SecureManagedPathState: Equatable, Sendable {
   case directory
 }
 
+enum SecureManagedLeafState: Equatable, Sendable {
+  case missing
+  case regularFile(SecureFileIdentity)
+}
+
+enum SecureDirectoryEntryState: Equatable, Sendable {
+  case missing
+  case present(SecureDirectoryEntryIdentity)
+}
+
+struct SecureDirectoryEntryIdentity: Equatable, Sendable {
+  let device: dev_t
+  let inode: ino_t
+  let owner: uid_t
+  let fileType: mode_t
+}
+
 struct SecureFileIdentity: Equatable, Sendable {
   let device: dev_t
   let inode: ino_t
@@ -431,11 +448,110 @@ enum SecureFileAccess {
     }
   }
 
-  private static func openOwnedDirectory(
+  static func openOwnedDirectory(
     _ url: URL,
     expectedOwnerID: uid_t
   ) throws -> Int32 {
     try openVerifiedDirectory(url, expectedOwnerID: expectedOwnerID)
+  }
+
+  static func directoryIdentity(
+    descriptor: Int32,
+    expectedOwnerID: uid_t
+  ) throws -> SecureFileIdentity {
+    var status = stat()
+    guard Darwin.fstat(descriptor, &status) == 0 else {
+      throw ProfileStorageError.io(String(cString: strerror(errno)))
+    }
+    guard (status.st_mode & S_IFMT) == S_IFDIR else {
+      throw ProfileStorageError.unsafeFilesystemObject
+    }
+    guard status.st_uid == expectedOwnerID else {
+      throw ProfileStorageError.unexpectedFileOwner
+    }
+    return SecureFileIdentity(
+      device: status.st_dev,
+      inode: status.st_ino,
+      owner: status.st_uid
+    )
+  }
+
+  static func verifyDirectoryPathIdentity(
+    _ url: URL,
+    equals expectedIdentity: SecureFileIdentity,
+    expectedOwnerID: uid_t
+  ) throws {
+    let descriptor = try openVerifiedDirectory(url, expectedOwnerID: expectedOwnerID)
+    defer { _ = Darwin.close(descriptor) }
+    guard
+      try directoryIdentity(
+        descriptor: descriptor,
+        expectedOwnerID: expectedOwnerID
+      ) == expectedIdentity
+    else {
+      throw ProfileStorageError.fileChangedDuringRead
+    }
+  }
+
+  static func managedRegularFileState(
+    in directoryDescriptor: Int32,
+    named name: String,
+    expectedOwnerID: uid_t
+  ) throws -> SecureManagedLeafState {
+    switch try directoryEntryState(
+      in: directoryDescriptor,
+      named: name,
+      expectedOwnerID: expectedOwnerID
+    ) {
+    case .missing:
+      return .missing
+    case .present(let identity):
+      guard identity.fileType == S_IFREG else {
+        throw ProfileStorageError.unsafeFilesystemObject
+      }
+      return .regularFile(
+        SecureFileIdentity(
+          device: identity.device,
+          inode: identity.inode,
+          owner: identity.owner
+        )
+      )
+    }
+  }
+
+  static func directoryEntryState(
+    in directoryDescriptor: Int32,
+    named name: String,
+    expectedOwnerID: uid_t
+  ) throws -> SecureDirectoryEntryState {
+    guard isValidLeafName(name) else {
+      throw ProfileStorageError.unsafeFilesystemObject
+    }
+
+    var status = stat()
+    let result = name.withCString { leaf in
+      Darwin.fstatat(directoryDescriptor, leaf, &status, AT_SYMLINK_NOFOLLOW)
+    }
+    guard result == 0 else {
+      if errno == ENOENT {
+        return .missing
+      }
+      if errno == ELOOP || errno == EISDIR || errno == ENXIO || errno == ENOTDIR {
+        throw ProfileStorageError.unsafeFilesystemObject
+      }
+      throw ProfileStorageError.io(String(cString: strerror(errno)))
+    }
+    guard status.st_uid == expectedOwnerID else {
+      throw ProfileStorageError.unexpectedFileOwner
+    }
+    return .present(
+      SecureDirectoryEntryIdentity(
+        device: status.st_dev,
+        inode: status.st_ino,
+        owner: status.st_uid,
+        fileType: status.st_mode & S_IFMT
+      )
+    )
   }
 
   static func openRegularFileDescriptor(
@@ -603,12 +719,9 @@ enum SecureFileAccess {
     return URL(fileURLWithPath: resolvedPath, isDirectory: true)
   }
 
-  private static func validatedLeafName(_ url: URL) throws -> String {
+  static func validatedLeafName(_ url: URL) throws -> String {
     let name = url.lastPathComponent
-    guard !name.isEmpty,
-      name != ".",
-      name != "..",
-      !name.contains("/"),
+    guard isValidLeafName(name),
       url.deletingLastPathComponent().appendingPathComponent(name).standardizedFileURL
         == url.standardizedFileURL
     else {
@@ -617,7 +730,15 @@ enum SecureFileAccess {
     return name
   }
 
-  private static func regularFileIdentity(
+  private static func isValidLeafName(_ name: String) -> Bool {
+    !name.isEmpty
+      && name != "."
+      && name != ".."
+      && !name.utf8.contains(0)
+      && !name.contains("/")
+  }
+
+  static func regularFileIdentity(
     descriptor: Int32,
     expectedOwnerID: uid_t
   ) throws -> SecureFileIdentity {

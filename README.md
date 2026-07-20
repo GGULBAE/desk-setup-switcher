@@ -51,6 +51,7 @@ Its DMG is an ad-hoc-signed development artifact, not a supported download, and 
 ## Privacy and safety
 
 - Profiles, backups, and diagnostics stay on the Mac. The app has no account, cloud sync, app-owned server, telemetry, analytics, ads, or automatic profile switching.
+- App-managed profile and backup files are owner-private. Updates are staged and committed relative to one verified directory handle, and corrupt data is quarantined or recovered from the last-known-good backup when that can be proven safe.
 - Capture is read-only. Applying a profile always requires an explicit review and confirmation.
 - The app reads current state again before execution. If the profile, device state, capability, or rollback evidence changed, it applies nothing and returns to a refreshed review.
 - High-risk display and network changes use a 15-second **Keep Changes / Revert Now** safety window. Timeout, window close, confirmation failure, or a fatal transaction error requests rollback where supported.
@@ -89,7 +90,7 @@ Capability-level evidence and unresolved hardware/manual checks live in the [sup
 
 ## Contributing, support, and security
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), follow the [Code of Conduct](CODE_OF_CONDUCT.md), and keep changes inside the project’s local-only, explicit-apply safety model.
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), follow the [Code of Conduct](CODE_OF_CONDUCT.md), and keep changes inside the project’s local-only, explicit-apply safety model. Published commits and annotated tags must use a GitHub noreply email. Already-public legacy Git identity metadata is retained without rewriting history and is represented in the audit exception file by immutable commit IDs only.
 
 Use [SUPPORT.md](SUPPORT.md) for questions and bug reports. For vulnerabilities, unsafe mutations, privacy leaks, exposed secrets, or rollback failures, follow the current [SECURITY.md](SECURITY.md) instructions. Private vulnerability reporting is currently disabled: request a private channel without including sensitive details in the initial contact, and never use a public issue.
 
