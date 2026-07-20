@@ -6,7 +6,8 @@ set +a
 unset github_token
 github_token="${GH_TOKEN:-}"
 export -n github_token 2>/dev/null || true
-unset GH_TOKEN GITHUB_TOKEN
+unset GH_TOKEN GITHUB_TOKEN GH_HOST GH_DEBUG DEBUG GH_ENTERPRISE_TOKEN \
+    GITHUB_ENTERPRISE_TOKEN GH_CONFIG_DIR
 
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
@@ -64,6 +65,8 @@ done
 
 release_require_command gh
 temporary_root="$(mktemp -d "${TMPDIR:-/tmp}/desk-setup-attestation-verify.XXXXXX")"
+gh_config_directory="$temporary_root/gh-config"
+mkdir -m 0700 "$gh_config_directory"
 cleanup() {
     rm -rf "$temporary_root"
 }
@@ -77,7 +80,8 @@ manifest_bundle="$download_directory/release-manifest.provenance.sigstore.json"
 signer_workflow="$GITHUB_REPOSITORY/.github/workflows/release.yml"
 source_ref="refs/tags/$RELEASE_TAG"
 
-GH_TOKEN="$github_token" gh attestation verify "$dmg_path" \
+GH_CONFIG_DIR="$gh_config_directory" GH_TOKEN="$github_token" gh attestation verify "$dmg_path" \
+    --hostname github.com \
     --repo "$GITHUB_REPOSITORY" \
     --bundle "$provenance_bundle" \
     --signer-workflow "$signer_workflow" \
@@ -86,7 +90,8 @@ GH_TOKEN="$github_token" gh attestation verify "$dmg_path" \
     --deny-self-hosted-runners \
     --format json >"$temporary_root/provenance-verification.json"
 
-GH_TOKEN="$github_token" gh attestation verify "$dmg_path" \
+GH_CONFIG_DIR="$gh_config_directory" GH_TOKEN="$github_token" gh attestation verify "$dmg_path" \
+    --hostname github.com \
     --repo "$GITHUB_REPOSITORY" \
     --bundle "$sbom_bundle" \
     --predicate-type https://spdx.dev/Document/v2.3 \
@@ -96,7 +101,8 @@ GH_TOKEN="$github_token" gh attestation verify "$dmg_path" \
     --deny-self-hosted-runners \
     --format json >"$temporary_root/sbom-verification.json"
 
-GH_TOKEN="$github_token" gh attestation verify "$manifest_path" \
+GH_CONFIG_DIR="$gh_config_directory" GH_TOKEN="$github_token" gh attestation verify "$manifest_path" \
+    --hostname github.com \
     --repo "$GITHUB_REPOSITORY" \
     --bundle "$manifest_bundle" \
     --signer-workflow "$signer_workflow" \

@@ -145,6 +145,21 @@ git -C "$clean_repository" add safe.txt SafeSettings.swift random.png
 git -C "$clean_repository" commit -q -m "add explicit safe fixtures"
 assert_passes "$clean_repository" clean
 
+# The repository audit test deliberately contains private-looking synthetic
+# probes. Only its exact reviewed blob is exempt; changing the same path must
+# immediately restore ordinary detection.
+reviewed_self_repository="$(new_repository reviewed-audit-fixture)"
+cp "$ROOT_DIR/scripts/test-audit-public-release.sh" \
+    "$reviewed_self_repository/scripts/test-audit-public-release.sh"
+git -C "$reviewed_self_repository" add scripts/test-audit-public-release.sh
+git -C "$reviewed_self_repository" commit -q -m "add reviewed audit fixture"
+assert_passes "$reviewed_self_repository" reviewed-audit-fixture
+self_change_probe="$(printf '%s%s' 'UnexpectedDesk-' '3201')"
+printf '\nSSID=%s\n' "$self_change_probe" \
+    >>"$reviewed_self_repository/scripts/test-audit-public-release.sh"
+assert_fails_without_value \
+    "$reviewed_self_repository" reviewed-audit-fixture-change ssid "$self_change_probe"
+
 probe_one="$(printf '%s%s' 'OfficeWest-' '4831')"
 ssid_repository="$(new_repository labeled-network)"
 printf 'SSID=%s\n' "$probe_one" >"$ssid_repository/private.txt"

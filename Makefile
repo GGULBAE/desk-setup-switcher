@@ -46,7 +46,12 @@ verify-downloaded-release:
 	./scripts/release/verify-downloaded-candidate.sh
 
 verify-remote-controls:
-	./scripts/release/verify-remote-controls.sh
+	@test -n "$${REMOTE_CONTROLS_EVIDENCE_OUTPUT:-}" || { \
+		echo 'REMOTE_CONTROLS_EVIDENCE_OUTPUT must be an absent absolute path in an owner-0700 directory outside the repository.' >&2; \
+		exit 2; \
+	}
+	@./scripts/release/verify-remote-controls.sh --phase final-pre-tag \
+		--evidence-output "$${REMOTE_CONTROLS_EVIDENCE_OUTPUT}"
 
 verify:
 	./scripts/verify.sh

@@ -6,7 +6,8 @@ set +a
 unset github_token
 github_token="${GH_TOKEN:-}"
 export -n github_token 2>/dev/null || true
-unset GH_TOKEN GITHUB_TOKEN
+unset GH_TOKEN GITHUB_TOKEN GH_HOST GH_DEBUG DEBUG GH_ENTERPRISE_TOKEN \
+    GITHUB_ENTERPRISE_TOKEN GH_CONFIG_DIR
 umask 077
 source "$(dirname "$0")/lib.sh"
 
@@ -128,8 +129,21 @@ tag_object="$(git rev-parse "refs/tags/$RELEASE_TAG")" || {
 }
 checkout_commit="$(git rev-parse HEAD)" || release_die "The checkout commit could not be resolved."
 [[ "$tag_object" =~ ^[0-9a-f]{40}$ ]] || release_die "The local release tag object is invalid."
+[[ "$(git cat-file -t "$tag_object" 2>/dev/null)" == tag ]] || {
+    release_die "The local release tag must be annotated."
+}
 [[ "$tag_commit" == "$EXPECTED_COMMIT" && "$checkout_commit" == "$EXPECTED_COMMIT" ]] || {
     release_die "The local tag, checkout, and expected commit differ."
+}
+git show-ref --verify --quiet refs/remotes/origin/master || {
+    release_die "The fetched origin/master ref is unavailable."
+}
+origin_master="$(git rev-parse refs/remotes/origin/master^{commit})" || {
+    release_die "The fetched origin/master commit is unavailable."
+}
+release_verify_final_pre_tag_evidence_chain \
+    "$RELEASE_TAG" "$EXPECTED_COMMIT" "$tag_object" "$origin_master" || {
+    release_die "The final-pre-tag evidence, A-to-B history, and tag digest binding are invalid."
 }
 tracked_notes="$(git ls-files --error-unmatch -- "$RELEASE_NOTES_PATH")" || {
     release_die "Curated release notes are not tracked."
@@ -186,19 +200,23 @@ preupload_fingerprint="$temporary_root/preupload-fingerprint.txt"
 final_fingerprint="$temporary_root/final-fingerprint.txt"
 remote_error="$temporary_root/remote-command.stderr"
 remote_output="$temporary_root/remote-command.stdout"
+gh_config_directory="$temporary_root/gh-config"
 final_download_staging=""
 
 cleanup() {
+    trap '' HUP INT QUIT TERM
+    release_stop_active_child || true
     rm -rf -- "$temporary_root"
     if [[ -n "${final_download_staging:-}" ]]; then
         rm -rf -- "$final_download_staging"
     fi
 }
 trap cleanup EXIT
+release_install_exit_signal_traps
 
 final_download_staging="$(mktemp -d "$download_parent/.desk-setup-draft-download.XXXXXX")"
 
-mkdir "$candidate_snapshot" "$initial_download" "$second_download"
+mkdir -m 0700 "$candidate_snapshot" "$initial_download" "$second_download" "$gh_config_directory"
 for name in "${asset_names[@]}"; do
     cp -- "$source_directory/$name" "$candidate_snapshot/$name"
     [[ -f "$source_directory/$name" && ! -L "$source_directory/$name" ]] || {
@@ -216,13 +234,13 @@ cmp -s "$notes_path" "$notes_snapshot" || {
     release_die "Curated release notes changed while they were snapshotted."
 }
 
-release_title="Desk Setup Switcher $RELEASE_TAG signed candidate"
+release_title="Desk Setup Switcher $RELEASE_TAG public beta"
 
 require_remote_tag_commit() {
     local tag_ref
     tag_ref="refs/tags/$RELEASE_TAG"
     : >"$remote_refs_path"
-    if ! git ls-remote --exit-code --tags origin "$tag_ref" "$tag_ref^{}" \
+    if ! release_run_tracked_timeout 90 git ls-remote --exit-code --tags origin "$tag_ref" "$tag_ref^{}" \
         >"$remote_refs_path" 2>"$remote_error"; then
         release_die "The release tag could not be read from origin."
     fi
@@ -235,10 +253,9 @@ require_remote_tag_commit() {
       abort "Remote tag response contains an unexpected ref." unless rows.all? { |row| [direct_ref, peeled_ref].include?(row[1]) }
       direct = rows.select { |row| row[1] == direct_ref }
       peeled = rows.select { |row| row[1] == peeled_ref }
-      abort "Remote tag response is not unique." unless direct.length == 1 && peeled.length <= 1 && rows.length == direct.length + peeled.length
+      abort "Remote tag response is not unique." unless direct.length == 1 && peeled.length == 1 && rows.length == 2
       abort "Remote direct tag object differs from the local tag object." unless direct.fetch(0).fetch(0) == expected_object
-      resolved = peeled.empty? ? direct.fetch(0).fetch(0) : peeled.fetch(0).fetch(0)
-      abort "Remote tag does not resolve to EXPECTED_COMMIT." unless resolved == expected_commit
+      abort "Remote tag does not resolve to EXPECTED_COMMIT." unless peeled.fetch(0).fetch(0) == expected_commit
     ' "$EXPECTED_COMMIT" "$tag_object" "$RELEASE_TAG" "$remote_refs_path" || {
         release_die "The remote release tag does not resolve uniquely to EXPECTED_COMMIT."
     }
@@ -246,7 +263,9 @@ require_remote_tag_commit() {
 
 read_release_state() {
     : >"$release_response"
-    if ! GH_TOKEN="$github_token" gh api \
+    if ! GH_CONFIG_DIR="$gh_config_directory" \
+        release_run_tracked_secret_env_timeout GH_TOKEN "$github_token" 90 gh api \
+        --hostname github.com \
         --method GET \
         --paginate \
         --slurp \
@@ -345,8 +364,10 @@ download_and_compare_state() {
         release_die "A release download staging directory is not empty."
     }
     if [[ -s "$state_assets" ]]; then
-        GH_TOKEN="$github_token" gh release download "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
+        GH_CONFIG_DIR="$gh_config_directory" \
+            release_run_tracked_secret_env_timeout GH_TOKEN "$github_token" 90 \
+            gh release download "$RELEASE_TAG" \
+            --repo "github.com/$GITHUB_REPOSITORY" \
             --dir "$destination" \
             >"$remote_output" 2>"$remote_error" || release_die "Existing draft assets could not be downloaded."
     fi
@@ -373,8 +394,10 @@ read_release_state
 
 if [[ "$(tr -d '\n' <"$state_status")" == absent ]]; then
     require_remote_tag_commit
-    GH_TOKEN="$github_token" gh release create "$RELEASE_TAG" \
-        --repo "$GITHUB_REPOSITORY" \
+    GH_CONFIG_DIR="$gh_config_directory" \
+        release_run_tracked_secret_env_timeout GH_TOKEN "$github_token" 90 \
+        gh release create "$RELEASE_TAG" \
+        --repo "github.com/$GITHUB_REPOSITORY" \
         --draft \
         --prerelease \
         --verify-tag \
@@ -410,8 +433,10 @@ if [[ -s "$state_missing" ]]; then
     done <"$state_missing"
     [[ "${#missing_paths[@]}" -gt 0 ]] || release_die "The missing release asset list is invalid."
     require_remote_tag_commit
-    GH_TOKEN="$github_token" gh release upload "$RELEASE_TAG" "${missing_paths[@]}" \
-        --repo "$GITHUB_REPOSITORY" \
+    GH_CONFIG_DIR="$gh_config_directory" \
+        release_run_tracked_secret_env_timeout GH_TOKEN "$github_token" 90 \
+        gh release upload "$RELEASE_TAG" "${missing_paths[@]}" \
+        --repo "github.com/$GITHUB_REPOSITORY" \
         >"$remote_output" 2>"$remote_error" || release_die "Missing draft assets could not be uploaded additively."
 fi
 

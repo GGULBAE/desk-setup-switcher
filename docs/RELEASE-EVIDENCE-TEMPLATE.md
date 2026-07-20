@@ -20,7 +20,23 @@ Follow [Distribution](DISTRIBUTION.md), [Governance](../GOVERNANCE.md), the [sup
 
 ## Candidate freeze and verification
 
-Capture the sanitized `make verify-remote-controls` transcript immediately before creating the tag, while `v*` refs and Releases are still empty. It cannot be regenerated after tag creation. The command performs local reads and authenticated GitHub GETs only; it configures nothing, pushes nothing, and does not authorize the later tag action.
+First establish clean remote-master commit **A** with the two fresh
+`final-pre-tag` manual JSON records defined by [the public release approval
+contract](PUBLICATION-APPROVAL.md), then wait for exact-A CI. From a clean,
+complete, non-shallow checkout of A, run
+`make verify-remote-controls REMOTE_CONTROLS_EVIDENCE_OUTPUT=/absolute/private/remote-controls-final-pre-tag.json`
+while remote `v*` refs and Releases are still empty. The parent directory must
+be owner-owned mode 0700, the output path must be absent and outside the
+repository, and the resulting mode-0600 bytes are exact external evidence
+**E**. Create the annotated `v0.1.0` tag object locally against A with the exact
+E digest-binding message, but do not push it. Create **B** as A's direct
+single-parent child adding only unchanged E at
+`docs/evidence/releases/v0.1.0/remote-controls-final-pre-tag.json` as `100644`.
+Integrate B without a merge commit, wait for exact-B CI, and rerun the A→B
+semantic/history check. A separate authorization is required before the first
+push of that already recorded tag object. E cannot be regenerated after local
+tag creation. The verifier configures nothing, pushes nothing, and does not
+authorize the later tag push.
 
 - [ ] The tag equals `v` plus `CFBundleShortVersionString`; `CFBundleVersion` is a positive candidate-unique build number.
 - [ ] The commit and submodules/dependencies are fixed, the checkout is complete and non-shallow, and the worktree is clean.
@@ -72,12 +88,14 @@ The release app is built once. Signing, packaging, notarization, and stapling ma
 | Control | Evidence link or read-only result |
 | --- | --- |
 | Default-branch protection and required CI | `<not recorded>` |
-| `make verify-remote-controls` sanitized output, exact commit, release/CI workflow blobs, and CI run/job IDs | `<not recorded>` |
+| Final gate output from `make verify-remote-controls REMOTE_CONTROLS_EVIDENCE_OUTPUT=…`, exact commit, all three candidate/draft, CI, and publication workflow blobs, and CI run/job IDs | `<not recorded>` |
 | Release-tag creation rule and exact operator-only bypass | `<not recorded>` |
 | No-bypass release-tag update/deletion rule | `<not recorded>` |
 | Protected `release-candidate` environment | `<not recorded>` |
 | Required reviewer and bypass policy | `<not recorded>` |
-| Settings evidence for environment administrator bypass | `<intended value; observed value; timestamp; authenticated viewer; read-only Settings evidence link>` |
+| `release-candidate-admin-bypass.json` ordinary blob, current phase, observer, protected source-bundle SHA-256 | `<not recorded; no raw screenshot>` |
+| `release-publication-admin-token-scope.json` ordinary blob, current phase, observer, protected source-bundle SHA-256 | `<not recorded; no raw screenshot or token>` |
+| Publication token type/owner/repository-only selection/expiry and exact five read permissions | `<not recorded; value never recorded>` |
 | GitHub-hosted runner enforcement and runner image | `<not recorded>` |
 | Environment-scoped signing/notary credentials present | `<not recorded; never record values>` |
 | Secret child-environment isolation and direct-exec consumer checks | `<not recorded; result only>` |
@@ -91,10 +109,10 @@ The release app is built once. Signing, packaging, notarization, and stapling ma
 | Protected draft Release URL/ID | `<not recorded>` |
 
 - [ ] A read-only query proves the effective remote workflow cannot publish an unsigned artifact or bypass approval.
-- [ ] The final-pre-tag API verifier passes with zero drift and reports the expected `manual_gates=1`; separate read-only Settings evidence closes that administrator-bypass gate.
-- [ ] The recorded result came from `make verify-remote-controls`; direct `remote_controls_policy.rb` normalized-evidence output is offline component evidence and is not accepted as the final gate.
-- [ ] The release manifest records `runner-environment=github-hosted`; each secret had one direct-exec consumer and was absent from unrelated child environments.
-- [ ] Normal completion and one catchable-cancellation probe confirm no decoded release credential or tracked notarization child remains. Do not claim shell cleanup for `SIGKILL` or host loss.
+- [ ] The two final-pre-tag records use protected screenshot/review-note bundles with visible phase/UTC challenge, false administrator bypass, distinct source SHA-256 values, exact policy operator, and no committed raw screenshot or token; then the final-pre-tag API verifier passes with zero drift and reports `manual_gates=2`.
+- [ ] The recorded result came from `make verify-remote-controls REMOTE_CONTROLS_EVIDENCE_OUTPUT=/absolute/private/…`; direct `remote_controls_policy.rb` normalized-evidence output is offline component evidence and is not accepted as the final gate.
+- [ ] The release manifest records `runner-environment=github-hosted`; each signing/notarization secret had one direct-exec consumer and was absent from unrelated child environments. The distinct admin-read token had exactly five bounded workflow uses, and the publication helper installed it only through five tracked, timeout-bounded GitHub read/download launcher call sites.
+- [ ] Normal completion and one catchable signing/notarization-cancellation probe confirm no decoded release credential or tracked notarization child remains. Do not claim shell cleanup for `SIGKILL` or host loss, and do not treat cleanup evidence as publication retry authorization.
 - [ ] The immutable exact-nine-asset workflow artifact was finalized before the first Release mutation. Its ID/archive digest and attempt-1 origin run are recorded, and the origin build run was never rerun.
 - [ ] The separate draft run proved the origin workflow/repository/commit/job/artifact metadata, downloaded the raw archive by ID, matched its SHA-256, extracted exactly nine regular files, and verified the signed candidate plus all three attestation bundles before mutation.
 - [ ] If draft recovery ran, every pre-existing asset first compared byte-for-byte with that artifact, only missing names were appended without clobber, and no Release edit/delete/publication or tag mutation occurred. Record each draft attempt separately.
@@ -154,7 +172,18 @@ Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPL
 - [ ] README, English/Korean guides, SECURITY, SUPPORT, privacy, checksums, site, and release notes agree.
 - [ ] The bilingual site passes deployed no-tracking/no-cookie and clean-session link checks.
 - [ ] Repository description, topics, Homepage, and social preview match the approved copy.
-- [ ] The release approver explicitly approves the final artifact, tag, notes, publication, and site.
+- [ ] The release approver explicitly approves the final artifact, tag, notes, and Release publication. Site activation remains a separate reviewed `site/release-publication.json` change and separate final user approval.
+- [ ] Clean A contains the final manual records and all three reviewed workflow blobs; exact-A CI passed before E was collected.
+- [ ] Final external E was created once at mode 0600, and B is A's direct single-parent child whose only change adds the unchanged E bytes at the fixed path as `100644`.
+- [ ] The tag is annotated and targets A; its direct object SHA, peeled commit, and exact E-digest message are recorded. The object was created locally before B, was not pushed then, and did not move.
+- [ ] B reached `master` without a merge commit; exact-B CI and the A→B semantic/history recheck passed before a separate tag-push authorization allowed the first push of the already recorded object.
+- [ ] After the exact draft exists, both manual records are replaced in a reviewed docs-only master commit with new `pre-publication` phase/tag-object/peeled-commit/Release-ID challenges, canonical UTC observations no older than 24 hours, and two new source-artifact digests distinct from each other and both final-pre-tag baselines; exact-commit CI passes.
+- [ ] The exclusive single-writer freeze covers master/tag/Release/assets, rulesets, both environments and bypass/reviewer/deployment settings, workflow state, Actions permissions, secret/variable names, immutable/security/labels/metadata, actor roles, and token configuration from before the two-pass read through the PATCH and post-read.
+- [ ] The fresh two-pass `pre-publication` controls manifest binds the direct tag object, peeled tag commit and Release ID, all three active workflow blobs/routes, both environment deployment/reviewer records, and the two current manual evidence digests.
+- [ ] The closed-schema `publication-approval.json` follows [PUBLICATION-APPROVAL.md](PUBLICATION-APPROVAL.md), binds this exact candidate and pre-publication manifest digest, and is added with that manifest in one reviewed direct-successor commit that changes only those two allowlisted evidence paths, remains inside its maximum 24-hour approval window, and passes the exact approval commit's master-push `Verify macOS app` CI job.
+- [ ] Every timestamp is canonical UTC and the records satisfy `final manuals observedAt ≤ final E collectedAt ≤ pre manuals observedAt ≤ pre manifest collectedAt ≤ approval approvedAt`.
+- [ ] The publication workflow, `release-publication` protection/actors, administrator-bypass evidence, and exact fine-grained `RELEASE_ADMIN_READ_TOKEN` contract are bound without exposing a credential value: owner `GGULBAE`, repository selection only `GGULBAE/desk-setup-switcher`, unexpired, no account/organization permissions, and exactly Actions/Administration/Attestations/Contents/Metadata read-only.
+- [ ] A later run refuses an already-public Release. Same-process recovery is limited to the originating PATCH's ambiguous response. `HUP`, `INT`, `QUIT`, `TERM`, workflow cancellation, runner/host loss, unavailable or incomplete logs, and any public or post-process ambiguous state are incident-only.
 - [ ] The maintainer separately approves each promotional post.
 - [ ] After publication, all nine assets are re-downloaded and the final hash/signature plus all three attestation bundles still match.
 

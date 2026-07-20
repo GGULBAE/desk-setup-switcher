@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "desk-setup-switcher.remote-release-controls-policy/v1",
-  "phase": "final-pre-tag",
+  "schemaVersion": "desk-setup-switcher.remote-release-controls-policy/v2",
+  "phase": "release-lifecycle",
   "configured": false
 }

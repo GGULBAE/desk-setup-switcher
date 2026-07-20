@@ -2,17 +2,31 @@
 
 set -euo pipefail
 set +x
+set +a
 umask 077
-unset GH_DEBUG DEBUG
+
+github_token="${GH_TOKEN:-}"
+export -n github_token 2>/dev/null || true
+unset GH_TOKEN GITHUB_TOKEN GH_HOST GH_DEBUG DEBUG GH_ENTERPRISE_TOKEN \
+    GITHUB_ENTERPRISE_TOKEN GH_CONFIG_DIR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "$SCRIPT_DIR/lib.sh"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
 POLICY_PATH="$SCRIPT_DIR/remote-controls-policy.json"
 POLICY_VALIDATOR="$SCRIPT_DIR/remote_controls_policy.rb"
 COLLECTOR="$SCRIPT_DIR/collect_remote_controls_evidence.rb"
 WORKFLOW_PATH="$ROOT_DIR/.github/workflows/release.yml"
 CI_WORKFLOW_PATH="$ROOT_DIR/.github/workflows/ci.yml"
+PUBLICATION_WORKFLOW_PATH="$ROOT_DIR/.github/workflows/publish-release.yml"
 REPOSITORY="GGULBAE/desk-setup-switcher"
+RELEASE_TAG="v0.1.0"
+API_TIMEOUT_SECONDS=20
+EVIDENCE_DIRECTORY="$ROOT_DIR/docs/evidence/releases/$RELEASE_TAG"
+CANDIDATE_MANUAL_EVIDENCE="$EVIDENCE_DIRECTORY/release-candidate-admin-bypass.json"
+PUBLICATION_MANUAL_EVIDENCE="$EVIDENCE_DIRECTORY/release-publication-admin-token-scope.json"
+PRE_PUBLICATION_OUTPUT="$EVIDENCE_DIRECTORY/remote-controls-pre-publication.json"
+FINAL_PRE_TAG_OUTPUT="$EVIDENCE_DIRECTORY/remote-controls-final-pre-tag.json"
 
 policy_error() {
     printf 'ERROR: remote controls policy mismatch\n' >&2
@@ -40,7 +54,85 @@ internal_error() {
     exit 70
 }
 
-[[ "$#" -eq 0 ]] || policy_error
+phase="final-pre-tag"
+expected_release_commit=""
+expected_release_id=""
+evidence_output=""
+show_usage() {
+    cat <<'USAGE'
+Usage:
+  verify-remote-controls.sh --phase final-pre-tag --evidence-output /absolute/private/remote-controls-final-pre-tag.json
+  verify-remote-controls.sh --phase pre-publication --release-commit SHA --release-id ID
+
+final-pre-tag performs two complete read-only observations while every v* ref
+and GitHub Release is absent, then preserves the exact normalized bytes at an
+absent destination in a private directory outside the repository. pre-publication performs the same two observations
+after the exact tag and sole draft prerelease exist, then writes the reviewed
+manifest at docs/evidence/releases/v0.1.0/remote-controls-pre-publication.json.
+Create publication-approval.json from that manifest digest and observed master,
+then add only those two files in one direct-successor commit.
+USAGE
+}
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        --phase)
+            [[ "$#" -ge 2 ]] || policy_error
+            phase="$2"
+            shift 2
+            ;;
+        --release-commit)
+            [[ "$#" -ge 2 && -z "$expected_release_commit" ]] || policy_error
+            expected_release_commit="$2"
+            shift 2
+            ;;
+        --release-id)
+            [[ "$#" -ge 2 && -z "$expected_release_id" ]] || policy_error
+            expected_release_id="$2"
+            shift 2
+            ;;
+        --evidence-output)
+            [[ "$#" -ge 2 && -z "$evidence_output" ]] || policy_error
+            evidence_output="$2"
+            shift 2
+            ;;
+        -h|--help)
+            show_usage
+            exit 0
+            ;;
+        *) policy_error ;;
+    esac
+done
+case "$phase" in
+    final-pre-tag)
+        [[ -z "$expected_release_commit" && -z "$expected_release_id" ]] || policy_error
+        case "$evidence_output" in
+            /*)
+                evidence_output="$(ruby -e '
+                  source, repository = ARGV
+                  expanded = File.expand_path(source)
+                  raise unless source == expanded && !source.match?(/[\r\n]/)
+                  parent = File.dirname(expanded)
+                  parent_stat = File.lstat(parent)
+                  repository = File.realpath(repository)
+                  parent_real = File.realpath(parent)
+                  real_destination = File.join(parent_real, File.basename(expanded))
+                  raise unless parent_stat.directory? && !parent_stat.symlink? &&
+                    parent_stat.uid == Process.euid && (parent_stat.mode & 0o777) == 0o700
+                  raise if real_destination == repository ||
+                    real_destination.start_with?("#{repository}/")
+                  raise if File.exist?(expanded) || File.symlink?(expanded)
+                  puts real_destination
+                ' "$evidence_output" "$ROOT_DIR" 2>/dev/null)" || policy_error ;;
+            *) policy_error ;;
+        esac
+        ;;
+    pre-publication)
+        [[ "$expected_release_commit" =~ ^[0-9a-f]{40}$ ]] || policy_error
+        [[ "$expected_release_id" =~ ^[1-9][0-9]*$ ]] || policy_error
+        [[ -z "$evidence_output" ]] || policy_error
+        ;;
+    *) policy_error ;;
+esac
 command -v ruby >/dev/null 2>&1 || internal_error
 
 # This fixed checked-in policy is the only authority for a live collection.
@@ -55,6 +147,8 @@ elif [[ "$policy_status" -ne 0 ]]; then
 fi
 
 command -v git >/dev/null 2>&1 || internal_error
+command -v shasum >/dev/null 2>&1 || internal_error
+command -v awk >/dev/null 2>&1 || internal_error
 
 repository_root="$(git -C "$ROOT_DIR" rev-parse --show-toplevel 2>/dev/null)" || local_anchor_error
 repository_root="$(cd "$repository_root" 2>/dev/null && pwd -P)" || local_anchor_error
@@ -76,6 +170,10 @@ expected_workflow_blob="$(git -C "$ROOT_DIR" rev-parse 'HEAD:.github/workflows/r
 expected_ci_workflow_blob="$(git -C "$ROOT_DIR" rev-parse 'HEAD:.github/workflows/ci.yml' 2>/dev/null)" \
     || local_anchor_error
 [[ "$expected_ci_workflow_blob" =~ ^[0-9a-f]{40}$ ]] || local_anchor_error
+expected_publication_workflow_blob="$(
+    git -C "$ROOT_DIR" rev-parse 'HEAD:.github/workflows/publish-release.yml' 2>/dev/null
+)" || local_anchor_error
+[[ "$expected_publication_workflow_blob" =~ ^[0-9a-f]{40}$ ]] || local_anchor_error
 expected_policy_blob="$(
     git -C "$ROOT_DIR" rev-parse 'HEAD:scripts/release/remote-controls-policy.json' 2>/dev/null
 )" || local_anchor_error
@@ -84,19 +182,204 @@ working_workflow_blob="$(git -C "$ROOT_DIR" hash-object -- "$WORKFLOW_PATH" 2>/d
     || local_anchor_error
 working_ci_workflow_blob="$(git -C "$ROOT_DIR" hash-object -- "$CI_WORKFLOW_PATH" 2>/dev/null)" \
     || local_anchor_error
+working_publication_workflow_blob="$(
+    git -C "$ROOT_DIR" hash-object -- "$PUBLICATION_WORKFLOW_PATH" 2>/dev/null
+)" || local_anchor_error
 working_policy_blob="$(git -C "$ROOT_DIR" hash-object -- "$POLICY_PATH" 2>/dev/null)" \
     || local_anchor_error
 [[ "$working_workflow_blob" == "$expected_workflow_blob" ]] || local_anchor_error
 [[ "$working_ci_workflow_blob" == "$expected_ci_workflow_blob" ]] || local_anchor_error
+[[ "$working_publication_workflow_blob" == "$expected_publication_workflow_blob" ]] \
+    || local_anchor_error
 [[ "$working_policy_blob" == "$expected_policy_blob" ]] || local_anchor_error
-unset working_workflow_blob working_ci_workflow_blob working_policy_blob
+unset working_workflow_blob working_ci_workflow_blob working_publication_workflow_blob working_policy_blob
+
+local_v_refs="$(git -C "$ROOT_DIR" for-each-ref --format='%(refname)' 'refs/tags/v*' 2>/dev/null)" \
+    || local_anchor_error
+local_release_tag_object=""
+if [[ "$phase" == final-pre-tag ]]; then
+    [[ -z "$local_v_refs" ]] || local_anchor_error
+    [[ ! -e "$evidence_output" && ! -L "$evidence_output" ]] || local_anchor_error
+else
+    [[ "$local_v_refs" == "refs/tags/$RELEASE_TAG" ]] || local_anchor_error
+    local_release_tag_object="$(
+        git -C "$ROOT_DIR" rev-parse "refs/tags/$RELEASE_TAG" 2>/dev/null
+    )" || local_anchor_error
+    [[ "$local_release_tag_object" =~ ^[0-9a-f]{40}$ ]] || local_anchor_error
+    [[ "$(git -C "$ROOT_DIR" cat-file -t "$local_release_tag_object" 2>/dev/null)" == tag ]] \
+        || local_anchor_error
+    local_release_commit="$(
+        git -C "$ROOT_DIR" rev-parse "refs/tags/$RELEASE_TAG^{commit}" 2>/dev/null
+    )" || local_anchor_error
+    [[ "$local_release_commit" == "$expected_release_commit" ]] || local_anchor_error
+    git -C "$ROOT_DIR" merge-base --is-ancestor "$expected_release_commit" "$expected_commit" \
+        >/dev/null 2>&1 || local_anchor_error
+    [[ -d "$EVIDENCE_DIRECTORY" && ! -L "$EVIDENCE_DIRECTORY" ]] || local_anchor_error
+    [[ ! -e "$PRE_PUBLICATION_OUTPUT" && ! -L "$PRE_PUBLICATION_OUTPUT" ]] || local_anchor_error
+    final_pre_tag_relative="${FINAL_PRE_TAG_OUTPUT#"$ROOT_DIR/"}"
+    [[ -f "$FINAL_PRE_TAG_OUTPUT" && ! -L "$FINAL_PRE_TAG_OUTPUT" && -s "$FINAL_PRE_TAG_OUTPUT" ]] \
+        || local_anchor_error
+    [[ "$(git -C "$ROOT_DIR" ls-files --error-unmatch -- "$final_pre_tag_relative" 2>/dev/null)" == \
+        "$final_pre_tag_relative" ]] || local_anchor_error
+    [[ "$(git -C "$ROOT_DIR" ls-tree "$expected_commit" -- "$final_pre_tag_relative" 2>/dev/null)" =~ \
+        ^100644\ blob\ [0-9a-f]{40}$'\t' ]] || local_anchor_error
+    final_evidence_introduction_commits="$(git -C "$ROOT_DIR" log --full-history --format=%H --reverse \
+        "$expected_release_commit..$expected_commit" -- "$final_pre_tag_relative" 2>/dev/null)" \
+        || local_anchor_error
+    [[ "$final_evidence_introduction_commits" =~ ^[0-9a-f]{40}$ ]] || local_anchor_error
+    final_evidence_introduction_commit="$final_evidence_introduction_commits"
+    [[ "$(git -C "$ROOT_DIR" rev-list --parents -n 1 \
+        "$final_evidence_introduction_commit" 2>/dev/null)" == \
+        "$final_evidence_introduction_commit $expected_release_commit" ]] || local_anchor_error
+    [[ "$(git -C "$ROOT_DIR" diff-tree --no-commit-id --name-status -r \
+        "$expected_release_commit" "$final_evidence_introduction_commit" 2>/dev/null)" == \
+        $'A\t'"$final_pre_tag_relative" ]] || local_anchor_error
+    [[ "$(git -C "$ROOT_DIR" ls-tree "$final_evidence_introduction_commit" -- \
+        "$final_pre_tag_relative" 2>/dev/null)" =~ ^100644\ blob\ [0-9a-f]{40}$'\t' ]] \
+        || local_anchor_error
+    introduction_digest="$(git -C "$ROOT_DIR" show \
+        "$final_evidence_introduction_commit:$final_pre_tag_relative" 2>/dev/null \
+        | shasum -a 256 | awk '{print $1}')" || local_anchor_error
+    [[ "$introduction_digest" == "$(shasum -a 256 "$FINAL_PRE_TAG_OUTPUT" | awk '{print $1}')" ]] \
+        || local_anchor_error
+    tag_workflow_blob="$(git -C "$ROOT_DIR" rev-parse \
+        "$expected_release_commit:.github/workflows/release.yml" 2>/dev/null)" || local_anchor_error
+    tag_ci_workflow_blob="$(git -C "$ROOT_DIR" rev-parse \
+        "$expected_release_commit:.github/workflows/ci.yml" 2>/dev/null)" || local_anchor_error
+    tag_publication_workflow_blob="$(git -C "$ROOT_DIR" rev-parse \
+        "$expected_release_commit:.github/workflows/publish-release.yml" 2>/dev/null)" || local_anchor_error
+    tag_policy_blob="$(git -C "$ROOT_DIR" rev-parse \
+        "$expected_release_commit:scripts/release/remote-controls-policy.json" 2>/dev/null)" \
+        || local_anchor_error
+    [[ "$tag_workflow_blob" == "$expected_workflow_blob" && \
+        "$tag_ci_workflow_blob" == "$expected_ci_workflow_blob" && \
+        "$tag_publication_workflow_blob" == "$expected_publication_workflow_blob" && \
+        "$tag_policy_blob" == "$expected_policy_blob" ]] || local_anchor_error
+fi
+unset local_v_refs
+
+policy_contract="$(
+    ruby "$POLICY_VALIDATOR" --publication-approval-contract "$POLICY_PATH" 2>/dev/null
+)" || policy_error
+policy_operator_fields="$(ruby -rjson -e '
+  value = JSON.parse(ARGV.fetch(0), allow_nan: false, create_additions: false)
+  raise unless value.is_a?(Hash) &&
+    value.keys.sort == %w[approvalMode operator publisher reviewer schemaVersion]
+  operator = value.fetch("operator")
+  raise unless operator.is_a?(Hash) && operator.keys.sort == %w[id login type]
+  raise unless operator.fetch("id").is_a?(Integer) && operator.fetch("id").positive?
+  raise unless operator.fetch("login").is_a?(String) &&
+    operator.fetch("login").match?(/\A(?!-)[A-Za-z0-9-]{1,39}(?<!-)\z/)
+  raise unless operator.fetch("type") == "User"
+  puts [operator.fetch("id"), operator.fetch("login")].join("\t")
+' "$policy_contract" 2>/dev/null)" || policy_error
+IFS=$'\t' read -r policy_operator_id policy_operator_login <<<"$policy_operator_fields"
+[[ "$policy_operator_id" =~ ^[1-9][0-9]*$ && -n "$policy_operator_login" ]] || policy_error
+manual_verified_at="$(ruby -rtime -e 'puts Time.now.utc.iso8601' 2>/dev/null)" \
+    || internal_error
+validate_manual_file() {
+    local input_path="$1"
+    local control="$2"
+    local permission_profile="$3"
+    local manual_arguments=(
+        manual-evidence
+        --input "$input_path"
+        --control "$control"
+        --permission-profile "$permission_profile"
+        --actor-id "$policy_operator_id"
+        --actor-login "$policy_operator_login"
+        --verified-at "$manual_verified_at"
+        --phase "$phase"
+    )
+    if [[ "$phase" == pre-publication ]]; then
+        manual_arguments+=(
+            --release-commit "$expected_release_commit"
+            --release-id "$expected_release_id"
+            --release-tag-object "$local_release_tag_object"
+        )
+    fi
+    ruby "$COLLECTOR" "${manual_arguments[@]}" 2>/dev/null
+}
+for manual_path in "$CANDIDATE_MANUAL_EVIDENCE" "$PUBLICATION_MANUAL_EVIDENCE"; do
+    [[ -f "$manual_path" && ! -L "$manual_path" && -s "$manual_path" ]] || local_anchor_error
+    manual_relative="${manual_path#"$ROOT_DIR/"}"
+    [[ "$(git -C "$ROOT_DIR" ls-files --error-unmatch -- "$manual_relative" 2>/dev/null)" == \
+        "$manual_relative" ]] || local_anchor_error
+    [[ "$(git -C "$ROOT_DIR" ls-tree "$expected_commit" -- "$manual_relative" 2>/dev/null)" =~ \
+        ^100644\ blob\ [0-9a-f]{40}$'\t' ]] || local_anchor_error
+done
+candidate_manual_result="$(validate_manual_file \
+    "$CANDIDATE_MANUAL_EVIDENCE" \
+    release-candidate-administrator-bypass-disabled \
+    candidate)" || local_anchor_error
+publication_manual_result="$(validate_manual_file \
+    "$PUBLICATION_MANUAL_EVIDENCE" \
+    release-publication-administrator-bypass-disabled-and-admin-read-token-minimum-scope \
+    publication)" || local_anchor_error
+manual_fields="$(ruby -rjson -e '
+  rows = ARGV.map { |source| JSON.parse(source, allow_nan: false, create_additions: false) }
+  rows.each do |row|
+    raise unless row.is_a?(Hash) &&
+      row.keys.sort == %w[control observedAt sha256 sourceArtifactSHA256]
+    raise unless row.fetch("sha256").match?(/\A[0-9a-f]{64}\z/) &&
+      row.fetch("sourceArtifactSHA256").match?(/\A[0-9a-f]{64}\z/)
+  end
+  raise unless rows.map { |row| row.fetch("sha256") }.uniq.length == 2
+  raise unless rows.map { |row| row.fetch("sourceArtifactSHA256") }.uniq.length == 2
+  puts [
+    *rows.map { |row| row.fetch("sha256") },
+    *rows.map { |row| row.fetch("sourceArtifactSHA256") }
+  ].join("\t")
+' "$candidate_manual_result" "$publication_manual_result" 2>/dev/null)" || local_anchor_error
+IFS=$'\t' read -r candidate_manual_sha256 publication_manual_sha256 \
+    candidate_manual_source_sha256 publication_manual_source_sha256 <<<"$manual_fields"
+[[ "$candidate_manual_sha256" =~ ^[0-9a-f]{64}$ ]] || local_anchor_error
+[[ "$publication_manual_sha256" =~ ^[0-9a-f]{64}$ ]] || local_anchor_error
+[[ "$candidate_manual_source_sha256" =~ ^[0-9a-f]{64}$ ]] || local_anchor_error
+[[ "$publication_manual_source_sha256" =~ ^[0-9a-f]{64}$ ]] || local_anchor_error
+unset manual_path manual_relative manual_fields
+unset policy_contract policy_operator_fields
+
+final_pre_tag_evidence_sha256=""
+final_pre_tag_collected_at=""
+if [[ "$phase" == pre-publication ]]; then
+    final_pre_tag_evidence_sha256="$(
+        shasum -a 256 "$FINAL_PRE_TAG_OUTPUT" 2>/dev/null | awk '{print $1}'
+    )" || local_anchor_error
+    [[ "$final_pre_tag_evidence_sha256" =~ ^[0-9a-f]{64}$ ]] || local_anchor_error
+    final_pre_tag_collected_at="$(ruby -rjson -rtime -e '
+      value = JSON.parse(File.binread(ARGV.fetch(0)), allow_nan: false, create_additions: false)
+      text = value.fetch("collectedAt")
+      time = Time.iso8601(text)
+      raise unless text == time.utc.iso8601
+      puts text
+    ' "$FINAL_PRE_TAG_OUTPUT" 2>/dev/null)" || local_anchor_error
+    ruby "$POLICY_VALIDATOR" \
+        --policy "$POLICY_PATH" \
+        --evidence "$FINAL_PRE_TAG_OUTPUT" \
+        --expected-commit "$expected_release_commit" \
+        --expected-workflow-blob "$expected_workflow_blob" \
+        --expected-ci-workflow-blob "$expected_ci_workflow_blob" \
+        --expected-publication-workflow-blob "$expected_publication_workflow_blob" \
+        >/dev/null 2>&1 || local_anchor_error
+    if ! git -C "$ROOT_DIR" cat-file -p "$local_release_tag_object" 2>/dev/null \
+        | ruby -e '
+          expected = "remote-controls-final-pre-tag-sha256: #{ARGV.fetch(0)}\n"
+          source = STDIN.read
+          _headers, separator, message = source.partition("\n\n")
+          exit 1 unless separator == "\n\n" && message == expected
+        ' "$final_pre_tag_evidence_sha256"; then
+        local_anchor_error
+    fi
+fi
 
 policy_status=0
 ci_workflow_id="$(
     ruby "$POLICY_VALIDATOR" \
         --ci-workflow-id "$POLICY_PATH" \
         --expected-workflow-blob "$expected_workflow_blob" \
-        --expected-ci-workflow-blob "$expected_ci_workflow_blob" 2>/dev/null
+        --expected-ci-workflow-blob "$expected_ci_workflow_blob" \
+        --expected-publication-workflow-blob "$expected_publication_workflow_blob" 2>/dev/null
 )" || policy_status=$?
 if [[ "$policy_status" -eq 1 ]]; then
     policy_error
@@ -104,6 +387,22 @@ elif [[ "$policy_status" -ne 0 ]]; then
     internal_error
 fi
 [[ "$ci_workflow_id" =~ ^[1-9][0-9]*$ ]] || policy_error
+unset policy_status
+
+policy_status=0
+publication_workflow_id="$(
+    ruby "$POLICY_VALIDATOR" \
+        --publication-workflow-id "$POLICY_PATH" \
+        --expected-workflow-blob "$expected_workflow_blob" \
+        --expected-ci-workflow-blob "$expected_ci_workflow_blob" \
+        --expected-publication-workflow-blob "$expected_publication_workflow_blob" 2>/dev/null
+)" || policy_status=$?
+if [[ "$policy_status" -eq 1 ]]; then
+    policy_error
+elif [[ "$policy_status" -ne 0 ]]; then
+    internal_error
+fi
+[[ "$publication_workflow_id" =~ ^[1-9][0-9]*$ ]] || policy_error
 unset policy_status
 
 if ! local_triggers="$(
@@ -119,16 +418,42 @@ if ! local_ci_triggers="$(
 fi
 [[ "$local_ci_triggers" == '["pull_request","push","workflow_dispatch"]' ]] \
     || local_anchor_error
+if ! local_candidate_security="$(
+    ruby "$COLLECTOR" local-workflow-security --workflow "$WORKFLOW_PATH" 2>/dev/null
+)"; then
+    local_anchor_error
+fi
+[[ "$local_candidate_security" == '{"triggers":["workflow_dispatch"],"contentsWrite":true}' ]] \
+    || local_anchor_error
+if ! local_ci_security="$(
+    ruby "$COLLECTOR" local-workflow-security --workflow "$CI_WORKFLOW_PATH" 2>/dev/null
+)"; then
+    local_anchor_error
+fi
+[[ "$local_ci_security" == '{"triggers":["pull_request","push","workflow_dispatch"],"contentsWrite":false}' ]] \
+    || local_anchor_error
+if ! local_publication_security="$(
+    ruby "$COLLECTOR" local-workflow-security --workflow "$PUBLICATION_WORKFLOW_PATH" 2>/dev/null
+)"; then
+    local_anchor_error
+fi
+[[ "$local_publication_security" == '{"triggers":["workflow_dispatch"],"contentsWrite":true}' ]] \
+    || local_anchor_error
 
 local_anchors_match() {
     local observed_root observed_shallow observed_commit
-    local observed_workflow_blob observed_ci_workflow_blob observed_policy_blob
-    local observed_workflow_worktree_blob observed_ci_workflow_worktree_blob
-    local observed_policy_worktree_blob observed_status
+    local observed_workflow_blob observed_ci_workflow_blob observed_publication_workflow_blob
+    local observed_policy_blob observed_workflow_worktree_blob observed_ci_workflow_worktree_blob
+    local observed_publication_worktree_blob observed_policy_worktree_blob observed_status
+    local observed_candidate_manual observed_publication_manual observed_v_refs observed_release_commit
+    local observed_release_tag_object observed_release_tag_type observed_final_pre_tag_evidence
 
     [[ -f "$WORKFLOW_PATH" && ! -L "$WORKFLOW_PATH" ]] || return 1
     [[ -f "$CI_WORKFLOW_PATH" && ! -L "$CI_WORKFLOW_PATH" ]] || return 1
+    [[ -f "$PUBLICATION_WORKFLOW_PATH" && ! -L "$PUBLICATION_WORKFLOW_PATH" ]] || return 1
     [[ -f "$POLICY_PATH" && ! -L "$POLICY_PATH" ]] || return 1
+    [[ -f "$CANDIDATE_MANUAL_EVIDENCE" && ! -L "$CANDIDATE_MANUAL_EVIDENCE" ]] || return 1
+    [[ -f "$PUBLICATION_MANUAL_EVIDENCE" && ! -L "$PUBLICATION_MANUAL_EVIDENCE" ]] || return 1
     observed_root="$(git -C "$ROOT_DIR" rev-parse --show-toplevel 2>/dev/null)" || return 1
     observed_root="$(cd "$observed_root" 2>/dev/null && pwd -P)" || return 1
     observed_shallow="$(git -C "$ROOT_DIR" rev-parse --is-shallow-repository 2>/dev/null)" \
@@ -140,6 +465,9 @@ local_anchors_match() {
     observed_ci_workflow_blob="$(
         git -C "$ROOT_DIR" rev-parse 'HEAD:.github/workflows/ci.yml' 2>/dev/null
     )" || return 1
+    observed_publication_workflow_blob="$(
+        git -C "$ROOT_DIR" rev-parse 'HEAD:.github/workflows/publish-release.yml' 2>/dev/null
+    )" || return 1
     observed_policy_blob="$(
         git -C "$ROOT_DIR" rev-parse 'HEAD:scripts/release/remote-controls-policy.json' 2>/dev/null
     )" || return 1
@@ -149,11 +477,23 @@ local_anchors_match() {
     observed_ci_workflow_worktree_blob="$(
         git -C "$ROOT_DIR" hash-object -- "$CI_WORKFLOW_PATH" 2>/dev/null
     )" || return 1
+    observed_publication_worktree_blob="$(
+        git -C "$ROOT_DIR" hash-object -- "$PUBLICATION_WORKFLOW_PATH" 2>/dev/null
+    )" || return 1
     observed_policy_worktree_blob="$(
         git -C "$ROOT_DIR" hash-object -- "$POLICY_PATH" 2>/dev/null
     )" || return 1
     observed_status="$(
         git -C "$ROOT_DIR" status --porcelain=v1 --untracked-files=all 2>/dev/null
+    )" || return 1
+    observed_candidate_manual="$(
+        shasum -a 256 "$CANDIDATE_MANUAL_EVIDENCE" 2>/dev/null | awk '{print $1}'
+    )" || return 1
+    observed_publication_manual="$(
+        shasum -a 256 "$PUBLICATION_MANUAL_EVIDENCE" 2>/dev/null | awk '{print $1}'
+    )" || return 1
+    observed_v_refs="$(
+        git -C "$ROOT_DIR" for-each-ref --format='%(refname)' 'refs/tags/v*' 2>/dev/null
     )" || return 1
 
     [[ "$observed_root" == "$ROOT_DIR" ]] || return 1
@@ -161,11 +501,40 @@ local_anchors_match() {
     [[ "$observed_commit" == "$expected_commit" ]] || return 1
     [[ "$observed_workflow_blob" == "$expected_workflow_blob" ]] || return 1
     [[ "$observed_ci_workflow_blob" == "$expected_ci_workflow_blob" ]] || return 1
+    [[ "$observed_publication_workflow_blob" == "$expected_publication_workflow_blob" ]] \
+        || return 1
     [[ "$observed_policy_blob" == "$expected_policy_blob" ]] || return 1
     [[ "$observed_workflow_worktree_blob" == "$expected_workflow_blob" ]] || return 1
     [[ "$observed_ci_workflow_worktree_blob" == "$expected_ci_workflow_blob" ]] || return 1
+    [[ "$observed_publication_worktree_blob" == "$expected_publication_workflow_blob" ]] \
+        || return 1
     [[ "$observed_policy_worktree_blob" == "$expected_policy_blob" ]] || return 1
+    [[ "$observed_candidate_manual" == "$candidate_manual_sha256" ]] || return 1
+    [[ "$observed_publication_manual" == "$publication_manual_sha256" ]] || return 1
     [[ -z "$observed_status" ]] || return 1
+    if [[ "$phase" == final-pre-tag ]]; then
+        [[ -z "$observed_v_refs" ]] || return 1
+        [[ ! -e "$evidence_output" && ! -L "$evidence_output" ]] || return 1
+    else
+        [[ "$observed_v_refs" == "refs/tags/$RELEASE_TAG" ]] || return 1
+        observed_release_commit="$(
+            git -C "$ROOT_DIR" rev-parse "refs/tags/$RELEASE_TAG^{commit}" 2>/dev/null
+        )" || return 1
+        observed_release_tag_object="$(
+            git -C "$ROOT_DIR" rev-parse "refs/tags/$RELEASE_TAG" 2>/dev/null
+        )" || return 1
+        observed_release_tag_type="$(
+            git -C "$ROOT_DIR" cat-file -t "$observed_release_tag_object" 2>/dev/null
+        )" || return 1
+        [[ "$observed_release_commit" == "$expected_release_commit" ]] || return 1
+        [[ "$observed_release_tag_object" == "$local_release_tag_object" ]] || return 1
+        [[ "$observed_release_tag_type" == tag ]] || return 1
+        observed_final_pre_tag_evidence="$(
+            shasum -a 256 "$FINAL_PRE_TAG_OUTPUT" 2>/dev/null | awk '{print $1}'
+        )" || return 1
+        [[ "$observed_final_pre_tag_evidence" == "$final_pre_tag_evidence_sha256" ]] || return 1
+        [[ ! -e "$PRE_PUBLICATION_OUTPUT" && ! -L "$PRE_PUBLICATION_OUTPUT" ]] || return 1
+    fi
 }
 
 local_anchors_match || local_anchor_error
@@ -180,24 +549,84 @@ chmod 0700 "$temporary_root" >/dev/null 2>&1 || {
     rm -rf -- "$temporary_root" >/dev/null 2>&1 || :
     internal_error
 }
+RUNNER_TEMP="$temporary_root/tracked-runner"
+gh_config_directory="$temporary_root/gh-config"
+mkdir -m 0700 "$RUNNER_TEMP" "$gh_config_directory" >/dev/null 2>&1 || internal_error
 cleanup() {
+    trap '' HUP INT QUIT TERM
+    release_stop_active_child || true
     rm -rf -- "$temporary_root" >/dev/null 2>&1 || :
 }
+run_tracked_with_timeout() {
+    local timeout_seconds="$1"
+    shift
+    GH_CONFIG_DIR="$gh_config_directory" \
+        release_run_tracked_secret_env_timeout GH_TOKEN "$github_token" \
+        "$timeout_seconds" "$@"
+}
 trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
+release_install_exit_signal_traps
 
 snapshot_one="$temporary_root/snapshot-1"
 snapshot_two="$temporary_root/snapshot-2"
 mkdir "$snapshot_one" "$snapshot_two" >/dev/null 2>&1 || internal_error
 chmod 0700 "$snapshot_one" "$snapshot_two" >/dev/null 2>&1 || internal_error
 
+if [[ "$phase" == pre-publication ]]; then
+    final_candidate_manual="$temporary_root/final-release-candidate-admin-bypass.json"
+    final_publication_manual="$temporary_root/final-release-publication-admin-token-scope.json"
+    for final_manual_spec in \
+        "$CANDIDATE_MANUAL_EVIDENCE:$final_candidate_manual" \
+        "$PUBLICATION_MANUAL_EVIDENCE:$final_publication_manual"; do
+        final_source_path="${final_manual_spec%%:*}"
+        final_destination="${final_manual_spec#*:}"
+        final_relative="${final_source_path#"$ROOT_DIR/"}"
+        final_tree="$(git -C "$ROOT_DIR" ls-tree "$expected_release_commit" -- \
+            "$final_relative" 2>/dev/null)" || local_anchor_error
+        [[ "$final_tree" =~ ^100644\ blob\ [0-9a-f]{40}$'\t' ]] || local_anchor_error
+        git -C "$ROOT_DIR" show "$expected_release_commit:$final_relative" \
+            >"$final_destination" 2>/dev/null || local_anchor_error
+        chmod 0600 "$final_destination" >/dev/null 2>&1 || internal_error
+    done
+    final_candidate_result="$(ruby "$COLLECTOR" manual-evidence \
+        --input "$final_candidate_manual" \
+        --control release-candidate-administrator-bypass-disabled \
+        --permission-profile candidate \
+        --actor-id "$policy_operator_id" \
+        --actor-login "$policy_operator_login" \
+        --verified-at "$final_pre_tag_collected_at" \
+        --phase final-pre-tag 2>/dev/null)" || local_anchor_error
+    final_publication_result="$(ruby "$COLLECTOR" manual-evidence \
+        --input "$final_publication_manual" \
+        --control release-publication-administrator-bypass-disabled-and-admin-read-token-minimum-scope \
+        --permission-profile publication \
+        --actor-id "$policy_operator_id" \
+        --actor-login "$policy_operator_login" \
+        --verified-at "$final_pre_tag_collected_at" \
+        --phase final-pre-tag 2>/dev/null)" || local_anchor_error
+    ruby -rjson -e '
+      current_candidate, current_publication, final_candidate, final_publication = ARGV
+      rows = [current_candidate, current_publication, final_candidate, final_publication].map do |source|
+        value = JSON.parse(source, allow_nan: false, create_additions: false)
+        raise unless value.is_a?(Hash) &&
+          value.keys.sort == %w[control observedAt sha256 sourceArtifactSHA256]
+        value
+      end
+      sources = rows.map { |row| row.fetch("sourceArtifactSHA256") }
+      raise unless sources.all? { |digest| digest.match?(/\A[0-9a-f]{64}\z/) }
+      raise unless sources.uniq.length == 4
+    ' "$candidate_manual_result" "$publication_manual_result" \
+        "$final_candidate_result" "$final_publication_result" 2>/dev/null || local_anchor_error
+    unset final_manual_spec final_source_path final_destination final_relative final_tree
+    unset final_candidate_result final_publication_result
+fi
+
 api_get() {
     local endpoint_id="$1"
     local endpoint="$2"
     local output="$3"
     shift 3
-    if ! gh api \
+    if ! run_tracked_with_timeout "$API_TIMEOUT_SECONDS" gh api \
         --hostname github.com \
         -X GET \
         -H 'Accept: application/vnd.github+json' \
@@ -270,6 +699,22 @@ collect_controls() {
         '/repos/GGULBAE/desk-setup-switcher/environments/release-candidate/variables?per_page=30' \
         "$snapshot/environment-variable-names.json" \
         --paginate --jq '{total_count: .total_count, names: (.variables | map(.name))}'
+    api_get E05 \
+        '/repos/GGULBAE/desk-setup-switcher/environments/release-publication' \
+        "$snapshot/publication-environment.json" \
+        --jq '{name: .name, protection_rules: [.protection_rules[] | if .type == "required_reviewers" then {type: .type, prevent_self_review: .prevent_self_review, reviewers: [.reviewers[] | {type: .type, reviewer: {id: .reviewer.id, login: .reviewer.login, type: .reviewer.type}}]} else {type: .type} end], deployment_branch_policy: {protected_branches: .deployment_branch_policy.protected_branches, custom_branch_policies: .deployment_branch_policy.custom_branch_policies}}'
+    api_get E06 \
+        '/repos/GGULBAE/desk-setup-switcher/environments/release-publication/deployment-branch-policies?per_page=30' \
+        "$snapshot/publication-deployment-policies.json" \
+        --paginate --jq '{total_count: .total_count, items: (.branch_policies | map({name: .name, type: .type}))}'
+    api_get E07 \
+        '/repos/GGULBAE/desk-setup-switcher/environments/release-publication/secrets?per_page=30' \
+        "$snapshot/publication-environment-secrets.json" \
+        --paginate --jq '{total_count: .total_count, names: (.secrets | map(.name))}'
+    api_get E08 \
+        '/repos/GGULBAE/desk-setup-switcher/environments/release-publication/variables?per_page=30' \
+        "$snapshot/publication-environment-variable-names.json" \
+        --paginate --jq '{total_count: .total_count, names: (.variables | map(.name))}'
     api_get C01 \
         '/repos/GGULBAE/desk-setup-switcher/actions/secrets?per_page=30' \
         "$snapshot/repository-secrets.json" \
@@ -301,12 +746,68 @@ collect_controls() {
     api_get L01 \
         '/repos/GGULBAE/desk-setup-switcher/labels/needs-triage' \
         "$snapshot/label.json" --jq '{name: .name, present: true}'
-    api_get B01 \
-        '/repos/GGULBAE/desk-setup-switcher/git/matching-refs/tags/v' \
-        "$snapshot/v-refs.json" --jq '.[] | {ref: .ref}'
-    api_get B02 \
-        '/repos/GGULBAE/desk-setup-switcher/releases?per_page=30' \
-        "$snapshot/releases.json" --paginate --jq '.[] | {id: .id}'
+    api_get W01 \
+        '/repos/GGULBAE/desk-setup-switcher/actions/workflows?per_page=100' \
+        "$snapshot/active-workflows.json" \
+        --paginate --jq '{total_count: .total_count, items: (.workflows | map({id: .id, name: .name, path: .path, state: .state}))}'
+    if [[ "$phase" == final-pre-tag ]]; then
+        api_get B01 \
+            '/repos/GGULBAE/desk-setup-switcher/git/matching-refs/tags/v?per_page=100' \
+            "$snapshot/v-refs.json" --paginate --jq '.[] | {ref: .ref}'
+        api_get B03 \
+            '/repos/GGULBAE/desk-setup-switcher/releases?per_page=100' \
+            "$snapshot/releases.json" --paginate --jq '.[] | {id: .id}'
+    else
+        api_get B01 \
+            '/repos/GGULBAE/desk-setup-switcher/git/matching-refs/tags/v?per_page=100' \
+            "$snapshot/v-refs-raw.json" \
+            --paginate --jq '.[] | {ref: .ref, object_type: .object.type, object_sha: .object.sha}'
+        api_get B02 \
+            '/repos/GGULBAE/desk-setup-switcher/commits/tags/v0.1.0' \
+            "$snapshot/v-commit.json" --jq '{commit_sha: .sha}'
+        api_get B04 \
+            "/repos/GGULBAE/desk-setup-switcher/git/tags/$local_release_tag_object" \
+            "$snapshot/v-tag-object.json" \
+            --jq '{tag_object_sha: .sha, tag: .tag, target_type: .object.type, target_sha: .object.sha}'
+        if ! ruby -rjson -e '
+          refs_path, commit_path, tag_path, output_path, expected_tag_object = ARGV
+          refs = File.readlines(refs_path, chomp: true).map do |line|
+            JSON.parse(line, allow_nan: false, create_additions: false)
+          end
+          commit = JSON.parse(File.binread(commit_path), allow_nan: false, create_additions: false)
+          tag = JSON.parse(File.binread(tag_path), allow_nan: false, create_additions: false)
+          raise unless refs.length == 1 && refs.fetch(0).is_a?(Hash) &&
+            refs.fetch(0).keys.sort == %w[object_sha object_type ref]
+          raise unless commit.is_a?(Hash) && commit.keys == ["commit_sha"]
+          raise unless tag.is_a?(Hash) &&
+            tag.keys.sort == %w[tag tag_object_sha target_sha target_type]
+          ref = refs.fetch(0)
+          raise unless ref.fetch("ref") == "refs/tags/v0.1.0"
+          raise unless ref.fetch("object_type") == "tag"
+          raise unless [ref.fetch("object_sha"), commit.fetch("commit_sha"),
+            tag.fetch("tag_object_sha"), tag.fetch("target_sha"), expected_tag_object].all? do |value|
+            value.is_a?(String) && value.match?(/\A[0-9a-f]{40}\z/)
+          end
+          raise unless ref.fetch("object_sha") == expected_tag_object &&
+            tag.fetch("tag_object_sha") == expected_tag_object && tag.fetch("tag") == "v0.1.0" &&
+            tag.fetch("target_type") == "commit" &&
+            tag.fetch("target_sha") == commit.fetch("commit_sha")
+          File.open(output_path, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |io|
+            io.puts(JSON.generate(ref.merge("commit_sha" => commit.fetch("commit_sha"))))
+          end
+        ' "$snapshot/v-refs-raw.json" "$snapshot/v-commit.json" \
+            "$snapshot/v-tag-object.json" "$snapshot/v-refs.json" \
+            "$local_release_tag_object" \
+            >/dev/null 2>&1; then
+            evidence_error
+        fi
+        rm -f -- "$snapshot/v-refs-raw.json" "$snapshot/v-commit.json" \
+            "$snapshot/v-tag-object.json" || internal_error
+        api_get B03 \
+            '/repos/GGULBAE/desk-setup-switcher/releases?per_page=100' \
+            "$snapshot/releases.json" \
+            --paginate --jq '.[] | {id: .id, tag_name: .tag_name, draft: .draft, prerelease: .prerelease}'
+    fi
     api_get C03 \
         "/repos/GGULBAE/desk-setup-switcher/commits/$expected_commit/check-runs?check_name=Verify%20macOS%20app&app_id=15368&filter=latest&per_page=100" \
         "$snapshot/check-runs.json" \
@@ -366,11 +867,15 @@ write_manifest() {
     local manifest_detail
     local manifest_files
     manifest_files=(
-        actions-permissions.json check-runs.json ci-workflow-content-1.json
+        actions-permissions.json active-workflows.json check-runs.json ci-workflow-content-1.json
         ci-workflow-content-2.json ci-workflow-metadata-1.json
         ci-workflow-metadata-2.json deployment-policies.json effective-master.json
         environment-secrets.json environment-variable-names.json environment.json
         immutable-releases.json label.json master-1.json master-2.json permission.json
+        publication-deployment-policies.json publication-environment-secrets.json
+        publication-environment-variable-names.json publication-environment.json
+        publication-workflow-content-1.json publication-workflow-content-2.json
+        publication-workflow-metadata-1.json publication-workflow-metadata-2.json
         private-vulnerability-reporting.json releases.json repository-secrets.json
         repository-variable-names.json repository.json ruleset-ids.json
         selected-actions.json v-refs.json viewer.json workflow-jobs.json
@@ -383,24 +888,68 @@ write_manifest() {
         manifest_index=$((manifest_index + 1))
     done
     if ! ruby -rjson -e '
-      path, commit, blob, ci_blob, triggers_json, ci_triggers_json, *files = ARGV
+      path, phase, collected_at, commit, blob, ci_blob, publication_blob, candidate_security_json,
+        ci_security_json, publication_security_json, release_commit, release_id_text,
+        release_tag_object, final_pre_tag_evidence_sha256,
+        candidate_manual_sha256, publication_manual_sha256, *files = ARGV
+      security = lambda do |source, workflow_path, workflow_blob|
+        value = JSON.parse(source, allow_nan: false, create_additions: false)
+        raise unless value.is_a?(Hash) && value.keys.sort == %w[contentsWrite triggers]
+        {
+          "projection" => "strict-local-workflow-ast/v1",
+          "workflowPath" => workflow_path,
+          "workflowBlob" => workflow_blob,
+          "triggers" => value.fetch("triggers"),
+          "contentsWrite" => value.fetch("contentsWrite")
+        }
+      end
+      expected_release = if phase == "final-pre-tag"
+        raise unless release_commit.empty? && release_id_text.empty? && release_tag_object.empty? &&
+          final_pre_tag_evidence_sha256.empty?
+        nil
+      else
+        raise unless phase == "pre-publication" && release_commit.match?(/\A[0-9a-f]{40}\z/) &&
+          release_id_text.match?(/\A[1-9][0-9]*\z/) &&
+          release_tag_object.match?(/\A[0-9a-f]{40}\z/)
+        raise unless final_pre_tag_evidence_sha256.match?(/\A[0-9a-f]{64}\z/)
+        {
+          "commitSha" => release_commit,
+          "id" => Integer(release_id_text, 10),
+          "tagObjectSha" => release_tag_object
+        }
+      end
       value = {
-        "schemaVersion" => "desk-setup-switcher.remote-release-controls-input/v1",
-        "phase" => "final-pre-tag",
+        "schemaVersion" => "desk-setup-switcher.remote-release-controls-input/v2",
+        "phase" => phase,
+        "collectedAt" => collected_at,
         "expectedCommit" => commit,
         "expectedWorkflowBlob" => blob,
         "expectedCIWorkflowBlob" => ci_blob,
-        "localTriggers" => {
-          "projection" => "strict-local-workflow-ast/v1",
-          "workflowPath" => ".github/workflows/release.yml",
-          "workflowBlob" => blob,
-          "triggers" => JSON.parse(triggers_json, create_additions: false)
-        },
-        "localCITriggers" => {
-          "projection" => "strict-local-workflow-ast/v1",
-          "workflowPath" => ".github/workflows/ci.yml",
-          "workflowBlob" => ci_blob,
-          "triggers" => JSON.parse(ci_triggers_json, create_additions: false)
+        "expectedPublicationWorkflowBlob" => publication_blob,
+        "expectedRelease" => expected_release,
+        "finalPreTagEvidenceSHA256" =>
+          phase == "final-pre-tag" ? nil : final_pre_tag_evidence_sha256,
+        "localCandidateWorkflow" => security.call(
+          candidate_security_json, ".github/workflows/release.yml", blob
+        ),
+        "localCIWorkflow" => security.call(
+          ci_security_json, ".github/workflows/ci.yml", ci_blob
+        ),
+        "localPublicationWorkflow" => security.call(
+          publication_security_json, ".github/workflows/publish-release.yml", publication_blob
+        ),
+        "manualEvidence" => {
+          "complete" => true,
+          "items" => [
+            {
+              "control" => "release-candidate-administrator-bypass-disabled",
+              "sha256" => candidate_manual_sha256
+            },
+            {
+              "control" => "release-publication-administrator-bypass-disabled-and-admin-read-token-minimum-scope",
+              "sha256" => publication_manual_sha256
+            }
+          ]
         },
         "files" => files.sort
       }
@@ -410,14 +959,21 @@ write_manifest() {
         io.write("\n")
       end
     ' \
-        "$snapshot/manifest.json" "$expected_commit" "$expected_workflow_blob" \
-        "$expected_ci_workflow_blob" "$local_triggers" "$local_ci_triggers" \
+        "$snapshot/manifest.json" "$phase" "$collected_at" "$expected_commit" \
+        "$expected_workflow_blob" \
+        "$expected_ci_workflow_blob" "$expected_publication_workflow_blob" \
+        "$local_candidate_security" "$local_ci_security" "$local_publication_security" \
+        "$expected_release_commit" "$expected_release_id" "$local_release_tag_object" \
+        "$final_pre_tag_evidence_sha256" \
+        "$candidate_manual_sha256" "$publication_manual_sha256" \
         "${manifest_files[@]}" >/dev/null 2>&1; then
         evidence_error
     fi
 }
 
 # One outer code anchor brackets both complete mutable-control observations.
+collection_started_at="$(ruby -rtime -e 'puts Time.now.utc.iso8601' 2>/dev/null)" \
+    || internal_error
 api_get A01 \
     '/repos/GGULBAE/desk-setup-switcher/git/ref/heads/master' \
     "$snapshot_one/master-1.json" \
@@ -444,6 +1000,14 @@ api_get A05 \
     '/repos/GGULBAE/desk-setup-switcher/actions/workflows/ci.yml' \
     "$snapshot_one/ci-workflow-metadata-1.json" \
     --jq '{id: .id, name: .name, path: .path, state: .state}'
+api_get A06 \
+    "/repos/GGULBAE/desk-setup-switcher/contents/.github/workflows/publish-release.yml?ref=$master_sha_1" \
+    "$snapshot_one/publication-workflow-content-1.json" \
+    --jq "{commit_sha: \"$master_sha_1\", type: .type, path: .path, sha: .sha, encoding: .encoding, content: .content}"
+api_get A07 \
+    '/repos/GGULBAE/desk-setup-switcher/actions/workflows/publish-release.yml' \
+    "$snapshot_one/publication-workflow-metadata-1.json" \
+    --jq '{id: .id, name: .name, path: .path, state: .state}'
 
 COLLECTED_RULESET_COUNT=0
 COLLECTED_CI_RUN_ID=0
@@ -463,7 +1027,7 @@ ci_job_id_two="$COLLECTED_CI_JOB_ID"
 [[ "$ci_run_attempt_two" == "$ci_run_attempt_one" ]] || evidence_error
 [[ "$ci_job_id_two" == "$ci_job_id_one" ]] || evidence_error
 
-api_get A06 \
+api_get A08 \
     '/repos/GGULBAE/desk-setup-switcher/git/ref/heads/master' \
     "$snapshot_two/master-2.json" \
     --jq '{ref: .ref, object: {type: .object.type, sha: .object.sha}}'
@@ -473,45 +1037,96 @@ if ! master_sha_2="$(
     evidence_error
 fi
 [[ "$master_sha_2" =~ ^[0-9a-f]{40}$ ]] || evidence_error
-api_get A07 \
+api_get A09 \
     "/repos/GGULBAE/desk-setup-switcher/contents/.github/workflows/release.yml?ref=$master_sha_2" \
     "$snapshot_two/workflow-content-2.json" \
     --jq "{commit_sha: \"$master_sha_2\", type: .type, path: .path, sha: .sha, encoding: .encoding, content: .content}"
-api_get A08 \
+api_get A10 \
     '/repos/GGULBAE/desk-setup-switcher/actions/workflows/release.yml' \
     "$snapshot_two/workflow-metadata-2.json" \
     --jq '{id: .id, name: .name, path: .path, state: .state}'
-api_get A09 \
+api_get A11 \
     "/repos/GGULBAE/desk-setup-switcher/contents/.github/workflows/ci.yml?ref=$master_sha_2" \
     "$snapshot_two/ci-workflow-content-2.json" \
     --jq "{commit_sha: \"$master_sha_2\", type: .type, path: .path, sha: .sha, encoding: .encoding, content: .content}"
-api_get A10 \
+api_get A12 \
     '/repos/GGULBAE/desk-setup-switcher/actions/workflows/ci.yml' \
     "$snapshot_two/ci-workflow-metadata-2.json" \
+    --jq '{id: .id, name: .name, path: .path, state: .state}'
+api_get A13 \
+    "/repos/GGULBAE/desk-setup-switcher/contents/.github/workflows/publish-release.yml?ref=$master_sha_2" \
+    "$snapshot_two/publication-workflow-content-2.json" \
+    --jq "{commit_sha: \"$master_sha_2\", type: .type, path: .path, sha: .sha, encoding: .encoding, content: .content}"
+api_get A14 \
+    '/repos/GGULBAE/desk-setup-switcher/actions/workflows/publish-release.yml' \
+    "$snapshot_two/publication-workflow-metadata-2.json" \
     --jq '{id: .id, name: .name, path: .path, state: .state}'
 
 for anchor_name in \
     master-1.json workflow-content-1.json workflow-metadata-1.json \
-    ci-workflow-content-1.json ci-workflow-metadata-1.json; do
+    ci-workflow-content-1.json ci-workflow-metadata-1.json \
+    publication-workflow-content-1.json publication-workflow-metadata-1.json; do
     copy_projection "$snapshot_one/$anchor_name" "$snapshot_two/$anchor_name"
 done
 for anchor_name in \
     master-2.json workflow-content-2.json workflow-metadata-2.json \
-    ci-workflow-content-2.json ci-workflow-metadata-2.json; do
+    ci-workflow-content-2.json ci-workflow-metadata-2.json \
+    publication-workflow-content-2.json publication-workflow-metadata-2.json; do
     copy_projection "$snapshot_two/$anchor_name" "$snapshot_one/$anchor_name"
 done
+
+local_anchors_match || local_anchor_error
+collected_at="$(ruby -rtime -e 'puts Time.now.utc.iso8601' 2>/dev/null)" || internal_error
+ruby -rtime -e '
+  started = Time.iso8601(ARGV.fetch(0))
+  collected = Time.iso8601(ARGV.fetch(1))
+  raise unless ARGV.fetch(0) == started.utc.iso8601 &&
+    ARGV.fetch(1) == collected.utc.iso8601 && started <= collected
+' "$collection_started_at" "$collected_at" >/dev/null 2>&1 || internal_error
+manual_verified_at="$collected_at"
+candidate_manual_final_result="$(validate_manual_file \
+    "$CANDIDATE_MANUAL_EVIDENCE" \
+    release-candidate-administrator-bypass-disabled \
+    candidate)" || local_anchor_error
+publication_manual_final_result="$(validate_manual_file \
+    "$PUBLICATION_MANUAL_EVIDENCE" \
+    release-publication-administrator-bypass-disabled-and-admin-read-token-minimum-scope \
+    publication)" || local_anchor_error
+[[ "$candidate_manual_final_result" == "$candidate_manual_result" && \
+    "$publication_manual_final_result" == "$publication_manual_result" ]] || local_anchor_error
+if [[ "$phase" == pre-publication ]]; then
+    ruby -rjson -rtime -e '
+      final_collected_text, pre_collected_text, *manual_rows = ARGV
+      final_collected = Time.iso8601(final_collected_text)
+      pre_collected = Time.iso8601(pre_collected_text)
+      raise unless final_collected_text == final_collected.utc.iso8601 &&
+        pre_collected_text == pre_collected.utc.iso8601 && final_collected <= pre_collected
+      manual_rows.each do |source|
+        observed_text = JSON.parse(source, allow_nan: false, create_additions: false)
+          .fetch("observedAt")
+        observed = Time.iso8601(observed_text)
+        raise unless observed_text == observed.utc.iso8601 &&
+          final_collected <= observed && observed <= pre_collected
+      end
+    ' "$final_pre_tag_collected_at" "$collected_at" \
+        "$candidate_manual_final_result" "$publication_manual_final_result" \
+        >/dev/null 2>&1 || local_anchor_error
+fi
+unset candidate_manual_result publication_manual_result
 
 write_manifest "$snapshot_one" "$ruleset_count_one"
 write_manifest "$snapshot_two" "$ruleset_count_two"
 evidence_one="$temporary_root/evidence-1.json"
 evidence_two="$temporary_root/evidence-2.json"
 if ! checks_count_one="$(
-    ruby "$COLLECTOR" collect --input-dir "$snapshot_one" --output "$evidence_one" 2>/dev/null
+    ruby "$COLLECTOR" collect-lifecycle \
+        --input-dir "$snapshot_one" --output "$evidence_one" 2>/dev/null
 )"; then
     evidence_error
 fi
 if ! checks_count_two="$(
-    ruby "$COLLECTOR" collect --input-dir "$snapshot_two" --output "$evidence_two" 2>/dev/null
+    ruby "$COLLECTOR" collect-lifecycle \
+        --input-dir "$snapshot_two" --output "$evidence_two" 2>/dev/null
 )"; then
     evidence_error
 fi
@@ -520,19 +1135,46 @@ fi
 cmp -s "$evidence_one" "$evidence_two" || evidence_error
 checks_count="$checks_count_two"
 evidence_path="$evidence_two"
+if ! ruby -rjson -e '
+  evidence_path, candidate_path, publication_path = ARGV
+  evidence = JSON.parse(File.binread(evidence_path), allow_nan: false, create_additions: false)
+  viewer = evidence.dig("authenticatedViewer", "actor")
+  raise unless viewer.is_a?(Hash) && viewer.keys.sort == %w[id login type]
+  source_digests = [candidate_path, publication_path].map do |path|
+    manual = JSON.parse(File.binread(path), allow_nan: false, create_additions: false)
+    observer = manual.fetch("observer")
+    raise unless observer.fetch("id") == viewer.fetch("id")
+    raise unless observer.fetch("type") == viewer.fetch("type")
+    raise unless observer.fetch("login").casecmp?(viewer.fetch("login"))
+    manual.fetch("sourceArtifactSHA256")
+  end
+  raise unless source_digests.uniq.length == source_digests.length
+' "$evidence_path" "$CANDIDATE_MANUAL_EVIDENCE" "$PUBLICATION_MANUAL_EVIDENCE" \
+    >/dev/null 2>&1; then
+    evidence_error
+fi
 
 # Close local race windows as well as remote ones. A policy, workflow, HEAD, or
 # worktree change during collection invalidates the trusted local authority.
 local_anchors_match || local_anchor_error
 
 policy_status=0
-ruby "$POLICY_VALIDATOR" \
-    --policy "$POLICY_PATH" \
-    --evidence "$evidence_path" \
-    --expected-commit "$expected_commit" \
-    --expected-workflow-blob "$expected_workflow_blob" \
-    --expected-ci-workflow-blob "$expected_ci_workflow_blob" >/dev/null 2>&1 \
-    || policy_status=$?
+policy_arguments=(
+    --policy "$POLICY_PATH"
+    --evidence "$evidence_path"
+    --expected-commit "$expected_commit"
+    --expected-workflow-blob "$expected_workflow_blob"
+    --expected-ci-workflow-blob "$expected_ci_workflow_blob"
+    --expected-publication-workflow-blob "$expected_publication_workflow_blob"
+)
+if [[ "$phase" == pre-publication ]]; then
+    policy_arguments+=(
+        --expected-release-commit "$expected_release_commit"
+        --expected-release-id "$expected_release_id"
+        --expected-release-tag-object "$local_release_tag_object"
+    )
+fi
+ruby "$POLICY_VALIDATOR" "${policy_arguments[@]}" >/dev/null 2>&1 || policy_status=$?
 if [[ "$policy_status" -eq 1 ]]; then
     policy_error
 elif [[ "$policy_status" -ne 0 ]]; then
@@ -544,12 +1186,81 @@ unset policy_status
 # returns so it cannot mutate or replace a trusted local anchor before output.
 local_anchors_match || local_anchor_error
 
-printf 'OK remote-controls final-pre-tag repository=%s commit=%s release_workflow_blob=%s ci_workflow_blob=%s ci_run_id=%s ci_run_attempt=%s ci_job_id=%s checks=%s manual_gates=1\n' \
+evidence_sha256="$(shasum -a 256 "$evidence_path" 2>/dev/null | awk '{print $1}')" \
+    || internal_error
+[[ "$evidence_sha256" =~ ^[0-9a-f]{64}$ ]] || internal_error
+if [[ "$phase" == pre-publication ]]; then
+    durable_evidence_output="$PRE_PUBLICATION_OUTPUT"
+    evidence_record="docs/evidence/releases/$RELEASE_TAG/remote-controls-pre-publication.json"
+    durable_directory_policy="repository"
+else
+    durable_evidence_output="$evidence_output"
+    evidence_record="protected-external-output"
+    durable_directory_policy="private"
+fi
+durable_real_output="$(ruby -e '
+  require "securerandom"
+  source, destination, directory_policy, repository = ARGV
+  directory = File.dirname(destination)
+  directory_stat = File.lstat(directory)
+  directory_real = File.realpath(directory)
+  repository_real = File.realpath(repository)
+  real_destination = File.join(directory_real, File.basename(destination))
+  raise unless directory_stat.directory? && !directory_stat.symlink? &&
+    directory_stat.uid == Process.euid
+  case directory_policy
+  when "private"
+    raise unless (directory_stat.mode & 0o777) == 0o700
+    raise if real_destination == repository_real ||
+      real_destination.start_with?("#{repository_real}/")
+  when "repository"
+    raise unless (directory_stat.mode & 0o022).zero?
+    raise unless real_destination.start_with?("#{repository_real}/")
+  else
+    raise
+  end
+  raise if File.exist?(real_destination) || File.symlink?(real_destination)
+  bytes = File.binread(source)
+  raise if bytes.empty?
+  temporary = File.join(directory_real, ".remote-controls-evidence.#{Process.pid}.#{SecureRandom.hex(8)}")
+  begin
+    File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |io|
+      io.write(bytes)
+      io.flush
+      io.fsync
+    end
+    File.link(temporary, real_destination)
+    File.unlink(temporary)
+    File.open(directory_real, File::RDONLY) { |io| io.fsync }
+  ensure
+    File.unlink(temporary) if File.exist?(temporary) || File.symlink?(temporary)
+  end
+  puts real_destination
+' "$evidence_path" "$durable_evidence_output" "$durable_directory_policy" "$ROOT_DIR" \
+    2>/dev/null)" || {
+    internal_error
+}
+[[ -n "$durable_real_output" && "$durable_real_output" != *$'\n'* \
+    && "$durable_real_output" != *$'\r'* ]] || internal_error
+durable_evidence_output="$durable_real_output"
+ruby -e '
+  stat = File.lstat(ARGV.fetch(0))
+  raise unless stat.file? && !stat.symlink? && stat.nlink == 1 &&
+    stat.uid == Process.euid && (stat.mode & 0o777) == 0o600
+' "$durable_evidence_output" >/dev/null 2>&1 || internal_error
+cmp -s "$evidence_path" "$durable_evidence_output" || internal_error
+
+printf 'OK remote-controls phase=%s repository=%s observed_master=%s release_workflow_blob=%s ci_workflow_blob=%s publication_workflow_blob=%s publication_workflow_id=%s ci_run_id=%s ci_run_attempt=%s ci_job_id=%s checks=%s manual_gates=2 evidence_sha256=%s evidence_record=%s\n' \
+    "$phase" \
     "$REPOSITORY" \
     "$expected_commit" \
     "$expected_workflow_blob" \
     "$expected_ci_workflow_blob" \
+    "$expected_publication_workflow_blob" \
+    "$publication_workflow_id" \
     "$ci_run_id_two" \
     "$ci_run_attempt_two" \
     "$ci_job_id_two" \
-    "$checks_count"
+    "$checks_count" \
+    "$evidence_sha256" \
+    "$evidence_record"

@@ -48,9 +48,11 @@ the exact existing `v0.1.0` tag and commit plus a confirmation phrase, reference
 `release-candidate`, builds the signed/notarized/stapled candidate, and creates
 only a draft prerelease. It is not effective remotely yet.
 
-**Invariant:** do not create or push any `v*` tag until GitHub serves the reviewed
-manual workflow from the default branch and a read-only check proves that the
-old automatic publisher cannot run.
+**Invariant:** do not create or push any remote `v*` tag until GitHub serves the
+reviewed manual workflow from the default branch and a read-only check proves
+that the old automatic publisher cannot run. The later local annotated tag
+object is created only after clean A and external E exist, and it is not pushed
+at creation time.
 
 ## Current repository controls
 
@@ -115,10 +117,11 @@ or promotional post unless that action is named separately.
    plus a second active `v*` ruleset that blocks update and deletion with no
    bypass actor. Do not grant the operator a path to move or delete an existing
    release tag, and do not test either rule with a release tag.
-4. **Create the release gate.** Create `release-candidate`, restrict it to the
-   exact `v0.1.0` tag, configure the required reviewer, explicitly
-   decide self-review and administrator-bypass behavior, and leave it without
-   credentials until read-back proves the protection.
+4. **Create the release gates.** Create both `release-candidate` and
+   `release-publication`, restrict each to the exact `v0.1.0` tag, configure the
+   required reviewers and publisher, explicitly decide self-review and
+   administrator-bypass behavior, and leave both without credentials until
+   read-back proves the protection.
 5. **Push code only to a feature branch.** After local verification, record and
    push the exact current `codex/public-beta-release` HEAD. It must descend from
    audited implementation tip `6609484` and include this audit record. Use
@@ -141,32 +144,62 @@ or promotional post unless that action is named separately.
    approval permission. Create `needs-triage`, apply the approved
    description/topics/Homepage and disabled-Discussions state, and read every
    value back.
-10. **Configure protected values without exposing them.** Add the four variables
-   and three secrets below directly through GitHub's protected environment UI.
-   Never paste values into issues, PRs, task messages, commands, fixtures, or logs.
+10. **Configure protected values without exposing them.** Add the four signing
+    variables and three signing/notarization secrets below directly to
+    `release-candidate`. Add the separate minimum-scope
+    `RELEASE_ADMIN_READ_TOKEN` only to `release-publication`. Never paste values
+    into issues, PRs, task messages, commands, fixtures, or logs.
 11. **Synchronize evidence and anchor the policy.** After read-back confirms the
     changed settings, update `SECURITY.md`, support/governance/distribution/
     readiness documents, and the completion ledger through another reviewed PR.
     Populate every authoritative-policy field from reviewed read-only evidence:
-    repository numeric/node identity and approved metadata/state, release and CI
-    workflow IDs/names/paths/blobs, release and CI-check identity, actor
+    repository numeric/node identity and approved metadata/state; CI, candidate,
+    and publication workflow IDs/names/paths/blobs; both release environments;
+    release and CI-check identity; actor
     IDs/logins/types, and the approval mode/count/self-review setting. Do not copy
-    synthetic fixture identities. Review and merge that policy with both workflow
-    blobs it names,
-    then wait for exact-commit CI; the final remote `master` commit becomes
-    `EXPECTED_COMMIT`.
-12. **Run the final-pre-tag read-only gate.** From a clean, complete, non-shallow
-    checkout whose HEAD is that effective `master`, authenticate as the configured
-    operator with repository-admin visibility, and run
-    `make verify-remote-controls` while both `v*` refs and Releases remain empty. Record
-    the sanitized `manual_gates=1` transcript and separately record the environment
-    administrator-bypass Settings state. The command performs local reads and
-    authenticated GETs only; it configures, pushes, tags, dispatches, and approves
-    nothing.
-13. **Stop for tag approval.** Creating the annotated `v0.1.0` tag, pushing only
-    that ref, dispatching the signed workflow, approving the environment, and
-    preparing the draft are a later explicit approval boundary. Publication is
-    another boundary after exact-candidate lifecycle and beta evidence.
+    synthetic fixture identities. Review and merge that policy with all three
+    candidate/draft, CI, and publication workflow blobs it names,
+    then wait for exact-commit CI. The later clean A commit containing the final
+    manual records becomes `EXPECTED_COMMIT`.
+12. **Establish A and run the final-pre-tag read-only gate.** Through the
+    protected reviewed path, establish clean remote-master commit **A** with the
+    two fresh closed-schema `final-pre-tag` manual records, both environments'
+    administrator-bypass state, the publication token's repository-only
+    least-privilege configuration, and all three reviewed workflow blobs. Wait
+    for exact-A CI. From a clean, complete, non-shallow checkout whose HEAD is A,
+    authenticate as the configured operator with repository-admin visibility
+    and run
+    `make verify-remote-controls REMOTE_CONTROLS_EVIDENCE_OUTPUT=/absolute/private/remote-controls-final-pre-tag.json`
+    while remote `v*` refs and Releases remain empty. Preserve the exact
+    mode-0600 output outside the repository as **E** and record the sanitized
+    `manual_gates=2` transcript. The command performs local reads and
+    authenticated GETs only; it configures, pushes, tags, dispatches, and
+    approves nothing.
+13. **Bind E before the first tag push.** Create the annotated `v0.1.0` tag
+    object locally against A with the exact E-digest message, record its object
+    SHA and peeled A commit, and do not push it. Create **B** as A's direct
+    single-parent child adding only unchanged E at the fixed evidence path as
+    `100644`. Integrate B into `master` by fast-forward, rebase, or one-commit
+    squash only when the resulting graph preserves the exact A→B edge; never
+    use a merge commit. Wait for exact-B CI and repeat the A→B semantic/history
+    check. Then stop for a separate tag-push approval. Only that approval may
+    authorize the first push of the already recorded tag object, followed by a
+    separately approved signed-workflow dispatch, environment approval, and
+    draft preparation. Publication remains another boundary after exact-candidate
+    lifecycle and beta evidence.
+14. **Use the v2 pre-publication path after the draft.** Record both the direct
+    annotated-tag object SHA and peeled commit. After lifecycle/beta evidence,
+    capture new protected Settings bundles and replace both manual records with
+    fresh `pre-publication` phase/tag-object/commit/Release-ID challenges in one
+    reviewed docs-only master commit; wait for CI. Freeze every release-relevant
+    GitHub Settings surface, run the two-pass pre-publication verifier, then add
+    only its manifest and the approval record in one direct-successor commit.
+    That approval commit's exact master-push CI must pass before dispatch. Every
+    timestamp is canonical UTC and must satisfy `final manuals observedAt ≤
+    final E collectedAt ≤ pre manuals observedAt ≤ pre manifest collectedAt
+    ≤ approval approvedAt`. This v2 lifecycle is a later
+    design correction; it does not retroactively turn the 2026-07-18 historical
+    read-only observations into publication evidence.
 
 Required protected environment variables:
 
@@ -180,6 +213,15 @@ Required protected environment secrets:
 - `DEVELOPER_ID_CERTIFICATE_BASE64`
 - `DEVELOPER_ID_CERTIFICATE_PASSWORD`
 - `APPLE_NOTARY_API_KEY_BASE64`
+
+The publication environment additionally contains only
+`RELEASE_ADMIN_READ_TOKEN`, a repository-scoped fine-grained read token with
+exactly Actions, Administration, Attestations, Contents, and implicit Metadata
+read access. It has exactly five bounded workflow uses: pinned checkout,
+candidate restoration, pre-publication attestation verification, the
+publication helper, and post-publication attestation verification. Within the
+helper, it is installed only through five tracked, timeout-bounded GitHub
+read/download launcher call sites; it is never the publication write token.
 
 The repository currently has one collaborator. Turning on prevent-self-review
 with only `GGULBAE` as reviewer would deadlock the job. Before remote setup, choose
@@ -201,6 +243,11 @@ The first option provides the stronger trust boundary.
   `master` and never restore the unsigned automatic publisher.
 - If approval cannot proceed, cancel the run and correct the reviewer policy;
   do not use a silent administrator bypass.
+- A publication-side `HUP`, `INT`, `QUIT`, `TERM`, workflow cancellation,
+  runner/host loss, unavailable or incomplete logs, or any ambiguous PATCH
+  outcome is incident-only. Preserve state and use read-only review; never
+  automatically retry, adopt a public Release, or infer safety from a missing
+  marker.
 - If a credentialed candidate fails before its exact nine assets are finalized as
   the immutable attempt-1 origin artifact, preserve the run and start a new
   versioned candidate. Never rerun the origin build: GitHub full reruns remove its

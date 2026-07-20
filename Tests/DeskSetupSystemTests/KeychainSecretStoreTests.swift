@@ -92,7 +92,7 @@ struct KeychainSecretStoreTests {
   func errorsDoNotContainSecrets() {
     let api = MockKeychainAPI(forcedUpdateResult: .failure(-50))
     let store = KeychainSecretStore(api: api)
-    let secretText = "synthetic-secret-that-must-not-appear"
+    let secretText = Data((0..<32).map { UInt8($0) }).base64EncodedString()
 
     do {
       try store.save(Data(secretText.utf8), account: "failure.synthetic")

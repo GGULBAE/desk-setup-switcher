@@ -5,15 +5,21 @@ set +x
 set +a
 umask 077
 
-# Keep the credential out of every child process except the four explicit
-# read-only GitHub API calls below. In particular, dirname is the first child
-# process this script starts, so isolation must happen before sourcing lib.sh.
+# Keep the credential out of every child process except the scoped read-only
+# GitHub API helper below. In particular, dirname is the first child process
+# this script starts, so isolation must happen before sourcing lib.sh.
 github_token="${GH_TOKEN:-}"
-unset GH_TOKEN GITHUB_TOKEN
+unset GH_TOKEN GITHUB_TOKEN GH_HOST GH_DEBUG DEBUG GH_ENTERPRISE_TOKEN \
+    GITHUB_ENTERPRISE_TOKEN GH_CONFIG_DIR
 export -n github_token 2>/dev/null || true
 source "$(dirname "$0")/lib.sh"
 
-release_require_execution_context
+case "${RELEASE_OPERATION:-}" in
+    prepare-draft) protected_environment=release-candidate ;;
+    publish-release) protected_environment=release-publication ;;
+    *) release_die "Candidate restoration is restricted to a reviewed release operation." ;;
+esac
+release_require_execution_context "$protected_environment"
 
 release_require_single_line RELEASE_CANDIDATE_RUN_ID
 release_require_single_line RELEASE_CANDIDATE_ARTIFACT_ID
@@ -60,8 +66,8 @@ done
 [[ "$RELEASE_CANDIDATE_RUN_ATTEMPT" == 1 ]] || {
     release_die "The restored candidate must originate from workflow attempt 1."
 }
-[[ "$RELEASE_OPERATION" == prepare-draft ]] || {
-    release_die "Candidate restoration is restricted to the prepare-draft operation."
+[[ "$RELEASE_OPERATION" == prepare-draft || "$RELEASE_OPERATION" == publish-release ]] || {
+    release_die "Candidate restoration is restricted to a reviewed release operation."
 }
 [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ && "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
     release_die "The current workflow run identity is invalid."
@@ -124,22 +130,29 @@ repository_id_path="$temporary_root/repository-id.txt"
 artifact_size_path="$temporary_root/artifact-size.txt"
 remote_error="$temporary_root/remote-command.stderr"
 parse_error="$temporary_root/parse.stderr"
+gh_config_directory="$temporary_root/gh-config"
 staging_directory=""
 
 cleanup() {
+    trap '' HUP INT QUIT TERM
+    release_stop_active_child || true
     rm -rf -- "$temporary_root"
     if [[ -n "${staging_directory:-}" ]]; then
         rm -rf -- "$staging_directory"
     fi
 }
 trap cleanup EXIT
+release_install_exit_signal_traps
+mkdir -m 0700 "$gh_config_directory"
 
 github_api_to_file() {
     local endpoint="$1"
     local destination="$2"
     : >"$destination"
     : >"$remote_error"
-    if ! GH_TOKEN="$github_token" gh api \
+    if ! GH_CONFIG_DIR="$gh_config_directory" \
+        release_run_tracked_secret_env_timeout GH_TOKEN "$github_token" 90 gh api \
+        --hostname github.com \
         --method GET \
         -H "Accept: application/vnd.github+json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \

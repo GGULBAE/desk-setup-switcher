@@ -1,0 +1,566 @@
+{
+  "schemaVersion": "desk-setup-switcher.remote-release-controls-evidence/v2",
+  "phase": "pre-publication",
+  "collectedAt": "2026-07-18T01:00:00Z",
+  "finalPreTagEvidenceSHA256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "repository": {
+    "id": 424242,
+    "nodeId": "R_SYNTHETIC_DESK_SETUP_SWITCHER",
+    "name": "desk-setup-switcher",
+    "fullName": "synthetic-operator/desk-setup-switcher",
+    "owner": {
+      "id": 1001,
+      "login": "synthetic-operator",
+      "type": "User"
+    },
+    "private": false,
+    "visibility": "public",
+    "defaultBranch": "master",
+    "archived": false,
+    "disabled": false,
+    "hasDiscussions": false,
+    "description": "Capture, edit, and safely apply local macOS desk setup profiles.",
+    "homepage": "https://example.invalid/desk-setup-switcher",
+    "topics": [
+      "macos",
+      "menu-bar",
+      "open-source",
+      "swift",
+      "swiftui"
+    ]
+  },
+  "authenticatedViewer": {
+    "actor": {
+      "id": 1001,
+      "login": "synthetic-operator",
+      "type": "User"
+    },
+    "repositoryPermission": "admin"
+  },
+  "anchorReads": [
+    {
+      "sequence": 1,
+      "master": {
+        "ref": "refs/heads/master",
+        "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "ciWorkflow": {
+        "id": 7000,
+        "name": "CI",
+        "path": ".github/workflows/ci.yml",
+        "state": "active",
+        "blobSha": "cccccccccccccccccccccccccccccccccccccccc",
+        "triggers": [
+          "pull_request",
+          "push",
+          "workflow_dispatch"
+        ]
+      },
+      "candidateWorkflow": {
+        "id": 7001,
+        "name": "Signed release candidate",
+        "path": ".github/workflows/release.yml",
+        "state": "active",
+        "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "triggers": [
+          "workflow_dispatch"
+        ]
+      },
+      "publicationWorkflow": {
+        "id": 7002,
+        "name": "Publish approved signed release",
+        "path": ".github/workflows/publish-release.yml",
+        "state": "active",
+        "blobSha": "dddddddddddddddddddddddddddddddddddddddd",
+        "triggers": [
+          "workflow_dispatch"
+        ]
+      }
+    },
+    {
+      "sequence": 2,
+      "master": {
+        "ref": "refs/heads/master",
+        "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "ciWorkflow": {
+        "id": 7000,
+        "name": "CI",
+        "path": ".github/workflows/ci.yml",
+        "state": "active",
+        "blobSha": "cccccccccccccccccccccccccccccccccccccccc",
+        "triggers": [
+          "pull_request",
+          "push",
+          "workflow_dispatch"
+        ]
+      },
+      "candidateWorkflow": {
+        "id": 7001,
+        "name": "Signed release candidate",
+        "path": ".github/workflows/release.yml",
+        "state": "active",
+        "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "triggers": [
+          "workflow_dispatch"
+        ]
+      },
+      "publicationWorkflow": {
+        "id": 7002,
+        "name": "Publish approved signed release",
+        "path": ".github/workflows/publish-release.yml",
+        "state": "active",
+        "blobSha": "dddddddddddddddddddddddddddddddddddddddd",
+        "triggers": [
+          "workflow_dispatch"
+        ]
+      }
+    }
+  ],
+  "ciWorkflow": {
+    "id": 7000,
+    "name": "CI",
+    "path": ".github/workflows/ci.yml",
+    "state": "active",
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "blobSha": "cccccccccccccccccccccccccccccccccccccccc",
+    "triggers": [
+      "pull_request",
+      "push",
+      "workflow_dispatch"
+    ],
+    "contentsWrite": false
+  },
+  "rulesets": {
+    "complete": true,
+    "master": [
+      {
+        "id": 101,
+        "name": "Protect master",
+        "target": "branch",
+        "enforcement": "active",
+        "sourceType": "Repository",
+        "source": "synthetic-operator/desk-setup-switcher",
+        "conditions": {
+          "include": [
+            "refs/heads/master"
+          ],
+          "exclude": []
+        },
+        "bypassActors": [],
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "type": "pull_request",
+            "parameters": {
+              "dismissStaleReviewsOnPush": true,
+              "requireCodeOwnerReview": false,
+              "requireLastPushApproval": true,
+              "requiredApprovingReviewCount": 1,
+              "requiredReviewThreadResolution": true
+            }
+          },
+          {
+            "type": "required_status_checks",
+            "parameters": {
+              "strictRequiredStatusChecksPolicy": true,
+              "doNotEnforceOnCreate": false,
+              "requiredStatusChecks": [
+                {
+                  "context": "Verify macOS app",
+                  "integrationId": 15368
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "tags": [
+      {
+        "id": 102,
+        "name": "Release tag creation",
+        "target": "tag",
+        "enforcement": "active",
+        "sourceType": "Repository",
+        "source": "synthetic-operator/desk-setup-switcher",
+        "conditions": {
+          "include": [
+            "refs/tags/v*"
+          ],
+          "exclude": []
+        },
+        "bypassActors": [
+          {
+            "actor": {
+              "id": 1001,
+              "login": "synthetic-operator",
+              "type": "User"
+            },
+            "bypassMode": "always"
+          }
+        ],
+        "rules": [
+          {
+            "type": "creation"
+          }
+        ]
+      },
+      {
+        "id": 103,
+        "name": "Release tag immutability",
+        "target": "tag",
+        "enforcement": "active",
+        "sourceType": "Repository",
+        "source": "synthetic-operator/desk-setup-switcher",
+        "conditions": {
+          "include": [
+            "refs/tags/v*"
+          ],
+          "exclude": []
+        },
+        "bypassActors": [],
+        "rules": [
+          {
+            "type": "update",
+            "parameters": {
+              "updateAllowsFetchAndMerge": false
+            }
+          },
+          {
+            "type": "deletion"
+          }
+        ]
+      }
+    ],
+    "effectiveMaster": {
+      "complete": true,
+      "items": [
+        {
+          "rulesetId": 101,
+          "sourceType": "Repository",
+          "source": "synthetic-operator/desk-setup-switcher",
+          "rule": {
+            "type": "deletion"
+          }
+        },
+        {
+          "rulesetId": 101,
+          "sourceType": "Repository",
+          "source": "synthetic-operator/desk-setup-switcher",
+          "rule": {
+            "type": "non_fast_forward"
+          }
+        },
+        {
+          "rulesetId": 101,
+          "sourceType": "Repository",
+          "source": "synthetic-operator/desk-setup-switcher",
+          "rule": {
+            "type": "pull_request",
+            "parameters": {
+              "dismissStaleReviewsOnPush": true,
+              "requireCodeOwnerReview": false,
+              "requireLastPushApproval": true,
+              "requiredApprovingReviewCount": 1,
+              "requiredReviewThreadResolution": true
+            }
+          }
+        },
+        {
+          "rulesetId": 101,
+          "sourceType": "Repository",
+          "source": "synthetic-operator/desk-setup-switcher",
+          "rule": {
+            "type": "required_status_checks",
+            "parameters": {
+              "strictRequiredStatusChecksPolicy": true,
+              "doNotEnforceOnCreate": false,
+              "requiredStatusChecks": [
+                {
+                  "context": "Verify macOS app",
+                  "integrationId": 15368
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "repositoryConfiguration": {
+    "secrets": {
+      "complete": true,
+      "names": []
+    },
+    "variables": {
+      "complete": true,
+      "names": []
+    }
+  },
+  "security": {
+    "privateVulnerabilityReporting": true,
+    "immutableReleases": {
+      "enabled": true,
+      "enforcedByOwner": false
+    }
+  },
+  "actions": {
+    "enabled": true,
+    "allowedActions": "selected",
+    "shaPinningRequired": true,
+    "selectedActions": {
+      "githubOwnedAllowed": true,
+      "verifiedAllowed": false,
+      "patternsAllowed": []
+    },
+    "workflowPermissions": {
+      "defaultWorkflowPermissions": "read",
+      "canApprovePullRequestReviews": false
+    }
+  },
+  "labels": {
+    "needsTriage": {
+      "name": "needs-triage",
+      "present": true
+    }
+  },
+  "releaseBoundary": {
+    "vRefs": {
+      "complete": true,
+      "items": [
+        {
+          "ref": "refs/tags/v0.1.0",
+          "objectType": "tag",
+          "objectSha": "8888888888888888888888888888888888888888",
+          "commitSha": "9999999999999999999999999999999999999999"
+        }
+      ]
+    },
+    "releases": {
+      "complete": true,
+      "items": [
+        {
+          "id": 12345,
+          "tag": "v0.1.0",
+          "draft": true,
+          "prerelease": true
+        }
+      ]
+    }
+  },
+  "ci": {
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "workflowRuns": {
+      "complete": true,
+      "items": [
+        {
+          "id": 8001,
+          "workflowId": 7000,
+          "checkSuiteId": 9001,
+          "path": ".github/workflows/ci.yml",
+          "event": "push",
+          "headBranch": "master",
+          "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "runAttempt": 2,
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "jobs": {
+      "complete": true,
+      "items": [
+        {
+          "id": 10001,
+          "runId": 8001,
+          "runAttempt": 2,
+          "checkRunId": 11001,
+          "name": "Verify macOS app",
+          "workflowName": "CI",
+          "headBranch": "master",
+          "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "checkRuns": {
+      "complete": true,
+      "items": [
+        {
+          "id": 11001,
+          "name": "Verify macOS app",
+          "appId": 15368,
+          "checkSuiteId": 9001,
+          "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  },
+  "candidateWorkflow": {
+    "id": 7001,
+    "name": "Signed release candidate",
+    "path": ".github/workflows/release.yml",
+    "state": "active",
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "triggers": [
+      "workflow_dispatch"
+    ],
+    "contentsWrite": true
+  },
+  "publicationWorkflow": {
+    "id": 7002,
+    "name": "Publish approved signed release",
+    "path": ".github/workflows/publish-release.yml",
+    "state": "active",
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "blobSha": "dddddddddddddddddddddddddddddddddddddddd",
+    "triggers": [
+      "workflow_dispatch"
+    ],
+    "contentsWrite": true
+  },
+  "workflowInventory": {
+    "complete": true,
+    "items": [
+      {
+        "id": 7000,
+        "name": "CI",
+        "path": ".github/workflows/ci.yml",
+        "state": "active",
+        "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "blobSha": "cccccccccccccccccccccccccccccccccccccccc",
+        "triggers": [
+          "pull_request",
+          "push",
+          "workflow_dispatch"
+        ],
+        "contentsWrite": false
+      },
+      {
+        "id": 7002,
+        "name": "Publish approved signed release",
+        "path": ".github/workflows/publish-release.yml",
+        "state": "active",
+        "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "blobSha": "dddddddddddddddddddddddddddddddddddddddd",
+        "triggers": [
+          "workflow_dispatch"
+        ],
+        "contentsWrite": true
+      },
+      {
+        "id": 7001,
+        "name": "Signed release candidate",
+        "path": ".github/workflows/release.yml",
+        "state": "active",
+        "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "triggers": [
+          "workflow_dispatch"
+        ],
+        "contentsWrite": true
+      }
+    ]
+  },
+  "environments": {
+    "releaseCandidate": {
+      "name": "release-candidate",
+      "protection": {
+        "preventSelfReview": true,
+        "reviewers": [
+          {
+            "id": 1002,
+            "login": "synthetic-reviewer",
+            "type": "User"
+          }
+        ]
+      },
+      "deployment": {
+        "protectedBranches": false,
+        "customBranchPolicies": true,
+        "policies": [
+          {
+            "name": "v0.1.0",
+            "type": "tag"
+          }
+        ]
+      },
+      "secrets": {
+        "complete": true,
+        "names": [
+          "APPLE_NOTARY_API_KEY_BASE64",
+          "DEVELOPER_ID_CERTIFICATE_BASE64",
+          "DEVELOPER_ID_CERTIFICATE_PASSWORD"
+        ]
+      },
+      "variables": {
+        "complete": true,
+        "names": [
+          "APPLE_NOTARY_ISSUER_ID",
+          "APPLE_NOTARY_KEY_ID",
+          "APPLE_TEAM_ID",
+          "DEVELOPER_ID_APPLICATION"
+        ]
+      }
+    },
+    "releasePublication": {
+      "name": "release-publication",
+      "protection": {
+        "preventSelfReview": true,
+        "reviewers": [
+          {
+            "id": 1002,
+            "login": "synthetic-reviewer",
+            "type": "User"
+          }
+        ]
+      },
+      "deployment": {
+        "protectedBranches": false,
+        "customBranchPolicies": true,
+        "policies": [
+          {
+            "name": "v0.1.0",
+            "type": "tag"
+          }
+        ]
+      },
+      "secrets": {
+        "complete": true,
+        "names": [
+          "RELEASE_ADMIN_READ_TOKEN"
+        ]
+      },
+      "variables": {
+        "complete": true,
+        "names": [
+          "APPLE_TEAM_ID",
+          "DEVELOPER_ID_APPLICATION"
+        ]
+      }
+    }
+  },
+  "manualEvidence": {
+    "complete": true,
+    "items": [
+      {
+        "control": "release-candidate-administrator-bypass-disabled",
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      {
+        "control": "release-publication-administrator-bypass-disabled-and-admin-read-token-minimum-scope",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    ]
+  }
+}

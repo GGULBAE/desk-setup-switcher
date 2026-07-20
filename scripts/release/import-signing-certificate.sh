@@ -50,7 +50,7 @@ cleanup_failed_import() {
     local exit_status=$?
     local cleanup_failed=false
     trap - EXIT
-    trap '' INT TERM
+    trap '' HUP INT QUIT TERM
     set +e
 
     if ! release_stop_active_child; then
@@ -159,5 +159,5 @@ identity_count="$(printf '%s\n' "$identities" | grep -F -c "\"$DEVELOPER_ID_APPL
     release_die "The temporary Keychain must contain exactly one matching Developer ID identity."
 }
 
-trap - EXIT INT TERM
+trap - EXIT HUP INT QUIT TERM
 printf 'Imported the reviewed Developer ID identity into the ephemeral release Keychain.\n'

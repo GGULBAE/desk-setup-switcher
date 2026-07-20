@@ -186,9 +186,13 @@ jobs:
 
           git check-ref-format --allow-onelevel "$RELEASE_TAG" >/dev/null
           git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
+          tag_object="$(git rev-parse "refs/tags/$RELEASE_TAG")"
           tag_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
           checkout_commit="$(git rev-parse HEAD)"
-          if [[ "$tag_commit" != "$EXPECTED_COMMIT" || "$checkout_commit" != "$EXPECTED_COMMIT" ]]; then
+          if [[ ! "$tag_object" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ "$(git cat-file -t "$tag_object")" != tag ]] \
+            || [[ "$tag_commit" != "$EXPECTED_COMMIT" ]] \
+            || [[ "$checkout_commit" != "$EXPECTED_COMMIT" ]]; then
             echo "::error::The tag, checked-out commit, and expected_commit input do not identify the same commit." >&2
             exit 1
           fi
@@ -457,7 +461,10 @@ jobs:
           set -euo pipefail
           git check-ref-format --allow-onelevel "$RELEASE_TAG" >/dev/null
           git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
-          if [[ "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" != "$EXPECTED_COMMIT" ]] \
+          tag_object="$(git rev-parse "refs/tags/$RELEASE_TAG")"
+          if [[ ! "$tag_object" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ "$(git cat-file -t "$tag_object")" != tag ]] \
+            || [[ "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" != "$EXPECTED_COMMIT" ]] \
             || [[ "$(git rev-parse HEAD)" != "$EXPECTED_COMMIT" ]]; then
             echo "::error::The draft checkout does not match the candidate commit." >&2
             exit 1

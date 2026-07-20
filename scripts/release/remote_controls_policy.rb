@@ -2,7 +2,9 @@
 # frozen_string_literal: true
 
 require "optparse"
+require "json"
 require "uri"
+require "time"
 require_relative "release_policy"
 
 # Verifies a normalized, value-free snapshot of the GitHub controls that must
@@ -13,7 +15,11 @@ require_relative "release_policy"
 module RemoteControlsPolicy
   POLICY_SCHEMA = "desk-setup-switcher.remote-release-controls-policy/v1"
   EVIDENCE_SCHEMA = "desk-setup-switcher.remote-release-controls-evidence/v1"
+  POLICY_SCHEMA_V2 = "desk-setup-switcher.remote-release-controls-policy/v2"
+  EVIDENCE_SCHEMA_V2 = "desk-setup-switcher.remote-release-controls-evidence/v2"
   PHASE = "final-pre-tag"
+  LIFECYCLE_PHASE = "release-lifecycle"
+  PRE_PUBLICATION_PHASE = "pre-publication"
   VERSION = "0.1.0"
   TAG = "v0.1.0"
   DEFAULT_BRANCH = "master"
@@ -22,6 +28,8 @@ module RemoteControlsPolicy
   RELEASE_WORKFLOW_PATH = ".github/workflows/release.yml"
   CI_WORKFLOW_NAME = "CI"
   CI_WORKFLOW_PATH = ".github/workflows/ci.yml"
+  PUBLICATION_WORKFLOW_NAME = "Publish approved signed release"
+  PUBLICATION_WORKFLOW_PATH = ".github/workflows/publish-release.yml"
   CI_RUN_PATH = CI_WORKFLOW_PATH
   CI_WORKFLOW_TRIGGERS = %w[pull_request push workflow_dispatch].freeze
   REQUIRED_CHECK_NAME = "Verify macOS app"
@@ -40,6 +48,17 @@ module RemoteControlsPolicy
     APPLE_TEAM_ID
     DEVELOPER_ID_APPLICATION
   ].freeze
+  REQUIRED_PUBLICATION_SECRETS = %w[RELEASE_ADMIN_READ_TOKEN].freeze
+  REQUIRED_PUBLICATION_VARIABLES = %w[APPLE_TEAM_ID DEVELOPER_ID_APPLICATION].freeze
+  MANUAL_CONTROLS = %w[
+    release-candidate-administrator-bypass-disabled
+    release-publication-administrator-bypass-disabled-and-admin-read-token-minimum-scope
+  ].freeze
+  MANUAL_EVIDENCE_PATHS = %w[
+    docs/evidence/releases/v0.1.0/release-candidate-admin-bypass.json
+    docs/evidence/releases/v0.1.0/release-publication-admin-token-scope.json
+  ].freeze
+  MANUAL_EVIDENCE_SCHEMA = "desk-setup-switcher.manual-release-control-evidence/v1"
 
   PolicyError = ReleasePolicy::PolicyError
 
@@ -65,6 +84,8 @@ module RemoteControlsPolicy
   end
 
   def exact_string(value, label, max_bytes: 1024)
+    value = value.encode(Encoding::UTF_8) if value.is_a?(String) &&
+                                                value.encoding == Encoding::US_ASCII
     unless value.is_a?(String) && !value.empty? && value.bytesize <= max_bytes &&
            value.encoding == Encoding::UTF_8 && value.valid_encoding? &&
            !value.match?(/[\r\n\0]/)
@@ -92,6 +113,13 @@ module RemoteControlsPolicy
     value
   end
 
+  def sha256(value, label)
+    exact_string(value, label)
+    reject!(label) unless value.match?(/\A[0-9a-f]{64}\z/)
+
+    value
+  end
+
   def github_login(value, label)
     exact_string(value, label, max_bytes: 39)
     reject!(label) unless value.match?(/\A(?!-)[A-Za-z0-9-]+(?<!-)\z/)
@@ -111,7 +139,7 @@ module RemoteControlsPolicy
 
   def same_actor?(left, right)
     left["id"] == right["id"] &&
-      left["login"] == right["login"] &&
+      left["login"].casecmp?(right["login"]) &&
       left["type"] == right["type"]
   end
 
@@ -691,53 +719,484 @@ module RemoteControlsPolicy
     true
   end
 
+  # v2 is a release-lifecycle contract. It preserves the one-time final-pre-tag
+  # observation while also supporting a fresh pre-publication observation after
+  # the exact draft exists. The publication workflow and environment are part of
+  # the authoritative policy rather than being inferred from the observation.
+  def validate_policy_workflow_v2(value, label, expected_name:, expected_path:)
+    workflow = exact_object(value, label, %w[blobSha id name path])
+    positive_integer(workflow["id"], label)
+    sha(workflow["blobSha"], label)
+    reject!(label) unless workflow["name"] == expected_name && workflow["path"] == expected_path
+    workflow
+  end
+
+  def validate_policy_release_v2(value)
+    exact_object(value, "v2 policy release", %w[candidateWorkflow ci publicationWorkflow tag version])
+    reject!("v2 policy release") unless value["version"] == VERSION && value["tag"] == TAG
+    candidate = validate_policy_workflow_v2(
+      value["candidateWorkflow"],
+      "v2 candidate workflow",
+      expected_name: RELEASE_WORKFLOW_NAME,
+      expected_path: RELEASE_WORKFLOW_PATH
+    )
+    publication = validate_policy_workflow_v2(
+      value["publicationWorkflow"],
+      "v2 publication workflow",
+      expected_name: PUBLICATION_WORKFLOW_NAME,
+      expected_path: PUBLICATION_WORKFLOW_PATH
+    )
+    ci = exact_object(value["ci"], "v2 policy CI", %w[appId name workflow])
+    reject!("v2 policy CI") unless ci["name"] == REQUIRED_CHECK_NAME &&
+                                    ci["appId"] == GITHUB_ACTIONS_APP_ID
+    ci_workflow = validate_policy_workflow_v2(
+      ci["workflow"],
+      "v2 CI workflow",
+      expected_name: CI_WORKFLOW_NAME,
+      expected_path: CI_WORKFLOW_PATH
+    )
+    ids = [candidate["id"], ci_workflow["id"], publication["id"]]
+    reject!("v2 policy workflow identities") unless ids.uniq.length == 3
+    value
+  end
+
+  def validate_manual_evidence_v2(value, expected: nil)
+    exact_object(value, "manual release-control evidence", %w[complete items])
+    reject!("manual release-control evidence") unless value["complete"] == true
+    items = exact_array(value["items"], "manual release-control evidence", length: 2)
+    normalized = items.map do |item|
+      exact_object(item, "manual release-control item", %w[control sha256])
+      control = exact_string(item["control"], "manual release-control item", max_bytes: 160)
+      digest = sha256(item["sha256"], "manual release-control item")
+      { "control" => control, "sha256" => digest }
+    end
+    reject!("manual release-control evidence") unless
+      normalized.map { |item| item["control"] } == MANUAL_CONTROLS &&
+      normalized.map { |item| item["sha256"] }.uniq.length == 2
+    if expected
+      reject!("manual release-control evidence") unless
+        normalized.map { |item| item["control"] } == expected["items"].map { |item| item["control"] }
+    end
+    { "complete" => true, "items" => normalized }
+  end
+
+  def validate_policy_manual_controls_v2(value)
+    exact_object(value, "manual release-control policy", %w[complete items])
+    reject!("manual release-control policy") unless value["complete"] == true
+    items = exact_array(value["items"], "manual release-control policy", length: 2)
+    normalized = items.map do |item|
+      exact_object(item, "manual release-control policy item", %w[control path schemaVersion])
+      {
+        "control" => exact_string(item["control"], "manual release-control policy item", max_bytes: 160),
+        "path" => exact_string(item["path"], "manual release-control policy item", max_bytes: 256),
+        "schemaVersion" => exact_string(
+          item["schemaVersion"], "manual release-control policy item", max_bytes: 160
+        )
+      }
+    end
+    reject!("manual release-control policy") unless
+      normalized.map { |item| item["control"] } == MANUAL_CONTROLS &&
+      normalized.map { |item| item["path"] } == MANUAL_EVIDENCE_PATHS &&
+      normalized.all? { |item| item["schemaVersion"] == MANUAL_EVIDENCE_SCHEMA }
+    { "complete" => true, "items" => normalized }
+  end
+
+  def validate_policy_v2(value)
+    if value.is_a?(Hash) && value["configured"] == false
+      exact_object(value, "v2 remote controls policy preamble", %w[configured phase schemaVersion])
+      reject!("v2 remote controls policy schema") unless value["schemaVersion"] == POLICY_SCHEMA_V2
+      reject!("v2 remote controls policy phase") unless value["phase"] == LIFECYCLE_PHASE
+      reject!("remote controls policy configuration")
+    end
+    exact_object(
+      value,
+      "v2 remote controls policy",
+      %w[actors approval configured manualEvidence phase release repository schemaVersion]
+    )
+    reject!("v2 remote controls policy schema") unless value["schemaVersion"] == POLICY_SCHEMA_V2
+    reject!("v2 remote controls policy phase") unless value["phase"] == LIFECYCLE_PHASE
+    reject!("remote controls policy configuration") unless value["configured"] == true
+
+    repository = validate_policy_repository(value["repository"])
+    release = validate_policy_release_v2(value["release"])
+    actors = exact_object(value["actors"], "v2 policy actors", %w[operator publisher reviewer])
+    operator = actor(actors["operator"], "v2 policy operator", configured: true)
+    reviewer = actor(actors["reviewer"], "v2 policy reviewer", configured: true)
+    publisher = actor(actors["publisher"], "v2 policy publisher", configured: true)
+    owner, repository_name = repository["fullName"].split("/", 2)
+    reject!("v2 policy repository identity") unless repository_name == repository["name"] &&
+                                                    owner&.casecmp?(operator["login"])
+
+    approval = exact_object(
+      value["approval"],
+      "v2 policy approval",
+      %w[mode preventSelfReview requiredApprovals]
+    )
+    exact_boolean(approval["preventSelfReview"], "v2 policy approval")
+    reject!("v2 policy approval") unless approval["requiredApprovals"].is_a?(Integer)
+    case approval["mode"]
+    when "independent-review"
+      reject!("v2 policy approval") unless same_actor?(operator, publisher)
+      reject!("v2 policy approval") if same_actor?(reviewer, publisher)
+      reject!("v2 policy approval") unless approval["preventSelfReview"] == true &&
+                                             approval["requiredApprovals"] == 1
+    when "one-maintainer"
+      reject!("v2 policy approval") unless same_actor?(operator, reviewer) &&
+                                             same_actor?(operator, publisher)
+      reject!("v2 policy approval") unless approval["preventSelfReview"] == false &&
+                                             approval["requiredApprovals"] == 0
+    else
+      reject!("v2 policy approval")
+    end
+    manual_evidence = validate_policy_manual_controls_v2(value["manualEvidence"])
+    {
+      schema: :v2,
+      repository: repository,
+      release: release,
+      operator: operator,
+      reviewer: reviewer,
+      publisher: publisher,
+      approval: approval,
+      manual_evidence: manual_evidence
+    }
+  end
+
+  def validate_anchor_workflow_v2(value, label, expected:, expected_blob:, expected_name:,
+                                  expected_path:, expected_triggers:)
+    validate_anchor_workflow(
+      value,
+      label,
+      expected: expected,
+      expected_blob: expected_blob,
+      expected_name: expected_name,
+      expected_path: expected_path,
+      expected_triggers: expected_triggers
+    )
+  end
+
+  def validate_anchors_v2(value, policy, expected_commit:, expected_workflow_blob:,
+                          expected_ci_workflow_blob:, expected_publication_workflow_blob:)
+    reads = exact_array(value, "v2 anchor reads", length: 2)
+    expected_candidate = policy.dig(:release, "candidateWorkflow")
+    expected_ci = policy.dig(:release, "ci", "workflow")
+    expected_publication = policy.dig(:release, "publicationWorkflow")
+    reads.each_with_index do |read, index|
+      exact_object(
+        read,
+        "v2 anchor read",
+        %w[candidateWorkflow ciWorkflow master publicationWorkflow sequence]
+      )
+      reject!("v2 anchor read sequence") unless read["sequence"] == index + 1
+      master = exact_object(read["master"], "v2 master anchor", %w[commitSha ref])
+      reject!("v2 master anchor") unless master == {
+        "ref" => MASTER_REF,
+        "commitSha" => expected_commit
+      }
+      validate_anchor_workflow_v2(
+        read["candidateWorkflow"], "v2 candidate workflow anchor",
+        expected: expected_candidate, expected_blob: expected_workflow_blob,
+        expected_name: RELEASE_WORKFLOW_NAME, expected_path: RELEASE_WORKFLOW_PATH,
+        expected_triggers: ["workflow_dispatch"]
+      )
+      validate_anchor_workflow_v2(
+        read["ciWorkflow"], "v2 CI workflow anchor",
+        expected: expected_ci, expected_blob: expected_ci_workflow_blob,
+        expected_name: CI_WORKFLOW_NAME, expected_path: CI_WORKFLOW_PATH,
+        expected_triggers: CI_WORKFLOW_TRIGGERS
+      )
+      validate_anchor_workflow_v2(
+        read["publicationWorkflow"], "v2 publication workflow anchor",
+        expected: expected_publication, expected_blob: expected_publication_workflow_blob,
+        expected_name: PUBLICATION_WORKFLOW_NAME, expected_path: PUBLICATION_WORKFLOW_PATH,
+        expected_triggers: ["workflow_dispatch"]
+      )
+    end
+    reject!("v2 anchor reads") unless reads[0].except("sequence") == reads[1].except("sequence")
+  end
+
+  def validate_workflow_v2(value, label, expected:, expected_commit:, expected_blob:,
+                           expected_name:, expected_path:, expected_triggers:, contents_write:)
+    exact_object(value, label, %w[blobSha commitSha contentsWrite id name path state triggers])
+    exact_boolean(value["contentsWrite"], label)
+    reject!(label) unless value["id"] == expected["id"] && value["name"] == expected_name &&
+                          value["path"] == expected_path && value["state"] == "active" &&
+                          value["commitSha"] == expected_commit && value["blobSha"] == expected_blob &&
+                          value["triggers"] == expected_triggers &&
+                          value["contentsWrite"] == contents_write
+    value
+  end
+
+  def validate_workflow_inventory_v2(value, workflows)
+    exact_object(value, "active workflow inventory", %w[complete items])
+    reject!("active workflow inventory") unless value["complete"] == true
+    items = exact_array(value["items"], "active workflow inventory", length: 3)
+    items.each do |item|
+      exact_object(
+        item,
+        "active workflow inventory item",
+        %w[blobSha commitSha contentsWrite id name path state triggers]
+      )
+    end
+    reject!("active workflow inventory") unless items == workflows.sort_by { |item| item["path"] }
+    reject!("active workflow inventory") unless items.all? { |item| item["state"] == "active" }
+    reject!("active workflow inventory") unless items.map { |item| item["id"] }.uniq.length == 3 &&
+                                                   items.map { |item| item["path"] }.uniq.length == 3 &&
+                                                   items.map { |item| item["name"] }.uniq.length == 3
+    write_paths = items.select { |item| item["contentsWrite"] }.map { |item| item["path"] }.sort
+    reject!("active workflow inventory") unless write_paths == [RELEASE_WORKFLOW_PATH, PUBLICATION_WORKFLOW_PATH].sort
+  end
+
+  def validate_environment_v2(value, policy, label:, name:, required_secrets:, required_variables:)
+    exact_object(value, label, %w[deployment name protection secrets variables])
+    reject!(label) unless value["name"] == name
+    protection = exact_object(value["protection"], "#{label} protection", %w[preventSelfReview reviewers])
+    reject!("#{label} protection") unless protection["preventSelfReview"] ==
+                                             policy.dig(:approval, "preventSelfReview")
+    reviewers = exact_array(protection["reviewers"], "#{label} reviewers", length: 1)
+    actor(reviewers.first, "#{label} reviewer")
+    reject!("#{label} reviewer") unless same_actor?(reviewers.first, policy.fetch(:reviewer))
+    deployment = exact_object(
+      value["deployment"], "#{label} deployment", %w[customBranchPolicies policies protectedBranches]
+    )
+    reject!("#{label} deployment") unless deployment["protectedBranches"] == false &&
+                                            deployment["customBranchPolicies"] == true
+    policies = exact_array(deployment["policies"], "#{label} deployment", length: 1)
+    exact_object(policies.first, "#{label} deployment", %w[name type])
+    reject!("#{label} deployment") unless policies.first == { "name" => TAG, "type" => "tag" }
+    reject!("#{label} secrets") unless named_collection(value["secrets"], "#{label} secrets") == required_secrets
+    reject!("#{label} variables") unless named_collection(value["variables"], "#{label} variables") == required_variables
+  end
+
+  def validate_repository_configuration_v2(value)
+    exact_object(value, "v2 repository configuration names", %w[secrets variables])
+    secrets = named_collection(value["secrets"], "v2 repository secret names")
+    variables = named_collection(value["variables"], "v2 repository variable names")
+    all_secrets = REQUIRED_ENVIRONMENT_SECRETS + REQUIRED_PUBLICATION_SECRETS
+    all_variables = REQUIRED_ENVIRONMENT_VARIABLES + REQUIRED_PUBLICATION_VARIABLES
+    reject!("v2 repository secret shadowing") unless (secrets & all_secrets).empty?
+    reject!("v2 repository variable shadowing") unless (variables & all_variables).empty?
+  end
+
+  def validate_release_boundary_v2(value, phase:, expected_release_commit:, expected_release_id:,
+                                   expected_release_tag_object:)
+    exact_object(value, "v2 release boundary", %w[releases vRefs])
+    if phase == PHASE
+      empty_complete_collection(value["vRefs"], "v2 v tag references")
+      empty_complete_collection(value["releases"], "v2 GitHub releases")
+      return
+    end
+    reject!("v2 pre-publication release boundary") unless phase == PRE_PUBLICATION_PHASE
+    ref = complete_single_item(value["vRefs"], "v2 pre-publication tag references")
+    exact_object(ref, "v2 pre-publication tag reference", %w[commitSha objectSha objectType ref])
+    sha(ref["objectSha"], "v2 pre-publication tag reference")
+    sha(ref["commitSha"], "v2 pre-publication tag reference")
+    reject!("v2 pre-publication tag reference") unless ref["objectType"] == "tag"
+    reject!("v2 pre-publication tag reference") unless ref["ref"] == "refs/tags/#{TAG}" &&
+                                                        ref["commitSha"] == expected_release_commit &&
+                                                        ref["objectSha"] == expected_release_tag_object
+    release = complete_single_item(value["releases"], "v2 pre-publication releases")
+    exact_object(release, "v2 pre-publication release", %w[draft id prerelease tag])
+    positive_integer(release["id"], "v2 pre-publication release")
+    reject!("v2 pre-publication release") unless release == {
+      "id" => expected_release_id,
+      "tag" => TAG,
+      "draft" => true,
+      "prerelease" => true
+    }
+  end
+
+  def validate_evidence_v2(value, policy, expected_commit:, expected_workflow_blob:,
+                           expected_ci_workflow_blob:, expected_publication_workflow_blob:,
+                           expected_release_commit:, expected_release_id:,
+                           expected_release_tag_object:)
+    exact_object(
+      value,
+      "v2 remote controls evidence",
+      %w[actions anchorReads authenticatedViewer candidateWorkflow ci ciWorkflow collectedAt environments finalPreTagEvidenceSHA256 labels manualEvidence phase publicationWorkflow releaseBoundary repository repositoryConfiguration rulesets schemaVersion security workflowInventory]
+    )
+    reject!("v2 remote controls evidence schema") unless value["schemaVersion"] == EVIDENCE_SCHEMA_V2
+    phase = value["phase"]
+    reject!("v2 remote controls evidence phase") unless [PHASE, PRE_PUBLICATION_PHASE].include?(phase)
+    collected_at = value["collectedAt"]
+    reject!("v2 collected timestamp") unless collected_at.is_a?(String) && collected_at.bytesize <= 32
+    begin
+      collected_time = Time.iso8601(collected_at)
+    rescue ArgumentError
+      reject!("v2 collected timestamp")
+    end
+    reject!("v2 collected timestamp") unless collected_at == collected_time.utc.iso8601
+    if phase == PRE_PUBLICATION_PHASE
+      sha256(value["finalPreTagEvidenceSHA256"], "final-pre-tag evidence digest")
+      sha(expected_release_commit, "expected release commit anchor")
+      sha(expected_release_tag_object, "expected release tag object anchor")
+      positive_integer(expected_release_id, "expected release ID anchor")
+    else
+      reject!("unexpected final-pre-tag evidence digest") unless value["finalPreTagEvidenceSHA256"].nil?
+      reject!("unexpected pre-publication anchors") if expected_release_commit || expected_release_id ||
+                                                       expected_release_tag_object
+    end
+    compare_repository(value["repository"], policy)
+    validate_authenticated_viewer(value["authenticatedViewer"], policy)
+    validate_anchors_v2(
+      value["anchorReads"], policy,
+      expected_commit: expected_commit,
+      expected_workflow_blob: expected_workflow_blob,
+      expected_ci_workflow_blob: expected_ci_workflow_blob,
+      expected_publication_workflow_blob: expected_publication_workflow_blob
+    )
+    candidate = validate_workflow_v2(
+      value["candidateWorkflow"], "v2 candidate workflow evidence",
+      expected: policy.dig(:release, "candidateWorkflow"), expected_commit: expected_commit,
+      expected_blob: expected_workflow_blob, expected_name: RELEASE_WORKFLOW_NAME,
+      expected_path: RELEASE_WORKFLOW_PATH, expected_triggers: ["workflow_dispatch"],
+      contents_write: true
+    )
+    ci_workflow = validate_workflow_v2(
+      value["ciWorkflow"], "v2 CI workflow evidence",
+      expected: policy.dig(:release, "ci", "workflow"), expected_commit: expected_commit,
+      expected_blob: expected_ci_workflow_blob, expected_name: CI_WORKFLOW_NAME,
+      expected_path: CI_WORKFLOW_PATH, expected_triggers: CI_WORKFLOW_TRIGGERS,
+      contents_write: false
+    )
+    publication = validate_workflow_v2(
+      value["publicationWorkflow"], "v2 publication workflow evidence",
+      expected: policy.dig(:release, "publicationWorkflow"), expected_commit: expected_commit,
+      expected_blob: expected_publication_workflow_blob, expected_name: PUBLICATION_WORKFLOW_NAME,
+      expected_path: PUBLICATION_WORKFLOW_PATH, expected_triggers: ["workflow_dispatch"],
+      contents_write: true
+    )
+    validate_workflow_inventory_v2(value["workflowInventory"], [candidate, ci_workflow, publication])
+    validate_rulesets(value["rulesets"], policy)
+    environments = exact_object(
+      value["environments"], "v2 release environments", %w[releaseCandidate releasePublication]
+    )
+    validate_environment_v2(
+      environments["releaseCandidate"], policy, label: "release-candidate environment",
+      name: RELEASE_ENVIRONMENT, required_secrets: REQUIRED_ENVIRONMENT_SECRETS,
+      required_variables: REQUIRED_ENVIRONMENT_VARIABLES
+    )
+    validate_environment_v2(
+      environments["releasePublication"], policy, label: "release-publication environment",
+      name: "release-publication", required_secrets: REQUIRED_PUBLICATION_SECRETS,
+      required_variables: REQUIRED_PUBLICATION_VARIABLES
+    )
+    validate_repository_configuration_v2(value["repositoryConfiguration"])
+    validate_manual_evidence_v2(value["manualEvidence"], expected: policy.fetch(:manual_evidence))
+    validate_security(value["security"])
+    validate_actions(value["actions"])
+    validate_labels(value["labels"])
+    validate_release_boundary_v2(
+      value["releaseBoundary"], phase: phase,
+      expected_release_commit: expected_release_commit,
+      expected_release_id: expected_release_id,
+      expected_release_tag_object: expected_release_tag_object
+    )
+    validate_ci(value["ci"], policy, expected_commit: expected_commit)
+    true
+  end
+
   # The trusted collector/wrapper must derive these anchors from a clean,
   # non-shallow local HEAD and its checked-in workflow. This offline validator
   # intentionally does not inspect the working tree or make network requests.
-  def validate_expected_workflow_blobs(policy, expected_workflow_blob:, expected_ci_workflow_blob:)
+  def validate_expected_workflow_blobs(policy, expected_workflow_blob:, expected_ci_workflow_blob:,
+                                       expected_publication_workflow_blob: nil)
     sha(expected_workflow_blob, "expected workflow blob anchor")
+    candidate_key = policy[:schema] == :v2 ? "candidateWorkflow" : "workflow"
     reject!("expected workflow blob anchor") unless expected_workflow_blob ==
-                                                      policy.dig(:release, "workflow", "blobSha")
+                                                      policy.dig(:release, candidate_key, "blobSha")
     sha(expected_ci_workflow_blob, "expected CI workflow blob anchor")
     reject!("expected CI workflow blob anchor") unless expected_ci_workflow_blob ==
                                                          policy.dig(:release, "ci", "workflow", "blobSha")
+    if policy[:schema] == :v2
+      sha(expected_publication_workflow_blob, "expected publication workflow blob anchor")
+      reject!("expected publication workflow blob anchor") unless expected_publication_workflow_blob ==
+                                                                  policy.dig(:release, "publicationWorkflow", "blobSha")
+    elsif expected_publication_workflow_blob
+      reject!("expected publication workflow blob anchor")
+    end
   end
 
-  def verify(policy_path:, evidence_path:, expected_commit:, expected_workflow_blob:, expected_ci_workflow_blob:)
+  def verify(policy_path:, evidence_path:, expected_commit:, expected_workflow_blob:, expected_ci_workflow_blob:,
+             expected_publication_workflow_blob: nil, expected_release_commit: nil,
+             expected_release_id: nil, expected_release_tag_object: nil)
     policy = load_policy(policy_path)
     sha(expected_commit, "expected commit anchor")
     validate_expected_workflow_blobs(
       policy,
       expected_workflow_blob: expected_workflow_blob,
-      expected_ci_workflow_blob: expected_ci_workflow_blob
+      expected_ci_workflow_blob: expected_ci_workflow_blob,
+      expected_publication_workflow_blob: expected_publication_workflow_blob
     )
     evidence_value = ReleasePolicy.strict_json(evidence_path, "remote controls evidence", max_bytes: 4 * 1024 * 1024)
-    validate_evidence(
-      evidence_value,
-      policy,
-      expected_commit: expected_commit,
-      expected_workflow_blob: expected_workflow_blob,
-      expected_ci_workflow_blob: expected_ci_workflow_blob
-    )
+    if policy[:schema] == :v2
+      validate_evidence_v2(
+        evidence_value, policy,
+        expected_commit: expected_commit,
+        expected_workflow_blob: expected_workflow_blob,
+        expected_ci_workflow_blob: expected_ci_workflow_blob,
+        expected_publication_workflow_blob: expected_publication_workflow_blob,
+        expected_release_commit: expected_release_commit,
+        expected_release_id: expected_release_id,
+        expected_release_tag_object: expected_release_tag_object
+      )
+      [:v2, evidence_value["phase"]]
+    else
+      reject!("unexpected pre-publication anchors") if expected_release_commit || expected_release_id ||
+                                                       expected_release_tag_object
+      validate_evidence(
+        evidence_value,
+        policy,
+        expected_commit: expected_commit,
+        expected_workflow_blob: expected_workflow_blob,
+        expected_ci_workflow_blob: expected_ci_workflow_blob
+      )
+      [:v1, PHASE]
+    end
   end
 
   def load_policy(policy_path)
     policy_value = ReleasePolicy.strict_json(policy_path, "remote controls policy", max_bytes: 1024 * 1024)
-    validate_policy(policy_value)
+    case policy_value.is_a?(Hash) && policy_value["schemaVersion"]
+    when POLICY_SCHEMA_V2
+      validate_policy_v2(policy_value)
+    else
+      validate_policy(policy_value).merge(schema: :v1)
+    end
+  end
+
+  def publication_approval_contract(policy)
+    reject!("publication approval contract") unless policy[:schema] == :v2
+    {
+      "schemaVersion" => "desk-setup-switcher.publication-approval-contract/v1",
+      "approvalMode" => policy.dig(:approval, "mode"),
+      "operator" => policy.fetch(:operator).slice("id", "login", "type"),
+      "reviewer" => policy.fetch(:reviewer).slice("id", "login", "type"),
+      "publisher" => policy.fetch(:publisher).slice("id", "login", "type")
+    }
   end
 
   def run_cli(argv)
     options = {}
     parser = OptionParser.new do |option|
-      option.banner = "Usage: remote_controls_policy.rb (--check-policy FILE [--expected-workflow-blob SHA --expected-ci-workflow-blob SHA] | --ci-workflow-id FILE --expected-workflow-blob SHA --expected-ci-workflow-blob SHA | --policy FILE --evidence FILE --expected-commit SHA --expected-workflow-blob SHA --expected-ci-workflow-blob SHA)"
+      option.banner = "Usage: remote_controls_policy.rb (--check-policy FILE [workflow blob anchors] | --ci-workflow-id FILE [workflow blob anchors] | --publication-workflow-id FILE [workflow blob anchors] | --publication-approval-contract FILE | --policy FILE --evidence FILE --expected-commit SHA [workflow blob anchors] [pre-publication anchors])"
       option.separator "The evidence mode validates normalized data only; its trusted wrapper must bind a clean, non-shallow local HEAD."
       option.on("--check-policy FILE") { |value| options[:check_policy] = value }
       option.on("--ci-workflow-id FILE") { |value| options[:ci_workflow_id] = value }
+      option.on("--publication-workflow-id FILE") { |value| options[:publication_workflow_id] = value }
+      option.on("--publication-approval-contract FILE") do |value|
+        options[:publication_approval_contract] = value
+      end
       option.on("--policy FILE") { |value| options[:policy] = value }
       option.on("--evidence FILE") { |value| options[:evidence] = value }
       option.on("--expected-commit SHA") { |value| options[:expected_commit] = value }
       option.on("--expected-workflow-blob SHA") { |value| options[:expected_workflow_blob] = value }
       option.on("--expected-ci-workflow-blob SHA") { |value| options[:expected_ci_workflow_blob] = value }
+      option.on("--expected-publication-workflow-blob SHA") { |value| options[:expected_publication_workflow_blob] = value }
+      option.on("--expected-release-commit SHA") { |value| options[:expected_release_commit] = value }
+      option.on("--expected-release-id ID") { |value| options[:expected_release_id] = value }
+      option.on("--expected-release-tag-object SHA") do |value|
+        options[:expected_release_tag_object] = value
+      end
       option.on("-h", "--help") do
         puts option
         return 0
@@ -750,36 +1209,60 @@ module RemoteControlsPolicy
     end
     raise PolicyError, "unexpected positional arguments" unless argv.empty?
 
-    if options[:ci_workflow_id]
-      if options[:check_policy] || options[:policy] || options[:evidence] || options[:expected_commit]
+    if options[:publication_approval_contract]
+      disallowed = options.keys - [:publication_approval_contract]
+      raise PolicyError, "command options are mutually exclusive" unless disallowed.empty?
+      contract = publication_approval_contract(load_policy(options.fetch(:publication_approval_contract)))
+      puts JSON.generate(contract)
+      return 0
+    end
+
+    workflow_id_policy = options[:ci_workflow_id] || options[:publication_workflow_id]
+    if workflow_id_policy
+      if options[:ci_workflow_id] && options[:publication_workflow_id]
+        raise PolicyError, "command options are mutually exclusive"
+      end
+      if options[:check_policy] || options[:policy] || options[:evidence] || options[:expected_commit] ||
+         options[:expected_release_commit] || options[:expected_release_id] ||
+         options[:expected_release_tag_object]
         raise PolicyError, "command options are mutually exclusive"
       end
       unless options[:expected_workflow_blob] && options[:expected_ci_workflow_blob]
         raise PolicyError, "required command option is missing"
       end
-      policy = load_policy(options[:ci_workflow_id])
+      policy = load_policy(workflow_id_policy)
       validate_expected_workflow_blobs(
         policy,
         expected_workflow_blob: options[:expected_workflow_blob],
-        expected_ci_workflow_blob: options[:expected_ci_workflow_blob]
+        expected_ci_workflow_blob: options[:expected_ci_workflow_blob],
+        expected_publication_workflow_blob: options[:expected_publication_workflow_blob]
       )
-      puts policy.dig(:release, "ci", "workflow", "id")
+      if options[:publication_workflow_id]
+        reject!("publication workflow ID mode") unless policy[:schema] == :v2
+        puts policy.dig(:release, "publicationWorkflow", "id")
+      else
+        puts policy.dig(:release, "ci", "workflow", "id")
+      end
       return 0
     end
 
     if options[:check_policy]
-      if options[:policy] || options[:evidence] || options[:expected_commit]
+      if options[:policy] || options[:evidence] || options[:expected_commit] ||
+         options[:expected_release_commit] || options[:expected_release_id] ||
+         options[:expected_release_tag_object]
         raise PolicyError, "command options are mutually exclusive"
       end
       policy = load_policy(options[:check_policy])
-      if options[:expected_workflow_blob] || options[:expected_ci_workflow_blob]
+      if options[:expected_workflow_blob] || options[:expected_ci_workflow_blob] ||
+         options[:expected_publication_workflow_blob]
         unless options[:expected_workflow_blob] && options[:expected_ci_workflow_blob]
           raise PolicyError, "required command option is missing"
         end
         validate_expected_workflow_blobs(
           policy,
           expected_workflow_blob: options[:expected_workflow_blob],
-          expected_ci_workflow_blob: options[:expected_ci_workflow_blob]
+          expected_ci_workflow_blob: options[:expected_ci_workflow_blob],
+          expected_publication_workflow_blob: options[:expected_publication_workflow_blob]
         )
         puts "OK remote-controls policy workflow-blobs-bound"
       else
@@ -792,14 +1275,25 @@ module RemoteControlsPolicy
       raise PolicyError, "required command option is missing"
     end
 
-    verify(
+    schema, phase = verify(
       policy_path: options[:policy],
       evidence_path: options[:evidence],
       expected_commit: options[:expected_commit],
       expected_workflow_blob: options[:expected_workflow_blob],
-      expected_ci_workflow_blob: options[:expected_ci_workflow_blob]
+      expected_ci_workflow_blob: options[:expected_ci_workflow_blob],
+      expected_publication_workflow_blob: options[:expected_publication_workflow_blob],
+      expected_release_commit: options[:expected_release_commit],
+      expected_release_tag_object: options[:expected_release_tag_object],
+      expected_release_id: options[:expected_release_id]&.then do |value|
+        reject!("expected release ID anchor") unless value.match?(/\A[1-9][0-9]*\z/)
+        Integer(value, 10)
+      end
     )
-    puts "OK remote-controls normalized-evidence manual_gates=1"
+    if schema == :v2
+      puts "OK remote-controls normalized-evidence phase=#{phase} manual_gates=2"
+    else
+      puts "OK remote-controls normalized-evidence manual_gates=1"
+    end
     0
   end
 end

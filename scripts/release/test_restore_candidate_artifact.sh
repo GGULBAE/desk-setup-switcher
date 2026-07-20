@@ -24,6 +24,10 @@ trap cleanup EXIT
 mock_bin="$temporary_root/mock-bin"
 mkdir "$mock_bin"
 real_ruby="$(command -v ruby)"
+runtime_gh_token="$("$real_ruby" -rsecurerandom -e 'STDOUT.write(SecureRandom.hex(32))')"
+runtime_github_alias_token="$("$real_ruby" -rsecurerandom -e 'STDOUT.write(SecureRandom.hex(32))')"
+runtime_lowercase_alias_token="$("$real_ruby" -rsecurerandom -e 'STDOUT.write(SecureRandom.hex(32))')"
+runtime_gh_token_sha256="$(printf '%s' "$runtime_gh_token" | shasum -a 256 | awk '{print $1}')"
 
 cat >"$mock_bin/dirname" <<'MOCK_DIRNAME'
 #!/usr/bin/env bash
@@ -117,7 +121,11 @@ cat >"$mock_bin/gh" <<'MOCK_GH'
 #!/usr/bin/env bash
 set -euo pipefail
 
-[[ "${GH_TOKEN:-}" == synthetic-test-token ]] || {
+received_token="${GH_TOKEN:-}"
+unset GH_TOKEN
+received_token_sha256="$(printf '%s' "$received_token" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+unset received_token
+[[ "$received_token_sha256" == "$MOCK_EXPECTED_GH_TOKEN_SHA256" ]] || {
     printf 'The mock gh credential is missing.\n' >&2
     exit 78
 }
@@ -129,10 +137,11 @@ printf 'gh-authenticated\n' >>"$MOCK_CHILD_LOG"
 printf '%q ' "$@" >>"$MOCK_COMMAND_LOG"
 printf '\n' >>"$MOCK_COMMAND_LOG"
 
-[[ "$#" == 8 && "$1" == api && "$2" == --method && "$3" == GET \
-    && "$4" == -H && "$5" == "Accept: application/vnd.github+json" \
-    && "$6" == -H && "$7" == "X-GitHub-Api-Version: 2022-11-28" ]] || exit 80
-endpoint="$8"
+[[ "$#" == 10 && "$1" == api && "$2" == --hostname && "$3" == github.com \
+    && "$4" == --method && "$5" == GET \
+    && "$6" == -H && "$7" == "Accept: application/vnd.github+json" \
+    && "$8" == -H && "$9" == "X-GitHub-Api-Version: 2022-11-28" ]] || exit 80
+endpoint="${10}"
 
 emit_failure() {
     printf '{"private_remote_response":"SENSITIVE_REMOTE_MARKER"}\n'
@@ -423,6 +432,7 @@ run_target_with_overrides() {
     local candidate_digest="$3"
     local current_id="$4"
     local operation="${5:-prepare-draft}"
+    local protected_environment="${6:-release-candidate}"
     env -i \
         "PATH=$mock_bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" \
         "HOME=${HOME:-/tmp}" \
@@ -434,15 +444,15 @@ run_target_with_overrides() {
         GITHUB_REF_TYPE=tag \
         "GITHUB_REF=refs/tags/$tag" \
         "GITHUB_REF_NAME=$tag" \
-        RELEASE_PROTECTED_ENVIRONMENT=release-candidate \
+        "RELEASE_PROTECTED_ENVIRONMENT=$protected_environment" \
         GITHUB_REPOSITORY=GGULBAE/desk-setup-switcher \
         "GITHUB_RUN_ID=$current_id" \
         GITHUB_RUN_ATTEMPT=1 \
         RUNNER_ENVIRONMENT=github-hosted \
         "RUNNER_TEMP=$source_parent" \
-        GH_TOKEN=synthetic-test-token \
-        GITHUB_TOKEN=synthetic-secondary-token \
-        github_token=synthetic-preexisting-lowercase \
+        "GH_TOKEN=$runtime_gh_token" \
+        "GITHUB_TOKEN=$runtime_github_alias_token" \
+        "github_token=$runtime_lowercase_alias_token" \
         "RELEASE_CANDIDATE_RUN_ID=$origin_run_id" \
         "RELEASE_CANDIDATE_ARTIFACT_ID=$artifact_id" \
         "RELEASE_CANDIDATE_ARTIFACT_SHA256=$candidate_digest" \
@@ -461,6 +471,7 @@ run_target_with_overrides() {
         "MOCK_DOWNLOAD_ARCHIVE=$download_archive" \
         "MOCK_CHILD_LOG=$child_log" \
         "MOCK_COMMAND_LOG=$command_log" \
+        "MOCK_EXPECTED_GH_TOKEN_SHA256=$runtime_gh_token_sha256" \
         "$RELEASE_SCRIPTS_DIR/restore-candidate-artifact.sh"
 }
 
@@ -482,7 +493,7 @@ assert_no_credential_leak() {
 }
 
 assert_commands_are_read_only() {
-    if grep -Ev -q '^api --method GET -H Accept:\\ application/vnd\.github\+json -H X-GitHub-Api-Version:\\ 2022-11-28 /repos/GGULBAE/desk-setup-switcher/actions/' "$command_log"; then
+    if grep -Ev -q '^api --hostname github\.com --method GET -H Accept:\\ application/vnd\.github\+json -H X-GitHub-Api-Version:\\ 2022-11-28 /repos/GGULBAE/desk-setup-switcher/actions/' "$command_log"; then
         fail "Candidate restoration invoked a non-read-only GitHub command."
     fi
     pass
@@ -512,9 +523,12 @@ assert_destination_unchanged_or_absent() {
 
 run_success_case() {
     local scenario="$1"
+    local operation="${2:-prepare-draft}"
+    local protected_environment="${3:-release-candidate}"
     local name first_child
     setup_case "$scenario"
-    if ! run_target "$scenario" >"$case_root/stdout" 2>"$case_root/stderr"; then
+    if ! run_target_with_overrides "$scenario" 1 "$archive_digest" "$current_run_id" \
+        "$operation" "$protected_environment" >"$case_root/stdout" 2>"$case_root/stderr"; then
         sed -n '1,100p' "$case_root/stderr" >&2
         fail "Expected artifact restoration failed: $scenario"
     fi
@@ -570,6 +584,7 @@ run_failure_case() {
 }
 
 run_success_case success
+run_success_case publication-success publish-release release-publication
 
 for scenario in \
     run-id-mismatch \
@@ -650,6 +665,28 @@ if run_target_with_overrides same-run 1 "$archive_digest" "$origin_run_id" \
 fi
 [[ ! -e "$source_directory" && ! -L "$source_directory" && ! -s "$case_root/stdout" ]] || {
     fail "Same-run validation exposed a candidate output."
+}
+pass
+assert_no_credential_leak "$case_root/stderr"
+
+setup_case publication-wrong-environment
+if run_target_with_overrides publication-wrong-environment 1 "$archive_digest" "$current_run_id" \
+    publish-release release-candidate >"$case_root/stdout" 2>"$case_root/stderr"; then
+    fail "Publication restoration escaped the publication environment."
+fi
+[[ ! -e "$source_directory" && ! -L "$source_directory" && ! -s "$case_root/stdout" ]] || {
+    fail "Wrong publication environment exposed a candidate output."
+}
+pass
+assert_no_credential_leak "$case_root/stderr"
+
+setup_case draft-wrong-environment
+if run_target_with_overrides draft-wrong-environment 1 "$archive_digest" "$current_run_id" \
+    prepare-draft release-publication >"$case_root/stdout" 2>"$case_root/stderr"; then
+    fail "Draft restoration escaped the candidate environment."
+fi
+[[ ! -e "$source_directory" && ! -L "$source_directory" && ! -s "$case_root/stdout" ]] || {
+    fail "Wrong draft environment exposed a candidate output."
 }
 pass
 assert_no_credential_leak "$case_root/stderr"

@@ -504,6 +504,15 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
     ["d1515acfcff87a30f1df2e35f1faab895ee08eb3", "Tests/DeskSetupSystemTests/NetworkAdapterTests.swift", "ip-host"],
     # End-to-end invariant fixture: one historical synthetic host set.
     ["23214b39846087c8ae5c274a060236dcf668a7bb", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
+    # The audit regression script deliberately generates private-looking probe
+    # values. Exempt only these exact reviewed blobs; any edit at the same path
+    # receives a new object ID and is scanned normally.
+    ["fef644754e21169074c924ad95eeea834deeac67", "scripts/test-audit-public-release.sh", "device-identifier"],
+    ["fef644754e21169074c924ad95eeea834deeac67", "scripts/test-audit-public-release.sh", "ip-host"],
+    ["fef644754e21169074c924ad95eeea834deeac67", "scripts/test-audit-public-release.sh", "ssid"],
+    ["ed3d0a9967e58535b121e2ab881d2dbb25f44a9e", "scripts/test-audit-public-release.sh", "device-identifier"],
+    ["ed3d0a9967e58535b121e2ab881d2dbb25f44a9e", "scripts/test-audit-public-release.sh", "ip-host"],
+    ["ed3d0a9967e58535b121e2ab881d2dbb25f44a9e", "scripts/test-audit-public-release.sh", "ssid"],
   ]).freeze
   SAFE_VALUE_WORDS = /(?:\A|[^a-z0-9])(?:demo|example|fake|fixture|mock|placeholder|redacted|sample|synthetic|test(?:ing)?)(?:\z|[^a-z0-9])/i
   SAFE_CONTEXT_WORDS = /(?:\b(?:documentation[- ]only|e\.g\.|example data|for example|mock fixture|redacted fixture|synthetic(?: data| fixture| value)?|test fixture)\b|예시?\s*[:：]?)/i

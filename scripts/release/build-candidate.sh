@@ -94,7 +94,7 @@ cleanup() {
     local exit_status=$?
     local cleanup_failed=false
     trap - EXIT
-    trap '' INT TERM
+    trap '' HUP INT QUIT TERM
     set +e
 
     if ! release_stop_active_child; then

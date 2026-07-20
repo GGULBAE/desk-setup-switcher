@@ -1,0 +1,234 @@
+name: Publish approved signed release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag (v0.1.0)"
+        required: true
+        type: string
+      expected_commit:
+        description: "Exact lowercase commit SHA referenced by the tag"
+        required: true
+        type: string
+      release_id:
+        description: "Exact protected draft Release ID"
+        required: true
+        type: string
+      candidate_origin_run_id:
+        description: "Exact successful build-candidate origin run ID"
+        required: true
+        type: string
+      candidate_artifact_id:
+        description: "Exact retained candidate artifact ID"
+        required: true
+        type: string
+      candidate_artifact_sha256:
+        description: "Exact retained candidate archive SHA-256"
+        required: true
+        type: string
+      final_dmg_sha256:
+        description: "Exact final stapled DMG SHA-256"
+        required: true
+        type: string
+      approval_record_commit:
+        description: "Exact master commit containing the final approval record"
+        required: true
+        type: string
+      approval_record_sha256:
+        description: "Exact publication-approval.json SHA-256"
+        required: true
+        type: string
+      approver_login:
+        description: "GitHub login named by the protected approval record"
+        required: true
+        type: string
+      publisher_login:
+        description: "Exact GitHub login allowed to dispatch publication"
+        required: true
+        type: string
+      confirmation:
+        description: "Type exactly: publish approved v0.1.0 release RELEASE_ID"
+        required: true
+        type: string
+
+permissions: {}
+
+# Serialize publication with build/draft runs while preserving their separate
+# protected environments and permissions.
+concurrency:
+  group: signed-release-candidate-v0.1.0
+  cancel-in-progress: false
+
+jobs:
+  validate-publication:
+    name: Validate final publication dispatch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      RELEASE_ID: ${{ inputs.release_id }}
+      RELEASE_CANDIDATE_RUN_ID: ${{ inputs.candidate_origin_run_id }}
+      RELEASE_CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+      RELEASE_CANDIDATE_ARTIFACT_SHA256: ${{ inputs.candidate_artifact_sha256 }}
+      RELEASE_FINAL_DMG_SHA256: ${{ inputs.final_dmg_sha256 }}
+      RELEASE_APPROVAL_RECORD_COMMIT: ${{ inputs.approval_record_commit }}
+      RELEASE_APPROVAL_RECORD_SHA256: ${{ inputs.approval_record_sha256 }}
+      RELEASE_APPROVER_LOGIN: ${{ inputs.approver_login }}
+      RELEASE_PUBLISHER_LOGIN: ${{ inputs.publisher_login }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Reject ambiguous final approval inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nocasematch
+          login_pattern='^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$'
+          if [[ "$RELEASE_TAG" != v0.1.0 ]] \
+            || [[ ! "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ ! "$RELEASE_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$RELEASE_CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$RELEASE_CANDIDATE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$RELEASE_CANDIDATE_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+            || [[ ! "$RELEASE_FINAL_DMG_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+            || [[ ! "$RELEASE_APPROVAL_RECORD_COMMIT" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ ! "$RELEASE_APPROVAL_RECORD_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+            || [[ ! "$RELEASE_APPROVER_LOGIN" =~ $login_pattern ]] \
+            || [[ ! "$RELEASE_PUBLISHER_LOGIN" =~ $login_pattern ]] \
+            || [[ "$RELEASE_CONFIRMATION" != "publish approved $RELEASE_TAG release $RELEASE_ID" ]] \
+            || [[ "$GITHUB_ACTOR" != "$RELEASE_PUBLISHER_LOGIN" ]] \
+            || [[ "$GITHUB_TRIGGERING_ACTOR" != "$RELEASE_PUBLISHER_LOGIN" ]] \
+            || [[ "$GITHUB_REF_TYPE" != tag ]] \
+            || [[ "$GITHUB_REF" != "refs/tags/$RELEASE_TAG" ]] \
+            || [[ "$GITHUB_REF_NAME" != "$RELEASE_TAG" ]] \
+            || [[ ! "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ "$GITHUB_RUN_ATTEMPT" != 1 ]] \
+            || [[ "$GITHUB_RUN_ID" == "$RELEASE_CANDIDATE_RUN_ID" ]]; then
+            echo "::error::The publication dispatch does not identify one approved v0.1.0 Release and actor." >&2
+            exit 1
+          fi
+
+  publish-approved-release:
+    name: Publish and verify approved immutable public beta
+    needs: validate-publication
+    runs-on: macos-15
+    timeout-minutes: 45
+    environment: release-publication
+    permissions:
+      contents: write
+    env:
+      RELEASE_OPERATION: publish-release
+      RELEASE_TAG: ${{ inputs.tag }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      RELEASE_ID: ${{ inputs.release_id }}
+      RELEASE_CANDIDATE_RUN_ID: ${{ inputs.candidate_origin_run_id }}
+      RELEASE_CANDIDATE_RUN_ATTEMPT: "1"
+      RELEASE_CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+      RELEASE_CANDIDATE_ARTIFACT_SHA256: ${{ inputs.candidate_artifact_sha256 }}
+      RELEASE_FINAL_DMG_SHA256: ${{ inputs.final_dmg_sha256 }}
+      RELEASE_APPROVAL_RECORD_COMMIT: ${{ inputs.approval_record_commit }}
+      RELEASE_APPROVAL_RECORD_SHA256: ${{ inputs.approval_record_sha256 }}
+      RELEASE_APPROVER_LOGIN: ${{ inputs.approver_login }}
+      RELEASE_PUBLISHER_LOGIN: ${{ inputs.publisher_login }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+      RELEASE_PROTECTED_ENVIRONMENT: release-publication
+      DESK_SETUP_RELEASE_MUTATIONS: "1"
+      RELEASE_APPROVAL_RECORD_PATH: docs/evidence/releases/v0.1.0/publication-approval.json
+      RELEASE_NOTES_PATH: docs/releases/v0.1.0.md
+      RELEASE_SOURCE_DIR: artifacts/release
+      RELEASE_DOWNLOAD_DIR: .build/release-download
+
+    steps:
+      - name: Check out the immutable release tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+          token: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+
+      - name: Bind publication checkout to the exact tag and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git check-ref-format --allow-onelevel "$RELEASE_TAG" >/dev/null
+          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
+          tag_object="$(git rev-parse "refs/tags/$RELEASE_TAG")"
+          if [[ ! "$tag_object" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ "$(git cat-file -t "$tag_object")" != tag ]] \
+            || [[ "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" != "$EXPECTED_COMMIT" ]] \
+            || [[ "$(git rev-parse HEAD)" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::The publication checkout does not match the approved candidate commit." >&2
+            exit 1
+          fi
+          if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+            echo "::error::The publication checkout is not clean." >&2
+            exit 1
+          fi
+
+      - name: Require protected publication verification variables
+        shell: bash
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          for name in DEVELOPER_ID_APPLICATION APPLE_TEAM_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Required protected publication value $name is not configured." >&2
+              exit 1
+            fi
+          done
+
+      - name: Prepare private publication paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in artifacts .build; do
+            if [[ -e "$path" || -L "$path" ]]; then
+              echo "::error::Expected an absent private publication path: $path" >&2
+              exit 1
+            fi
+            mkdir -m 0700 -- "$path"
+          done
+
+      - name: Restore the exact candidate from its origin artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+        run: exec /bin/bash scripts/release/restore-candidate-artifact.sh
+
+      - name: Verify origin candidate and all attestations before publication
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          RELEASE_DOWNLOAD_DIR: artifacts/release
+        run: make verify-downloaded-release
+
+      - name: Publish only the exact approved Release ID
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ADMIN_READ_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+        run: exec /bin/bash scripts/release/publish-approved-release.sh
+
+      - name: Verify public redownload and all attestations
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: make verify-downloaded-release
+
+      - name: Clean publication download state
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -d "$RELEASE_DOWNLOAD_DIR" ]]; then
+            rm -rf -- "$RELEASE_DOWNLOAD_DIR"
+          fi

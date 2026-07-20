@@ -2,11 +2,13 @@
 # frozen_string_literal: true
 
 require "base64"
+require "digest"
 require "digest/sha1"
 require "json"
 require "optparse"
 require "psych"
 require "tempfile"
+require "time"
 require_relative "release_policy"
 
 # Normalizes fixed, value-minimized projections produced by the trusted
@@ -15,16 +17,39 @@ require_relative "release_policy"
 module RemoteControlsCollector
   EVIDENCE_SCHEMA = "desk-setup-switcher.remote-release-controls-evidence/v1"
   INPUT_SCHEMA = "desk-setup-switcher.remote-release-controls-input/v1"
+  EVIDENCE_SCHEMA_V2 = "desk-setup-switcher.remote-release-controls-evidence/v2"
+  INPUT_SCHEMA_V2 = "desk-setup-switcher.remote-release-controls-input/v2"
   PHASE = "final-pre-tag"
+  PRE_PUBLICATION_PHASE = "pre-publication"
   MASTER_REF = "refs/heads/master"
   RELEASE_TAG_REF = "refs/tags/v0.1.0"
   RELEASE_WORKFLOW_PATH = ".github/workflows/release.yml"
   CI_WORKFLOW_PATH = ".github/workflows/ci.yml"
+  PUBLICATION_WORKFLOW_PATH = ".github/workflows/publish-release.yml"
   LOCAL_TRIGGER_PROJECTION = "strict-local-workflow-ast/v1"
+  MANUAL_EVIDENCE_SCHEMA = "desk-setup-switcher.manual-release-control-evidence/v1"
+  MANUAL_CONTROLS = {
+    "candidate" => "release-candidate-administrator-bypass-disabled",
+    "publication" =>
+      "release-publication-administrator-bypass-disabled-and-admin-read-token-minimum-scope"
+  }.freeze
+  MANUAL_PERMISSION_PROFILES = {
+    "candidate" => [],
+    "publication" => %w[
+      actions:read
+      administration:read
+      attestations:read
+      contents:read
+      metadata:read
+    ]
+  }.freeze
 
   MAX_MANIFEST_BYTES = 64 * 1024
   MAX_PROJECTION_BYTES = 2 * 1024 * 1024
   MAX_WORKFLOW_BYTES = 2 * 1024 * 1024
+  MANUAL_TOKEN_MINIMUM_REMAINING_SECONDS = 2_700
+  MANUAL_TOKEN_MAXIMUM_ISSUANCE_CAPTURE_SECONDS = 900
+  MANUAL_TOKEN_MAXIMUM_LIFETIME_SECONDS = 30 * 86_400
   SHA = /\A[0-9a-f]{40}\z/
   NAME = /\A[A-Za-z_][A-Za-z0-9_]*\z/
   BASENAME = /\A[A-Za-z0-9][A-Za-z0-9.-]*\.json\z/
@@ -64,6 +89,17 @@ module RemoteControlsCollector
     workflow-permissions.json
     workflow-runs.json
   ].sort.freeze
+  LIFECYCLE_EXTRA_INPUT_FILES = %w[
+    active-workflows.json
+    publication-deployment-policies.json
+    publication-environment-secrets.json
+    publication-environment-variable-names.json
+    publication-environment.json
+    publication-workflow-content-1.json
+    publication-workflow-content-2.json
+    publication-workflow-metadata-1.json
+    publication-workflow-metadata-2.json
+  ].sort.freeze
 
   KNOWN_RULE_TYPES = %w[
     creation
@@ -97,6 +133,8 @@ module RemoteControlsCollector
   end
 
   def exact_string(value, allow_empty: false, max_bytes: 2048, pattern: nil)
+    value = value.encode(Encoding::UTF_8) if value.is_a?(String) &&
+                                                value.encoding == Encoding::US_ASCII
     unavailable! unless value.is_a?(String) && value.encoding == Encoding::UTF_8 && value.valid_encoding?
     unavailable! if !allow_empty && value.empty?
     unavailable! if value.bytesize > max_bytes || value.match?(/[\r\n\0]/)
@@ -210,6 +248,17 @@ module RemoteControlsCollector
     exact_string(node.value, max_bytes: 256)
   end
 
+  def yaml_mapping(node)
+    unavailable! unless node.is_a?(Psych::Nodes::Mapping)
+    result = {}
+    node.children.each_slice(2) do |key_node, value_node|
+      key = yaml_scalar(key_node)
+      unavailable! if result.key?(key)
+      result[key] = value_node
+    end
+    result
+  end
+
   # Psych's object loader applies YAML 1.1 boolean coercion to the key `on`.
   # Inspecting the AST preserves the exact source spelling and lets us reject
   # duplicate top-level and trigger keys before extracting the trigger names.
@@ -218,12 +267,7 @@ module RemoteControlsCollector
     root = document&.root
     unavailable! unless root.is_a?(Psych::Nodes::Mapping)
 
-    top_level = {}
-    root.children.each_slice(2) do |key_node, value_node|
-      key = yaml_scalar(key_node)
-      unavailable! if top_level.key?(key)
-      top_level[key] = value_node
-    end
+    top_level = yaml_mapping(root)
     on_node = top_level.fetch("on")
 
     triggers = case on_node
@@ -253,6 +297,54 @@ module RemoteControlsCollector
     unavailable! if triggers.empty? || triggers.uniq != triggers
     triggers
   rescue KeyError, Psych::Exception
+    unavailable!
+  end
+
+  def permissions_write_contents?(node)
+    return false if node.nil?
+
+    case node
+    when Psych::Nodes::Mapping
+      permissions = yaml_mapping(node)
+      contents = permissions["contents"]
+      return false unless contents
+
+      yaml_scalar(contents) == "write"
+    when Psych::Nodes::Scalar
+      value = yaml_scalar(node)
+      unavailable! unless %w[read-all write-all].include?(value)
+      value == "write-all"
+    else
+      unavailable!
+    end
+  end
+
+  # A workflow is a contents-write route when either workflow-level or any
+  # job-level permissions can write repository contents. The projection is
+  # source-derived from the exact blob and deliberately ignores step commands.
+  def workflow_contents_write(source)
+    document = Psych.parse(source)
+    root = document&.root
+    top_level = yaml_mapping(root)
+    return true if permissions_write_contents?(top_level["permissions"])
+
+    jobs_node = top_level.fetch("jobs")
+    jobs = yaml_mapping(jobs_node)
+    jobs.any? do |_name, job_node|
+      job = yaml_mapping(job_node)
+      permissions_write_contents?(job["permissions"])
+    end
+  rescue KeyError, Psych::Exception
+    unavailable!
+  end
+
+  def local_workflow_security(path)
+    source = ReleasePolicy.read_utf8(path, "release workflow", max_bytes: MAX_WORKFLOW_BYTES)
+    {
+      "triggers" => workflow_triggers(source),
+      "contentsWrite" => workflow_contents_write(source)
+    }
+  rescue ReleasePolicy::PolicyError
     unavailable!
   end
 
@@ -297,7 +389,11 @@ module RemoteControlsCollector
     source = bytes.dup.force_encoding(Encoding::UTF_8)
     unavailable! unless source.valid_encoding? && !source.include?("\0")
 
-    { "blobSha" => blob_sha, "triggers" => workflow_triggers(source) }
+    {
+      "blobSha" => blob_sha,
+      "triggers" => workflow_triggers(source),
+      "contentsWrite" => workflow_contents_write(source)
+    }
   rescue ArgumentError, KeyError
     unavailable!
   end
@@ -364,6 +460,200 @@ module RemoteControlsCollector
     unavailable! unless local.fetch("workflowPath") == expected_path
     unavailable! unless exact_sha(local.fetch("workflowBlob")) == expected_blob
     canonical_strings(local.fetch("triggers"), allow_empty: false, pattern: TRIGGER)
+  rescue KeyError
+    unavailable!
+  end
+
+  def normalize_local_workflow_projection(value, expected_path:, expected_blob:)
+    local = exact_object(value, %w[contentsWrite projection triggers workflowBlob workflowPath])
+    unavailable! unless local.fetch("projection") == LOCAL_TRIGGER_PROJECTION
+    unavailable! unless local.fetch("workflowPath") == expected_path
+    unavailable! unless exact_sha(local.fetch("workflowBlob")) == expected_blob
+    {
+      "triggers" => canonical_strings(local.fetch("triggers"), allow_empty: false, pattern: TRIGGER),
+      "contentsWrite" => exact_boolean(local.fetch("contentsWrite"))
+    }
+  rescue KeyError
+    unavailable!
+  end
+
+  def normalize_manual_evidence_input(value)
+    raw = exact_object(value, %w[complete items])
+    unavailable! unless raw.fetch("complete") == true
+    items = exact_array(raw.fetch("items"), length: 2).map do |item|
+      entry = exact_object(item, %w[control sha256])
+      {
+        "control" => exact_string(entry.fetch("control"), max_bytes: 160),
+        "sha256" => exact_string(entry.fetch("sha256"), pattern: /\A[0-9a-f]{64}\z/)
+      }
+    end
+    unavailable! unless items.map { |item| item.fetch("control") }.uniq.length == items.length
+    unavailable! unless items.map { |item| item.fetch("sha256") }.uniq.length == items.length
+    { "complete" => true, "items" => items }
+  rescue KeyError
+    unavailable!
+  end
+
+  def manual_evidence(path:, expected_control:, permission_profile:, actor_id:, actor_login:,
+                      verified_at:, phase:, release_commit: nil,
+                      release_id: nil, release_tag_object: nil, freshness_mode: "current")
+    unavailable! unless MANUAL_PERMISSION_PROFILES.key?(permission_profile)
+    unavailable! unless MANUAL_CONTROLS.value?(expected_control)
+    unavailable! unless MANUAL_CONTROLS.fetch(permission_profile) == expected_control
+    positive_integer(actor_id)
+    exact_string(actor_login, max_bytes: 39, pattern: /\A(?!-)[A-Za-z0-9-]+(?<!-)\z/)
+    unavailable! unless [PHASE, PRE_PUBLICATION_PHASE].include?(phase)
+    unavailable! unless %w[current historical].include?(freshness_mode)
+    unavailable! if freshness_mode == "historical" && phase != PHASE
+
+    expected_subject = if phase == PHASE
+      unavailable! if release_commit || release_id || release_tag_object
+      { "tag" => "v0.1.0" }
+    else
+      exact_sha(release_commit)
+      positive_integer(release_id)
+      exact_sha(release_tag_object)
+      {
+        "peeledCommit" => release_commit,
+        "releaseId" => release_id,
+        "tag" => "v0.1.0",
+        "tagObjectSha" => release_tag_object
+      }
+    end
+
+    source = ReleasePolicy.with_regular_file(path, "manual release-control evidence") do |io, stat|
+      unavailable! unless stat.nlink == 1 && stat.size.positive? && stat.size <= MAX_MANIFEST_BYTES
+      bytes = io.read(MAX_MANIFEST_BYTES + 1) || "".b
+      unavailable! if bytes.bytesize > MAX_MANIFEST_BYTES
+      bytes
+    end
+    text = source.dup.force_encoding(Encoding::UTF_8)
+    unavailable! unless text.valid_encoding? && !text.include?("\0")
+    value = ReleasePolicy.parse_strict_json(text, "manual release-control evidence")
+    raw = exact_object(
+      value,
+      %w[administratorBypassEnabled control observedAt observer phase redactionReviewed schemaVersion sourceArtifactSHA256 subject token tokenPermissions]
+    )
+    unavailable! unless raw.fetch("schemaVersion") == MANUAL_EVIDENCE_SCHEMA
+    unavailable! unless raw.fetch("control") == expected_control && raw.fetch("phase") == phase
+    unavailable! unless raw.fetch("administratorBypassEnabled") == false
+    unavailable! unless raw.fetch("redactionReviewed") == true
+    unavailable! unless raw.fetch("subject") == expected_subject
+
+    observer = actor(raw.fetch("observer"))
+    unavailable! unless observer.fetch("id") == actor_id && observer.fetch("type") == "User" &&
+                        observer.fetch("login").casecmp?(actor_login)
+    source_artifact = exact_string(
+      raw.fetch("sourceArtifactSHA256"), pattern: /\A[0-9a-f]{64}\z/
+    )
+    unavailable! unless raw.fetch("tokenPermissions") ==
+                        MANUAL_PERMISSION_PROFILES.fetch(permission_profile)
+
+    observed_at = exact_string(raw.fetch("observedAt"), max_bytes: 32)
+    verified_at = exact_string(verified_at.encode(Encoding::UTF_8), max_bytes: 32)
+    observed_time = Time.iso8601(observed_at)
+    verified_time = Time.iso8601(verified_at)
+    unavailable! unless observed_at == observed_time.utc.iso8601 &&
+                        verified_at == verified_time.utc.iso8601
+    unavailable! unless observed_time <= verified_time
+    unavailable! if freshness_mode == "current" && (verified_time - observed_time) > 86_400
+
+    token = raw.fetch("token")
+    if permission_profile == "candidate"
+      unavailable! unless token.nil?
+    else
+      token = exact_object(
+        token,
+        %w[accountPermissions expiresAt issuedAt organizationPermissions repositorySelection resourceOwner type]
+      )
+      unavailable! unless token.fetch("type") == "fine-grained-personal-access-token"
+      resource_owner = exact_string(token.fetch("resourceOwner"), max_bytes: 39)
+      unavailable! unless resource_owner.casecmp?(actor_login)
+      repositories = exact_array(token.fetch("repositorySelection"), length: 1)
+      repository = exact_string(repositories.fetch(0), max_bytes: 141)
+      unavailable! unless repository.casecmp?("#{actor_login}/desk-setup-switcher")
+      unavailable! unless token.fetch("accountPermissions") == [] &&
+                          token.fetch("organizationPermissions") == []
+      issued_at = exact_string(token.fetch("issuedAt"), max_bytes: 32)
+      expires_at = exact_string(token.fetch("expiresAt"), max_bytes: 32)
+      issued_time = Time.iso8601(issued_at)
+      expires_time = Time.iso8601(expires_at)
+      unavailable! unless issued_at == issued_time.utc.iso8601 &&
+                          expires_at == expires_time.utc.iso8601 &&
+                          issued_time <= observed_time && observed_time < expires_time
+      unavailable! if (observed_time - issued_time) > MANUAL_TOKEN_MAXIMUM_ISSUANCE_CAPTURE_SECONDS
+      unavailable! if (expires_time - issued_time) > MANUAL_TOKEN_MAXIMUM_LIFETIME_SECONDS
+      unavailable! if freshness_mode == "current" &&
+                      (expires_time - verified_time) < MANUAL_TOKEN_MINIMUM_REMAINING_SECONDS
+    end
+
+    {
+      "control" => expected_control,
+      "observedAt" => observed_at,
+      "sha256" => Digest::SHA256.hexdigest(source.b),
+      "sourceArtifactSHA256" => source_artifact
+    }
+  rescue KeyError, ArgumentError
+    unavailable!
+  end
+
+  def normalize_manifest_v2(value)
+    raw = exact_object(
+      value,
+      %w[collectedAt expectedCIWorkflowBlob expectedCommit expectedPublicationWorkflowBlob expectedRelease expectedWorkflowBlob files finalPreTagEvidenceSHA256 localCandidateWorkflow localCIWorkflow localPublicationWorkflow manualEvidence phase schemaVersion]
+    )
+    unavailable! unless raw.fetch("schemaVersion") == INPUT_SCHEMA_V2
+    phase = exact_string(raw.fetch("phase"), max_bytes: 32)
+    unavailable! unless [PHASE, PRE_PUBLICATION_PHASE].include?(phase)
+    collected_at = exact_string(raw.fetch("collectedAt"), max_bytes: 32)
+    collected_time = Time.iso8601(collected_at)
+    unavailable! unless collected_at == collected_time.utc.iso8601
+    expected_commit = exact_sha(raw.fetch("expectedCommit"))
+    expected_blob = exact_sha(raw.fetch("expectedWorkflowBlob"))
+    expected_ci_blob = exact_sha(raw.fetch("expectedCIWorkflowBlob"))
+    expected_publication_blob = exact_sha(raw.fetch("expectedPublicationWorkflowBlob"))
+    final_pre_tag_evidence_sha256 = raw.fetch("finalPreTagEvidenceSHA256")
+    expected_release = raw.fetch("expectedRelease")
+    if phase == PHASE
+      unavailable! unless expected_release.nil? && final_pre_tag_evidence_sha256.nil?
+    else
+      final_pre_tag_evidence_sha256 = exact_string(
+        final_pre_tag_evidence_sha256, pattern: /\A[0-9a-f]{64}\z/
+      )
+      release = exact_object(expected_release, %w[commitSha id tagObjectSha])
+      expected_release = {
+        "commitSha" => exact_sha(release.fetch("commitSha")),
+        "id" => positive_integer(release.fetch("id")),
+        "tagObjectSha" => exact_sha(release.fetch("tagObjectSha"))
+      }
+    end
+    {
+      "phase" => phase,
+      "collectedAt" => collected_at,
+      "expectedCommit" => expected_commit,
+      "expectedWorkflowBlob" => expected_blob,
+      "expectedCIWorkflowBlob" => expected_ci_blob,
+      "expectedPublicationWorkflowBlob" => expected_publication_blob,
+      "expectedRelease" => expected_release,
+      "finalPreTagEvidenceSHA256" => final_pre_tag_evidence_sha256,
+      "localCandidateWorkflow" => normalize_local_workflow_projection(
+        raw.fetch("localCandidateWorkflow"),
+        expected_path: RELEASE_WORKFLOW_PATH,
+        expected_blob: expected_blob
+      ),
+      "localCIWorkflow" => normalize_local_workflow_projection(
+        raw.fetch("localCIWorkflow"),
+        expected_path: CI_WORKFLOW_PATH,
+        expected_blob: expected_ci_blob
+      ),
+      "localPublicationWorkflow" => normalize_local_workflow_projection(
+        raw.fetch("localPublicationWorkflow"),
+        expected_path: PUBLICATION_WORKFLOW_PATH,
+        expected_blob: expected_publication_blob
+      ),
+      "manualEvidence" => normalize_manual_evidence_input(raw.fetch("manualEvidence")),
+      "files" => canonical_strings(raw.fetch("files"), allow_empty: false, pattern: BASENAME)
+    }
   rescue KeyError
     unavailable!
   end
@@ -672,6 +962,60 @@ module RemoteControlsCollector
     unavailable!
   end
 
+  def normalize_active_workflow_inventory(values)
+    workflows = paged_items(values).map do |value|
+      raw = exact_object(value, %w[id name path state])
+      {
+        "id" => positive_integer(raw.fetch("id")),
+        "name" => exact_string(raw.fetch("name"), max_bytes: 100),
+        "path" => exact_string(raw.fetch("path"), max_bytes: 256),
+        "state" => exact_string(raw.fetch("state"), max_bytes: 64)
+      }
+    end
+    unavailable! unless workflows.map { |workflow| workflow["id"] }.uniq.length == workflows.length
+    unavailable! unless workflows.map { |workflow| workflow["path"] }.uniq.length == workflows.length
+    active = workflows.select { |workflow| workflow["state"] == "active" }
+    active.sort_by! { |workflow| workflow["path"] }
+    { "complete" => true, "items" => active }
+  rescue KeyError
+    unavailable!
+  end
+
+  def normalize_pre_publication_refs(values)
+    refs = values.map do |value|
+      raw = exact_object(value, %w[commit_sha object_sha object_type ref])
+      {
+        "ref" => exact_string(raw.fetch("ref"), max_bytes: 256),
+        "objectType" => exact_string(raw.fetch("object_type"), max_bytes: 32),
+        "objectSha" => exact_sha(raw.fetch("object_sha")),
+        "commitSha" => exact_sha(raw.fetch("commit_sha"))
+      }
+    end
+    refs.sort_by! { |ref| ref["ref"] }
+    unavailable! unless refs.map { |ref| ref["ref"] }.uniq.length == refs.length
+    { "complete" => true, "items" => refs }
+  rescue KeyError
+    unavailable!
+  end
+
+  def normalize_pre_publication_releases(values)
+    releases = values.map do |value|
+      raw = exact_object(value, %w[draft id prerelease tag_name])
+      {
+        "id" => positive_integer(raw.fetch("id")),
+        "tag" => exact_string(raw.fetch("tag_name"), max_bytes: 256),
+        "draft" => exact_boolean(raw.fetch("draft")),
+        "prerelease" => exact_boolean(raw.fetch("prerelease"))
+      }
+    end
+    releases.sort_by! { |release| release["id"] }
+    unavailable! unless releases.map { |release| release["id"] }.uniq.length == releases.length
+    unavailable! unless releases.map { |release| release["tag"] }.uniq.length == releases.length
+    { "complete" => true, "items" => releases }
+  rescue KeyError
+    unavailable!
+  end
+
   def paged_names(values)
     unavailable! if values.empty?
     total_count = nil
@@ -900,6 +1244,32 @@ module RemoteControlsCollector
     expected
   end
 
+  def verify_manifest_files_v2(manifest, summaries)
+    expected = (
+      STATIC_INPUT_FILES + LIFECYCLE_EXTRA_INPUT_FILES + manifest_detail_files(summaries.length)
+    ).sort
+    unavailable! unless manifest.fetch("files") == expected
+    expected
+  end
+
+  def normalize_scoped_environment(input_directory, prefix: "")
+    environment = normalize_environment(read_json(input_directory, "#{prefix}environment.json"))
+    environment.fetch("deployment")["policies"] = deployment_policies(
+      read_json_lines(input_directory, "#{prefix}deployment-policies.json")
+    )
+    environment["secrets"] = {
+      "complete" => true,
+      "names" => paged_names(read_json_lines(input_directory, "#{prefix}environment-secrets.json"))
+    }
+    environment["variables"] = {
+      "complete" => true,
+      "names" => paged_names(
+        read_json_lines(input_directory, "#{prefix}environment-variable-names.json")
+      )
+    }
+    environment
+  end
+
   def secure_atomic_write(path, bytes)
     unavailable! unless path.is_a?(String) && !path.empty?
     expanded = File.expand_path(path)
@@ -1092,6 +1462,202 @@ module RemoteControlsCollector
     unavailable!
   end
 
+  def collect_lifecycle(input_directory:, output_path: nil)
+    input_directory = require_secure_directory(input_directory)
+    manifest = normalize_manifest_v2(
+      read_json(input_directory, "manifest.json", max_bytes: MAX_MANIFEST_BYTES)
+    )
+
+    repository = normalize_repository(read_json(input_directory, "repository.json"))
+    viewer = authenticated_viewer(
+      read_json(input_directory, "viewer.json"),
+      read_json(input_directory, "permission.json")
+    )
+
+    workflow_specs = {
+      "candidateWorkflow" => {
+        path: RELEASE_WORKFLOW_PATH,
+        content: "workflow-content",
+        metadata: "workflow-metadata",
+        blob: manifest.fetch("expectedWorkflowBlob"),
+        local: manifest.fetch("localCandidateWorkflow")
+      },
+      "ciWorkflow" => {
+        path: CI_WORKFLOW_PATH,
+        content: "ci-workflow-content",
+        metadata: "ci-workflow-metadata",
+        blob: manifest.fetch("expectedCIWorkflowBlob"),
+        local: manifest.fetch("localCIWorkflow")
+      },
+      "publicationWorkflow" => {
+        path: PUBLICATION_WORKFLOW_PATH,
+        content: "publication-workflow-content",
+        metadata: "publication-workflow-metadata",
+        blob: manifest.fetch("expectedPublicationWorkflowBlob"),
+        local: manifest.fetch("localPublicationWorkflow")
+      }
+    }.freeze
+
+    anchors = [1, 2].map do |sequence|
+      master = master_anchor(read_json(input_directory, "master-#{sequence}.json"))
+      workflows = workflow_specs.to_h do |name, specification|
+        content = decoded_workflow_content(
+          read_json(
+            input_directory,
+            "#{specification.fetch(:content)}-#{sequence}.json",
+            max_bytes: MAX_WORKFLOW_BYTES * 2
+          ),
+          master.fetch("commitSha"),
+          expected_path: specification.fetch(:path)
+        )
+        unavailable! unless content.fetch("blobSha") == specification.fetch(:blob)
+        unavailable! unless content.fetch("triggers") == specification.dig(:local, "triggers")
+        unavailable! unless content.fetch("contentsWrite") == specification.dig(:local, "contentsWrite")
+        metadata = workflow_metadata(
+          read_json(input_directory, "#{specification.fetch(:metadata)}-#{sequence}.json"),
+          content,
+          expected_path: specification.fetch(:path)
+        )
+        [name, metadata]
+      end
+      { "sequence" => sequence, "master" => master }.merge(workflows)
+    end
+
+    candidate_environment = normalize_scoped_environment(input_directory)
+    publication_environment = normalize_scoped_environment(input_directory, prefix: "publication-")
+    summary_values = read_json_lines(input_directory, "ruleset-ids.json", allow_empty: true)
+    summaries = ruleset_summaries(summary_values)
+    input_files = verify_manifest_files_v2(manifest, summaries)
+
+    known_actors = [repository.fetch("owner"), viewer.fetch("actor")] +
+                   candidate_environment.dig("protection", "reviewers") +
+                   publication_environment.dig("protection", "reviewers")
+    known_actors = known_actors.uniq
+    grouped_ids = known_actors.group_by { |candidate| candidate.fetch("id") }
+    unavailable! unless grouped_ids.values.all? { |actors| actors.uniq.length == 1 }
+
+    rulesets = summaries.each_with_index.filter_map do |summary, index|
+      filename = format("ruleset-detail-%04d.json", index + 1)
+      normalize_ruleset_detail(read_json(input_directory, filename), summary, known_actors)
+    end
+    master_rulesets, tag_rulesets = classify_rulesets(rulesets)
+
+    latest_anchor = anchors.last
+    full_workflows = workflow_specs.to_h do |name, specification|
+      workflow = latest_anchor.fetch(name).merge(
+        "commitSha" => latest_anchor.dig("master", "commitSha"),
+        "contentsWrite" => specification.dig(:local, "contentsWrite")
+      )
+      [name, workflow]
+    end
+    raw_inventory = normalize_active_workflow_inventory(
+      read_json_lines(input_directory, "active-workflows.json")
+    )
+    expected_inventory_identities = full_workflows.values.map do |workflow|
+      workflow.slice("id", "name", "path", "state")
+    end.sort_by { |workflow| workflow.fetch("path") }
+    unavailable! unless raw_inventory.fetch("items") == expected_inventory_identities
+    workflow_inventory = {
+      "complete" => true,
+      "items" => full_workflows.values.sort_by { |workflow| workflow.fetch("path") }
+    }
+
+    checks = normalize_check_runs(read_json_lines(input_directory, "check-runs.json"))
+    workflow_runs = normalize_workflow_runs(read_json_lines(input_directory, "workflow-runs.json"))
+    workflow_jobs = normalize_workflow_jobs(
+      read_json_lines(input_directory, "workflow-jobs.json"),
+      repository.fetch("fullName")
+    )
+    private_label = exact_object(read_json(input_directory, "label.json"), %w[name present])
+    if manifest.fetch("phase") == PHASE
+      boundary = {
+        "vRefs" => {
+          "complete" => true,
+          "items" => boundary_refs(read_json_lines(input_directory, "v-refs.json", allow_empty: true))
+        },
+        "releases" => {
+          "complete" => true,
+          "items" => boundary_releases(
+            read_json_lines(input_directory, "releases.json", allow_empty: true)
+          )
+        }
+      }
+    else
+      boundary = {
+        "vRefs" => normalize_pre_publication_refs(
+          read_json_lines(input_directory, "v-refs.json", allow_empty: true)
+        ),
+        "releases" => normalize_pre_publication_releases(
+          read_json_lines(input_directory, "releases.json", allow_empty: true)
+        )
+      }
+    end
+
+    evidence = {
+      "schemaVersion" => EVIDENCE_SCHEMA_V2,
+      "phase" => manifest.fetch("phase"),
+      "collectedAt" => manifest.fetch("collectedAt"),
+      "repository" => repository,
+      "authenticatedViewer" => viewer,
+      "anchorReads" => anchors,
+      "candidateWorkflow" => full_workflows.fetch("candidateWorkflow"),
+      "ciWorkflow" => full_workflows.fetch("ciWorkflow"),
+      "publicationWorkflow" => full_workflows.fetch("publicationWorkflow"),
+      "workflowInventory" => workflow_inventory,
+      "rulesets" => {
+        "complete" => true,
+        "master" => master_rulesets,
+        "tags" => tag_rulesets,
+        "effectiveMaster" => normalize_effective_master(
+          read_json_lines(input_directory, "effective-master.json", allow_empty: true)
+        )
+      },
+      "environments" => {
+        "releaseCandidate" => candidate_environment,
+        "releasePublication" => publication_environment
+      },
+      "repositoryConfiguration" => {
+        "secrets" => {
+          "complete" => true,
+          "names" => paged_names(read_json_lines(input_directory, "repository-secrets.json"))
+        },
+        "variables" => {
+          "complete" => true,
+          "names" => paged_names(read_json_lines(input_directory, "repository-variable-names.json"))
+        }
+      },
+      "manualEvidence" => manifest.fetch("manualEvidence"),
+      "finalPreTagEvidenceSHA256" => manifest.fetch("finalPreTagEvidenceSHA256"),
+      "security" => normalize_security(input_directory),
+      "actions" => normalize_actions(input_directory),
+      "labels" => {
+        "needsTriage" => {
+          "name" => exact_string(private_label.fetch("name"), max_bytes: 100),
+          "present" => exact_boolean(private_label.fetch("present"))
+        }
+      },
+      "releaseBoundary" => boundary,
+      "ci" => {
+        "commitSha" => manifest.fetch("expectedCommit"),
+        "workflowRuns" => { "complete" => true, "items" => workflow_runs },
+        "jobs" => { "complete" => true, "items" => workflow_jobs },
+        "checkRuns" => { "complete" => true, "items" => checks }
+      }
+    }
+
+    if output_path && output_path != "-"
+      expanded_output = File.expand_path(output_path)
+      input_paths = (["manifest.json"] + input_files).map do |name|
+        File.expand_path(File.join(input_directory, name))
+      end
+      unavailable! if input_paths.include?(expanded_output)
+    end
+    emit_evidence(evidence, output_path)
+    checks.length
+  rescue KeyError
+    unavailable!
+  end
+
   def parse_options(argv, allowed:, required:)
     options = {}
     seen = {}
@@ -1100,7 +1666,17 @@ module RemoteControlsCollector
         "--input-dir DIR" => :input_directory,
         "--input FILE" => :input,
         "--workflow FILE" => :workflow_path,
-        "--output FILE" => :output_path
+        "--output FILE" => :output_path,
+        "--control NAME" => :control,
+        "--permission-profile NAME" => :permission_profile,
+        "--actor-id ID" => :actor_id,
+        "--actor-login LOGIN" => :actor_login,
+        "--verified-at TIME" => :verified_at,
+        "--phase PHASE" => :phase,
+        "--freshness-mode MODE" => :freshness_mode,
+        "--release-commit SHA" => :release_commit,
+        "--release-id ID" => :release_id,
+        "--release-tag-object SHA" => :release_tag_object
       }.each do |specification, key|
         option.on(specification) do |value|
           unavailable! if seen[key]
@@ -1124,6 +1700,9 @@ module RemoteControlsCollector
     when "local-triggers"
       options = parse_options(argv, allowed: %i[workflow_path], required: %i[workflow_path])
       puts JSON.generate(local_triggers(options.fetch(:workflow_path)))
+    when "local-workflow-security"
+      options = parse_options(argv, allowed: %i[workflow_path], required: %i[workflow_path])
+      puts JSON.generate(local_workflow_security(options.fetch(:workflow_path)))
     when "master-sha"
       options = parse_options(argv, allowed: %i[input], required: %i[input])
       value = ReleasePolicy.strict_json(
@@ -1149,13 +1728,52 @@ module RemoteControlsCollector
       options = parse_options(argv, allowed: %i[input], required: %i[input])
       jobs = normalize_workflow_jobs(strict_json_lines(options.fetch(:input)))
       puts exact_array(jobs, length: 1).first.fetch("id")
-    when "collect"
+    when "active-workflow-inventory"
+      options = parse_options(argv, allowed: %i[input], required: %i[input])
+      value = normalize_active_workflow_inventory(strict_json_lines(options.fetch(:input)))
+      puts JSON.generate(value)
+    when "pre-publication-refs"
+      options = parse_options(argv, allowed: %i[input], required: %i[input])
+      value = normalize_pre_publication_refs(strict_json_lines(options.fetch(:input), allow_empty: true))
+      puts JSON.generate(value)
+    when "pre-publication-releases"
+      options = parse_options(argv, allowed: %i[input], required: %i[input])
+      value = normalize_pre_publication_releases(strict_json_lines(options.fetch(:input), allow_empty: true))
+      puts JSON.generate(value)
+    when "manual-evidence"
+      options = parse_options(
+        argv,
+        allowed: %i[
+          input control permission_profile actor_id actor_login verified_at phase release_commit
+          release_id release_tag_object freshness_mode
+        ],
+        required: %i[
+          input control permission_profile actor_id actor_login verified_at phase
+        ]
+      )
+      actor_id = Integer(options.fetch(:actor_id), 10)
+      release_id = options[:release_id]&.then { |value| Integer(value, 10) }
+      value = manual_evidence(
+        path: options.fetch(:input),
+        expected_control: options.fetch(:control),
+        permission_profile: options.fetch(:permission_profile),
+        actor_id: actor_id,
+        actor_login: options.fetch(:actor_login),
+        verified_at: options.fetch(:verified_at),
+        phase: options.fetch(:phase),
+        release_commit: options[:release_commit],
+        release_id: release_id,
+        release_tag_object: options[:release_tag_object],
+        freshness_mode: options.fetch(:freshness_mode, "current")
+      )
+      puts JSON.generate(value)
+    when "collect", "collect-lifecycle"
       options = parse_options(
         argv,
         allowed: %i[input_directory output_path],
         required: %i[input_directory]
       )
-      count = collect(**options)
+      count = command == "collect" ? collect(**options) : collect_lifecycle(**options)
       puts count if options[:output_path] && options[:output_path] != "-"
     else
       unavailable!

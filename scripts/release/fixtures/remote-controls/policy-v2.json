@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "desk-setup-switcher.remote-release-controls-policy/v2",
+  "phase": "release-lifecycle",
+  "configured": true,
+  "repository": {
+    "id": 424242,
+    "nodeId": "R_SYNTHETIC_DESK_SETUP_SWITCHER",
+    "name": "desk-setup-switcher",
+    "fullName": "synthetic-operator/desk-setup-switcher",
+    "visibility": "public",
+    "defaultBranch": "master",
+    "archived": false,
+    "disabled": false,
+    "hasDiscussions": false,
+    "description": "Capture, edit, and safely apply local macOS desk setup profiles.",
+    "homepage": "https://example.invalid/desk-setup-switcher",
+    "topics": [
+      "macos",
+      "menu-bar",
+      "open-source",
+      "swift",
+      "swiftui"
+    ]
+  },
+  "release": {
+    "version": "0.1.0",
+    "tag": "v0.1.0",
+    "candidateWorkflow": {
+      "id": 7001,
+      "name": "Signed release candidate",
+      "path": ".github/workflows/release.yml",
+      "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "ci": {
+      "name": "Verify macOS app",
+      "appId": 15368,
+      "workflow": {
+        "id": 7000,
+        "name": "CI",
+        "path": ".github/workflows/ci.yml",
+        "blobSha": "cccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    "publicationWorkflow": {
+      "id": 7002,
+      "name": "Publish approved signed release",
+      "path": ".github/workflows/publish-release.yml",
+      "blobSha": "dddddddddddddddddddddddddddddddddddddddd"
+    }
+  },
+  "actors": {
+    "operator": {
+      "configured": true,
+      "id": 1001,
+      "login": "synthetic-operator",
+      "type": "User"
+    },
+    "reviewer": {
+      "configured": true,
+      "id": 1002,
+      "login": "synthetic-reviewer",
+      "type": "User"
+    },
+    "publisher": {
+      "configured": true,
+      "id": 1001,
+      "login": "SYNTHETIC-OPERATOR",
+      "type": "User"
+    }
+  },
+  "approval": {
+    "mode": "independent-review",
+    "requiredApprovals": 1,
+    "preventSelfReview": true
+  },
+  "manualEvidence": {
+    "complete": true,
+    "items": [
+      {
+        "control": "release-candidate-administrator-bypass-disabled",
+        "path": "docs/evidence/releases/v0.1.0/release-candidate-admin-bypass.json",
+        "schemaVersion": "desk-setup-switcher.manual-release-control-evidence/v1"
+      },
+      {
+        "control": "release-publication-administrator-bypass-disabled-and-admin-read-token-minimum-scope",
+        "path": "docs/evidence/releases/v0.1.0/release-publication-admin-token-scope.json",
+        "schemaVersion": "desk-setup-switcher.manual-release-control-evidence/v1"
+      }
+    ]
+  }
+}

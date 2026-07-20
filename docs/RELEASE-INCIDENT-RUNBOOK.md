@@ -4,6 +4,46 @@ Use this runbook when a published release is affected by a P0/P1, signing/notari
 
 The governing rule is simple: **never replace an asset, move/reuse a tag, or rewrite provenance to hide a problem**. Preserve evidence and recover with a new patch version through the full [distribution gate](DISTRIBUTION.md).
 
+## 0. Unpublished approval-attempt renewal
+
+This narrow path applies only when a named normal fail-closed check emitted
+`SAFE_PRE_PATCH_FAILURE`, the same run emitted no `PATCH_ATTEMPT_BEGIN`, and the
+runner plus helper process tree then ended normally. Absence of a marker is
+never proof that no PATCH occurred. `HUP`, `INT`, `QUIT`, `TERM`, workflow
+cancellation, runner/host loss, unavailable, abrupt, or incomplete logs, any
+launch/transport failure after `PATCH_ATTEMPT_BEGIN`, and every unknown outcome
+are incident-only—even when the interruption appears to precede the PATCH. For
+an eligible normal failure, preserve the complete Actions logs and use
+read-only checks to prove the exact annotated tag object/peeled commit,
+`master`, current manual evidence, frozen Settings, and draft Release/assets
+remain unchanged.
+
+If the approval and current manual records are still fresh, a new attempt-1
+workflow dispatch may reuse the exact approval after a new protected-environment
+approval. GitHub's rerun command is forbidden.
+
+If freshness expired or drift is suspected, use the next unused `NNN` from
+`001` through `999`. In one reviewed docs-only commit, `git mv` exactly the
+manifest, approval, candidate-manual JSON, and publication-manual JSON from
+their fixed paths into
+`docs/evidence/releases/v0.1.0/attempts/NNN/`. The directory and all targets
+must previously be absent and untracked. Each archived byte stream must equal
+`git show <prior-approval-commit>:<original-fixed-path>`; allow only those four
+renames, never overwrite/reuse a directory, and never edit the bytes. In a
+later reviewed docs-only commit, capture new protected Settings bundles and add
+both fresh manual JSON records at their fixed paths with new phase/tag-object/
+peeled-commit/Release-ID challenges and source digests. Wait for exact-commit
+CI, repeat the two-pass snapshot, and create a new add-only manifest/approval
+direct successor. Restore the exclusive Settings/repository single-writer
+freeze before snapshotting.
+
+If the Release is public, a PATCH was sent, or the originating process ended
+without resolving the PATCH outcome, renewal and automatic retry are
+forbidden. Only the same live process that sent the PATCH may resolve a missing
+response by an immediate exact public-state read. Every later run treats public
+or ambiguous state as incident-only and proceeds with read-only preservation,
+never adoption, replacement, deletion, or tag movement.
+
 ## 1. Classify and stop
 
 1. The triager records sanitized impact and proposes severity. The maintainer decides public product severity; the security responder decides confidential security severity.
