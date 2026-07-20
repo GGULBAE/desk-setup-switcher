@@ -291,7 +291,27 @@ case "${1:-}" in
         [[ "${STUB_SECURITY_FAIL_IMPORT:-0}" != 1 ]] || exit 42
         ;;
     find-identity)
-        printf '  1) SYNTHETIC "%s"\n     1 valid identities found\n' "$DEVELOPER_ID_APPLICATION"
+        case "${STUB_SECURITY_IDENTITY_SCENARIO:-exact}" in
+            exact)
+                printf '  1) 0123456789012345678901234567890123456789 "%s"\n     1 valid identities found\n' \
+                    "$DEVELOPER_ID_APPLICATION"
+                ;;
+            extra-valid)
+                printf '  1) 0123456789012345678901234567890123456789 "%s"\n' \
+                    "$DEVELOPER_ID_APPLICATION"
+                printf '  2) FEDCBA9876543210FEDCBA9876543210FEDCBA98 "Developer ID Application: Unexpected Identity (ZZZZZ99999)"\n'
+                printf '     2 valid identities found\n'
+                ;;
+            matching-missing)
+                printf '  1) FEDCBA9876543210FEDCBA9876543210FEDCBA98 "Developer ID Application: Unexpected Identity (ZZZZZ99999)"\n'
+                printf '     1 valid identities found\n'
+                ;;
+            malformed-summary)
+                printf '  1) 0123456789012345678901234567890123456789 "%s"\n     2 valid identities found\n' \
+                    "$DEVELOPER_ID_APPLICATION"
+                ;;
+            *) exit 98 ;;
+        esac
         ;;
     delete-keychain)
         rm -f -- "$last_argument"
@@ -421,6 +441,46 @@ pass
     release_die "Mock signing cleanup left the successful signing directory behind."
 }
 pass
+
+assert_identity_inventory_rejected() {
+    local scenario="$1"
+    local expected_error="$2"
+    local runner="$temporary_root/mock-runner-identity-$scenario"
+    local github_env="$runner/github-env"
+    local signing_directory
+    mkdir -p "$runner"
+    assert_fails "${credential_environment[@]}" \
+        "RUNNER_TEMP=$runner" \
+        "GITHUB_ENV=$github_env" \
+        "DEVELOPER_ID_CERTIFICATE_BASE64=$runtime_certificate" \
+        "DEVELOPER_ID_CERTIFICATE_PASSWORD=$runtime_certificate_password" \
+        "STUB_SECURITY_IDENTITY_SCENARIO=$scenario" \
+        "$RELEASE_SCRIPTS_DIR/import-signing-certificate.sh"
+    read_handoff_paths "$github_env"
+    signing_directory="$(dirname "$RELEASE_SIGNING_KEYCHAIN")"
+    [[ ! -e "$signing_directory" && ! -L "$signing_directory" ]] || {
+        release_die "Rejected signing identity inventory left credential material behind: $scenario"
+    }
+    pass
+    grep -F -q -- "$expected_error" "$temporary_root/expected-failure.stderr" || {
+        release_die "Rejected signing identity inventory used an unexpected diagnostic: $scenario"
+    }
+    pass
+    if grep -F -q -- 'Unexpected Identity' "$temporary_root/expected-failure.stderr"; then
+        release_die "Rejected signing identity inventory disclosed an unreviewed identity name: $scenario"
+    fi
+    pass
+}
+
+assert_identity_inventory_rejected \
+    extra-valid \
+    'The temporary Keychain must contain exactly one valid codesigning identity, and it must match the reviewed Developer ID identity.'
+assert_identity_inventory_rejected \
+    matching-missing \
+    'The temporary Keychain must contain exactly one valid codesigning identity, and it must match the reviewed Developer ID identity.'
+assert_identity_inventory_rejected \
+    malformed-summary \
+    'The temporary Keychain identity inventory is invalid.'
 
 failed_runner="$temporary_root/mock-runner-failure"
 failed_github_env="$failed_runner/github-env"

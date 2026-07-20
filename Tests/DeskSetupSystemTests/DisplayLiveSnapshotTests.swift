@@ -56,7 +56,17 @@ final class DisplayLiveSnapshotTests: XCTestCase {
       XCTAssertEqual(snapshot.displayModeCatalog?.count, 0)
     } else {
       XCTAssertFalse(settings.displays.isEmpty)
-      XCTAssertEqual(settings.displays.count, snapshot.items.count)
+      let colorProfileItems = snapshot.items.filter {
+        $0.key.hasPrefix("display.colorProfile.")
+      }
+      XCTAssertEqual(
+        colorProfileItems.count,
+        settings.displays.count(where: { $0.colorProfile.isIncluded })
+      )
+      XCTAssertEqual(
+        snapshot.items.count,
+        settings.displays.count + colorProfileItems.count
+      )
       XCTAssertEqual(snapshot.displayModeCatalog?.count, settings.displays.count)
     }
   }

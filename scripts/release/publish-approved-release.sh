@@ -21,7 +21,8 @@ publication_mutation_state=pre
 release_die() {
     case "${publication_mutation_state:-pre}" in
         pre) printf 'SAFE_PRE_PATCH_FAILURE\n' >&2 ;;
-        incident) printf 'INCIDENT_ONLY_FAILURE\n' >&2 ;;
+        attempting|incident) printf 'INCIDENT_ONLY_FAILURE\n' >&2 ;;
+        *) printf 'INCIDENT_ONLY_FAILURE\n' >&2 ;;
     esac
     printf 'Release tooling error: %s\n' "$1" >&2
     exit 1
@@ -1321,6 +1322,7 @@ if [[ "$state_before" == draft ]]; then
         --input "$publish_request" \
         "/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
         >"$publish_response" 2>"$remote_error" || patch_status=$?
+    publication_mutation_state=incident
     if [[ -n "${release_active_child_pid:-}" ]]; then
         release_incident_die "The publication helper process tree could not be proven stopped."
     fi

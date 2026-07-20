@@ -64,26 +64,26 @@ const content = {
     supportEyebrow: "Honest support boundary",
     supportTitle: "Three areas. Evidence shown plainly.",
     supportSummary:
-      "Read-only discovery has run on Apple Silicon. Apply and rollback paths are deterministic mock verified. No live setting mutation has been hardware verified.",
+      "Current-source read-only group/base paths passed on Apple Silicon. Individual ColorSync-profile, input-volume, and service-IPv4 field presence/read was not itemized; every listed apply and rollback path remains deterministic mock evidence. No live setting mutation has been hardware verified.",
     capabilities: [
       {
         name: "Displays",
         items: "Output mode, primary display, resolution, refresh rate, ColorSync ICC profile",
-        evidence: "Live-read + mock apply/rollback",
+        evidence: "Current-source group/base live-read · item-level read unclaimed · apply/rollback mock-only",
       },
       {
         name: "Audio",
         items: "Default input/output and settable device volume",
-        evidence: "Live-read + mock apply/rollback",
+        evidence: "Current-source group/base live-read · item-level read unclaimed · apply/rollback mock-only",
       },
       {
         name: "Network",
         items: "Exact Ethernet/Wi-Fi service DHCP or manual IPv4",
-        evidence: "Live-read + mock apply/rollback",
+        evidence: "Current-source group/base live-read · service-IPv4 item read unclaimed · apply/rollback mock-only",
       },
     ],
     supportNote:
-      "Initial beta support: Apple Silicon on macOS 14 or later. The packaged Intel slice is not a physical Intel support claim.",
+      "Planned v0.1.0 platform: Apple Silicon with a macOS 14 deployment target. Exact-candidate lifecycle testing on Sonoma remains a release gate. The packaged Intel slice is not a physical Intel support claim.",
     safetyEyebrow: "Safety before speed",
     safetyTitle: "High-risk changes get a recovery step.",
     safetyBody:
@@ -126,6 +126,7 @@ const content = {
     contribute: "Contributing guide",
     security: "Security reporting",
     userGuide: "User guide",
+    userGuidePath: "docs/guides/USER-GUIDE.md",
     supportMatrix: "Support matrix",
     supportHelp: "Support",
     privacyPolicy: "Privacy policy",
@@ -190,26 +191,26 @@ const content = {
     supportEyebrow: "정직한 지원 경계",
     supportTitle: "세 가지 영역, 검증 수준까지 그대로.",
     supportSummary:
-      "Apple Silicon에서 읽기 전용 탐색을 실행했습니다. 적용·롤백 경로는 결정론적 mock 검증입니다. 실제 설정 변경은 하드웨어에서 검증되지 않았습니다.",
+      "현재 소스의 읽기 전용 그룹/기본 경로는 Apple Silicon에서 통과했습니다. ColorSync 프로필·입력 볼륨·서비스 IPv4 개별 필드의 실제 존재/읽기는 항목별로 확인하지 않았고, 나열한 모든 적용·롤백 경로는 결정론적 mock 증거입니다. 실제 설정 변경은 하드웨어에서 검증되지 않았습니다.",
     capabilities: [
       {
         name: "디스플레이",
         items: "출력 방식, 주 디스플레이, 해상도, 주사율, ColorSync ICC 프로필",
-        evidence: "실기 읽기 + mock 적용/롤백",
+        evidence: "현재 소스 그룹/기본 실기 읽기 · 개별 필드 읽기 미주장 · 적용/롤백 mock 전용",
       },
       {
         name: "오디오",
         items: "기본 입력/출력과 설정 가능한 기기 볼륨",
-        evidence: "실기 읽기 + mock 적용/롤백",
+        evidence: "현재 소스 그룹/기본 실기 읽기 · 개별 필드 읽기 미주장 · 적용/롤백 mock 전용",
       },
       {
         name: "네트워크",
         items: "정확한 Ethernet/Wi-Fi 서비스의 DHCP 또는 수동 IPv4",
-        evidence: "실기 읽기 + mock 적용/롤백",
+        evidence: "현재 소스 그룹/기본 실기 읽기 · 서비스 IPv4 개별 읽기 미주장 · 적용/롤백 mock 전용",
       },
     ],
     supportNote:
-      "초기 베타 지원: macOS 14 이상 Apple Silicon. 패키지의 Intel slice는 실제 Intel 지원을 뜻하지 않습니다.",
+      "v0.1.0 예정 환경: macOS 14 deployment target의 Apple Silicon. Sonoma에서 exact candidate 수명주기 검증을 통과해야 출시할 수 있습니다. 패키지의 Intel slice는 실제 Intel 지원을 뜻하지 않습니다.",
     safetyEyebrow: "속도보다 안전",
     safetyTitle: "위험한 변경에는 복구 단계를 둡니다.",
     safetyBody:
@@ -252,6 +253,7 @@ const content = {
     contribute: "기여 가이드",
     security: "보안 신고",
     userGuide: "사용 가이드",
+    userGuidePath: "docs/guides/USER-GUIDE.ko.md",
     supportMatrix: "지원표",
     supportHelp: "일반 지원",
     privacyPolicy: "개인정보 처리방침",
@@ -477,7 +479,7 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
             <div className="contribute-links">
               <a href={`${repositoryURL}/blob/master/CONTRIBUTING.md`}>{text.contribute}</a>
               <a href={`${repositoryURL}/security/policy`}>{text.security}</a>
-              <a href={`${repositoryURL}/blob/master/docs/guides/USER-GUIDE.md`}>{text.userGuide}</a>
+              <a href={`${repositoryURL}/blob/master/${text.userGuidePath}`}>{text.userGuide}</a>
               <a href={`${repositoryURL}/blob/master/docs/SUPPORT-MATRIX.md`}>{text.supportMatrix}</a>
               <a href={`${repositoryURL}/blob/master/SUPPORT.md`}>{text.supportHelp}</a>
               <a href={`${repositoryURL}/blob/master/docs/PRIVACY.md`}>{text.privacyPolicy}</a>

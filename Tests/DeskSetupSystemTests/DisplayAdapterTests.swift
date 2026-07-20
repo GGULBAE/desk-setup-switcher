@@ -433,6 +433,11 @@ struct DisplayAdapterTests {
     var settings = try displaySettings(from: snapshot)
     settings.displays[0].colorProfile = .init(value: target)
 
+    #expect(snapshot.items.count == displays.count + 1)
+    #expect(
+      snapshot.items.count(where: { $0.key.hasPrefix("display.colorProfile.") }) == 1
+    )
+
     let validation = await adapter.validate(.display(settings), against: snapshot)
     let plan = try await adapter.plan(.display(settings), from: snapshot, mode: .normal)
     let operation = try #require(

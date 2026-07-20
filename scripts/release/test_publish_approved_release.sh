@@ -1099,6 +1099,11 @@ run_scenario() {
         pass
         grep -q 'Published exact immutable public beta Release ID 7001' "$stdout_path" || return 1
         pass
+        ! grep -q '^SAFE_PRE_PATCH_FAILURE$\|^INCIDENT_ONLY_FAILURE$' "$stderr_path" || {
+            printf 'Scenario %s emitted a failure classification despite succeeding.\n' "$scenario" >&2
+            return 1
+        }
+        pass
     else
         [[ "$status" != 0 ]] || {
             printf 'Scenario %s unexpectedly succeeded.\n' "$scenario" >&2
@@ -1147,6 +1152,12 @@ run_scenario() {
             return 1
         }
         ! grep -q '^SAFE_PRE_PATCH_FAILURE$' "$stderr_path" || return 1
+        if [[ "$expected_result" == failure && "$scenario" != patch-signal-hang ]]; then
+            grep -q '^INCIDENT_ONLY_FAILURE$' "$stderr_path" || {
+                printf 'Scenario %s lacks the post-boundary incident marker.\n' "$scenario" >&2
+                return 1
+            }
+        fi
     fi
     pass
     unset incident_only

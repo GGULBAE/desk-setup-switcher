@@ -16,7 +16,7 @@ During the `0.x` public-beta period, the latest published beta receives security
 
 Do not open a public issue for a suspected vulnerability, exposed secret, unsafe system mutation, profile-import exploit, privacy leak, or rollback failure.
 
-**Current repository state (checked 2026-07-18): GitHub private vulnerability reporting is disabled.** Until a repository administrator enables it, contact [the repository owner](https://github.com/GGULBAE) and request a private reporting channel. Do not include vulnerability details, exploit material, secrets, or unredacted diagnostics in that initial public contact. The issue tracker and support form are public and must not be used for security reports.
+**Current repository state (rechecked 2026-07-20): GitHub private vulnerability reporting is disabled.** Until a repository administrator enables it, contact [the repository owner](https://github.com/GGULBAE) and request a private reporting channel. Do not include vulnerability details, exploit material, secrets, or unredacted diagnostics in that initial public contact. The issue tracker and support form are public and must not be used for security reports.
 
 Before the first public beta is announced, a repository administrator must enable GitHub private vulnerability reporting, replace the repository's **Security reporting instructions** contact link with the private advisory URL, and verify that it opens a private form. Once enabled, this document should be updated to make `https://github.com/GGULBAE/desk-setup-switcher/security/advisories/new` the primary reporting path.
 

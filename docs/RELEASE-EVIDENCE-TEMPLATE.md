@@ -42,7 +42,7 @@ authorize the later tag push.
 - [ ] The commit and submodules/dependencies are fixed, the checkout is complete and non-shallow, and the worktree is clean.
 - [ ] `make verify`, `make audit-public-release`, and `git diff --check` pass on that commit.
 - [ ] Remote CI passes the required checks for that exact commit.
-- [ ] Initial public support remains Apple Silicon on macOS 14 or later; no Intel runtime claim is present.
+- [ ] The planned initial target remains Apple Silicon with a macOS 14.0 deployment target; no Intel or unverified Sonoma runtime claim is present.
 - [ ] Release entitlements are reviewed, minimal, recorded below, and omit `com.apple.security.get-task-allow`.
 
 | Evidence | Value or link |
@@ -154,14 +154,15 @@ Record each result separately. Use synthetic data and the exact final DMG above.
 
 ## External beta and release blockers
 
-Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPLATE.md), use the same final DMG SHA-256 and final-DMG provenance attestation, run on Apple Silicon/macOS 14+, preserve real quarantine, and avoid live system-setting mutation unless separately authorized.
+Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPLATE.md), use the same final DMG SHA-256 and final-DMG provenance attestation, run on Apple Silicon within the planned macOS 14+ matrix, preserve real quarantine, and avoid live system-setting mutation unless separately authorized. At least one accepted report must run the full exact-candidate lifecycle on macOS 14 Sonoma.
 
-| Report | Tester record | Final DMG SHA matches | DMG provenance matches | Mandatory lifecycle passes | Open P0/P1 |
-| --- | --- | --- | --- | --- | --- |
-| Beta 1 | `<not recorded>` | [ ] | [ ] | [ ] | `<not recorded>` |
-| Beta 2 | `<not recorded>` | [ ] | [ ] | [ ] | `<not recorded>` |
-| Beta 3 | `<not recorded>` | [ ] | [ ] | [ ] | `<not recorded>` |
+| Report | Tester record | macOS / coverage role | Final DMG SHA matches | DMG provenance matches | Mandatory lifecycle passes | Open P0/P1 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Beta 1 | `<not recorded>` | `<not recorded>` | [ ] | [ ] | [ ] | `<not recorded>` |
+| Beta 2 | `<not recorded>` | `<not recorded>` | [ ] | [ ] | [ ] | `<not recorded>` |
+| Beta 3 | `<not recorded>` | `<not recorded>` | [ ] | [ ] | [ ] | `<not recorded>` |
 
+- [ ] At least one accepted report records Apple Silicon/macOS 14.x Sonoma and passes every mandatory exact-candidate lifecycle row.
 - [ ] A read-only public issue query shows zero unresolved P0/P1 issues for this candidate.
 - [ ] The maintainer records zero unresolved product P0/P1 blockers.
 - [ ] The security responder records only a yes/no statement that no confidential P0/P1 blocker remains; no private count or detail is published.

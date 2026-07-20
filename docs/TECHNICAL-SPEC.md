@@ -2,7 +2,7 @@
 
 ## Status and target
 
-This is both the implementation contract and a description of the current pre-release 0.1.0 architecture. A native Swift/SwiftUI menu-bar application, checked-in generated Xcode project, and Swift Package core/system/app targets exist for macOS 14 or later. Core and adapter behavior can be tested without launching the app or changing the host Mac.
+This is both the implementation contract and a description of the current pre-release 0.1.0 architecture. A native Swift/SwiftUI menu-bar application, checked-in generated Xcode project, and Swift Package core/system/app targets have a macOS 14.0 deployment target. The planned initial beta target is Apple Silicon on macOS 14 or later, but current runtime evidence is from macOS 26.5.2; an exact-candidate lifecycle report on Apple Silicon/macOS 14 Sonoma is still required before claiming macOS 14 support. Core and adapter behavior can be tested without launching the app or changing the host Mac.
 
 The repository targets both `arm64-apple-macos14.0` and `x86_64-apple-macos14.0`. The apply-reliability Swift Debug/Release, universal Xcode Debug/Release, Analyze, and packaged builds passed local `make verify` on 2026-07-14. No physical Intel Mac has been tested. Scripts use a process-local `DEVELOPER_DIR` fallback when full Xcode is installed but `xcode-select` points to Command Line Tools.
 
@@ -130,7 +130,7 @@ Capabilities are values, not thrown control flow. Permission denial produces an 
 
 - Display: UUID when available plus vendor/model/serial, built-in flag, and a conservative fallback fingerprint; runtime display IDs are session-only.
 - Audio: Core Audio device UID; names are presentation only.
-- Network: interface BSD name plus interface type; SSIDs are condition values, not credentials.
+- Network: persisted service identity is service kind plus service name and interface type. BSD interface names and SystemConfiguration service IDs are runtime/session-only resolution data; SSIDs are condition values, not credentials.
 - USB/hardware: stable registry attributes available through public IOKit APIs, with capability reasons when identity is ambiguous.
 
 Ambiguous matching never silently chooses a device. It produces a validation issue that the user can resolve.
@@ -167,7 +167,7 @@ The preceding header/editor follow-up passed full local `make verify` with 215 d
 
 Tray Surface v2 passed integrated non-live `make verify` on 2026-07-15 with 326 default cases: 130 XCTest cases and 196 Swift Testing cases, with six opt-in skips and zero failures. Across both frameworks, five skips are read-only hardware cases and one is a Keychain-write case. Lint/localization policy, Swift Debug/Release, universal Xcode Debug/Release, Analyze, package/checksum, mounted metadata/resources/architectures, and ad-hoc signature classification passed. Separately, `git diff --check` passed. The preceding measured-height and stable permission-handoff gates remain historical evidence.
 
-The five read-only display/audio/network/input/readiness cases were rerun on the current capture-permission source and passed on an Apple M5 Mac running macOS 26.5.2. The display gate accepts the legitimate zero-active state while an online session display sleeps, verifies a typed nonfatal empty snapshot in that state, and retains full count, identity, mode, and item assertions whenever active displays exist. The historical fresh install created one schema-v1 Ready profile from a read-only snapshot with all four groups, and its zero-operation plan kept Apply and Force Apply disabled. There is no live mutation, hardware rollback, live Keychain write, physical Intel, latest permission-flow screenshot, full VoiceOver/keyboard, or TCC matrix evidence. Signing/notarization and release publication were not performed.
+On 2026-07-20, current-source `DESK_SETUP_LIVE_READ_TESTS=1 make test` passed all 501 app cases on an Apple M5 Mac running macOS 26.5.2. Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths ran read-only. The display gate accepted the legitimate zero-active state while an online session display slept, verified a typed nonfatal empty snapshot in that state, and retained full count, identity, mode, and item assertions whenever active displays existed. The run did not itemize actual ColorSync-profile, input-volume, or exact service-IPv4 field presence/read on that host, so those item-level claims and every apply/rollback path remain mock-only. The historical fresh install created one schema-v1 Ready profile from a read-only snapshot with all four groups, and its zero-operation plan kept Apply and Force Apply disabled. There is no live mutation, hardware rollback, live Keychain write, physical Intel, latest permission-flow screenshot, full VoiceOver/keyboard, or TCC matrix evidence. Signing/notarization and release publication were not performed.
 
 ## Static and release verification
 
@@ -181,7 +181,7 @@ The release-only scripts additionally require GitHub's `RUNNER_ENVIRONMENT=githu
 
 Strict, duplicate-key-free notary verification emits the normalized submission ID from its one verified input snapshot. JSON and text sanitizers replace longest overlapping paths first so repository and runner-temp tokens are not consumed by a broader home path. Later release-policy checks still bind the sanitized result and log to the exact submission ID, pre-notary archive, and final evidence manifest. Deterministic mock command tests cover successful/failed import, handoff/cleanup, symlink refusal, child-environment isolation, and tracked cancellation; they do not substitute for a protected credentialed run.
 
-Packaging builds with automatic signing disabled, then ad-hoc signs the staged app. The verifier requires `Signature=adhoc`, no identity authority, a structurally valid signature, and no unexpected executable or Mach-O files in the app bundle. The current universal `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg` passed the mounted verification gate with SHA-256 `5e9581f1174adabcd729019ce91653c105d1d8db90d200bcfdc86d9e5d136729` and architectures `x86_64 arm64`; it was not installed or launched. Earlier local and installed-interaction checksums remain historical in the completion ledger; downloaded CI artifact ID `8256718472` verified the earlier UI-hardening package at SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. The DMGs are not byte-for-byte reproducible. These signatures provide code integrity only: the app has no Developer ID identity, no notarization, and no verified Gatekeeper trust path.
+Packaging builds with automatic signing disabled, then ad-hoc signs the staged app. The verifier requires `Signature=adhoc`, no identity authority, a structurally valid signature, and no unexpected executable or Mach-O files in the app bundle. The current universal `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg` passed the mounted verification gate with SHA-256 `0afb3a189b3a9d117dddadb6690b73993e590c8695a553e1d01dd7b7f0108a5d` and architectures `x86_64 arm64`; it was not installed or launched. Earlier local and installed-interaction checksums remain historical in the completion ledger; downloaded CI artifact ID `8256718472` verified the earlier UI-hardening package at SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`. The DMGs are not byte-for-byte reproducible. These signatures provide code integrity only: the app has no Developer ID identity, no notarization, and no verified Gatekeeper trust path.
 
 ## Tray reopen and simplified editor specification
 
@@ -209,12 +209,12 @@ Packaging builds with automatic signing disabled, then ad-hoc signs the staged a
 
 ### Visible profile document projection
 
-| Area | Visible controls | Persisted but hidden/excluded controls |
+| Area | Visible controls | Hidden, excluded, or deliberately unpersisted controls |
 | --- | --- | --- |
 | Metadata | Alias and symbol | Legacy activation, description, and conditions |
 | Display | Extended/mirrored output, primary display, per-display resolution/refresh, portable ColorSync ICC profile | Raw runtime ID, x/y origin, rotation, active state, HDR/pixel encoding/vendor modes |
 | Audio | Default input, default output, input volume, output volume | System output UID and output mute |
-| Network | Exact Ethernet/Wi‑Fi service target and DHCP/manual IPv4 | Wi‑Fi power/SSID, global IPv4, DNS, proxy, service order |
+| Network | Exact Ethernet/Wi‑Fi service target and DHCP/manual IPv4 | Persisted-but-dormant Wi‑Fi power/SSID, global IPv4, DNS, and proxy values; service order is absent rather than persisted |
 | Input | Nothing in the default editor | All legacy input values |
 
 Hidden values remain meaningful document data. `ProfileApplicabilityNormalizer` excludes their options before readiness and planning, and repeated normalization is idempotent.

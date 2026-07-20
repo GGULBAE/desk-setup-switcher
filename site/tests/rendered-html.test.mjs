@@ -86,7 +86,11 @@ test("renders the complete public-beta landing page without setting cookies", as
     assert.match(html, /Download the signed public beta\./);
     assert.doesNotMatch(html, /There is no supported public download today\./);
   }
-  assert.match(html, /Apple Silicon on macOS 14 or later/);
+  assert.match(html, /Planned v0\.1\.0 platform: Apple Silicon with a macOS 14 deployment target/);
+  assert.match(html, /Exact-candidate lifecycle testing on Sonoma remains a release gate/);
+  assert.match(html, /Current-source group\/base live-read/);
+  assert.match(html, /item-level read unclaimed/);
+  assert.match(html, /apply\/rollback mock-only/);
   assert.match(html, /No live setting mutation has been hardware verified\./);
   assert.match(html, /Apply Available Settings/);
   assert.match(html, /Keep Changes/);
@@ -207,6 +211,9 @@ test("keeps the site account-free, local-content-only, and free of starter capab
   assert.doesNotMatch(browserSource, /<script[^>]+src=["']https?:\/\//i);
   assert.match(landing, /내 책상 설정을, 내가 확인하고 되돌립니다/);
   assert.match(landing, /텔레메트리 없음/);
+  assert.match(landing, /userGuidePath: "docs\/guides\/USER-GUIDE\.md"/);
+  assert.match(landing, /userGuidePath: "docs\/guides\/USER-GUIDE\.ko\.md"/);
+  assert.match(landing, /href=\{`\$\{repositoryURL\}\/blob\/master\/\$\{text\.userGuidePath\}`\}/);
   assert.doesNotMatch(landing, /VoiceOver/i);
   assert.doesNotMatch(
     runtimeSource,

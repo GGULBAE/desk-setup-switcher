@@ -59,9 +59,9 @@ kept separate from the deterministic local build and test command; the
 - The three product screens use synthetic fixture data and sanitized public derivatives.
 - The silent demo stops at the Apply Preview. It does not simulate an Apply result or claim live hardware mutation.
 - Download remains unavailable until the complete distribution gate passes and the maintainer-approved canonical GitHub Release exists.
-- Apple Silicon on macOS 14 or later is the initial support claim; the `x86_64` slice is not advertised as physically verified.
-- Read-only discovery and deterministic mock apply/rollback evidence are distinguished explicitly.
-- Comprehensive assistive-technology certification is outside the initial beta gate.
+- Apple Silicon with a macOS 14 deployment target is the planned `v0.1.0` platform. At least one external exact-candidate lifecycle report must pass on Sonoma before that minimum-OS support claim is used; the `x86_64` slice is not advertised as physically verified.
+- On 2026-07-20, current-source opt-in read-only tests passed Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. They did not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on this host, so those item-level claims and every apply/rollback path remain mock-only.
+- Comprehensive assistive-technology certification is outside the initial beta gate. Keyboard behavior, accessibility names and values, and non-color state cues remain required.
 
 Asset sources and sanitization are recorded in [release asset provenance](../docs/RELEASE-ASSET-PROVENANCE.md).
 

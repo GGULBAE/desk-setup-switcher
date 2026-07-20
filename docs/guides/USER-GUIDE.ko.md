@@ -8,15 +8,15 @@ Desk Setup Switcher는 선택한 디스플레이·오디오·네트워크 설정
 
 아직 지원되는 공개 다운로드가 없습니다. 저장소와 CI에서 만든 DMG는 ad-hoc 서명된 개발 검증 자료이며, 서명·공증된 일반 사용자용 릴리스가 아닙니다. 일반 사용자는 Gatekeeper를 우회해 설치하지 마세요.
 
-`v0.1.0`이 승인되어 공개된 뒤에는 프로젝트의 [GitHub Releases 페이지](https://github.com/GGULBAE/desk-setup-switcher/releases)가 유일한 공식 다운로드 경로가 됩니다. 초기 public beta 지원 환경은 다음과 같습니다.
+`v0.1.0`이 승인되어 공개된 뒤에는 프로젝트의 [GitHub Releases 페이지](https://github.com/GGULBAE/desk-setup-switcher/releases)가 유일한 공식 다운로드 경로가 됩니다. 초기 public beta 예정 환경은 다음과 같습니다.
 
 - Apple Silicon
-- macOS 14 Sonoma 이상
+- exact candidate가 Sonoma 수명주기 검증을 통과한 뒤의 macOS 14 Sonoma deployment target
 - 공개된 GitHub Release에 첨부된 서명·공증 DMG
 
 DMG에 Intel slice가 들어 있더라도 Intel 지원을 의미하지 않습니다. 실제 Intel Mac 설치·실행 검증은 아직 통과하지 않았습니다. App Store 릴리스, 앱 내 업데이트, 지원되는 Homebrew 설치도 아직 없습니다.
 
-2026-07-18 기준 Display, Audio, Network의 적용·rollback 경로는 구현되고 결정론적 mock 검증을 통과했지만, 실제 하드웨어 변경은 검증되지 않았습니다. 기능에 의존하기 전에 [지원표](../SUPPORT-MATRIX.md)를 확인하세요. 이 가이드는 하드웨어 인증을 의미하지 않습니다.
+2026-07-20 현재 소스에서 opt-in 읽기 전용 테스트의 Display, Audio, Network, Input, ConditionContext, ApplyLivePreparation 그룹/기본 경로가 Apple Silicon/macOS 26.5.2에서 통과했습니다. 다만 이 테스트는 해당 호스트의 ColorSync 프로필·입력 볼륨·서비스 IPv4 개별 필드 존재/읽기를 항목별로 확인하지 않았습니다. 따라서 그 개별 실기 읽기 주장과 모든 Display, Audio, Network 적용·rollback 경로는 mock 검증 전용으로 남으며, 실제 설정 변경은 검증되지 않았습니다. 기능에 의존하기 전에 [지원표](../SUPPORT-MATRIX.md)를 확인하세요. 이 가이드는 하드웨어 인증을 의미하지 않습니다.
 
 키보드 동작, 접근성 이름·값, 비색상 상태 단서는 유지합니다. 포괄적인 보조 기술 인증은 초기 베타 범위에 포함하지 않습니다.
 

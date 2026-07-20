@@ -1,6 +1,6 @@
 # Launch copy and repository metadata
 
-Last reviewed: 2026-07-18
+Last reviewed: 2026-07-20
 
 This document is a copy deck and approval checklist. It does not authorize a GitHub setting change, site deployment, release publication, or community post.
 
@@ -8,7 +8,7 @@ Desk Setup Switcher currently has no supported download. The local/CI DMG is ad-
 
 ## Current remote state
 
-A read-only GitHub query on 2026-07-18 returned:
+Authenticated read-only GitHub queries on 2026-07-18 and 2026-07-20 returned the same public-surface state:
 
 | Field | Current value | Required action |
 | --- | --- | --- |
@@ -209,6 +209,7 @@ Do not apply metadata or publish copy until every applicable box has recorded ev
 - [ ] Browser download and the extracted DMG preserve a real quarantine attribute; checksum and final-DMG provenance match, and Gatekeeper opens the official candidate without Open Anyway.
 - [ ] Exact-candidate first launch and launch-at-login default-off, upgrade, schema 0→1 migration, backup recovery, import/export, diagnostics, uninstall, and optional app-owned data removal each have separate passing evidence.
 - [ ] Three external Apple Silicon reports use browser-downloaded protected workflow artifacts and the identical final DMG SHA-256/final-DMG provenance attestation.
+- [ ] At least one of those reports passes the full exact-candidate lifecycle on macOS 14 Sonoma before any launch copy states macOS 14 support.
 - [ ] A public read-only query and maintainer decision show zero unresolved P0/P1 issues, and the security responder records only a yes/no no-confidential-blocker sign-off.
 - [ ] The final support matrix states the exact Display/Audio/Network hardware-mutation evidence or preserves the explicit mock-verified limitation.
 - [ ] The canonical [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases) contains the approved immutable assets and curated English/Korean notes.

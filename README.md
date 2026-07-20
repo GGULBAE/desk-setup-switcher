@@ -70,9 +70,9 @@ Selecting an audio input device does not record audio, so the app does not need 
 
 ## Supported scope and honest limits
 
-- The planned initial public beta targets **Apple Silicon** on **macOS 14 Sonoma or later**.
+- The planned initial public beta targets **Apple Silicon** with a **macOS 14 Sonoma deployment target**. At least one external exact-candidate lifecycle report must pass on Sonoma before macOS 14 is claimed as supported.
 - The project can build an `x86_64` slice, but physical Intel installation and runtime testing have not passed. Intel is not currently a supported platform.
-- Read-only discovery has live Apple Silicon evidence. Display, audio, and network apply/rollback paths are deterministic mock verified; no live hardware-mutation verification is claimed.
+- On 2026-07-20, current-source opt-in read-only tests passed the Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. Those tests do not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on this host, so those item-level claims and every apply/rollback path remain mock-only. No live setting mutation is verified.
 - Current user-facing profile work is limited to Display, Audio, and Network. Legacy Input and condition data may round-trip through profile files but is dormant and does not drive automatic switching.
 - Keyboard behavior, accessible names and values, and non-color state cues remain part of UI quality. Comprehensive assistive-technology certification is outside the initial beta scope.
 

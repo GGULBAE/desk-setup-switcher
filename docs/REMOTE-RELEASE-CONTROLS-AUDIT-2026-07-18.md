@@ -1,6 +1,8 @@
 # Remote release controls audit
 
-Date: 2026-07-18 16:04 KST
+Original observation: 2026-07-18 16:04 KST
+
+Latest read-only recheck: 2026-07-20 14:00 KST
 
 ## Outcome
 
@@ -12,6 +14,33 @@ Release exists, so the unsafe path has not run.
 This was a read-only audit. It did not push a branch, create or move a tag,
 change a workflow setting, create an environment, inspect credential values,
 publish a Release, or deploy the site.
+
+## 2026-07-20 read-only recheck
+
+The release-control implementation advanced after the original observation, so
+the repository and the exact local release boundary were queried again before
+requesting any remote change. The unsafe remote state is unchanged. This recheck
+used authenticated GitHub GET/list operations and a refreshed `origin/master`;
+it did not run the final remote-controls collector because the authoritative
+policy correctly remains `configured:false` until the real protection and actor
+decisions exist.
+
+| Boundary | Rechecked value |
+| --- | --- |
+| Remote default branch | `master` at `1489b7fcb41ffa7e55a43ed65e6befc538838140`; still the ancestor of the local branch |
+| Audited local release-control baseline | `8951f2eff50a5f95657ff9f11a34eebb3bd0203e`; 26 commits ahead of remote `master` before this documentation-only recheck amendment |
+| Local reviewed workflow blobs | CI `ab5228895a4da48e8b88ef792e1e043ce00ad938`; candidate/draft `8823e73221d6af038d3469880fb0b8e7a36140e1`; publication `b380c279d1e222ee7ea1bd5a941ef30ee6eb5079` |
+| Effective remote workflows | CI `311269011` active; historical Release `311269012` active; no publication workflow exists remotely |
+| Effective remote workflow blobs | CI `7ba41d81c2e5d917d35d598c68a0791ea97081fc`; unsafe Release `0648b71f683fa0bdcc430d02a7e16d32e0ee0c42` |
+| Protections and release gates | No `master` protection, ruleset, or environment; immutable Releases and private vulnerability reporting disabled |
+| Actions and security | All Actions allowed and full-SHA enforcement disabled; default workflow token read-only and PR-review approval disabled; secret scanning, push protection, and Dependabot security updates enabled |
+| Names and public boundary | Repository secret/variable name lists empty; environment credential-name lists unavailable because no environment exists; no tag or Release; one administrator collaborator; stale mouse/keyboard description, no topics or Homepage, Discussions disabled, and no `needs-triage` label |
+| Current local closure | `make verify` passed 2,940 non-live checks/assertions at the audited baseline; unsigned development-evidence DMG SHA-256 `5e9581f1174adabcd729019ce91653c105d1d8db90d200bcfdc86d9e5d136729`; not installed, launched, uploaded, or published |
+
+The recheck changes no conclusion below: do not push a `v*` tag, dispatch a
+release workflow, or treat the local mock/structural evidence as a protected
+remote result. The original table is retained as historical evidence; this
+section is the current pre-mutation status.
 
 ## Audited identities
 
@@ -122,9 +151,10 @@ or promotional post unless that action is named separately.
    required reviewers and publisher, explicitly decide self-review and
    administrator-bypass behavior, and leave both without credentials until
    read-back proves the protection.
-5. **Push code only to a feature branch.** After local verification, record and
-   push the exact current `codex/public-beta-release` HEAD. It must descend from
-   audited implementation tip `6609484` and include this audit record. Use
+5. **Push code only to a feature branch.** After local verification and explicit
+   approval for that push, record and push the exact current
+   `codex/public-beta-release` HEAD. It must contain audited release-control
+   baseline `8951f2e` and this read-only recheck amendment. Use
    `--no-follow-tags`; do not update `master` directly.
 6. **Open and verify a PR.** Target `master`, let the PR run the updated read-only
    CI, and require `Verify macOS app` to pass with `make verify` plus the complete

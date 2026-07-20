@@ -32,6 +32,7 @@ release_require_path_within "$GITHUB_ENV" "$RUNNER_TEMP"
 }
 
 release_require_command openssl
+release_require_command ruby
 release_require_command security
 release_require_command sleep
 release_require_command stat
@@ -154,10 +155,29 @@ rm -f -- "$certificate_path"
 }
 
 identities="$(security find-identity -v -p codesigning "$RELEASE_SIGNING_KEYCHAIN")"
-identity_count="$(printf '%s\n' "$identities" | grep -F -c "\"$DEVELOPER_ID_APPLICATION\"" || true)"
-[[ "$identity_count" == 1 ]] || {
-    release_die "The temporary Keychain must contain exactly one matching Developer ID identity."
+identity_counts="$(printf '%s\n' "$identities" | ruby -e '
+  expected = ARGV.fetch(0)
+  lines = STDIN.read.lines(chomp: true)
+  raise if lines.empty?
+  summary = lines.pop
+  summary_match = summary.match(/\A\s*([0-9]+) valid identities found\z/)
+  raise unless summary_match
+  declared_count = Integer(summary_match[1], 10)
+  names = lines.map do |line|
+    match = line.match(/\A\s*[0-9]+\) [0-9A-Fa-f]{40} "(.*)"\z/)
+    raise unless match
+    match[1]
+  end
+  raise unless names.length == declared_count
+  puts [declared_count, names.count(expected)].join("\t")
+' "$DEVELOPER_ID_APPLICATION" 2>/dev/null)" || {
+    release_die "The temporary Keychain identity inventory is invalid."
 }
+IFS=$'\t' read -r valid_identity_count matching_identity_count <<<"$identity_counts"
+[[ "$valid_identity_count" == 1 && "$matching_identity_count" == 1 ]] || {
+    release_die "The temporary Keychain must contain exactly one valid codesigning identity, and it must match the reviewed Developer ID identity."
+}
+unset identities identity_counts valid_identity_count matching_identity_count
 
 trap - EXIT HUP INT QUIT TERM
 printf 'Imported the reviewed Developer ID identity into the ephemeral release Keychain.\n'

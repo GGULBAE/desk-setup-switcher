@@ -8,15 +8,15 @@ Desk Setup Switcher saves selected display, audio, and network settings as local
 
 There is no supported public download yet. Repository and CI-generated DMGs are ad-hoc-signed development evidence; they are not signed, notarized end-user releases. Do not bypass Gatekeeper to install them as an ordinary user.
 
-After `v0.1.0` is approved and published, the canonical download will be the project's [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases). The initial public beta will support:
+After `v0.1.0` is approved and published, the canonical download will be the project's [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases). The planned initial public-beta target is:
 
 - Apple Silicon;
-- macOS 14 Sonoma or later; and
+- a macOS 14 Sonoma deployment target, after the exact candidate passes the Sonoma lifecycle gate; and
 - the signed and notarized DMG attached to the published GitHub Release.
 
 The included Intel slice is not an Intel support claim. Physical Intel installation and runtime testing have not passed. There is also no App Store release, in-app updater, or supported Homebrew installation yet.
 
-As of 2026-07-18, Display, Audio, and Network apply/rollback paths are implemented and deterministic mock verified, but no live hardware mutation is verified. Read the [support matrix](../SUPPORT-MATRIX.md) before relying on a capability. This guide must not be read as hardware certification.
+On 2026-07-20, current-source opt-in read-only tests passed the Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. Those tests did not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on this host, so those item-level live-read claims and every Display, Audio, and Network apply/rollback path remain mock-only. No live setting mutation is verified. Read the [support matrix](../SUPPORT-MATRIX.md) before relying on a capability. This guide must not be read as hardware certification.
 
 Keyboard behavior, accessibility names and values, and non-color state cues are maintained. Comprehensive assistive-technology certification is outside the initial beta scope.
 
