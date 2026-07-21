@@ -31,7 +31,7 @@ Both guides cover:
 
 - Planned public-beta platform: Apple Silicon with a macOS 14 Sonoma deployment target; at least one external exact-candidate lifecycle report must pass on Sonoma before minimum-OS support is claimed.
 - Intel is cross-built but physically unverified and is not initially supported.
-- On 2026-07-20, current-source opt-in read-only tests passed Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. They did not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on this host; those item-level claims and all Display, Audio, and Network apply/rollback paths remain mock-only, with no live mutation verified.
+- On 2026-07-20, opt-in read-only tests passed the then-current Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. That dated run did not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on the host; those item-level claims and all Display, Audio, and Network apply/rollback paths remain mock-only, with no live mutation verified.
 - The app is local-only: no account, cloud, telemetry, analytics, or automatic switching.
 - Keyboard behavior, accessibility names and values, and non-color cues are maintained; comprehensive assistive-technology certification is outside the initial beta scope.
 

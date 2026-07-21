@@ -16,7 +16,7 @@ After `v0.1.0` is approved and published, the canonical download will be the pro
 
 The included Intel slice is not an Intel support claim. Physical Intel installation and runtime testing have not passed. There is also no App Store release, in-app updater, or supported Homebrew installation yet.
 
-On 2026-07-20, current-source opt-in read-only tests passed the Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. Those tests did not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on this host, so those item-level live-read claims and every Display, Audio, and Network apply/rollback path remain mock-only. No live setting mutation is verified. Read the [support matrix](../SUPPORT-MATRIX.md) before relying on a capability. This guide must not be read as hardware certification.
+On 2026-07-20, opt-in read-only tests passed the then-current Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. That dated run did not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on the host, so those item-level live-read claims and every Display, Audio, and Network apply/rollback path remain mock-only. No live setting mutation is verified. Read the [support matrix](../SUPPORT-MATRIX.md) before relying on a capability. This guide must not be read as hardware certification.
 
 Keyboard behavior, accessibility names and values, and non-color state cues are maintained. Comprehensive assistive-technology certification is outside the initial beta scope.
 
@@ -73,6 +73,8 @@ Each profile exposes one state-aware review action:
 - **Review Available…** means some executable settings exist but other items will be omitted, blocked, unsupported, or unavailable.
 
 The review is read-only. Inspect the target values, operation list, omissions, and technical details before continuing.
+
+The top of Apply Preview carries a **Beta** text-and-shield status: Apply and rollback are not hardware-verified, so check System Settings after applying. Review content and decision actions form one scroll sequence; at reduced height or large text, scroll through the plan before the buttons become reachable. Escape cancels, while Return alone does not apply.
 
 - **Apply Profile** starts a complete plan.
 - **Apply Available Settings** applies only the listed executable items. Use it only when every omission is expected.

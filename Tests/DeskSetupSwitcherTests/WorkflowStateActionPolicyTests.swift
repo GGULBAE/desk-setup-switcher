@@ -209,6 +209,60 @@ import Testing
       #expect(koreanNormal == "프로필 적용")
       #expect(koreanForce == "사용 가능한 설정 적용")
       #expect(
+        ApplyPreviewActionCopy.hardwareVerificationNotice(languageCode: "en")
+          == "Beta · Apply/rollback not hardware-verified. Check System Settings after applying."
+      )
+      #expect(
+        ApplyPreviewActionCopy.hardwareVerificationNotice(languageCode: "ko")
+          == "Beta · 적용/롤백은 실제 하드웨어 검증 전입니다. 적용 후 시스템 설정을 확인하세요."
+      )
+      #expect(
+        ApplyPreviewHardwareVerificationStatus.localized(languageCode: "en")
+          == ApplyPreviewHardwareVerificationStatus(
+            text:
+              "Beta · Apply/rollback not hardware-verified. Check System Settings after applying.",
+            systemImage: "exclamationmark.shield",
+            accessibilityLabel: "Beta hardware verification status"
+          )
+      )
+      #expect(
+        ApplyPreviewHardwareVerificationStatus.localized(languageCode: "ko")
+          == ApplyPreviewHardwareVerificationStatus(
+            text:
+              "Beta · 적용/롤백은 실제 하드웨어 검증 전입니다. 적용 후 시스템 설정을 확인하세요.",
+            systemImage: "exclamationmark.shield",
+            accessibilityLabel: "Beta 하드웨어 검증 상태"
+          )
+      )
+      #expect(ApplyPreviewDecisionPolicy.primaryActionShortcut == .none)
+      #expect(!ApplyPreviewDecisionPolicy.focusesActionsOnAppear)
+      #expect(
+        ApplyPreviewReviewOrderPolicy.contentSections == [
+          .plannedChanges,
+          .omissions,
+          .validation,
+          .rejections,
+        ]
+      )
+      #expect(
+        !ApplyPreviewDecisionPolicy.isPrimaryActionDisabled(
+          canExecute: true,
+          isProfileMutationLocked: false
+        )
+      )
+      #expect(
+        ApplyPreviewDecisionPolicy.isPrimaryActionDisabled(
+          canExecute: false,
+          isProfileMutationLocked: false
+        )
+      )
+      #expect(
+        ApplyPreviewDecisionPolicy.isPrimaryActionDisabled(
+          canExecute: true,
+          isProfileMutationLocked: true
+        )
+      )
+      #expect(
         ApplyPreviewActionCopy.reviewNotice(
           for: .initial,
           actionTitle: englishNormal,
@@ -238,6 +292,104 @@ import Testing
         )
           == "미리보기를 연 뒤 Mac 상태가 변경되었습니다. 아직 적용된 항목은 없습니다. 갱신된 계획을 검토한 후 ‘사용 가능한 설정 적용’을 다시 누르세요."
       )
+    }
+
+    @Test("Apply Preview source binds review order, Beta semantics, and safe keyboard behavior")
+    func applyPreviewSourceContract() throws {
+      let testFile = URL(fileURLWithPath: #filePath)
+      let repositoryRoot =
+        testFile
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+      let sourceURL = repositoryRoot.appendingPathComponent(
+        "Sources/DeskSetupSwitcher/Workflow/TrayWorkflowWindowController.swift"
+      )
+      let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+      let body = try #require(
+        sourceSlice(
+          source,
+          after: "  var body: some View {\n    ScrollView {",
+          before: "\n  private var applyActionBar: some View {"
+        )
+      )
+      let orderedTokens = [
+        "previewHeader",
+        "hardwareVerificationNotice",
+        "applyNotices",
+        "ForEach(ApplyPreviewReviewOrderPolicy.contentSections",
+        "Divider()",
+        "applyActionBar",
+      ]
+      var searchStart = body.startIndex
+      for token in orderedTokens {
+        let range = try #require(body.range(of: token, range: searchStart..<body.endIndex))
+        searchStart = range.upperBound
+      }
+      #expect(body.contains(".defaultScrollAnchor(initialScrollAnchor)"))
+
+      let actionBar = try #require(
+        sourceSlice(
+          source,
+          after: "  private var applyActionBar: some View {",
+          before: "\n  @ViewBuilder\n  private var previewHeader: some View {"
+        )
+      )
+      #expect(
+        actionBar.contains("shortcut: ApplyPreviewDecisionPolicy.primaryActionShortcut")
+      )
+      #expect(!actionBar.contains("shortcut: .defaultAction"))
+      #expect(
+        actionBar.contains(
+          "focusesCancelOnAppear: ApplyPreviewDecisionPolicy.focusesActionsOnAppear"
+        )
+      )
+      #expect(
+        actionBar.contains("ApplyPreviewDecisionPolicy.isPrimaryActionDisabled(")
+      )
+
+      let hardwareStatus = try #require(
+        sourceSlice(
+          source,
+          after: "  private var hardwareVerificationNotice: some View {",
+          before: "\n  @ViewBuilder\n  private func operationRow"
+        )
+      )
+      #expect(
+        hardwareStatus.contains("Label(status.text, systemImage: status.systemImage)")
+      )
+      #expect(hardwareStatus.contains(".font(.callout.weight(.medium))"))
+      #expect(hardwareStatus.contains(".foregroundStyle(.primary)"))
+      #expect(
+        hardwareStatus.contains(
+          ".accessibilityIdentifier(\"apply-preview-beta-hardware-status\")"
+        )
+      )
+      #expect(hardwareStatus.contains(".accessibilityLabel(status.accessibilityLabel)"))
+      #expect(hardwareStatus.contains(".accessibilityValue(status.text)"))
+
+      let productionInitializer = try #require(
+        sourceSlice(
+          source,
+          after: "  init(\n    request: PendingApplyRequest,",
+          before: "\n  #if DEBUG"
+        )
+      )
+      #expect(productionInitializer.contains("self.showsHardwareVerificationStatus = true"))
+      #expect(productionInitializer.contains("self.initialScrollAnchor = .top"))
+    }
+
+    private func sourceSlice(
+      _ source: String,
+      after start: String,
+      before end: String
+    ) -> Substring? {
+      guard
+        let startRange = source.range(of: start),
+        let endRange = source.range(of: end, range: startRange.upperBound..<source.endIndex)
+      else { return nil }
+      return source[startRange.upperBound..<endRange.lowerBound]
     }
 
     @Test("location authorization updates permission copy and actions")

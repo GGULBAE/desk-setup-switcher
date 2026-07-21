@@ -50,6 +50,8 @@
 "Apply Available Settings" = "Apply Available Settings";
 "Apply Profile" = "Apply Profile";
 "This is a review. No setting changes until you press %@ below." = "This is a review. No setting changes until you press %@ below.";
+"Beta · Apply/rollback not hardware-verified. Check System Settings after applying." = "Beta · Apply/rollback not hardware-verified. Check System Settings after applying.";
+"Beta hardware verification status" = "Beta hardware verification status";
 "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press %@ again." = "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press %@ again.";
 "Executes the reviewed operations and then shows itemized results." = "Executes the reviewed operations and then shows itemized results.";
 "The apply preview is no longer current. Reopen it and try again." = "The apply preview is no longer current. Reopen it and try again.";

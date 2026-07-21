@@ -176,7 +176,7 @@ Use synthetic profile names and values. Do not choose Apply or mutate display, a
 | Gatekeeper/open | Identified Developer ID publisher; no Open Anyway | `<not recorded>` | [ ] |
 | Clean first launch | Menu-bar-only app appears normally | `<not recorded>` | [ ] |
 | Login default | Launch at login is off | `<not recorded>` | [ ] |
-| Three-step explanation | Capture → Edit → Review is understandable; stop before Apply | `<not recorded>` | [ ] |
+| Three-step explanation | Capture → Edit → Review is understandable; the localized Beta text-and-shield status explicitly says Apply/rollback are not hardware-verified and says to check System Settings afterward; at reduced height or large text, scroll through the plan until Cancel/Apply are reachable, then stop without activating Apply | `<not recorded>` | [ ] |
 | Upgrade | Recorded installable predecessor upgrades without losing schema-1 profiles, settings, selection, backups, or consent state; only a validator-approved first-public-beta lineage may record not applicable | `<not recorded>` | [ ] |
 | Schema migration | Synthetic schema 0 migrates to schema 1 without system-setting mutation | `<not recorded>` | [ ] |
 | Backup recovery | With app closed, synthetic primary corruption recovers last-known-good and quarantines safely | `<not recorded>` | [ ] |

@@ -79,7 +79,7 @@ enum ApplyResultCountPresentation {
   }
 }
 
-private enum WorkflowFooterShortcut {
+enum WorkflowFooterShortcut: Equatable, Sendable {
   case none
   case cancel
   case defaultAction
@@ -394,6 +394,19 @@ enum WorkflowErrorActionPolicy {
 }
 
 enum ApplyPreviewActionCopy {
+  static func hardwareVerificationNotice(languageCode: String? = nil) -> String {
+    localized(
+      "Beta · Apply/rollback not hardware-verified. Check System Settings after applying.",
+      languageCode: languageCode
+    )
+  }
+
+  static func hardwareVerificationAccessibilityLabel(
+    languageCode: String? = nil
+  ) -> String {
+    localized("Beta hardware verification status", languageCode: languageCode)
+  }
+
   static func actionTitle(
     for mode: ApplyMode,
     languageCode: String? = nil
@@ -426,6 +439,50 @@ enum ApplyPreviewActionCopy {
       return appLocalizedRuntime(key, languageCode: languageCode)
     }
     return appLocalizedRuntime(key)
+  }
+}
+
+struct ApplyPreviewHardwareVerificationStatus: Equatable, Sendable {
+  let text: String
+  let systemImage: String
+  let accessibilityLabel: String
+
+  static func localized(languageCode: String? = nil) -> Self {
+    Self(
+      text: ApplyPreviewActionCopy.hardwareVerificationNotice(languageCode: languageCode),
+      systemImage: "exclamationmark.shield",
+      accessibilityLabel: ApplyPreviewActionCopy.hardwareVerificationAccessibilityLabel(
+        languageCode: languageCode
+      )
+    )
+  }
+}
+
+enum ApplyPreviewReviewSection: CaseIterable, Hashable, Sendable {
+  case plannedChanges
+  case omissions
+  case validation
+  case rejections
+}
+
+enum ApplyPreviewReviewOrderPolicy {
+  static let contentSections: [ApplyPreviewReviewSection] = [
+    .plannedChanges,
+    .omissions,
+    .validation,
+    .rejections,
+  ]
+}
+
+enum ApplyPreviewDecisionPolicy {
+  static let primaryActionShortcut: WorkflowFooterShortcut = .none
+  static let focusesActionsOnAppear = false
+
+  static func isPrimaryActionDisabled(
+    canExecute: Bool,
+    isProfileMutationLocked: Bool
+  ) -> Bool {
+    !canExecute || isProfileMutationLocked
   }
 }
 
@@ -505,6 +562,19 @@ private struct AdaptiveWorkflowActionBar: View {
   let cancelAction: WorkflowFooterAction
   let trailingActions: [WorkflowFooterAction]
   let focusRequestID: String
+  let focusesCancelOnAppear: Bool
+
+  init(
+    cancelAction: WorkflowFooterAction,
+    trailingActions: [WorkflowFooterAction],
+    focusRequestID: String,
+    focusesCancelOnAppear: Bool = true
+  ) {
+    self.cancelAction = cancelAction
+    self.trailingActions = trailingActions
+    self.focusRequestID = focusRequestID
+    self.focusesCancelOnAppear = focusesCancelOnAppear
+  }
 
   var body: some View {
     AdaptiveWorkflowActionLayout(
@@ -517,6 +587,7 @@ private struct AdaptiveWorkflowActionBar: View {
     }
     .focusSection()
     .task(id: focusRequestID) {
+      guard focusesCancelOnAppear else { return }
       await Task.yield()
       keyboardFocusedActionID = WorkflowKeyboardFocusPolicy.initialActionID(
         cancelActionID: cancelAction.id,
@@ -575,6 +646,8 @@ struct ApplyPreviewView: View {
   @AccessibilityFocusState private var isHeadingAccessibilityFocused: Bool
   @State private var expandedTechnicalOperationIDs: Set<UUID> = []
   let request: PendingApplyRequest
+  let showsHardwareVerificationStatus: Bool
+  let initialScrollAnchor: UnitPoint
   let onCancel: () -> Void
   let onConfirm: () -> Void
 
@@ -584,103 +657,138 @@ struct ApplyPreviewView: View {
     onConfirm: @escaping () -> Void
   ) {
     self.request = request
+    self.showsHardwareVerificationStatus = true
+    self.initialScrollAnchor = .top
     self.onCancel = onCancel
     self.onConfirm = onConfirm
   }
+
+  #if DEBUG
+    init(
+      request: PendingApplyRequest,
+      showsHardwareVerificationStatus: Bool,
+      initialScrollAnchor: UnitPoint = .top,
+      onCancel: @escaping () -> Void = {},
+      onConfirm: @escaping () -> Void
+    ) {
+      self.request = request
+      self.showsHardwareVerificationStatus = showsHardwareVerificationStatus
+      self.initialScrollAnchor = initialScrollAnchor
+      self.onCancel = onCancel
+      self.onConfirm = onConfirm
+    }
+  #endif
 
   private var applyActionTitle: String {
     ApplyPreviewActionCopy.actionTitle(for: request.preparation.mode)
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      previewHeader
+    ScrollView {
+      VStack(alignment: .leading, spacing: 14) {
+        previewHeader
+        hardwareVerificationNotice
+        applyNotices
 
-      ScrollView {
-        VStack(alignment: .leading, spacing: 14) {
-          applyNotices
-
-          previewSection(
-            appLocalized("Planned changes"),
-            systemImage: "arrow.triangle.2.circlepath"
-          ) {
-            if request.preparation.operations.isEmpty {
-              Text(appLocalized("No setting needs to change."))
-                .foregroundStyle(.secondary)
-            } else {
-              ForEach(request.preparation.operations) { operation in
-                operationRow(operation)
-              }
-            }
-          }
-
-          if !request.preparation.omissions.isEmpty {
-            previewSection(
-              appLocalized("Skipped or unsupported"),
-              systemImage: "forward.end"
-            ) {
-              ForEach(request.preparation.omissions) { omission in
-                Label(appLocalizedRuntime(omission.reason), systemImage: "minus.circle")
-              }
-            }
-          }
-
-          if !request.preparation.validationIssues.isEmpty {
-            previewSection(
-              appLocalized("Validation"),
-              systemImage: "exclamationmark.bubble"
-            ) {
-              ForEach(request.preparation.validationIssues) { issue in
-                Label(
-                  appLocalizedRuntime(issue.message),
-                  systemImage: issue.isFatal ? "xmark.octagon" : "exclamationmark.circle"
-                )
-              }
-            }
-          }
-
-          if !request.preparation.rejectionReasons.isEmpty {
-            previewSection(appLocalized("Cannot apply"), systemImage: "hand.raised") {
-              ForEach(request.preparation.rejectionReasons, id: \.self) { reason in
-                Text(rejectionText(reason))
-              }
-            }
-          }
+        ForEach(ApplyPreviewReviewOrderPolicy.contentSections, id: \.self) { section in
+          reviewSection(section)
         }
-      }
-      .id(request.id)
-      .defaultScrollAnchor(.top)
-      .scrollBounceBehavior(.basedOnSize)
 
-      Divider()
-      AdaptiveWorkflowActionBar(
-        cancelAction: WorkflowFooterAction(
-          id: "cancel",
-          title: appLocalized("Cancel"),
-          role: .cancel,
-          shortcut: .cancel,
-          perform: onCancel
-        ),
-        trailingActions: [
-          WorkflowFooterAction(
-            id: "apply",
-            title: applyActionTitle,
-            accessibilityHint: appLocalized(
-              "Executes the reviewed operations and then shows itemized results."),
-            shortcut: .defaultAction,
-            isDisabled: !request.preparation.canExecute || model.isProfileMutationLocked,
-            isProminent: true,
-            perform: onConfirm
-          )
-        ],
-        focusRequestID: request.id.uuidString
-      )
+        Divider()
+        applyActionBar
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .id(request.id)
+    .defaultScrollAnchor(initialScrollAnchor)
+    .scrollBounceBehavior(.basedOnSize)
     .padding(20)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .task(id: request.id) {
       await Task.yield()
       isHeadingAccessibilityFocused = true
+    }
+  }
+
+  private var applyActionBar: some View {
+    AdaptiveWorkflowActionBar(
+      cancelAction: WorkflowFooterAction(
+        id: "cancel",
+        title: appLocalized("Cancel"),
+        role: .cancel,
+        shortcut: .cancel,
+        perform: onCancel
+      ),
+      trailingActions: [
+        WorkflowFooterAction(
+          id: "apply",
+          title: applyActionTitle,
+          accessibilityHint: appLocalized(
+            "Executes the reviewed operations and then shows itemized results."),
+          shortcut: ApplyPreviewDecisionPolicy.primaryActionShortcut,
+          isDisabled: ApplyPreviewDecisionPolicy.isPrimaryActionDisabled(
+            canExecute: request.preparation.canExecute,
+            isProfileMutationLocked: model.isProfileMutationLocked
+          ),
+          isProminent: true,
+          perform: onConfirm
+        )
+      ],
+      focusRequestID: request.id.uuidString,
+      focusesCancelOnAppear: ApplyPreviewDecisionPolicy.focusesActionsOnAppear
+    )
+  }
+
+  @ViewBuilder
+  private func reviewSection(_ section: ApplyPreviewReviewSection) -> some View {
+    switch section {
+    case .plannedChanges:
+      previewSection(
+        appLocalized("Planned changes"),
+        systemImage: "arrow.triangle.2.circlepath"
+      ) {
+        if request.preparation.operations.isEmpty {
+          Text(appLocalized("No setting needs to change."))
+            .foregroundStyle(.secondary)
+        } else {
+          ForEach(request.preparation.operations) { operation in
+            operationRow(operation)
+          }
+        }
+      }
+    case .omissions:
+      if !request.preparation.omissions.isEmpty {
+        previewSection(
+          appLocalized("Skipped or unsupported"),
+          systemImage: "forward.end"
+        ) {
+          ForEach(request.preparation.omissions) { omission in
+            Label(appLocalizedRuntime(omission.reason), systemImage: "minus.circle")
+          }
+        }
+      }
+    case .validation:
+      if !request.preparation.validationIssues.isEmpty {
+        previewSection(
+          appLocalized("Validation"),
+          systemImage: "exclamationmark.bubble"
+        ) {
+          ForEach(request.preparation.validationIssues) { issue in
+            Label(
+              appLocalizedRuntime(issue.message),
+              systemImage: issue.isFatal ? "xmark.octagon" : "exclamationmark.circle"
+            )
+          }
+        }
+      }
+    case .rejections:
+      if !request.preparation.rejectionReasons.isEmpty {
+        previewSection(appLocalized("Cannot apply"), systemImage: "hand.raised") {
+          ForEach(request.preparation.rejectionReasons, id: \.self) { reason in
+            Text(rejectionText(reason))
+          }
+        }
+      }
     }
   }
 
@@ -724,6 +832,21 @@ struct ApplyPreviewView: View {
     .font(.title2.bold())
     .accessibilityAddTraits(.isHeader)
     .accessibilityFocused($isHeadingAccessibilityFocused)
+  }
+
+  @ViewBuilder
+  private var hardwareVerificationNotice: some View {
+    if showsHardwareVerificationStatus {
+      let status = ApplyPreviewHardwareVerificationStatus.localized()
+      Label(status.text, systemImage: status.systemImage)
+        .font(.callout.weight(.medium))
+        .foregroundStyle(.primary)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier("apply-preview-beta-hardware-status")
+        .accessibilityLabel(status.accessibilityLabel)
+        .accessibilityValue(status.text)
+    }
   }
 
   @ViewBuilder

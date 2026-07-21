@@ -57,6 +57,7 @@ The historical remote **Release** workflow is still active and unsafe for any `v
 - Profiles, backups, and diagnostics stay on the Mac. The app has no account, cloud sync, app-owned server, telemetry, analytics, ads, or automatic profile switching.
 - App-managed profile and backup files are owner-private. Updates are staged and committed relative to one verified directory handle, and corrupt data is quarantined or recovered from the last-known-good backup when that can be proven safe.
 - Capture is read-only. Applying a profile always requires an explicit review and confirmation.
+- Apply Preview uses one review-to-decision scroll flow. A visible, non-color **Beta** status says Apply and rollback are not hardware-verified and asks you to check System Settings afterward; decision actions follow the review content, and Escape remains the cancel shortcut.
 - The app reads current state again before execution. If the profile, device state, capability, or rollback evidence changed, it applies nothing and returns to a refreshed review.
 - High-risk display and network changes use a 15-second **Keep Changes / Revert Now** safety window. Timeout, window close, confirmation failure, or a fatal transaction error requests rollback where supported.
 - Rollback is an attempt, not a guarantee. The result distinguishes success, failure, omission, rollback, rollback failure, and unverified outcomes so the current macOS state can be checked directly.
@@ -77,7 +78,7 @@ Selecting an audio input device does not record audio, so the app does not need 
 
 - The planned initial public beta targets **Apple Silicon** with a **macOS 14 Sonoma deployment target**. At least one external exact-candidate lifecycle report must pass on Sonoma before macOS 14 is claimed as supported.
 - The project can build an `x86_64` slice, but physical Intel installation and runtime testing have not passed. Intel is not currently a supported platform.
-- On 2026-07-20, current-source opt-in read-only tests passed the Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. Those tests do not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on this host, so those item-level claims and every apply/rollback path remain mock-only. No live setting mutation is verified.
+- On 2026-07-20, opt-in read-only tests passed the then-current Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. That dated run did not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on the host, so those item-level claims and every apply/rollback path remain mock-only. No live setting mutation is verified.
 - Current user-facing profile work is limited to Display, Audio, and Network. Legacy Input and condition data may round-trip through profile files but is dormant and does not drive automatic switching.
 - Keyboard behavior, accessible names and values, and non-color state cues remain part of UI quality. Comprehensive assistive-technology certification is outside the initial beta scope.
 

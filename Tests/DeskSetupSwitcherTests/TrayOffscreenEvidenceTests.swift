@@ -500,9 +500,16 @@ import Testing
         ),
       ]
       let outputDirectory = workflowEvidenceOutputDirectory
+      let bottomOutputDirectory = workflowBottomEvidenceOutputDirectory
       if let outputDirectory {
         try FileManager.default.createDirectory(
           at: outputDirectory,
+          withIntermediateDirectories: true
+        )
+      }
+      if let bottomOutputDirectory {
+        try FileManager.default.createDirectory(
+          at: bottomOutputDirectory,
           withIntermediateDirectories: true
         )
       }
@@ -510,10 +517,88 @@ import Testing
       for fixture in fixtures {
         setenv("DESK_SETUP_UI_AUDIT_LANGUAGE", fixture.languageCode, 1)
         let rendered = try renderApplyPreview(fixture)
+        let withoutHardwareStatus =
+          fixture.name == "23-apply-preview-en-initial"
+          ? try renderApplyPreview(fixture, showsHardwareVerificationStatus: false)
+          : nil
+        let bottomRendered =
+          fixture.largeText
+          ? try renderApplyPreview(fixture, initialScrollAnchor: .bottom)
+          : nil
         unsetenv("DESK_SETUP_UI_AUDIT_LANGUAGE")
 
         #expect(rendered.png.count > 10_000)
+        if let withoutHardwareStatus {
+          #expect(rendered.png != withoutHardwareStatus.png)
+        }
+        if let bottomRendered {
+          #expect(bottomRendered.png.count > 10_000)
+          #expect(rendered.png != bottomRendered.png)
+          #expect(bottomRendered.accessibility.contains("initial-scroll-anchor=bottom"))
+          let bottomRepresentation = try #require(
+            NSBitmapImageRep(data: bottomRendered.png)
+          )
+          let cancelActionInkCount = pixelCount(
+            in: bottomRepresentation,
+            viewport: fixture.size,
+            logicalRegion: CGRect(
+              x: 15,
+              y: fixture.size.height - 95,
+              width: 130,
+              height: 75
+            )
+          ) { perceivedBrightness($0) < 0.75 }
+          let applyActionInkCount = pixelCount(
+            in: bottomRepresentation,
+            viewport: fixture.size,
+            logicalRegion: CGRect(
+              x: fixture.size.width - 190,
+              y: fixture.size.height - 65,
+              width: 175,
+              height: 50
+            )
+          ) { perceivedBrightness($0) < 0.75 }
+          #expect(cancelActionInkCount > 50)
+          #expect(applyActionInkCount > 200)
+          if let bottomOutputDirectory {
+            try bottomRendered.png.write(
+              to: bottomOutputDirectory.appendingPathComponent(
+                "\(fixture.name)-bottom.png"
+              ),
+              options: .atomic
+            )
+            try bottomRendered.accessibility.write(
+              to: bottomOutputDirectory.appendingPathComponent(
+                "\(fixture.name)-bottom.ax.txt"
+              ),
+              atomically: true,
+              encoding: .utf8
+            )
+          }
+        }
         #expect(rendered.accessibility.contains("synthetic-apply-preview=true"))
+        #expect(
+          rendered.accessibility.contains(
+            "declared-beta-hardware-verification-status="
+              + ApplyPreviewActionCopy.hardwareVerificationNotice(
+                languageCode: fixture.languageCode
+              )
+          )
+        )
+        #expect(
+          rendered.accessibility.contains(
+            "declared-beta-hardware-verification-accessibility-label="
+              + ApplyPreviewActionCopy.hardwareVerificationAccessibilityLabel(
+                languageCode: fixture.languageCode
+              )
+          )
+        )
+        #expect(
+          rendered.accessibility.contains(
+            "declared-beta-hardware-verification-cues=text,exclamationmark.shield"
+          )
+        )
+        #expect(rendered.accessibility.contains("hardware-verification-status-visible=true"))
         #expect(!rendered.accessibility.contains("/Users/"))
         #expect(!rendered.accessibility.localizedCaseInsensitiveContains("password"))
         if let outputDirectory {
@@ -667,8 +752,22 @@ import Testing
       return URL(fileURLWithPath: path, isDirectory: true)
     }
 
+    private var workflowBottomEvidenceOutputDirectory: URL? {
+      guard
+        ProcessInfo.processInfo.environment[
+          "DESK_SETUP_WRITE_WORKFLOW_BOTTOM_EVIDENCE"
+        ] == "1",
+        let path = ProcessInfo.processInfo.environment[
+          "DESK_SETUP_WORKFLOW_BOTTOM_EVIDENCE_DIR"
+        ]
+      else { return nil }
+      return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
     private func renderApplyPreview(
-      _ fixture: ApplyPreviewFixture
+      _ fixture: ApplyPreviewFixture,
+      showsHardwareVerificationStatus: Bool = true,
+      initialScrollAnchor: UnitPoint = .top
     ) throws -> (png: Data, accessibility: String) {
       let configuration = UIAuditConfiguration(
         isEnabled: true,
@@ -728,13 +827,18 @@ import Testing
         reviewReason: fixture.reviewReason
       )
       let size = fixture.size
-      let root = ApplyPreviewView(request: request, onConfirm: {})
-        .environmentObject(model)
-        .environment(\.locale, Locale(identifier: fixture.languageCode))
-        .dynamicTypeSize(fixture.largeText ? .accessibility3 : .large)
-        .uiAuditEnvironment(configuration)
-        .frame(width: size.width, height: size.height)
-        .background(Color.white)
+      let root = ApplyPreviewView(
+        request: request,
+        showsHardwareVerificationStatus: showsHardwareVerificationStatus,
+        initialScrollAnchor: initialScrollAnchor,
+        onConfirm: {}
+      )
+      .environmentObject(model)
+      .environment(\.locale, Locale(identifier: fixture.languageCode))
+      .dynamicTypeSize(fixture.largeText ? .accessibility3 : .large)
+      .uiAuditEnvironment(configuration)
+      .frame(width: size.width, height: size.height)
+      .background(Color.white)
       let host = NSHostingView(rootView: root)
       host.frame = NSRect(origin: .zero, size: size)
       host.appearance = NSAppearance(named: .aqua)
@@ -757,6 +861,7 @@ import Testing
       let representation = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
       host.cacheDisplay(in: host.bounds, to: representation)
       let png = try #require(representation.representation(using: .png, properties: [:]))
+      let hardwareStatus = ApplyPreviewHardwareVerificationStatus.localized()
       var lines = [
         "source=ApplyPreviewView in attached offscreen NSWindow",
         "synthetic-apply-preview=true",
@@ -766,7 +871,14 @@ import Testing
         "review-reason=\(String(describing: fixture.reviewReason))",
         "mode=\(String(describing: fixture.mode))",
         "large-text=\(fixture.largeText)",
+        "initial-scroll-anchor=\(initialScrollAnchor == .bottom ? "bottom" : "top")",
         "live-display-audio-network-mutations=false",
+        "declared-beta-hardware-verification-status=" + hardwareStatus.text,
+        "declared-beta-hardware-verification-accessibility-label="
+          + hardwareStatus.accessibilityLabel,
+        "declared-beta-hardware-verification-cues=text,\(hardwareStatus.systemImage)",
+        "hardware-verification-status-visible=\(showsHardwareVerificationStatus)",
+        "offscreen-ax-limit=SwiftUI descendants may remain collapsed into AXGroup without ordering the window front",
       ]
       var visited: Set<ObjectIdentifier> = []
       appendAccessibility(host, depth: 0, lines: &lines, visited: &visited)
