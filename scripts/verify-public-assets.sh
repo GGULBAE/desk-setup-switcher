@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PUBLIC_DIR="$ROOT_DIR/site/public"
 CHECKSUM_FILE="$PUBLIC_DIR/assets.sha256"
 SOURCE_CHECKSUM_FILE="$ROOT_DIR/docs/evidence/public-release-assets/sources.sha256"
+SOURCE_FIXTURE_SLUG="bc3ec58"
 
 fail() {
     echo "Public asset verification failed: $*" >&2
@@ -16,7 +17,7 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "required command is unavailable: $1"
 }
 
-for command_name in awk cmp ffmpeg ffprobe grep ruby sed shasum sips stat strings; do
+for command_name in awk cmp ffmpeg ffprobe find grep ruby sed shasum sips sort stat strings; do
     require_command "$command_name"
 done
 
@@ -32,18 +33,30 @@ expected_assets=(
 )
 
 expected_sources=(
-    "docs/evidence/public-release-assets/f27c3f2/capture/01-empty-en-light.ax.txt"
-    "docs/evidence/public-release-assets/f27c3f2/capture/01-empty-en-light.png"
-    "docs/evidence/public-release-assets/f27c3f2/edit/13-display-en-light.ax.txt"
-    "docs/evidence/public-release-assets/f27c3f2/edit/13-display-en-light.png"
-    "docs/evidence/public-release-assets/f27c3f2/review/23-apply-preview-en-initial.ax.txt"
-    "docs/evidence/public-release-assets/f27c3f2/review/23-apply-preview-en-initial.png"
-    "docs/evidence/public-release-assets/f27c3f2/review/24-apply-preview-ko-refreshed.ax.txt"
-    "docs/evidence/public-release-assets/f27c3f2/review/24-apply-preview-ko-refreshed.png"
-    "docs/evidence/public-release-assets/f27c3f2/review/25-apply-preview-ko-minimum-large-text.ax.txt"
-    "docs/evidence/public-release-assets/f27c3f2/review/25-apply-preview-ko-minimum-large-text.png"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/capture/01-empty-en-light.ax.txt"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/capture/01-empty-en-light.png"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/edit/13-display-en-light.ax.txt"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/edit/13-display-en-light.png"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/23-apply-preview-en-initial.ax.txt"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/23-apply-preview-en-initial.png"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/24-apply-preview-ko-refreshed.ax.txt"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/24-apply-preview-ko-refreshed.png"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/25-apply-preview-ko-minimum-large-text.ax.txt"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/25-apply-preview-ko-minimum-large-text.png"
     "docs/evidence/public-release-assets/og-background-imagegen.png"
 )
+
+expected_source_tree="$({
+    printf '%s\n' "${expected_sources[@]}"
+    printf '%s\n' "docs/evidence/public-release-assets/sources.sha256"
+} | LC_ALL=C sort)"
+actual_source_tree="$(
+    find "$ROOT_DIR/docs/evidence/public-release-assets" -type f -print |
+        sed "s|^$ROOT_DIR/||" |
+        LC_ALL=C sort
+)"
+[[ "$actual_source_tree" == "$expected_source_tree" ]] ||
+    fail "source evidence tree contains missing or unexpected files"
 
 for relative_path in "${expected_assets[@]}"; do
     [[ -f "$PUBLIC_DIR/$relative_path" ]] || fail "missing required asset: site/public/$relative_path"
@@ -87,22 +100,22 @@ verify_png_properties "$PUBLIC_DIR/screenshots/edit.png" "screenshots/edit.png" 
 verify_png_properties "$PUBLIC_DIR/screenshots/review.png" "screenshots/review.png" 620 500 no
 verify_png_properties "$PUBLIC_DIR/og.png" "og.png" 1280 640 no
 
-SOURCE_FIXTURE_ROOT="$ROOT_DIR/docs/evidence/public-release-assets/f27c3f2"
+SOURCE_FIXTURE_ROOT="$ROOT_DIR/docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG"
 verify_png_properties \
     "$SOURCE_FIXTURE_ROOT/capture/01-empty-en-light.png" \
-    "f27c3f2/capture/01-empty-en-light.png" 368 260 yes
+    "$SOURCE_FIXTURE_SLUG/capture/01-empty-en-light.png" 368 260 yes
 verify_png_properties \
     "$SOURCE_FIXTURE_ROOT/edit/13-display-en-light.png" \
-    "f27c3f2/edit/13-display-en-light.png" 900 568 no
+    "$SOURCE_FIXTURE_SLUG/edit/13-display-en-light.png" 900 568 no
 verify_png_properties \
     "$SOURCE_FIXTURE_ROOT/review/23-apply-preview-en-initial.png" \
-    "f27c3f2/review/23-apply-preview-en-initial.png" 620 500 yes
+    "$SOURCE_FIXTURE_SLUG/review/23-apply-preview-en-initial.png" 620 500 yes
 verify_png_properties \
     "$SOURCE_FIXTURE_ROOT/review/24-apply-preview-ko-refreshed.png" \
-    "f27c3f2/review/24-apply-preview-ko-refreshed.png" 620 500 yes
+    "$SOURCE_FIXTURE_SLUG/review/24-apply-preview-ko-refreshed.png" 620 500 yes
 verify_png_properties \
     "$SOURCE_FIXTURE_ROOT/review/25-apply-preview-ko-minimum-large-text.png" \
-    "f27c3f2/review/25-apply-preview-ko-minimum-large-text.png" 520 360 yes
+    "$SOURCE_FIXTURE_SLUG/review/25-apply-preview-ko-minimum-large-text.png" 520 360 yes
 
 metadata_stripped_pngs=(
     "$PUBLIC_DIR/screenshots/capture.png"

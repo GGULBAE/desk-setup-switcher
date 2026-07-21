@@ -1,0 +1,16 @@
+source=ApplyPreviewView in attached offscreen NSWindow
+synthetic-apply-preview=true
+fixture=23-apply-preview-en-initial
+language=en
+viewport=620x500
+review-reason=initial
+mode=normal
+large-text=false
+initial-scroll-anchor=top
+live-display-audio-network-mutations=false
+declared-beta-hardware-verification-status=Beta · Apply/rollback not hardware-verified. Check System Settings after applying.
+declared-beta-hardware-verification-accessibility-label=Beta hardware verification status
+declared-beta-hardware-verification-cues=text,exclamationmark.shield
+hardware-verification-status-visible=true
+offscreen-ax-limit=SwiftUI descendants may remain collapsed into AXGroup without ordering the window front
+role=AXGroup

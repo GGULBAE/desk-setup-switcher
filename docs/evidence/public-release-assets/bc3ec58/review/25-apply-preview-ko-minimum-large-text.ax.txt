@@ -1,0 +1,16 @@
+source=ApplyPreviewView in attached offscreen NSWindow
+synthetic-apply-preview=true
+fixture=25-apply-preview-ko-minimum-large-text
+language=ko
+viewport=520x360
+review-reason=refreshedSystemState
+mode=force
+large-text=true
+initial-scroll-anchor=top
+live-display-audio-network-mutations=false
+declared-beta-hardware-verification-status=Beta · 적용/롤백은 실제 하드웨어 검증 전입니다. 적용 후 시스템 설정을 확인하세요.
+declared-beta-hardware-verification-accessibility-label=Beta 하드웨어 검증 상태
+declared-beta-hardware-verification-cues=text,exclamationmark.shield
+hardware-verification-status-visible=true
+offscreen-ax-limit=SwiftUI descendants may remain collapsed into AXGroup without ordering the window front
+role=AXGroup

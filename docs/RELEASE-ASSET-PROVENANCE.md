@@ -6,10 +6,10 @@ DEBUG-only synthetic UI fixtures. No installed personal profile, live Capture,
 Apply, permission request, UI automation, or display/audio/network mutation was
 used to create them.
 
-Capture, Edit, and Review were regenerated on 2026-07-20 from the exact
+Capture, Edit, and Review were regenerated on 2026-07-21 from the exact
 committed application-source tree
-`f27c3f285d21b454cbd7326f704c45f29023048c` (`Harden release storage and
-history audit`). Three filtered DEBUG-only offscreen evidence tests passed: one
+`bc3ec58e2f1f13e3c47be3e879fed957564012cd` (`Simplify and qualify Apply
+Preview flow`). Three filtered DEBUG-only offscreen evidence tests passed: one
 selected English empty-tray fixture, one selected English Display-editor
 fixture, and the three English/Korean Apply Preview fixtures. The evidence
 write paths were enabled only for those runs.
@@ -19,7 +19,7 @@ temporary profile store, no system snapshot adapters, and a confirmation
 closure that performs no action. The logical-size PNGs were visually inspected,
 normalized, and stripped of host ICC and ancillary metadata before being
 retained with their AX records under
-`docs/evidence/public-release-assets/f27c3f2/`. The AX records reject concrete
+`docs/evidence/public-release-assets/bc3ec58/`. The AX records reject concrete
 `/Users/` paths and password text; the retained source set also passed the
 release audit's credential, path, private-network, and device-identity scan.
 These properties establish the data-source boundary; they do not prove
@@ -30,15 +30,16 @@ installed-window behavior, real hardware support, Apply, or rollback.
 The renderer host was an Apple M5 Mac running macOS 26.5.2 (`25F84`). Xcode
 26.6 (`17F113`) was installed; the active `swift` driver reported Apple Swift
 6.3.3. The attached offscreen AppKit/SwiftUI windows were never ordered front.
-Their Retina backing scale produced raw 2× PNGs: `736×520` Capture, `1800×1136`
-Edit, `1240×1000` standard Review, and `1040×720` minimum Review. Those raw
-files retained host Display P3 or sRGB profiles and were not committed.
+The current offscreen renderer produced logical-size raw PNGs: `368×260`
+Capture, `900×568` Edit, `620×500` standard Review, and `520×360` minimum
+Review. Those raw files retained the host display or sRGB profile and were not
+committed; normalization removed that metadata before promotion.
 
 From a clean checkout whose `HEAD` equals the recorded source commit, the three
 DEBUG test invocations were:
 
 ```sh
-test "$(git rev-parse HEAD)" = "f27c3f285d21b454cbd7326f704c45f29023048c"
+test "$(git rev-parse HEAD)" = "bc3ec58e2f1f13e3c47be3e879fed957564012cd"
 
 DESK_SETUP_WRITE_TRAY_EVIDENCE=1 \
 DESK_SETUP_TRAY_EVIDENCE_DIR="$RAW_ROOT/capture" \
@@ -103,13 +104,13 @@ source PNG SHA-256 values in `sources.sha256` exactly.
 | Public asset | Source and transformation | SHA-256 | Synthetic and verification boundary |
 | --- | --- | --- | --- |
 | `site/public/app-icon.svg` | Exact copy of `Assets/AppIcon.svg`; original project artwork | `c183b584887cd946d0d0a4d3b1da77749ef4016ea6886c7ef798b7339aa1d109` | Contains no third-party logo or device artwork. The verifier requires byte identity with the canonical SVG. |
-| `site/public/screenshots/capture.png` | `docs/evidence/public-release-assets/f27c3f2/capture/01-empty-en-light.png` (`6622e3331e9a712cbfdcc1bcceb2d80b43d832226b866227e1e8f30c37b4016e`), flattened over white and normalized to opaque RGB24 by `scripts/build-public-demo.sh`, then stripped to critical PNG chunks | `5907d8427859093407373d0fa9bf6959a85d81baa7fc0f4a9a2c630f9531fcd5` | English light empty state, `368×260`, 17,830 bytes. Shows one centered Capture entry point; Capture was not invoked. No embedded ICC, textual, ancillary, or host-identifying metadata remains. |
-| `site/public/screenshots/edit.png` | `docs/evidence/public-release-assets/f27c3f2/edit/13-display-en-light.png` (`5010e59ae841678c1b39bca716b1a734dfe2d8c9f76cff8cba005ec159e74ec8`), normalized to opaque RGB24 by `scripts/build-public-demo.sh`, then stripped to critical PNG chunks | `5010e59ae841678c1b39bca716b1a734dfe2d8c9f76cff8cba005ec159e74ec8` | English light synthetic Display editor, `900×568`, 83,772 bytes. The footer identifies synthetic UI-audit mode; no save or hardware catalog operation occurred. No embedded ICC, textual, ancillary, or host-identifying metadata remains. |
-| `site/public/screenshots/review.png` | `docs/evidence/public-release-assets/f27c3f2/review/23-apply-preview-en-initial.png` (`c31ba7e9d5543843297e87f1abdd76d65bbbd81b3d9d4420470c786d660e71d9`), flattened over white and normalized to opaque RGB24 by `scripts/build-public-demo.sh`, then stripped to critical PNG chunks | `6e01331fbb47099c383f501bdc2a0455f178375cf0746d34bd4b628feb0cd2cc` | English light initial normal Apply Preview, `620×500`, 85,018 bytes. The warning promises a restoration attempt, not a guarantee. Planned values are hard-coded test data and the confirmation closure performs no action. Apply and rollback were not run. No embedded ICC, textual, ancillary, or host-identifying metadata remains. |
-| `site/public/demo/desk-setup-switcher.mp4` | The three normalized public screenshots, composed by `scripts/build-public-demo.sh` in Capture → Edit → Review order with two 0.6-second FFmpeg fades; H.264, `1280×720`, `yuv420p`, 37 seconds, input metadata excluded | `3f0e676d713842be7948fe002a9384c0df98a118dc1c422f882daa5a5815e094` | 467,726-byte silent synthetic product tour. It does not animate a click, claim successful Apply, or simulate hardware effects. The Review frame remains visible at the end. Standard MP4 brand, handler, and FFmpeg encoder tags remain; no source path, device, network, or personal metadata is present. |
-| `site/public/demo/captions.en.vtt` | Original English caption copy written for the 37-second synthetic tour | `467bb3f0c453709fd38398b3ea9a7ef7451abb872734be6e691215c2309a27b5` | Five contiguous WebVTT cues from `00:00.000` through `00:37.000`; calls the artifact a public-beta candidate and keeps Apply a separate confirmation. |
-| `site/public/demo/captions.ko.vtt` | Original Korean caption copy written for the same 37-second synthetic tour | `c43c6be5cc894cb4ea6de48695a0382b22b991b24896def62a99bffe427cc1b9` | Five contiguous WebVTT cues matching the English timing and verification boundary. |
-| `site/public/og.png` | `docs/evidence/public-release-assets/og-background-imagegen.png` (`ee29d142b55020ca65fd7196ed3bb2c8a861111bab94ffe30fd3b2a330b6f543`), exact public icon, regenerated Edit screenshot, and evergreen English copy composed at `1280×640` by `scripts/build-social-preview.swift`, then normalized to opaque RGB24 and stripped to critical PNG chunks | `48267a74bc5b72a0d6843f3fb9967fd74da6df11717d0fc3b9874936811d509e` | The abstract background was produced with OpenAI image generation and contains no person, place, device, logo, or factual scene. The final 556,664-byte composition was visually inspected and has no embedded profile or ancillary metadata. |
+| `site/public/screenshots/capture.png` | `docs/evidence/public-release-assets/bc3ec58/capture/01-empty-en-light.png` (`cf04f1b858ce7cf51130ba1c3c99432f0701ee0f856ecad979d017051c4a7309`), flattened over white and normalized to opaque RGB24 by `scripts/build-public-demo.sh`, then stripped to critical PNG chunks | `b9cf538d3c45efccd2b42e3906af36a08a5ce83bba3561d1e7794d57b43190c9` | English light empty state, `368×260`, 12,827 bytes. Shows one centered Capture entry point; Capture was not invoked. No embedded ICC, textual, ancillary, or host-identifying metadata remains. |
+| `site/public/screenshots/edit.png` | `docs/evidence/public-release-assets/bc3ec58/edit/13-display-en-light.png` (`26f736695bb78f0b90e32de9e210111fa9aa5178e23ba494f5f146936144e3f9`), normalized to opaque RGB24 by `scripts/build-public-demo.sh`, then stripped to critical PNG chunks | `26f736695bb78f0b90e32de9e210111fa9aa5178e23ba494f5f146936144e3f9` | English light synthetic Display editor, `900×568`, 57,227 bytes. The footer identifies synthetic UI-audit mode; no save or hardware catalog operation occurred. No embedded ICC, textual, ancillary, or host-identifying metadata remains. |
+| `site/public/screenshots/review.png` | `docs/evidence/public-release-assets/bc3ec58/review/23-apply-preview-en-initial.png` (`3611b34acef0bd311667cbd134fa62e76b19dbc4e751c27dd64ab2737d85ae0b`), flattened over white and normalized to opaque RGB24 by `scripts/build-public-demo.sh`, then stripped to critical PNG chunks | `cf23a1c2a6080ff1bff1b64baa26cdd59aaa70ed232d852cd86216aae3b9351d` | English light initial normal Apply Preview, `620×500`, 55,817 bytes. The visible text-and-shield Beta status says Apply/rollback are not hardware-verified and asks users to check System Settings afterward. Review content precedes both decision actions; the confirmation closure performs no action. Apply and rollback were not run. No embedded ICC, textual, ancillary, or host-identifying metadata remains. |
+| `site/public/demo/desk-setup-switcher.mp4` | The three normalized public screenshots, composed by `scripts/build-public-demo.sh` in Capture → Edit → Review order with two 0.6-second FFmpeg fades; H.264, `1280×720`, `yuv420p`, 37 seconds, input metadata excluded | `ef9ad94ce5b427d06b6d15de76f12cfd0f04dfc111287593146e6eb750c9e56c` | 482,638-byte silent synthetic product tour. It does not animate a click, claim successful Apply, or simulate hardware effects. The Review frame and Beta boundary remain visible at the end. Standard MP4 brand, handler, and FFmpeg encoder tags remain; no source path, device, network, or personal metadata is present. |
+| `site/public/demo/captions.en.vtt` | Original English caption copy written for the 37-second synthetic tour | `360b36314ffda121597bc1c17af5139a84a0161f3ffa81a6fbccc12d9797a6e5` | Five contiguous WebVTT cues from `00:00.000` through `00:37.000`; calls the artifact a public-beta candidate, names the Beta hardware-verification boundary, keeps Apply separate, and asks users to check System Settings afterward. |
+| `site/public/demo/captions.ko.vtt` | Original Korean caption copy written for the same 37-second synthetic tour | `ed5a31c48a782e67522a3f1c5144f436bfee287a0178b3f3c0983eb71ed445b4` | Five contiguous WebVTT cues matching the English timing and verification boundary. |
+| `site/public/og.png` | `docs/evidence/public-release-assets/og-background-imagegen.png` (`ee29d142b55020ca65fd7196ed3bb2c8a861111bab94ffe30fd3b2a330b6f543`), exact public icon, regenerated Edit screenshot, and evergreen English copy composed at `1280×640` by `scripts/build-social-preview.swift`, then normalized to opaque RGB24 and stripped to critical PNG chunks | `6cff49e8e86e42f82e8b92a96f74af77c6609073a486a9ee43c0660b56b9adda` | The abstract background was produced with OpenAI image generation and contains no person, place, device, logo, or factual scene. The final 552,970-byte composition was visually inspected and has no embedded profile or ancillary metadata. |
 
 The public PNG and video normalization was performed with FFmpeg 8.1.2. All
 three screenshots and the video are current deterministic outputs of
@@ -171,7 +172,7 @@ scripts/build-social-preview.sh
 make verify-public-assets
 ```
 
-The first script defaults to the evidence directory pinned to `f27c3f2`. The
+The first script defaults to the evidence directory pinned to `bc3ec58`. The
 verifier requires `ffmpeg`, `ffprobe`, `ruby`, `sips`, `shasum`, and standard
 macOS command-line tools. Missing media prerequisites are failures, not skipped
 checks. It verifies exact geometry, expected alpha, absence of embedded ICC
@@ -184,9 +185,13 @@ checksum manifests are mandatory, must contain exactly their declared files,
 and are checked from their respective base directories.
 
 This automated evidence does not OCR image pixels or certify complete
-accessibility. On 2026-07-20, the three public screenshots and social preview
-were visually compared with their named sources at original resolution; the
-Capture content was centered, Edit remained coherent without unintended
-clipping, and Review exposed its warning, changes, and actions. English and
-Korean AX records were retained, but full VoiceOver certification is excluded
-from the initial public-beta gate and is not claimed.
+accessibility. On 2026-07-21, all five normalized source images were visually
+compared side by side with the preceding pinned sources at matching viewports,
+and the three public screenshots, social preview, and representative demo
+frames were inspected. Capture remained centered, Edit remained coherent
+without unintended clipping, standard Review exposed the Beta boundary,
+warnings, changes, and actions, and minimum-size Korean large text began at the
+top with the rest reachable through the tested scroll sequence. English and
+Korean AX boundary records were retained; offscreen SwiftUI descendants may
+remain collapsed into `AXGroup`, so complete focused-control observation and
+full VoiceOver certification are not claimed.

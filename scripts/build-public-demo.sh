@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_ROOT="${1:-$ROOT_DIR/docs/evidence/public-release-assets/f27c3f2}"
+SOURCE_ROOT="${1:-$ROOT_DIR/docs/evidence/public-release-assets/bc3ec58}"
 SOURCE_CAPTURE="$SOURCE_ROOT/capture/01-empty-en-light.png"
 SOURCE_EDIT="$SOURCE_ROOT/edit/13-display-en-light.png"
 SOURCE_REVIEW="$SOURCE_ROOT/review/23-apply-preview-en-initial.png"
