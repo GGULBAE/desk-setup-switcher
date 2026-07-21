@@ -68,6 +68,8 @@ class ExternalBetaPolicyTestSuite
     verification_output = {
       "appCodesign" => "valid on disk\nsatisfies its designated requirement\n",
       "dmgCodesign" => "valid on disk\nsatisfies its designated requirement\n",
+      "mountedAppCompatibility" => "Verified release app metadata and resources: architectures=arm64,x86_64; minos=arm64:14.0,x86_64:14.0; executable-sha256=#{"3" * 64}\n",
+      "signedAppCompatibility" => "Verified release app metadata and resources: architectures=arm64,x86_64; minos=arm64:14.0,x86_64:14.0; executable-sha256=#{"3" * 64}\n",
       "spctlApp" => "accepted\nsource=Notarized Developer ID\n",
       "spctlDMG" => "accepted\nsource=Notarized Developer ID\n",
       "staplerValidate" => "The validate action worked!\n"
@@ -88,7 +90,10 @@ class ExternalBetaPolicyTestSuite
           "url" => "https://github.com/#{REPOSITORY}/actions/runs/#{RUN_ID}"
         }
       },
-      "toolchain" => { "swift" => "synthetic-6.0" },
+      "toolchain" => {
+        "minimum-system-version" => "14.0",
+        "swift" => "synthetic-6.0"
+      },
       "application" => {
         "bundleIdentifier" => BUNDLE_IDENTIFIER,
         "teamIdentifier" => "ABCDE12345",

@@ -87,6 +87,7 @@ ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-release-manifest \
     --run-id "$RELEASE_CANDIDATE_RUN_ID" \
     --run-attempt "$RELEASE_CANDIDATE_RUN_ATTEMPT" \
     --run-url "$run_url" \
+    --minimum-system-version "$MINIMUM_SYSTEM_VERSION" \
     --asset "$dmg_name=$dmg_path" \
     --asset "$(basename "$checksum_path")=$checksum_path" \
     --asset "$(basename "$sbom_path")=$sbom_path" \

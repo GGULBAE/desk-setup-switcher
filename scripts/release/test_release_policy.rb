@@ -475,10 +475,15 @@ class ReleasePolicyTestSuite
     app
   end
 
-  def verification_files(directory)
+  def verification_files(directory, executable_sha256:)
+    compatibility =
+      "Verified release app metadata and resources: architectures=arm64,x86_64; " \
+      "minos=arm64:14.0,x86_64:14.0; executable-sha256=#{executable_sha256}\n"
     {
       "appCodesign" => write(File.join(directory, "app-codesign.txt"), "/synthetic/app: valid on disk\n/synthetic/app: satisfies its Designated Requirement\n"),
       "dmgCodesign" => write(File.join(directory, "dmg-codesign.txt"), "/synthetic/dmg: valid on disk\n/synthetic/dmg: satisfies its Designated Requirement\n"),
+      "mountedAppCompatibility" => write(File.join(directory, "mounted-app-compatibility.txt"), compatibility),
+      "signedAppCompatibility" => write(File.join(directory, "signed-app-compatibility.txt"), compatibility),
       "staplerValidate" => write(File.join(directory, "stapler.txt"), "The validate action worked!\n"),
       "spctlDMG" => write(File.join(directory, "spctl-dmg.txt"), "/synthetic/dmg: accepted\nsource=Notarized Developer ID\n"),
       "spctlApp" => write(File.join(directory, "spctl-app.txt"), "/synthetic/app: accepted\nsource=Notarized Developer ID\n")
@@ -498,6 +503,7 @@ class ReleasePolicyTestSuite
       "--run-attempt", RUN_ATTEMPT,
       "--run-url", RUN_URL,
       "--toolchain", "architecture=arm64",
+      "--toolchain", "minimum-system-version=14.0",
       "--toolchain", "runner=macos-15",
       "--toolchain", "swift=Swift 6.1",
       "--toolchain", "xcode=Xcode 16.4",
@@ -579,7 +585,10 @@ class ReleasePolicyTestSuite
         File.basename(notary) => notary,
         File.basename(notary_log) => notary_log
       },
-      verifications: verification_files(directory)
+      verifications: verification_files(
+        directory,
+        executable_sha256: Digest::SHA256.file(executable).hexdigest
+      )
     }
   end
 
@@ -600,6 +609,7 @@ class ReleasePolicyTestSuite
       "--run-id", RUN_ID,
       "--run-attempt", RUN_ATTEMPT,
       "--run-url", RUN_URL,
+      "--minimum-system-version", "14.0",
       *asset_arguments
     ]
   end
@@ -625,7 +635,7 @@ class ReleasePolicyTestSuite
         assert_equal("desk-setup-switcher.release-evidence/v1", manifest.fetch("schemaVersion"))
         assert_equal(COMMIT, manifest.dig("release", "commit"))
         assert_equal(123456789, manifest.dig("release", "run", "id"))
-        assert_equal(%w[architecture runner swift xcode], manifest.fetch("toolchain").keys)
+        assert_equal(%w[architecture minimum-system-version runner swift xcode], manifest.fetch("toolchain").keys)
         assert_equal(
           {
             "arm64" => "0123456789abcdef0123456789abcdef01234567",
@@ -640,7 +650,15 @@ class ReleasePolicyTestSuite
         assert_equal("Accepted", manifest.dig("lineage", "notary", "status"))
         assert_equal(Digest::SHA256.file(context.fetch(:pre_dmg)).hexdigest,
                      manifest.dig("lineage", "notary", "submittedSha256"))
-        assert_equal(%w[appCodesign dmgCodesign spctlApp spctlDMG staplerValidate], manifest.fetch("verifications").map { |record| record.fetch("name") })
+        assert_equal(
+          %w[appCodesign dmgCodesign mountedAppCompatibility signedAppCompatibility spctlApp spctlDMG staplerValidate],
+          manifest.fetch("verifications").map { |record| record.fetch("name") }
+        )
+        compatibility_outputs = manifest.fetch("verifications").filter_map do |record|
+          record.fetch("output") if record.fetch("name").end_with?("AppCompatibility")
+        end
+        assert_equal(2, compatibility_outputs.length)
+        assert_equal(1, compatibility_outputs.uniq.length)
         assert(manifest.fetch("verifications").all? { |record| record.fetch("result") == "pass" }, "verification records were not pass-only")
         assert(manifest.fetch("verifications").all? { |record| !record.fetch("output").empty? }, "verification outputs were not embedded")
         assert(
@@ -750,6 +768,48 @@ class ReleasePolicyTestSuite
         extra_context = create_release_context(File.join(directory, "extra"))
         extra_context[:verifications]["securityAudit"] = write(File.join(directory, "extra", "security-audit.txt"), "PASS\n")
         assert_failure(*release_manifest_arguments(extra_context, output: File.join(directory, "extra.json")))
+      end
+    end
+
+    run("release manifest binds signed and mounted Mach-O compatibility to the declared minimum") do
+      Dir.mktmpdir do |directory|
+        context = create_release_context(directory)
+        context[:verifications]["signedAppCompatibility"] = write(
+          File.join(directory, "wrong-minimum.txt"),
+          "Verified release app metadata and resources: architectures=arm64,x86_64; " \
+          "minos=arm64:15.0,x86_64:15.0; " \
+          "executable-sha256=#{Digest::SHA256.file(context.fetch(:executable)).hexdigest}\n"
+        )
+        assert_failure(*release_manifest_arguments(context, output: File.join(directory, "wrong-minimum.json")))
+
+        context = create_release_context(File.join(directory, "asymmetric"))
+        context[:verifications]["mountedAppCompatibility"] = write(
+          File.join(directory, "asymmetric", "wrong-slice.txt"),
+          "Verified release app metadata and resources: architectures=arm64,x86_64; " \
+          "minos=arm64:14.0,x86_64:15.0; " \
+          "executable-sha256=#{Digest::SHA256.file(context.fetch(:executable)).hexdigest}\n"
+        )
+        assert_failure(*release_manifest_arguments(context, output: File.join(directory, "asymmetric.json")))
+      end
+    end
+
+    run("release manifest verification anchors self-consistent compatibility evidence to policy") do
+      Dir.mktmpdir do |directory|
+        context = create_release_context(directory)
+        manifest = File.join(directory, "release-manifest.json")
+        assert_success(*release_manifest_arguments(context, output: manifest))
+        data = JSON.parse(File.binread(manifest))
+        data.fetch("toolchain")["minimum-system-version"] = "15.0"
+        data.fetch("verifications").each do |record|
+          next unless record.fetch("name").end_with?("AppCompatibility")
+
+          output = record.fetch("output").gsub("arm64:14.0,x86_64:14.0", "arm64:15.0,x86_64:15.0")
+          record["output"] = output
+          record["sha256"] = Digest::SHA256.hexdigest(output.b)
+          record["size"] = output.bytesize
+        end
+        changed = write(File.join(directory, "self-consistent-policy-tamper.json"), JSON.pretty_generate(data) + "\n")
+        assert_failure(*verify_manifest_arguments(context, manifest: changed))
       end
     end
 

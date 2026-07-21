@@ -22,11 +22,17 @@ module ReleasePolicy
   REQUIRED_VERIFICATIONS = %w[
     appCodesign
     dmgCodesign
+    mountedAppCompatibility
+    signedAppCompatibility
     staplerValidate
     spctlDMG
     spctlApp
   ].freeze
   APP_ARCHITECTURES = %w[arm64 x86_64].freeze
+  APP_COMPATIBILITY_VERIFICATIONS = %w[
+    mountedAppCompatibility
+    signedAppCompatibility
+  ].freeze
   JSON_STRING_TOKEN = /"(?:[^"\\\x00-\x1f]|\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4}))*"/.freeze
 
   class PolicyError < StandardError; end
@@ -836,8 +842,33 @@ module ReleasePolicy
       lower.include?("the validate action worked")
     when "spctlDMG", "spctlApp"
       lower.include?("accepted") && lower.include?("source=notarized developer id")
+    when *APP_COMPATIBILITY_VERIFICATIONS
+      normalized.match?(/\AVerified release app metadata and resources: architectures=arm64,x86_64; minos=arm64:[1-9][0-9]*(?:\.[0-9]+){1,2},x86_64:[1-9][0-9]*(?:\.[0-9]+){1,2}; executable-sha256=[0-9a-f]{64}\z/)
     else
       false
+    end
+  end
+
+  def verify_app_compatibility_records(verifications, toolchain, expected_executable_sha256:)
+    minimum_system_version = toolchain["minimum-system-version"]
+    unless minimum_system_version.is_a?(String) &&
+           minimum_system_version.match?(/\A[1-9][0-9]*(?:\.[0-9]+){1,2}\z/)
+      raise PolicyError, "release toolchain minimum system version is missing or invalid"
+    end
+    executable_sha256 = validate_sha256(
+      expected_executable_sha256,
+      "release compatibility executable digest"
+    )
+    expected_output =
+      "Verified release app metadata and resources: architectures=arm64,x86_64; " \
+      "minos=arm64:#{minimum_system_version},x86_64:#{minimum_system_version}; " \
+      "executable-sha256=#{executable_sha256}\n"
+    records_by_name = verifications.to_h { |record| [record["name"], record] }
+    APP_COMPATIBILITY_VERIFICATIONS.each do |name|
+      record = records_by_name[name]
+      unless record && record["output"] == expected_output
+        raise PolicyError, "release compatibility evidence does not match the declared minimum system version"
+      end
     end
   end
 
@@ -934,6 +965,11 @@ module ReleasePolicy
     )
     assets = asset_entries(asset_specs)
     verifications = verification_records(verification_specs)
+    verify_app_compatibility_records(
+      verifications,
+      toolchain,
+      expected_executable_sha256: executable["sha256"]
+    )
     final_name = validate_asset_name(File.basename(final_dmg_path))
     final_asset = assets.find { |asset| asset["name"] == final_name }
     unless final_asset && final_asset["sha256"] == final_dmg["sha256"] && final_asset["size"] == final_dmg["size"]
@@ -1151,6 +1187,11 @@ module ReleasePolicy
     unless verification_names == REQUIRED_VERIFICATIONS.sort
       raise PolicyError, "release verification records must exactly match the required set"
     end
+    verify_app_compatibility_records(
+      verifications,
+      toolchain,
+      expected_executable_sha256: application.dig("executable", "sha256")
+    )
 
     assets = validate_asset_records(manifest["assets"])
     final_asset = assets.find { |asset| asset["name"] == final_dmg["name"] }
@@ -1183,8 +1224,19 @@ module ReleasePolicy
 
   def verify_release_manifest(manifest_path:, asset_specs:, expected_version:, expected_build_number:,
                               expected_tag:, expected_commit:, expected_namespace:, expected_created:,
-                              expected_run_id:, expected_run_attempt:, expected_run_url:)
+                              expected_run_id:, expected_run_attempt:, expected_run_url:,
+                              expected_minimum_system_version:)
     manifest = load_release_manifest(manifest_path)
+    minimum_system_version = ensure_single_line(
+      expected_minimum_system_version,
+      "expected minimum system version"
+    )
+    unless minimum_system_version.match?(/\A[1-9][0-9]*(?:\.[0-9]+){1,2}\z/)
+      raise PolicyError, "expected minimum system version is invalid"
+    end
+    unless manifest.dig("toolchain", "minimum-system-version") == minimum_system_version
+      raise PolicyError, "release manifest minimum system version does not match release policy"
+    end
     expected_release = validate_release_identity(
       version: expected_version,
       tag: expected_tag,
@@ -1484,24 +1536,26 @@ module ReleasePolicy
       puts "OK release-manifest"
     when "verify-release-manifest"
       options = { assets: [] }
-      parser = option_parser("Usage: release_policy.rb verify-release-manifest --manifest FILE --version VERSION --build-number BUILD --tag TAG --commit SHA --namespace URI --created RFC3339Z --run-id ID --run-attempt N --run-url URL --asset NAME=PATH [--asset NAME=PATH ...]")
+      parser = option_parser("Usage: release_policy.rb verify-release-manifest --manifest FILE --version VERSION --build-number BUILD --tag TAG --commit SHA --namespace URI --created RFC3339Z --run-id ID --run-attempt N --run-url URL --minimum-system-version VERSION --asset NAME=PATH [--asset NAME=PATH ...]")
       parser.on("--manifest FILE") { |value| options[:manifest] = value }
       parse_common_identity(parser, options)
       parser.on("--build-number BUILD") { |value| options[:build_number] = value }
       parser.on("--run-id ID") { |value| options[:run_id] = value }
       parser.on("--run-attempt N") { |value| options[:run_attempt] = value }
       parser.on("--run-url URL") { |value| options[:run_url] = value }
+      parser.on("--minimum-system-version VERSION") { |value| options[:minimum_system_version] = value }
       parser.on("--asset NAME=PATH") { |value| options[:assets] << value }
       parse_exact!(parser, argv)
       required!(options, :manifest, :version, :build_number, :tag, :commit, :namespace, :created,
-                :run_id, :run_attempt, :run_url, :assets)
+                :run_id, :run_attempt, :run_url, :minimum_system_version, :assets)
       verify_release_manifest(
         manifest_path: options[:manifest], asset_specs: options[:assets],
         expected_version: options[:version], expected_build_number: options[:build_number],
         expected_tag: options[:tag], expected_commit: options[:commit],
         expected_namespace: options[:namespace], expected_created: options[:created],
         expected_run_id: options[:run_id], expected_run_attempt: options[:run_attempt],
-        expected_run_url: options[:run_url]
+        expected_run_url: options[:run_url],
+        expected_minimum_system_version: options[:minimum_system_version]
       )
       puts "OK release-manifest-assets"
     when "verify-mounted-app"

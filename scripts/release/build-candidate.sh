@@ -169,6 +169,8 @@ codesign \
     "$signed_app"
 app_codesign_verify="$staging_root/app-codesign-verify.txt"
 codesign --verify --deep --strict --all-architectures --verbose=2 "$signed_app" >"$app_codesign_verify" 2>&1
+signed_app_compatibility="$staging_root/signed-app-compatibility.txt"
+"$RELEASE_SCRIPTS_DIR/verify-app-bundle.sh" "$signed_app" >"$signed_app_compatibility"
 
 app_codesign_report_arguments=()
 for architecture in arm64 x86_64; do
@@ -330,7 +332,8 @@ spctl --assess \
 hdiutil attach -quiet -nobrowse -readonly -mountpoint "$mount_point" "$dmg_path"
 attached=true
 mounted_app="$mount_point/$APP_NAME.app"
-"$RELEASE_SCRIPTS_DIR/verify-app-bundle.sh" "$mounted_app"
+mounted_app_compatibility="$staging_root/mounted-app-compatibility.txt"
+"$RELEASE_SCRIPTS_DIR/verify-app-bundle.sh" "$mounted_app" >"$mounted_app_compatibility"
 "$RELEASE_SCRIPTS_DIR/compare-bundle-manifest.sh" "$signed_app_manifest" "$mounted_app"
 mounted_app_codesign_verify="$staging_root/mounted-app-codesign-verify.txt"
 codesign --verify --deep --strict --all-architectures --verbose=2 "$mounted_app" >"$mounted_app_codesign_verify" 2>&1
@@ -391,12 +394,16 @@ manifest_namespace="https://github.com/GGULBAE/desk-setup-switcher/release-evide
 
 sanitized_app_codesign="$staging_root/app-codesign-verify.sanitized.txt"
 sanitized_dmg_codesign="$staging_root/dmg-codesign-verify.sanitized.txt"
+sanitized_signed_app_compatibility="$staging_root/signed-app-compatibility.sanitized.txt"
+sanitized_mounted_app_compatibility="$staging_root/mounted-app-compatibility.sanitized.txt"
 sanitized_designated_requirement="$staging_root/app-designated-requirement.sanitized.txt"
 sanitized_stapler="$staging_root/stapler-validate.sanitized.txt"
 sanitized_spctl_dmg="$staging_root/spctl-dmg.sanitized.txt"
 sanitized_spctl_app="$staging_root/spctl-app.sanitized.txt"
 release_sanitize_text "$app_codesign_verify" "$sanitized_app_codesign"
 release_sanitize_text "$final_dmg_codesign_verify" "$sanitized_dmg_codesign"
+release_sanitize_text "$signed_app_compatibility" "$sanitized_signed_app_compatibility"
+release_sanitize_text "$mounted_app_compatibility" "$sanitized_mounted_app_compatibility"
 release_sanitize_text "$designated_requirement" "$sanitized_designated_requirement"
 release_sanitize_text "$stapler_output" "$sanitized_stapler"
 release_sanitize_text "$spctl_dmg_output" "$sanitized_spctl_dmg"
@@ -438,6 +445,8 @@ ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" generate-release-manifest \
     --asset "$(basename "$notary_log_path")=$notary_log_path" \
     --verification "appCodesign=$sanitized_app_codesign" \
     --verification "dmgCodesign=$sanitized_dmg_codesign" \
+    --verification "mountedAppCompatibility=$sanitized_mounted_app_compatibility" \
+    --verification "signedAppCompatibility=$sanitized_signed_app_compatibility" \
     --verification "staplerValidate=$sanitized_stapler" \
     --verification "spctlDMG=$sanitized_spctl_dmg" \
     --verification "spctlApp=$sanitized_spctl_app" \

@@ -83,6 +83,9 @@ pass
 ruby "$RELEASE_SCRIPTS_DIR/test_external_beta_policy.rb"
 pass
 
+"$RELEASE_SCRIPTS_DIR/test_verify_app_bundle.sh"
+pass
+
 "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector.sh"
 pass
 

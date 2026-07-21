@@ -21,7 +21,7 @@ Every protected Developer ID candidate dispatch consumes its build number, inclu
 
 ## CPU support
 
-The Xcode and package gates currently cross-build a universal `arm64 x86_64` executable, and package inspection confirms both slices. Runtime and install evidence exists on Apple Silicon. Physical Intel execution, clean install, upgrade, profile recovery, and mutation/rollback have not been verified.
+The Xcode and package gates currently cross-build a universal `arm64 x86_64` executable. The release verifier rejects missing or extra slices and requires each slice's `LC_BUILD_VERSION` minimum to equal macOS 14.0; it records the same check after signing and again from the mounted final DMG, binds both records to the executable SHA-256, and independently matches their minimum to this repository policy. Runtime and install evidence exists on Apple Silicon. Physical Intel execution, clean install, upgrade, profile recovery, and mutation/rollback have not been verified.
 
 The planned initial public-beta CPU boundary is **Apple Silicon only**. It becomes a support claim only after the exact-candidate release gates, including the Sonoma lifecycle requirement, pass. The `x86_64` slice is an unverified convenience artifact, not an Intel support claim. Intel support may be added only after the physical verification matrix is recorded in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md).
 
