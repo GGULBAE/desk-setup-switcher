@@ -1080,7 +1080,9 @@ run_tracked_signal_case() {
     local disposition="$1"
     local signal_name="$2"
     local expected_status="$3"
-    local case_root="$temporary_root/tracked-signal-$disposition-$signal_name"
+    local signal_override="${4:-}"
+    local override_label="${signal_override:-default}"
+    local case_root="$temporary_root/tracked-signal-$disposition-$signal_name-$override_label"
     local runner_temp="$case_root/runner"
     local signal_root="$case_root/state"
     local marker="$case_root/cleanup-ran"
@@ -1099,6 +1101,7 @@ run_tracked_signal_case() {
       disposition="$5"
       signal_name="$6"
       child_pid_audit="$7"
+      release_tracked_signal_exit_status_override="$8"
       harness_pid="${BASHPID:-$$}"
       cleanup_on_exit() {
         local exit_status=$?
@@ -1137,7 +1140,8 @@ run_tracked_signal_case() {
         end
       " "$signal_name" "$harness_pid" "$child_pid_audit"
     ' _ "$RELEASE_SCRIPTS_DIR/lib.sh" "$signal_root" "$marker" \
-        "$custom_marker" "$disposition" "$signal_name" "$child_pid_audit"
+        "$custom_marker" "$disposition" "$signal_name" "$child_pid_audit" \
+        "$signal_override"
     harness_status=$?
     set -e
     elapsed=$((SECONDS - started_at))
@@ -1170,6 +1174,26 @@ for tracked_disposition in default ignored custom; do
     run_tracked_signal_case "$tracked_disposition" QUIT 131
     run_tracked_signal_case "$tracked_disposition" TERM 143
 done
+
+for tracked_signal_name in HUP INT QUIT TERM; do
+    run_tracked_signal_case default "$tracked_signal_name" 75 75
+done
+
+invalid_override_root="$temporary_root/tracked-signal-invalid-override"
+mkdir -m 0700 "$invalid_override_root"
+RUNNER_TEMP="$invalid_override_root" bash -c '
+  source "$1"
+  release_tracked_signal_exit_status_override=74
+  set +e
+  release_run_tracked ruby -e "exit 0"
+  status=$?
+  set -e
+  [[ "$status" == 70 && -z "${release_active_child_pid:-}" &&
+     -z "${release_active_launch_root:-}" ]]
+' _ "$RELEASE_SCRIPTS_DIR/lib.sh" || {
+    release_die "Tracked execution accepted an unsupported signal status override."
+}
+pass
 
 tracked_restore_root="$temporary_root/tracked-signal-restoration"
 mkdir -m 0700 "$tracked_restore_root"
@@ -1219,6 +1243,75 @@ RUNNER_TEMP="$tracked_boundary_root" bash -c '
 ' _ "$RELEASE_SCRIPTS_DIR/lib.sh" "$tracked_boundary_root/secret-result.txt" || {
     release_die "Tracked plain/secret normal exit or /dev/null stdin boundary failed."
 }
+pass
+
+tracked_stdin_root="$tracked_boundary_root/secret-stdin"
+tracked_stdin_runner="$tracked_stdin_root/runner"
+tracked_stdin_audit="$tracked_stdin_root/child-audit"
+tracked_stdin_permit="$tracked_stdin_root/permit-exit"
+tracked_stdin_ps="$tracked_stdin_root/processes.txt"
+tracked_stdin_stdout="$tracked_stdin_root/harness.stdout"
+tracked_stdin_stderr="$tracked_stdin_root/harness.stderr"
+mkdir -p "$tracked_stdin_runner"
+chmod 0700 "$tracked_stdin_runner"
+tracked_stdin_secret="$(runtime_secret)"
+export -n tracked_stdin_secret 2>/dev/null || true
+tracked_stdin_expected="$(printf '%s\n' "$tracked_stdin_secret" \
+    | shasum -a 256 | cut -d ' ' -f 1)"
+{ printf '%s\n' "$tracked_stdin_secret"; } | \
+RUNNER_TEMP="$tracked_stdin_runner" bash -c '
+  source "$1"
+  audit_path="$2"
+  permit_path="$3"
+  IFS= read -r scoped_secret
+  release_run_tracked_secret_stdin_timeout "$scoped_secret" 5 \
+    ruby -rdigest -e "
+      audit_path, permit_path = ARGV
+      value = STDIN.read
+      raise unless value.end_with?(%Q[\\n]) &&
+        ENV.values.none? { |item| item.include?(value.delete_suffix(%Q[\\n])) }
+      digest = Digest::SHA256.hexdigest(value)
+      value.clear
+      File.binwrite(audit_path, [Process.ppid, Process.pid, digest].join(%Q[\\t]) + %Q[\\n])
+      sleep 0.01 until File.exist?(permit_path)
+    " "$audit_path" "$permit_path"
+' _ "$RELEASE_SCRIPTS_DIR/lib.sh" "$tracked_stdin_audit" \
+    "$tracked_stdin_permit" >"$tracked_stdin_stdout" 2>"$tracked_stdin_stderr" &
+tracked_stdin_harness_pid=$!
+for _attempt in {1..400}; do
+    [[ -s "$tracked_stdin_audit" ]] && break
+    sleep 0.005
+done
+[[ -s "$tracked_stdin_audit" ]] || {
+    kill -KILL "$tracked_stdin_harness_pid" >/dev/null 2>&1 || true
+    wait "$tracked_stdin_harness_pid" >/dev/null 2>&1 || true
+    release_die "The tracked stdin-secret child did not start."
+}
+IFS=$'\t' read -r tracked_stdin_supervisor_pid tracked_stdin_child_pid \
+    tracked_stdin_actual <"$tracked_stdin_audit"
+[[ "$tracked_stdin_supervisor_pid" =~ ^[1-9][0-9]*$ \
+   && "$tracked_stdin_child_pid" =~ ^[1-9][0-9]*$ \
+   && "$tracked_stdin_actual" == "$tracked_stdin_expected" ]] || {
+    release_die "The tracked stdin-secret child boundary differs."
+}
+/bin/ps -Eww -p "$tracked_stdin_supervisor_pid" -o command= >"$tracked_stdin_ps"
+/bin/ps -Eww -p "$tracked_stdin_child_pid" -o command= >>"$tracked_stdin_ps"
+: >"$tracked_stdin_permit"
+set +e
+wait "$tracked_stdin_harness_pid"
+tracked_stdin_status=$?
+set -e
+[[ "$tracked_stdin_status" == 0 \
+   && -z "$(find "$tracked_stdin_runner" -maxdepth 1 \
+       -name 'desk-setup-tracked-launch.*' -print -quit)" ]] || {
+    release_die "The tracked stdin-secret transport did not exit and clean normally."
+}
+if grep -F -q -- "$tracked_stdin_secret" \
+    "$tracked_stdin_ps" "$tracked_stdin_stdout" "$tracked_stdin_stderr" \
+    "$tracked_stdin_audit"; then
+    release_die "The tracked stdin-secret transport exposed its raw value."
+fi
+unset tracked_stdin_secret
 pass
 
 set +e

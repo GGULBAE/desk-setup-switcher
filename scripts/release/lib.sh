@@ -368,22 +368,44 @@ release_restore_signal_traps() {
 }
 
 release_run_tracked_internal() {
-    local environment_name="$1"
-    local secret_value="$2"
-    local timeout_seconds="$3"
+    local secret_transport="$1"
+    local environment_name="$2"
+    local secret_value="$3"
+    local timeout_seconds="$4"
     local launch_root launch_gate child_status child_pid parent_pid cleanup_status
     local saved_hup_trap saved_int_trap saved_quit_trap saved_term_trap
+    local tracked_hup_status=129 tracked_int_status=130
+    local tracked_quit_status=131 tracked_term_status=143
+    local signal_status_override="${release_tracked_signal_exit_status_override:-}"
     local deferred_signal_status=0
-    shift 3
+    shift 4
     [[ -n "${RUNNER_TEMP:-}" && -d "$RUNNER_TEMP" && ! -L "$RUNNER_TEMP" ]] || return 70
     [[ "$timeout_seconds" =~ ^[0-9]+$ && "$timeout_seconds" -le 3600 ]] || return 70
     parent_pid="${BASHPID:-$$}"
     [[ "$parent_pid" =~ ^[1-9][0-9]*$ ]] || return 70
-    if [[ -n "$environment_name" ]]; then
-        [[ "$environment_name" =~ ^[A-Z_][A-Z0-9_]*$ && -n "$secret_value" ]] || return 70
-    else
-        [[ -z "$secret_value" ]] || return 70
-    fi
+    case "$secret_transport" in
+        none)
+            [[ -z "$environment_name" && -z "$secret_value" ]] || return 70
+            ;;
+        environment)
+            [[ "$environment_name" =~ ^[A-Z_][A-Z0-9_]*$ \
+                && -n "$secret_value" ]] || return 70
+            ;;
+        stdin)
+            [[ -z "$environment_name" && -n "$secret_value" ]] || return 70
+            ;;
+        *) return 70 ;;
+    esac
+    case "$signal_status_override" in
+        "") ;;
+        75)
+            tracked_hup_status=75
+            tracked_int_status=75
+            tracked_quit_status=75
+            tracked_term_status=75
+            ;;
+        *) return 70 ;;
+    esac
 
     # Defer catchable cancellation while the launch directory and launcher PID
     # become one tracked unit. Without this narrow critical section, a signal
@@ -393,10 +415,10 @@ release_run_tracked_internal() {
     saved_int_trap="$(trap -p INT)"
     saved_quit_trap="$(trap -p QUIT)"
     saved_term_trap="$(trap -p TERM)"
-    trap '[[ "$deferred_signal_status" -ne 0 ]] || deferred_signal_status=129' HUP
-    trap '[[ "$deferred_signal_status" -ne 0 ]] || deferred_signal_status=130' INT
-    trap '[[ "$deferred_signal_status" -ne 0 ]] || deferred_signal_status=131' QUIT
-    trap '[[ "$deferred_signal_status" -ne 0 ]] || deferred_signal_status=143' TERM
+    trap '[[ "$deferred_signal_status" -ne 0 ]] || deferred_signal_status=$tracked_hup_status' HUP
+    trap '[[ "$deferred_signal_status" -ne 0 ]] || deferred_signal_status=$tracked_int_status' INT
+    trap '[[ "$deferred_signal_status" -ne 0 ]] || deferred_signal_status=$tracked_quit_status' QUIT
+    trap '[[ "$deferred_signal_status" -ne 0 ]] || deferred_signal_status=$tracked_term_status' TERM
 
     if ! launch_root="$(mktemp -d "$RUNNER_TEMP/desk-setup-tracked-launch.XXXXXX")"; then
         release_restore_signal_traps \
@@ -428,15 +450,22 @@ release_run_tracked_internal() {
         return 70
     }
 
-    if [[ -n "$environment_name" ]]; then
+    if [[ "$secret_transport" != none ]]; then
         # The left side is a shell builtin writing to an anonymous pipe. This
         # keeps the secret out of argv, exported environment, and filesystem
         # storage while preserving `$!` as the Ruby launcher's exact PID.
         { printf '%s\n' "$secret_value"; } | ruby -e '
-          gate, expected_parent_text, timeout_text, environment_name, *command = ARGV
+          gate, expected_parent_text, timeout_text, secret_transport,
+            environment_name, *command = ARGV
           expected_parent = Integer(expected_parent_text, 10)
           timeout_seconds = Integer(timeout_text, 10)
-          raise unless timeout_seconds.between?(0, 3_600) && !command.empty?
+          raise unless %w[environment stdin].include?(secret_transport) &&
+            timeout_seconds.between?(0, 3_600) && !command.empty?
+          if secret_transport == "environment"
+            raise unless environment_name.match?(/\A[A-Z_][A-Z0-9_]*\z/)
+          else
+            raise unless environment_name.empty?
+          end
           secret = $stdin.read
           raise unless secret.end_with?("\n")
           secret = secret.delete_suffix("\n")
@@ -468,11 +497,24 @@ release_run_tracked_internal() {
           end
           exit!(75) unless Process.ppid == expected_parent
           Process.setsid
-          exec({ environment_name => secret }, *command) if timeout_seconds.zero?
-          child_environment = { environment_name => secret }
-          child = Process.spawn(child_environment, *command)
+          if secret_transport == "environment"
+            exec({ environment_name => secret }, *command) if timeout_seconds.zero?
+            child_environment = { environment_name => secret }
+            child = Process.spawn(child_environment, *command)
+          else
+            input_reader, input_writer = IO.pipe
+            child_environment = {}
+            child = Process.spawn(*command, in: input_reader)
+            input_reader.close
+            input_writer.write(secret + "\n")
+            input_writer.close
+          end
           secret.clear
           child_environment.clear
+          if timeout_seconds.zero?
+            status = Process.waitpid2(child).fetch(1)
+            exit!(status.exitstatus || 128 + status.termsig)
+          end
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
           loop do
             waited = Process.waitpid2(child, Process::WNOHANG)
@@ -501,7 +543,8 @@ release_run_tracked_internal() {
           rescue Errno::ECHILD
           end
           exit!(124)
-        ' "$launch_gate" "$parent_pid" "$timeout_seconds" "$environment_name" "$@" &
+        ' "$launch_gate" "$parent_pid" "$timeout_seconds" "$secret_transport" \
+            "$environment_name" "$@" &
     else
         ruby -e '
           gate, expected_parent_text, timeout_text, *command = ARGV
@@ -572,10 +615,10 @@ release_run_tracked_internal() {
     # catchable cancellation even if its caller had a default, ignored, or
     # custom disposition. Caller dispositions are restored only after the
     # process tree and private launch state are fully gone.
-    trap 'release_terminate_with_child 129' HUP
-    trap 'release_terminate_with_child 130' INT
-    trap 'release_terminate_with_child 131' QUIT
-    trap 'release_terminate_with_child 143' TERM
+    trap 'release_terminate_with_child "$tracked_hup_status"' HUP
+    trap 'release_terminate_with_child "$tracked_int_status"' INT
+    trap 'release_terminate_with_child "$tracked_quit_status"' QUIT
+    trap 'release_terminate_with_child "$tracked_term_status"' TERM
     [[ "$deferred_signal_status" -eq 0 ]] || release_terminate_with_child "$deferred_signal_status"
     if ! (umask 077; set -o noclobber; printf '%s\t%s\n' "$parent_pid" "$child_pid" >"$launch_gate"); then
         release_stop_active_child || true
@@ -610,14 +653,14 @@ release_run_tracked_internal() {
 }
 
 release_run_tracked() {
-    release_run_tracked_internal "" "" 0 "$@"
+    release_run_tracked_internal none "" "" 0 "$@"
 }
 
 release_run_tracked_timeout() {
     local timeout_seconds="$1"
     shift
     [[ "$timeout_seconds" =~ ^[1-9][0-9]*$ && "$timeout_seconds" -le 3600 ]] || return 70
-    release_run_tracked_internal "" "" "$timeout_seconds" "$@"
+    release_run_tracked_internal none "" "" "$timeout_seconds" "$@"
 }
 
 # Keep the secret out of the launcher's argv/environment. It crosses a private
@@ -627,7 +670,7 @@ release_run_tracked_secret_env() {
     local environment_name="$1"
     local secret_value="$2"
     shift 2
-    release_run_tracked_internal "$environment_name" "$secret_value" 0 "$@"
+    release_run_tracked_internal environment "$environment_name" "$secret_value" 0 "$@"
 }
 
 release_run_tracked_secret_env_timeout() {
@@ -636,7 +679,25 @@ release_run_tracked_secret_env_timeout() {
     local timeout_seconds="$3"
     shift 3
     [[ "$timeout_seconds" =~ ^[1-9][0-9]*$ && "$timeout_seconds" -le 3600 ]] || return 70
-    release_run_tracked_internal "$environment_name" "$secret_value" "$timeout_seconds" "$@"
+    release_run_tracked_internal environment "$environment_name" "$secret_value" \
+        "$timeout_seconds" "$@"
+}
+
+# Deliver a secret over an anonymous pipe to the tracked command's standard
+# input. Unlike an environment transport, this does not place the value in the
+# command's launch environment as reported by macOS process inspection.
+release_run_tracked_secret_stdin() {
+    local secret_value="$1"
+    shift
+    release_run_tracked_internal stdin "" "$secret_value" 0 "$@"
+}
+
+release_run_tracked_secret_stdin_timeout() {
+    local secret_value="$1"
+    local timeout_seconds="$2"
+    shift 2
+    [[ "$timeout_seconds" =~ ^[1-9][0-9]*$ && "$timeout_seconds" -le 3600 ]] || return 70
+    release_run_tracked_internal stdin "" "$secret_value" "$timeout_seconds" "$@"
 }
 
 release_sanitize_json() {

@@ -2,7 +2,7 @@
 
 Original observation: 2026-07-18 16:04 KST
 
-Latest read-only recheck: 2026-07-20 20:19 KST
+Latest read-only recheck: 2026-07-21 14:17 KST
 
 ## Outcome
 
@@ -14,6 +14,37 @@ Release exists, so the unsafe path has not run.
 This was a read-only audit. It did not push a branch, create or move a tag,
 change a workflow setting, create an environment, inspect credential values,
 publish a Release, or deploy the site.
+
+## 2026-07-21 read-only recheck
+
+Authenticated GitHub GET/list requests confirmed that the stop condition is
+unchanged: remote `master` is still
+`1489b7fcb41ffa7e55a43ed65e6befc538838140`, workflow `311269012` is still the
+active historical **Release** workflow, and there are still zero `v*` refs,
+Releases, rulesets, environments, repository secret names, and repository
+variable names. `master` protection is absent, immutable Releases and private
+vulnerability reporting are disabled, the `needs-triage` label and Pages site
+are absent, and the public description still advertises mouse and keyboard.
+No credential value was queried or retained.
+
+The first bounded invocation of the dedicated GET-only containment planner
+stopped before a complete observation and created no receipt because GitHub CLI
+2.95 rejects `--slurp` together with `--jq`. It made no PUT or other remote
+mutation. The local fix retains the CLI-side minimal-field projection, streams
+paginated JSON lines into strict duplicate-key-aware canonicalization, handles
+a trailing-slash `TMPDIR`, and passes 306 deterministic containment assertions,
+including multi-page, malformed, duplicate-key, inconsistent-total, truncated,
+drift, and uncertainty cases. A private plan receipt is still planning evidence,
+not proof that the active workflow was disabled.
+
+The containment helper assumes a trusted local account, checkout, and local
+Git, Ruby, and `gh` toolchain. Its descriptor/no-follow, Git-blob, streaming
+hash/HMAC, root-owned empty `gh` configuration, minimal child-environment, and
+signal controls defend capture-path consistency and replacement/truncation
+races during an authorized invocation. They do not sandbox a malicious
+same-UID process, hostile token-holding caller, compromised runtime/checkout,
+or substituted toolchain. The internal operation/plan authorization binding is
+an accidental-misuse guardrail, not authentication of a hostile caller.
 
 ## 2026-07-20 read-only recheck
 
