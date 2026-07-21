@@ -18,9 +18,9 @@ An ad-hoc signature is never promoted by changing its description. A public arti
 
 ## Current development baseline
 
-The current 2026-07-21 local release-controls candidate's no-Developer-ID path passed 3,938 deterministic checks/assertions: 506 app checks (183 XCTest cases, 322 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 3,432 release-tooling assertions (351 base release-policy, 659 remote-controls v1 policy/normalizer, 178 remote-controls v2 lifecycle-policy, 69 remote-controls v2 collector, 407 publication-approval policy, 469 external-beta/inventory/lineage policy, 129 collector-wrapper mock, 71 draft-reconciler mock, 246 artifact-restoration mock, 496 approved-publication mock, 152 legacy-workflow-containment mock, and 205 shell/workflow guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed. The release-tooling evidence is simulated and structural, not a candidate-history review, external beta result, credentialed signing, notarization, protected-remote, or publication result. The package was not installed or launched.
+The current 2026-07-21 local release-controls candidate's no-Developer-ID path passed 4,576 deterministic checks/assertions: 506 app checks (183 XCTest cases, 322 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 4,070 release-tooling assertions (351 base release-policy, 659 remote-controls v1 policy/normalizer, 178 remote-controls v2 lifecycle-policy, 69 remote-controls v2 collector, 407 publication-approval policy, 1,106 external-beta/inventory/lineage/template policy, 129 collector-wrapper mock, 71 draft-reconciler mock, 246 artifact-restoration mock, 496 approved-publication mock, 153 legacy-workflow-containment mock, and 205 shell/workflow guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, `arm64 x86_64`, and ad-hoc signature classification passed. The separate complete-history audit passed 39 assertions. The release-tooling evidence is simulated and structural, not a candidate-history review, external beta result, credentialed signing, notarization, protected-remote, or publication result. The package was not installed or launched.
 
-- Current development-only DMG SHA-256: `1934ef766afcc6fd86bbd34efc7e60051e318ba97fe03ffc69b595e7159d45c7`
+- Current development-only DMG SHA-256: `606a44fba00eca07711f5dd9bc8ad075e0a1d1f5295b4dc5fc5d90d0a6bc5855`
 - Authoritative current record: [Completion criteria and evidence ledger](COMPLETION-CRITERIA.md)
 - Historical 496-check baseline and DMG SHA-256 `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`: [Open-source release baseline audit](OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md)
 
@@ -218,6 +218,17 @@ Download all nine assets back through GitHub, require that no extra or missing a
 Test the exact downloaded and quarantined candidate on a clean account or Mac without deleting or manufacturing quarantine metadata. Use [the release evidence template](RELEASE-EVIDENCE-TEMPLATE.md) for the lifecycle record and [the external beta template](EXTERNAL-BETA-REPORT-TEMPLATE.md) for each tester.
 
 The three external testers must obtain the final stapled DMG from the protected workflow artifact produced by the approved run. They must download the artifact archive through a normal browser, extract the DMG through the normal macOS path, and record the actual `com.apple.quarantine` value on the extracted DMG before opening it. A report does not count when that attribute is absent, was manually added, or was deleted. Testers need read access to the public repository and artifact, not push, release, environment, or secret access. Each report must verify the identical final DMG SHA-256 and the final-DMG provenance attestation bound to the protected workflow run. At least one accepted report must run the complete lifecycle on Apple Silicon/macOS 14 Sonoma; deployment-target metadata alone cannot close the minimum-OS support gate. The actual-byte candidate inventory, predecessor-lineage record, three privacy-safe JSON reports, and protected independence-review set described in [the lineage contract](PREDECESSOR-LINEAGE.md) must pass `external_beta_policy.rb verify-set` against the restored candidate before approval can pass.
+
+`external_beta_template_cli.rb` provides stdout-only, current-schema
+inventory, lineage, report, and set shapes with reserved rejected placeholders.
+Its isolated load closure reads no candidate/host data, writes no files, and
+produces no approval or evidence digest. The separate verification policy does
+not load or dispatch the generator. Operators must preview and copy a selected
+shape through the protected editor workflow, replace it only with reviewed
+facts, connect actual byte digests in dependency order, and obtain a separate
+`verify-set` success.
+Tracked rejected placeholders under `docs/evidence/releases/` fail the public
+audit.
 
 The lifecycle gate is itemized; one successful first launch cannot stand in for the other rows:
 

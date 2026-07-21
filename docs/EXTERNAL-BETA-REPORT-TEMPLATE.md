@@ -43,6 +43,66 @@ artifact hashes, bind the actual inventory bytes, and select the latest
 installable predecessor. Inventory completeness remains a protected reviewer
 trust boundary; the local validator does not query GitHub.
 
+## Generate rejected-placeholder JSON safely
+
+The dedicated template CLI owns a stdout-only scaffold generator, isolated
+from the verification policy, so an operator does not need to reconstruct
+closed JSON objects from tests. It prints exactly one pretty JSON document plus
+a final newline, reads no candidate or host data, writes no file, computes no
+evidence digest, and never marks a gate complete. Every document contains reserved
+`<REJECTED_TEMPLATE:REPLACE_REQUIRED:...>` values plus independent false or
+invalid gates. `verify-set` rejects the reserved values explicitly.
+
+Available complete-document shapes are:
+
+| Kind | Extra options | Use |
+| --- | --- | --- |
+| `candidate-inventory-empty` | none | Reviewed history has no earlier consumed build |
+| `candidate-inventory-retained` | none | Inventory with one retained-item shape; duplicate the item only for real reviewed rows |
+| `candidate-inventory-not-retained` | none | Inventory with one non-retained-item shape |
+| `predecessor-lineage-none` | none | No installable predecessor after complete review |
+| `predecessor-lineage-recorded` | none | Latest installable predecessor is recorded |
+| `external-beta-report-none` | `--report-code`, `--coverage-role` | Report paired with approved first-beta no-predecessor lineage |
+| `external-beta-report-recorded` | `--report-code`, `--coverage-role` | Report paired with a recorded predecessor |
+| `external-beta-set` | `--sonoma-report-code` | Protected review of the three completed reports |
+
+Preview the required shape in the terminal:
+
+```sh
+ruby scripts/release/external_beta_template_cli.rb \
+  --kind external-beta-report-none \
+  --report-code beta-01 \
+  --coverage-role sonoma-full-lifecycle
+
+ruby scripts/release/external_beta_template_cli.rb \
+  --kind external-beta-report-none \
+  --report-code beta-02 \
+  --coverage-role additional-apple-silicon
+
+ruby scripts/release/external_beta_template_cli.rb \
+  --kind external-beta-set \
+  --sonoma-report-code beta-01
+```
+
+Use `external-beta-report-recorded` instead when lineage records an installable
+predecessor. Generate the third report with `beta-03`; each code appears once,
+and only the report that actually ran the full macOS 14 lifecycle may be named
+as the Sonoma report.
+
+The stdout is a structure reference, not evidence. Inspect it first, then copy
+it into a new file through the protected review/editor workflow. Do not use a
+plain shell `>` redirection against a canonical evidence path: the shell can
+truncate an existing file before this read-only generator starts. Do not
+commit any reserved placeholder. The public-history audit rejects this marker
+under `docs/evidence/releases/`, and the publication verifier independently
+rejects it.
+
+Fill only facts actually observed or reviewed. Bind actual bytes in dependency
+order—inventory, lineage, three reports, then set—and run `verify-set` below.
+Only its successful descriptor-bound result may feed publication approval; a
+generated document, edited document, or calculated digest by itself closes no
+gate.
+
 The publication helper re-reads all six files as descriptor-bound ordinary
 files, validates their exact schema and chronology, calculates their actual
 SHA-256 values, and cross-checks them with the restored release candidate and

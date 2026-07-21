@@ -2,17 +2,10 @@
 
 require "digest"
 require "json"
+require "psych"
 require "time"
 
 class ContainmentPolicyError < StandardError; end
-
-class StrictObject < Hash
-  def []=(key, value)
-    raise ContainmentPolicyError, "duplicate JSON key" if key?(key)
-
-    super
-  end
-end
 
 module LegacyWorkflowContainment
   module_function
@@ -36,6 +29,9 @@ module LegacyWorkflowContainment
   SHA1 = /\A[0-9a-f]{40}\z/
   SHA256 = /\A[0-9a-f]{64}\z/
   MAX_JSON_BYTES = 16 * 1024 * 1024
+  JSON_STRING_TOKEN = /"(?:[^"\\\x00-\x1f]|\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4}))*"/.freeze
+
+  class DuplicateJSONKeyError < StandardError; end
 
   def fail_policy
     raise ContainmentPolicyError, "policy mismatch"
@@ -44,6 +40,42 @@ module LegacyWorkflowContainment
   def exact_keys(value, keys)
     fail_policy unless value.is_a?(Hash) && value.keys.sort == keys.sort
     value
+  end
+
+  def reject_duplicate_json_keys!(node)
+    case node
+    when Psych::Nodes::Mapping
+      seen = {}
+      node.children.each_slice(2) do |key_node, value_node|
+        fail_policy unless key_node.is_a?(Psych::Nodes::Scalar)
+        raise DuplicateJSONKeyError if seen.key?(key_node.value)
+
+        seen[key_node.value] = true
+        reject_duplicate_json_keys!(value_node)
+      end
+    when Psych::Nodes::Sequence
+      node.children.each { |child| reject_duplicate_json_keys!(child) }
+    end
+  end
+
+  def parse_strict_json(source)
+    text = source.dup.force_encoding(Encoding::UTF_8)
+    fail_policy unless text.valid_encoding? && !text.include?("\0")
+    value = JSON.parse(
+      text,
+      allow_nan: false,
+      create_additions: false,
+      max_nesting: 100
+    )
+    normalized_source = text.gsub(JSON_STRING_TOKEN) do |token|
+      JSON.generate(JSON.parse(token, create_additions: false))
+    end
+    document = Psych.parse(normalized_source)
+    fail_policy unless document&.root
+    reject_duplicate_json_keys!(document.root)
+    value
+  rescue DuplicateJSONKeyError, JSON::ParserError, JSON::NestingError, Psych::SyntaxError
+    fail_policy
   end
 
   def strict_json_file(path, secure: false)
@@ -56,13 +88,8 @@ module LegacyWorkflowContainment
         stat.uid == Process.euid && (stat.mode & 0o077) == 0
     end
     fail_policy unless stat.size.between?(1, MAX_JSON_BYTES)
-    JSON.parse(
-      File.binread(path),
-      allow_nan: false,
-      create_additions: false,
-      object_class: StrictObject
-    )
-  rescue Errno::ENOENT, Errno::EACCES, JSON::ParserError
+    parse_strict_json(File.binread(path))
+  rescue Errno::ENOENT, Errno::EACCES
     fail_policy
   end
 

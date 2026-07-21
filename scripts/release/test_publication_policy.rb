@@ -160,12 +160,16 @@ class PublicationPolicyTestSuite
     assert(stderr.empty?, "success wrote stderr")
   end
 
-  def assert_failure(*args, forbidden: [])
+  def assert_failure(*args, forbidden: [], expected_error: nil)
     stdout, stderr, status = cli(*args)
     assert(!status.success?, "expected failure")
     assert_equal(1, status.exitstatus)
     assert(stdout.empty?, "failure wrote stdout")
-    assert(stderr.match?(/\APublication policy error: [A-Za-z0-9 .:-]+\n\z/), "failure output is unstable: #{stderr.inspect}")
+    if expected_error
+      assert_equal("Publication policy error: #{expected_error}\n", stderr)
+    else
+      assert(stderr.match?(/\APublication policy error: [A-Za-z0-9 .:-]+\n\z/), "failure output is unstable: #{stderr.inspect}")
+    end
     forbidden.each { |text| assert(!stderr.include?(text), "failure leaked input") }
   end
 
@@ -492,9 +496,15 @@ class PublicationPolicyTestSuite
 
     run("rejects duplicate JSON keys") do
       Dir.mktmpdir do |directory|
-        path = File.join(directory, "approval.json")
-        File.binwrite(path, '{"schemaVersion":"one","schemaVersion":"two"}')
-        assert_failure(*arguments(path), forbidden: [directory, "one", "two"])
+        marker = "SENSITIVE_DUPLICATE_MARKER"
+        path = write_record(directory)
+        valid = File.binread(path)
+        File.binwrite(path, valid.sub(/\A\{/, %({"schemaVersion":"#{marker}",)))
+        assert_failure(
+          *arguments(path),
+          forbidden: [directory, path, marker],
+          expected_error: "approval record contains duplicate JSON keys"
+        )
       end
     end
 

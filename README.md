@@ -89,7 +89,7 @@ Capability-level evidence and unresolved hardware/manual checks live in the [sup
 - [Profile JSON schema and interchange guide](docs/PROFILE-SCHEMA.md)
 - [Adapter contract and transaction safety](docs/ADAPTER-CONTRACT.md)
 - [Product scope](docs/PRODUCT.md) and [architecture](docs/ARCHITECTURE.md)
-- [Distribution and release gates](docs/DISTRIBUTION.md), including the [external-beta evidence contract](docs/EXTERNAL-BETA-REPORT-TEMPLATE.md), [build/predecessor lineage](docs/PREDECESSOR-LINEAGE.md), and closed [publication approval contract](docs/PUBLICATION-APPROVAL.md)
+- [Distribution and release gates](docs/DISTRIBUTION.md), including the [external-beta evidence contract and isolated rejected-placeholder generator CLI](docs/EXTERNAL-BETA-REPORT-TEMPLATE.md), [build/predecessor lineage](docs/PREDECESSOR-LINEAGE.md), and closed [publication approval contract](docs/PUBLICATION-APPROVAL.md)
 - [Detailed release-baseline audit](docs/OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md), [remote release-controls audit](docs/REMOTE-RELEASE-CONTROLS-AUDIT-2026-07-18.md), and [completion ledger](docs/COMPLETION-CRITERIA.md)
 
 ## Contributing, support, and security

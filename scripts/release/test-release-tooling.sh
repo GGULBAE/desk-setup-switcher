@@ -565,6 +565,8 @@ verify_downloaded="$RELEASE_SCRIPTS_DIR/verify-downloaded-candidate.sh"
 publication_helper="$RELEASE_SCRIPTS_DIR/publish-approved-release.sh"
 publication_policy="$RELEASE_SCRIPTS_DIR/publication_policy.rb"
 external_beta_policy="$RELEASE_SCRIPTS_DIR/external_beta_policy.rb"
+external_beta_template_cli="$RELEASE_SCRIPTS_DIR/external_beta_template_cli.rb"
+external_beta_templates="$RELEASE_SCRIPTS_DIR/external_beta_templates.rb"
 assert_contains "$workflow" "workflow_dispatch:"
 assert_contains "$workflow" "environment: release-candidate"
 assert_contains "$workflow" "DESK_SETUP_RELEASE_MUTATIONS: \"1\""
@@ -694,8 +696,13 @@ pass
 }
 pass
 
-ruby -e '
-  helper, policy, beta_policy = ARGV.map { |path| File.read(path) }
+ruby -rdigest -rjson -ropen3 -rrbconfig -rtmpdir -e '
+  helper, policy, beta_policy = ARGV.take(3).map { |path| File.read(path) }
+  workflow_source = File.binread(ARGV.fetch(3))
+  publication_workflow_source = File.binread(ARGV.fetch(4))
+  template_cli_path = ARGV.fetch(5)
+  template_cli_source = File.binread(template_cli_path)
+  template_source = File.binread(ARGV.fetch(6))
   abort "publication helper must contain exactly one PATCH callsite" unless
     helper.scan(/--method PATCH/).length == 1
   abort "publication helper mutation endpoint differs" unless
@@ -734,6 +741,11 @@ ruby -e '
       helper.include?(%q{--release-manifest "$candidate_snapshot/release-manifest.json"}) &&
       helper.include?(%q{--candidate-inventory "$candidate_inventory_evidence"}) &&
       helper.scan(/--report "\$\{external_beta_report_evidence\[[012]\]\}"/).length == 3
+  generator_entrypoints = %w[external_beta_template_cli.rb external_beta_templates.rb print-template]
+  abort "publication path invokes the rejected-template generator" if
+    [helper, workflow_source, publication_workflow_source].any? do |source|
+      generator_entrypoints.any? { |entrypoint| source.include?(entrypoint) }
+    end
   abort "publication helper does not retain the exact two-path approval diff" unless
     helper.include?(%q{expected = ["A\t#{approval_path}", "A\t#{controls_path}"].sort})
   abort "release-only approval schema still contains site publication authority" if
@@ -747,12 +759,128 @@ ruby -e '
       beta_policy.include?("changed during descriptor-bound read")
   abort "external beta policy does not validate the restored manifest" unless
     beta_policy.include?("ReleasePolicy.validate_release_manifest_data(manifest)")
+  verifier_generator_markers = %w[
+    external_beta_template_cli external_beta_templates DeskSetupExternalBetaTemplates
+    print-template run_print_template TEMPLATE_KINDS REPORT_TEMPLATE_KINDS
+  ]
+  abort "external beta verification policy can load or dispatch the template generator" if
+    verifier_generator_markers.any? { |marker| beta_policy.include?(marker) }
+  expected_template_cli_requires = [
+    %q{require "json"},
+    %q{require "optparse"},
+    %q{require_relative "external_beta_templates"}
+  ]
+  observed_template_cli_requires = template_cli_source.lines.grep(/^require/).map(&:chomp)
+  abort "external beta template CLI load closure differs" unless
+    observed_template_cli_requires == expected_template_cli_requires
+  abort "external beta template CLI source differs from the reviewed implementation" unless
+    Digest::SHA256.hexdigest(template_cli_source) ==
+      "8f9d7ffeddecdb570ad667f18bc170e3bfffc468103d86d58281c574dfea762b"
+  abort "external beta pure template source differs from the reviewed implementation" unless
+    Digest::SHA256.hexdigest(template_source) ==
+      "fe040b97175fb94ac1e68ab667fc3cb563218589dfb91dbc9971fb7b1c333bd6"
+  abort "external beta pure template source lacks rejected placeholders" unless
+    template_source.include?(%q{<REJECTED_TEMPLATE:REPLACE_REQUIRED:})
+  pure_source_forbidden = /(?:`|%x|\b(?:File|IO|Dir|Process|ENV|Socket|TCPSocket|UDPSocket|UNIXSocket|Net::HTTP|Open3|Kernel|URI|Thread|Fiber|Ractor|Time|Date|Random|SecureRandom|JSON|YAML|Psych|Marshal)\b|\b(?:system|exec|spawn|fork|open|read|write|puts|print|printf|warn|abort|exit|at_exit|require|load|autoload)\b)/
+  abort "external beta pure template source contains an I/O or host-state primitive" if
+    pure_source_forbidden.match?(template_source)
+  cli_host_forbidden = /(?:`|%x|\b(?:File|IO|Dir|Process|ENV|Socket|TCPSocket|UDPSocket|UNIXSocket|Net::HTTP|Open3|Kernel|URI|Thread|Fiber|Ractor|Time|Date|Random|SecureRandom|YAML|Psych|Marshal)\b|\b(?:system|exec|spawn|fork|open|read|write|print|printf|at_exit|load|autoload)\b)/
+  abort "external beta template CLI contains a host-state or mutation primitive" if
+    cli_host_forbidden.match?(template_cli_source)
+  abort "external beta template CLI stdout boundary differs" unless
+    template_cli_source.scan(/^    puts JSON\.pretty_generate\(template\)$/).length == 1 &&
+      template_cli_source.scan(/\bputs\b/).length == 1
+  expected_template_cli_errors = [
+    %q{    warn "External beta template error: #{error.message}"},
+    %q{    warn "External beta template error: invalid command line."},
+    %q{    warn "External beta template error: generation failed safely."}
+  ]
+  abort "external beta template CLI error boundary differs" unless
+    template_cli_source.lines.grep(/^    warn /).map(&:chomp) == expected_template_cli_errors &&
+      template_cli_source.lines.grep(/^    exit 1$/).length == 3
+  template_variants = [
+    %w[--kind candidate-inventory-empty],
+    %w[--kind candidate-inventory-retained],
+    %w[--kind candidate-inventory-not-retained],
+    %w[--kind predecessor-lineage-none],
+    %w[--kind predecessor-lineage-recorded],
+    %w[--kind external-beta-report-none --report-code beta-01 --coverage-role sonoma-full-lifecycle],
+    %w[--kind external-beta-report-recorded --report-code beta-02 --coverage-role additional-apple-silicon],
+    %w[--kind external-beta-set --sonoma-report-code beta-01]
+  ]
+  Dir.mktmpdir("desk-setup-template-closure.") do |working_directory|
+    template_variants.each do |arguments|
+      before = Dir.children(working_directory)
+      stdout, stderr, status = Open3.capture3(
+        RbConfig.ruby,
+        template_cli_path,
+        *arguments,
+        chdir: working_directory
+      )
+      abort "external beta template CLI variant failed" unless status.success? && stderr.empty?
+      parsed = JSON.parse(stdout, create_additions: false)
+      abort "external beta template CLI output is not canonical pretty JSON" unless
+        stdout == JSON.pretty_generate(parsed) + "\n"
+      abort "external beta template CLI variant wrote a cwd file" unless
+        before == Dir.children(working_directory)
+    end
+    stdout, stderr, status = Open3.capture3(
+      RbConfig.ruby,
+      template_cli_path,
+      "--ki",
+      "candidate-inventory-empty",
+      chdir: working_directory
+    )
+    abort "external beta template CLI accepts abbreviated options" unless
+      !status.success? && stdout.empty? &&
+        stderr == "External beta template error: invalid command line.\n" &&
+        Dir.children(working_directory).empty?
+  end
+  mutation_pattern = /(?:`|%x|\b(?:system|exec|spawn|fork)\b|Process\.|IO\.(?:popen|write|binwrite|copy_stream)|Open3|\b(?:Net::HTTP|Socket|TCPSocket|UDPSocket|UNIXSocket|URI)\b|FileUtils|Kernel\.open|(?<![.:])\bopen\s*\(|Dir\.(?:mkdir|rmdir|delete|unlink)|File\.(?:new|write|binwrite|delete|unlink|rename|chmod|chown|truncate)|ENV\s*\[[^\]]+\]\s*=)/
+  write_open_pattern = /File\.open\s*\([^)]*(?:["\x27`](?:w|a|r\+|w\+|a\+)[bt]?["\x27`]|File::(?:WRONLY|RDWR|CREAT|TRUNC|APPEND))/m
+  write_flag_pattern = /\bFile::(?:WRONLY|RDWR|CREAT|TRUNC|APPEND)\b/
+  stream_mutation_pattern = /\.(?:write|binwrite|syswrite|write_nonblock|truncate|flush|fsync|reopen|puts|print|printf|chmod|chown|unlink|delete|rename|mkdir|rmdir)\b|\b(?:file|io|stream|output)\s*<</
+  forbidden_mutation = lambda do |source|
+    mutation_pattern.match?(source) || write_open_pattern.match?(source) ||
+      write_flag_pattern.match?(source) || stream_mutation_pattern.match?(source)
+  end
+  guard_probes = [
+    %q{system "command"}, %q{spawn("command")}, %q{fork {}},
+    %q{Process.spawn("command")}, %q{IO.write(path, bytes)},
+    %q{Process.kill(9, pid)}, %q{io.write(bytes)}, %q{handle.syswrite(bytes)},
+    %q{handle.write_nonblock(bytes)}, %q{handle.reopen(path, "w")},
+    %q{handle.puts(secret)}, %q{Socket.tcp(host, port)}, %q{URI.open(url).read},
+    %q{ENV["SIDE_EFFECT"] = "1"},
+    %q{FileUtils.mkdir_p(path)}, %q{File.truncate(path, 0)},
+    %q{File.open(path, "w") {}},
+    %q{File.open(path, File::WRONLY | File::CREAT) {}},
+    %q{flags = File::WRONLY; File.open(path, flags) {}}
+  ]
+  abort "external beta mutation guard does not recognize a forbidden primitive" unless
+    guard_probes.all? { |source| forbidden_mutation.call(source) }
   abort "external beta policy contains process, network, or file mutation primitives" if
-    beta_policy.match?(/(?:`|%x\{|\bsystem\s*\(|\bexec\s*\(|IO\.popen|Open3|Net::HTTP|TCPSocket|UDPSocket|File\.(?:write|binwrite|delete|unlink|rename|chmod|chown))/)
+    forbidden_mutation.call(beta_policy)
+  expected_file_apis = {
+    "File.basename" => 1,
+    "File.lstat" => 2,
+    "File::RDONLY" => 1,
+    "File::NOFOLLOW" => 2,
+    "File.open" => 1
+  }
+  observed_file_apis = beta_policy.scan(/\bFile(?:\.|::)[A-Za-z_][A-Za-z0-9_]*/).tally
+  abort "external beta policy file API inventory differs" unless
+    observed_file_apis == expected_file_apis
+  expected_flag_assignments = [
+    "    flags = File::RDONLY",
+    "    flags |= File::NOFOLLOW if defined?(File::NOFOLLOW)"
+  ]
+  observed_flag_assignments = beta_policy.lines.grep(/^\s*flags\s*(?:=|\|=)/).map(&:chomp)
+  abort "external beta policy read-only flags differ" unless
+    observed_flag_assignments == expected_flag_assignments
   abort "external beta policy lacks a safe generic failure boundary" unless
     beta_policy.include?("rescue StandardError") &&
       beta_policy.include?("External beta policy error: evidence verification failed safely.")
-' "$publication_helper" "$publication_policy" "$external_beta_policy"
+' "$publication_helper" "$publication_policy" "$external_beta_policy" "$workflow" "$publication_workflow" "$external_beta_template_cli" "$external_beta_templates"
 pass
 
 assert_before "$publication_helper" 'external_beta_policy.rb" verify-set' '--method PATCH'

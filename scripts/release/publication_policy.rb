@@ -4,6 +4,7 @@ require "json"
 require "digest"
 require "optparse"
 require "time"
+require_relative "release_policy"
 
 module DeskSetupPublicationPolicy
   SCHEMA = "desk-setup-switcher.publication-approval/v2"
@@ -14,15 +15,6 @@ module DeskSetupPublicationPolicy
   LOGIN = /\A(?!-)[A-Za-z0-9-]{1,39}(?<!-)\z/
 
   class PolicyError < StandardError; end
-  class DuplicateKeyError < PolicyError; end
-
-  class StrictObject < Hash
-    def []=(key, value)
-      raise DuplicateKeyError, "duplicate JSON key" if key?(key)
-
-      super
-    end
-  end
 
   module_function
 
@@ -87,15 +79,11 @@ module DeskSetupPublicationPolicy
 
     text = bytes.force_encoding(Encoding::UTF_8)
     fail_policy!("approval record is not UTF-8") unless text.valid_encoding?
-    parsed = JSON.parse(
-      text,
-      allow_nan: false,
-      create_additions: false,
-      max_nesting: 32,
-      object_class: StrictObject
-    )
+    parsed = ReleasePolicy.parse_strict_json(text, "approval record", max_nesting: 32)
     [parsed, Digest::SHA256.hexdigest(bytes)]
-  rescue Errno::ENOENT, Errno::EACCES, Errno::EISDIR, Errno::ELOOP, JSON::ParserError, JSON::NestingError
+  rescue ReleasePolicy::PolicyError => error
+    raise PolicyError, error.message
+  rescue Errno::ENOENT, Errno::EACCES, Errno::EISDIR, Errno::ELOOP
     raise PolicyError, "approval record is unavailable or invalid"
   end
 

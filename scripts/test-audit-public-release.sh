@@ -496,6 +496,78 @@ git -C "$worktree_repository" commit -q -m "add tracked current file"
 printf 'SSID=%s\n' "$probe_nine" >"$worktree_repository/current.txt"
 assert_fails_without_value "$worktree_repository" worktree-change ssid "$probe_nine"
 
+rejected_template_repository="$(new_repository rejected-template-evidence)"
+mkdir -p "$rejected_template_repository/docs/evidence/releases/v0.1.0"
+printf '%s\n' 'docs/evidence/releases/** binary' \
+    >"$rejected_template_repository/.gitattributes"
+printf '%s\n' \
+    '{"marker":"safe"}' \
+    >"$rejected_template_repository/docs/evidence/releases/v0.1.0/candidate-inventory.json"
+git -C "$rejected_template_repository" add \
+    .gitattributes \
+    docs/evidence/releases/v0.1.0/candidate-inventory.json
+git -C "$rejected_template_repository" commit -q -m 'add safe evidence baseline'
+printf '%s\n' \
+    '{"marker":"<REJECTED_TEMPLATE:REPLACE_REQUIRED:release-manifest-sha256>"}' \
+    >"$rejected_template_repository/docs/evidence/releases/v0.1.0/candidate-inventory.json"
+git -C "$rejected_template_repository" add \
+    docs/evidence/releases/v0.1.0/candidate-inventory.json
+printf '%s\n' \
+    '{"marker":"safe-worktree"}' \
+    >"$rejected_template_repository/docs/evidence/releases/v0.1.0/candidate-inventory.json"
+run_audit "$rejected_template_repository" staged-rejected-template-evidence
+[[ "$last_status" != 0 ]] || fail "staged-rejected-template-evidence unexpectedly passed"
+grep -F -q 'Rejected template found in tracked release evidence' "$last_stderr" ||
+    fail "staged rejected-template-evidence did not fail at the release-evidence boundary"
+if grep -F -q 'candidate-inventory.json' "$last_stdout" "$last_stderr"; then
+    fail "staged-rejected-template-evidence exposed an evidence path"
+fi
+
+historical_template_repository="$(new_repository historical-rejected-template-evidence)"
+mkdir -p "$historical_template_repository/docs/evidence/releases/v0.1.0"
+printf '%s\n' 'docs/evidence/releases/** binary' \
+    >"$historical_template_repository/.gitattributes"
+printf '%s\n' \
+    '{"marker":"\u003cREJECTED_TEMPLATE:REPLACE_REQUIRED:release-manifest-sha256>"}' \
+    >"$historical_template_repository/docs/evidence/releases/v0.1.0/candidate-inventory.json"
+git -C "$historical_template_repository" add \
+    .gitattributes \
+    docs/evidence/releases/v0.1.0/candidate-inventory.json
+git -C "$historical_template_repository" commit -q -m 'add escaped rejected evidence template'
+printf '%s\n' \
+    '{"marker":"safe-current-commit"}' \
+    >"$historical_template_repository/docs/evidence/releases/v0.1.0/candidate-inventory.json"
+git -C "$historical_template_repository" add \
+    docs/evidence/releases/v0.1.0/candidate-inventory.json
+git -C "$historical_template_repository" commit -q -m 'replace rejected evidence with safe bytes'
+run_audit "$historical_template_repository" historical-rejected-template-evidence
+[[ "$last_status" != 0 ]] || fail "historical-rejected-template-evidence unexpectedly passed"
+grep -F -q 'Rejected template found in tracked release evidence' "$last_stderr" ||
+    fail "historical rejected-template-evidence did not fail at the release-evidence boundary"
+if grep -F -q 'candidate-inventory.json' "$last_stdout" "$last_stderr"; then
+    fail "historical-rejected-template-evidence exposed an evidence path"
+fi
+
+duplicate_template_repository="$(new_repository duplicate-rejected-template-evidence)"
+mkdir -p "$duplicate_template_repository/docs/evidence/releases/v0.1.0"
+printf '%s\n' \
+    '{"marker":"safe"}' \
+    >"$duplicate_template_repository/docs/evidence/releases/v0.1.0/candidate-inventory.json"
+git -C "$duplicate_template_repository" add \
+    docs/evidence/releases/v0.1.0/candidate-inventory.json
+git -C "$duplicate_template_repository" commit -q -m 'add safe evidence baseline'
+printf '%s\n' \
+    '{"marker":"\u003cREJECTED_TEMPLATE:REPLACE_REQUIRED:release-manifest-sha256>","marker":"safe"}' \
+    >"$duplicate_template_repository/docs/evidence/releases/v0.1.0/candidate-inventory.json"
+run_audit "$duplicate_template_repository" duplicate-rejected-template-evidence
+[[ "$last_status" != 0 ]] || fail "duplicate-rejected-template-evidence unexpectedly passed"
+grep -F -q 'Public-release audit could not inspect tracked release evidence' "$last_stderr" ||
+    fail "duplicate rejected-template-evidence did not fail closed during JSON inspection"
+if grep -F -q 'candidate-inventory.json' "$last_stdout" "$last_stderr"; then
+    fail "duplicate-rejected-template-evidence exposed an evidence path"
+fi
+pass
+
 shallow_repository="$(new_repository shallow)"
 git -C "$shallow_repository" rev-parse HEAD >"$(git -C "$shallow_repository" rev-parse --absolute-git-dir)/shallow"
 run_audit "$shallow_repository" shallow

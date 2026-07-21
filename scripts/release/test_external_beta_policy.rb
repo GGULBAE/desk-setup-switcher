@@ -10,6 +10,7 @@ require "tmpdir"
 
 class ExternalBetaPolicyTestSuite
   SCRIPT = File.expand_path("external_beta_policy.rb", __dir__)
+  TEMPLATE_SCRIPT = File.expand_path("external_beta_template_cli.rb", __dir__)
   REPOSITORY = "GGULBAE/desk-setup-switcher"
   TAG = "v0.1.0"
   VERSION = "0.1.0"
@@ -491,6 +492,73 @@ class ExternalBetaPolicyTestSuite
     Open3.capture3(RbConfig.ruby, SCRIPT, *arguments)
   end
 
+  def template_cli(*arguments)
+    Open3.capture3(RbConfig.ruby, TEMPLATE_SCRIPT, *arguments)
+  end
+
+  def template_arguments(kind, report_code: nil, coverage_role: nil, sonoma_report_code: nil)
+    arguments = ["--kind", kind]
+    arguments += ["--report-code", report_code] if report_code
+    arguments += ["--coverage-role", coverage_role] if coverage_role
+    arguments += ["--sonoma-report-code", sonoma_report_code] if sonoma_report_code
+    arguments
+  end
+
+  def template_output(kind, **options)
+    stdout, stderr, status = template_cli(*template_arguments(kind, **options))
+    assert(status.success?, "template generation failed: #{stderr.inspect}")
+    assert(stderr.empty?, "template generation wrote stderr")
+    value = JSON.parse(stdout, create_additions: false)
+    assert_equal(JSON.pretty_generate(value) + "\n", stdout, "template output is not canonical pretty JSON")
+    [value, stdout]
+  end
+
+  def json_type(value)
+    return :boolean if value == true || value == false
+
+    value.class.name
+  end
+
+  def json_shape(value)
+    case value
+    when Hash
+      value.transform_values { |item| json_shape(item) }
+    when Array
+      value.map { |item| json_shape(item) }
+    else
+      json_type(value)
+    end
+  end
+
+  def fill_template(template, replacement)
+    case template
+    when Hash
+      assert(replacement.is_a?(Hash), "template replacement is not an object")
+      assert_equal(template.keys.sort, replacement.keys.sort, "template object keys differ")
+      template.to_h { |key, value| [key, fill_template(value, replacement.fetch(key))] }
+    when Array
+      assert(replacement.is_a?(Array), "template replacement is not an array")
+      assert_equal(template.length, replacement.length, "template array length differs")
+      template.each_index.map { |index| fill_template(template.fetch(index), replacement.fetch(index)) }
+    else
+      assert_equal(json_type(template), json_type(replacement), "template leaf JSON type differs")
+      replacement
+    end
+  end
+
+  def json_strings(value)
+    case value
+    when Hash
+      value.keys.flat_map { |key| [key] + json_strings(value.fetch(key)) }
+    when Array
+      value.flat_map { |item| json_strings(item) }
+    when String
+      [value]
+    else
+      []
+    end
+  end
+
   def assert_success(*arguments, build_number: 1)
     stdout, stderr, status = cli(*arguments)
     assert(status.success?, "expected success: #{stderr.inspect}")
@@ -498,15 +566,19 @@ class ExternalBetaPolicyTestSuite
     assert(stderr.empty?, "success wrote stderr")
   end
 
-  def assert_failure(*arguments, forbidden: [])
+  def assert_failure(*arguments, forbidden: [], expected_error: nil)
     stdout, stderr, status = cli(*arguments)
     assert(!status.success?, "expected failure")
     assert_equal(1, status.exitstatus)
     assert(stdout.empty?, "failure wrote stdout")
-    assert(
-      stderr.match?(/\AExternal beta policy error: [A-Za-z0-9 .:-]+\n\z/),
-      "failure output is unstable: #{stderr.inspect}"
-    )
+    if expected_error
+      assert_equal("External beta policy error: #{expected_error}\n", stderr)
+    else
+      assert(
+        stderr.match?(/\AExternal beta policy error: [A-Za-z0-9 .:-]+\n\z/),
+        "failure output is unstable: #{stderr.inspect}"
+      )
+    end
     forbidden.each { |text| assert(!stderr.include?(text), "failure leaked sensitive input") }
   end
 
@@ -586,6 +658,233 @@ class ExternalBetaPolicyTestSuite
       fixture.dig(:lineage, "upgradePredecessor")["candidateInventorySHA256"] = inventory_sha256
     end
     rewrite_lineage_and_downstream!(fixture)
+  end
+
+  def test_rejected_template_generation
+    run("prints every closed template variant with the production schema shape") do
+      Dir.mktmpdir do |directory|
+        none_directory = File.join(directory, "none")
+        failed_directory = File.join(directory, "failed")
+        recorded_directory = File.join(directory, "recorded")
+        [none_directory, failed_directory, recorded_directory].each { |path| FileUtils.mkdir_p(path) }
+        none = build_fixture(none_directory)
+        failed = build_fixture(failed_directory, build_number: 2, predecessor: :failed)
+        recorded = build_fixture(recorded_directory, build_number: 2, predecessor: :published)
+        cases = [
+          ["candidate-inventory-empty", {}, none.fetch(:inventory)],
+          ["candidate-inventory-retained", {}, recorded.fetch(:inventory)],
+          ["candidate-inventory-not-retained", {}, failed.fetch(:inventory)],
+          ["predecessor-lineage-none", {}, none.fetch(:lineage)],
+          ["predecessor-lineage-recorded", {}, recorded.fetch(:lineage)],
+          [
+            "external-beta-report-none",
+            { report_code: "beta-01", coverage_role: "sonoma-full-lifecycle" },
+            none.fetch(:reports).fetch(0)
+          ],
+          [
+            "external-beta-report-recorded",
+            { report_code: "beta-02", coverage_role: "additional-apple-silicon" },
+            recorded.fetch(:reports).fetch(1)
+          ],
+          ["external-beta-set", { sonoma_report_code: "beta-01" }, none.fetch(:set)]
+        ]
+        cases.each do |kind, options, expected|
+          template, = template_output(kind, **options)
+          assert_equal(json_shape(expected), json_shape(template), "#{kind} schema shape differs")
+        end
+      end
+    end
+
+    run("prints deterministic private-data-free rejected placeholders") do
+      cases = [
+        ["candidate-inventory-empty", {}],
+        ["candidate-inventory-retained", {}],
+        ["candidate-inventory-not-retained", {}],
+        ["predecessor-lineage-none", {}],
+        ["predecessor-lineage-recorded", {}],
+        ["external-beta-report-none", { report_code: "beta-01", coverage_role: "sonoma-full-lifecycle" }],
+        ["external-beta-report-recorded", { report_code: "beta-03", coverage_role: "additional-apple-silicon" }],
+        ["external-beta-set", { sonoma_report_code: "beta-01" }]
+      ]
+      cases.each do |kind, options|
+        value, first = template_output(kind, **options)
+        _, second = template_output(kind, **options)
+        assert_equal(first, second, "#{kind} template is not deterministic")
+        assert(first.valid_encoding?, "#{kind} template is not valid UTF-8")
+        assert(first.bytesize <= 262_144, "#{kind} template exceeds the evidence size bound")
+        strings = json_strings(value)
+        assert(
+          strings.any? { |item| item.start_with?("<REJECTED_TEMPLATE:REPLACE_REQUIRED:") },
+          "#{kind} has no explicit rejected placeholder"
+        )
+        assert(
+          strings.none? { |item| item.match?(/(?:\/Users\/|\/home\/|ssid|@[A-Za-z0-9])/i) },
+          "#{kind} contains private-data-shaped text"
+        )
+        assert(strings.none? { |item| item.match?(/\A(?:[0-9a-f]{40}|[0-9a-f]{64})\z/) }, "#{kind} contains a plausible identity digest")
+      end
+
+      Dir.mktmpdir do |working_directory|
+        environment = {
+          "HOME" => "/Users/SENSITIVE_TEMPLATE_HOME",
+          "DESK_SETUP_SSID" => "SENSITIVE_TEMPLATE_SSID",
+          "DESK_SETUP_ACCOUNT" => "SENSITIVE_TEMPLATE_ACCOUNT"
+        }
+        stdout, stderr, status = Open3.capture3(
+          environment,
+          RbConfig.ruby,
+          TEMPLATE_SCRIPT,
+          *template_arguments("candidate-inventory-empty"),
+          chdir: working_directory
+        )
+        assert(status.success?, "environment-isolation template failed")
+        assert(stderr.empty?, "environment-isolation template wrote stderr")
+        _, expected = template_output("candidate-inventory-empty")
+        assert_equal(expected, stdout, "template output depends on host environment")
+        assert_equal([], Dir.children(working_directory), "template generator wrote a file")
+        assert(!stdout.include?("SENSITIVE_TEMPLATE"), "template output leaked the host environment")
+      end
+    end
+
+    run("rejects every generated template before it can close the beta gate") do
+      cases = [
+        ["candidate-inventory-empty", {}, :none, :inventory, "candidate inventory"],
+        ["candidate-inventory-retained", {}, :published, :inventory, "candidate inventory"],
+        ["candidate-inventory-not-retained", {}, :failed, :inventory, "candidate inventory"],
+        ["predecessor-lineage-none", {}, :none, :lineage, "predecessor lineage"],
+        ["predecessor-lineage-recorded", {}, :published, :lineage, "predecessor lineage"],
+        [
+          "external-beta-report-none",
+          { report_code: "beta-01", coverage_role: "sonoma-full-lifecycle" },
+          :none,
+          [:reports, 0],
+          "external beta report"
+        ],
+        [
+          "external-beta-report-recorded",
+          { report_code: "beta-02", coverage_role: "additional-apple-silicon" },
+          :published,
+          [:reports, 1],
+          "external beta report"
+        ],
+        ["external-beta-set", { sonoma_report_code: "beta-01" }, :none, :set, "external beta set"]
+      ]
+      cases.each do |kind, options, predecessor, target, label|
+        Dir.mktmpdir do |directory|
+          build_number = predecessor == :none ? 1 : 2
+          fixture = build_fixture(directory, build_number: build_number, predecessor: predecessor)
+          _, bytes = template_output(kind, **options)
+          path = if target.is_a?(Array)
+                   fixture.dig(:paths, target.fetch(0), target.fetch(1))
+                 else
+                   fixture.dig(:paths, target)
+                 end
+          File.binwrite(path, bytes)
+          stdout, stderr, status = cli(*arguments(fixture))
+          assert(!status.success?, "#{kind} unexpectedly passed verification")
+          assert(stdout.empty?, "#{kind} rejection wrote stdout")
+          assert_equal(
+            "External beta policy error: #{label} contains rejected template placeholders\n",
+            stderr,
+            "#{kind} rejection reason differs"
+          )
+        end
+      end
+    end
+
+    run("completes generated first-beta shapes with synthetic leaves and verifies the set") do
+      with_fixture do |fixture|
+        inventory, = template_output("candidate-inventory-empty")
+        lineage, = template_output("predecessor-lineage-none")
+        reports = [
+          template_output(
+            "external-beta-report-none",
+            report_code: "beta-01",
+            coverage_role: "sonoma-full-lifecycle"
+          ).first,
+          template_output(
+            "external-beta-report-none",
+            report_code: "beta-02",
+            coverage_role: "additional-apple-silicon"
+          ).first,
+          template_output(
+            "external-beta-report-none",
+            report_code: "beta-03",
+            coverage_role: "additional-apple-silicon"
+          ).first
+        ]
+        set, = template_output("external-beta-set", sonoma_report_code: "beta-01")
+        write_json(
+          fixture.dig(:paths, :inventory),
+          fill_template(inventory, fixture.fetch(:inventory))
+        )
+        write_json(
+          fixture.dig(:paths, :lineage),
+          fill_template(lineage, fixture.fetch(:lineage))
+        )
+        reports.each_with_index do |template, index|
+          write_json(
+            fixture.dig(:paths, :reports, index),
+            fill_template(template, fixture.fetch(:reports).fetch(index))
+          )
+        end
+        write_json(fixture.dig(:paths, :set), fill_template(set, fixture.fetch(:set)))
+        assert_success(*arguments(fixture))
+      end
+    end
+
+    run("fails closed for missing invalid duplicate and cross-kind template options") do
+      cases = [
+        [[], "External beta template error: template kind is missing\n"],
+        [template_arguments("SENSITIVE_KIND"), "External beta template error: template kind is invalid\n"],
+        [template_arguments("external-beta-report-none"), "External beta template error: report template options are missing\n"],
+        [
+          template_arguments(
+            "external-beta-report-none",
+            report_code: "SENSITIVE_CODE",
+            coverage_role: "sonoma-full-lifecycle"
+          ),
+          "External beta template error: template report code is invalid\n"
+        ],
+        [
+          template_arguments(
+            "external-beta-report-none",
+            report_code: "beta-01",
+            coverage_role: "SENSITIVE_ROLE"
+          ),
+          "External beta template error: template coverage role is invalid\n"
+        ],
+        [template_arguments("external-beta-set"), "External beta template error: set template options are missing\n"],
+        [
+          template_arguments("external-beta-set", sonoma_report_code: "SENSITIVE_CODE"),
+          "External beta template error: template Sonoma report code is invalid\n"
+        ],
+        [
+          template_arguments("candidate-inventory-empty", report_code: "beta-01"),
+          "External beta template error: template options differ for this kind\n"
+        ],
+        [
+          ["--kind", "candidate-inventory-empty", "--kind", "SENSITIVE_KIND"],
+          "External beta template error: template option is repeated\n"
+        ],
+        [
+          ["--kind", "candidate-inventory-empty", "SENSITIVE_ARGUMENT"],
+          "External beta template error: unexpected arguments\n"
+        ],
+        [
+          ["--kind", "candidate-inventory-empty", "--output", "SENSITIVE_PATH"],
+          "External beta template error: invalid command line.\n"
+        ]
+      ]
+      cases.each do |arguments_value, expected_stderr|
+        stdout, stderr, status = template_cli(*arguments_value)
+        assert(!status.success?, "invalid template command unexpectedly passed")
+        assert_equal(1, status.exitstatus)
+        assert(stdout.empty?, "invalid template command wrote stdout")
+        assert_equal(expected_stderr, stderr)
+        assert(!stderr.include?("SENSITIVE"), "invalid template command leaked an input value")
+      end
+    end
   end
 
   def test_success_paths
@@ -1052,11 +1351,15 @@ class ExternalBetaPolicyTestSuite
     run("rejects duplicate JSON keys") do
       with_fixture do |fixture, directory|
         marker = "SENSITIVE_DUPLICATE_MARKER"
-        File.binwrite(
-          fixture.dig(:paths, :set),
-          %({"schemaVersion":"desk-setup-switcher.external-beta-set/v1","schemaVersion":"#{marker}"}\n)
+        path = fixture.dig(:paths, :set)
+        valid = File.binread(path)
+        duplicate = valid.sub(/\A\{/, %({"schemaVersion":"#{marker}",))
+        File.binwrite(path, duplicate)
+        assert_failure(
+          *arguments(fixture),
+          forbidden: [directory, marker],
+          expected_error: "external beta set contains duplicate JSON keys"
         )
-        assert_failure(*arguments(fixture), forbidden: [directory, marker])
       end
     end
 
@@ -1125,6 +1428,7 @@ class ExternalBetaPolicyTestSuite
   end
 
   def execute
+    test_rejected_template_generation
     test_success_paths
     test_candidate_binding
     test_lineage

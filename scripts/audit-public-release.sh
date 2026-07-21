@@ -676,6 +676,15 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
     ["7eb44a7aca5edd094867368a122cff670949f015", "scripts/test-audit-public-release.sh", "device-identifier"],
     ["7eb44a7aca5edd094867368a122cff670949f015", "scripts/test-audit-public-release.sh", "ip-host"],
     ["7eb44a7aca5edd094867368a122cff670949f015", "scripts/test-audit-public-release.sh", "ssid"],
+    ["99488bb47b17665aa1a4e9ff1bdad9f8c263d5ec", "scripts/test-audit-public-release.sh", "device-identifier"],
+    ["99488bb47b17665aa1a4e9ff1bdad9f8c263d5ec", "scripts/test-audit-public-release.sh", "ip-host"],
+    ["99488bb47b17665aa1a4e9ff1bdad9f8c263d5ec", "scripts/test-audit-public-release.sh", "ssid"],
+    ["f5db6c2371a2bf916eab73acbdf5490cd6958988", "scripts/test-audit-public-release.sh", "device-identifier"],
+    ["f5db6c2371a2bf916eab73acbdf5490cd6958988", "scripts/test-audit-public-release.sh", "ip-host"],
+    ["f5db6c2371a2bf916eab73acbdf5490cd6958988", "scripts/test-audit-public-release.sh", "ssid"],
+    ["0b02c6c456890ef10aa590fbab57dc2e236be266", "scripts/test-audit-public-release.sh", "device-identifier"],
+    ["0b02c6c456890ef10aa590fbab57dc2e236be266", "scripts/test-audit-public-release.sh", "ip-host"],
+    ["0b02c6c456890ef10aa590fbab57dc2e236be266", "scripts/test-audit-public-release.sh", "ssid"],
   ]).freeze
   SAFE_VALUE_WORDS = /(?:\A|[^a-z0-9])(?:demo|example|fake|fixture|mock|placeholder|redacted|sample|synthetic|test(?:ing)?)(?:\z|[^a-z0-9])/i
   SAFE_CONTEXT_WORDS = /(?:\b(?:documentation[- ]only|e\.g\.|example data|for example|mock fixture|redacted fixture|synthetic(?: data| fixture| value)?|test fixture)\b|예시?\s*[:：]?)/i
@@ -1067,6 +1076,207 @@ if [[ -s "$git_scan_output" ]]; then
     echo "Unresolved public-release placeholder found in the current tree." >&2
     exit 1
 fi
+
+# A JSON string can spell the reserved marker with Unicode escapes, so a
+# worktree grep is not a complete boundary. Inspect the actual bytes from each
+# tracked worktree file, its stage-0 index blob, and the corresponding blobs in
+# every reachable commit tree. Reject ambiguous or malformed Git/file state
+# instead of silently treating it as safe. The scanner never emits a path or a
+# matched value.
+set +e
+ruby -rjson -rpsych -ropen3 -rset -e '
+  root = ARGV.fetch(0)
+  evidence_prefix = "docs/evidence/releases/".b
+  prefix = "<REJECTED_TEMPLATE:REPLACE_REQUIRED:"
+  json_string_token = /"(?:[^"\\\x00-\x1f]|\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4}))*"/
+  begin
+    git_capture = lambda do |*arguments|
+      stdout, _stderr, status = Open3.capture3("git", "-C", root, *arguments)
+      raise unless status.success?
+
+      stdout.b
+    end
+    nul_records = lambda do |output|
+      next [] if output.empty?
+      raise unless output.end_with?("\0")
+
+      output.byteslice(0, output.bytesize - 1).split("\0", -1)
+    end
+    contains_rejected_placeholder = lambda do |value|
+      case value
+      when Hash
+        value.any? do |key, item|
+          contains_rejected_placeholder.call(key) ||
+            contains_rejected_placeholder.call(item)
+        end
+      when Array
+        value.any? { |item| contains_rejected_placeholder.call(item) }
+      when String
+        value.start_with?(prefix)
+      else
+        false
+      end
+    end
+    reject_duplicate_json_keys = nil
+    reject_duplicate_json_keys = lambda do |node|
+      case node
+      when Psych::Nodes::Mapping
+        seen = {}
+        node.children.each_slice(2) do |key_node, value_node|
+          raise unless key_node.is_a?(Psych::Nodes::Scalar)
+          raise if seen.key?(key_node.value)
+
+          seen[key_node.value] = true
+          reject_duplicate_json_keys.call(value_node)
+        end
+      when Psych::Nodes::Sequence
+        node.children.each { |child| reject_duplicate_json_keys.call(child) }
+      end
+    end
+    inspect_bytes = lambda do |relative, bytes|
+      exit 3 if bytes.include?(prefix.b)
+      next unless relative.end_with?(".json".b)
+
+      text = bytes.dup.force_encoding(Encoding::UTF_8)
+      raise unless text.valid_encoding? && text.bytesize.between?(1, 262_144)
+
+      value = JSON.parse(
+        text,
+        allow_nan: false,
+        create_additions: false,
+        max_nesting: 64
+      )
+      normalized_text = text.gsub(json_string_token) do |token|
+        JSON.generate(JSON.parse(token, create_additions: false))
+      end
+      document = Psych.parse(normalized_text)
+      raise unless document&.root
+      reject_duplicate_json_keys.call(document.root)
+      exit 3 if contains_rejected_placeholder.call(value)
+    end
+    read_blob = lambda do |object|
+      raise unless object.match?(/\A(?:[0-9a-f]{40}|[0-9a-f]{64})\z/)
+      raise unless git_capture.call("cat-file", "-t", object) == "blob\n"
+
+      size_text = git_capture.call("cat-file", "-s", object)
+      raise unless size_text.match?(/\A(?:0|[1-9][0-9]*)\n\z/)
+      expected_size = Integer(size_text, 10)
+      bytes = git_capture.call("cat-file", "blob", object)
+      raise unless bytes.bytesize == expected_size
+
+      bytes
+    end
+    parse_tree_entries = lambda do |output|
+      nul_records.call(output).map do |record|
+        match = record.match(
+          /\A([0-7]{6}) (blob|tree|commit) ((?:[0-9a-f]{40}|[0-9a-f]{64}))\t(.+)\z/n
+        )
+        raise unless match
+
+        mode, type, object, relative = match.captures
+        raise unless relative.start_with?(evidence_prefix)
+        raise unless %w[100644 100755].include?(mode) && type == "blob"
+
+        [relative, object]
+      end
+    end
+
+    index_output = git_capture.call(
+      "--literal-pathspecs", "ls-files", "--stage", "-z", "--",
+      "docs/evidence/releases"
+    )
+    index_entries = []
+    seen_index_paths = Set.new
+    nul_records.call(index_output).each do |record|
+      match = record.match(
+        /\A([0-7]{6}) ((?:[0-9a-f]{40}|[0-9a-f]{64})) ([0-3])\t(.+)\z/n
+      )
+      raise unless match
+
+      mode, object, stage, relative = match.captures
+      raise unless relative.start_with?(evidence_prefix)
+      raise unless stage == "0" && %w[100644 100755].include?(mode)
+      raise unless seen_index_paths.add?(relative)
+
+      index_entries << [relative, object]
+    end
+
+    # Read the worktree independently from the index so staged/unstaged
+    # divergence cannot hide either representation.
+    index_entries.each do |relative, _object|
+      path = File.join(root.b, relative)
+      path_before = File.lstat(path)
+      raise unless path_before.file? && !path_before.symlink?
+
+      flags = File::RDONLY
+      flags |= File::NOFOLLOW if defined?(File::NOFOLLOW)
+      bytes = File.open(path, flags) do |file|
+        opened = file.stat
+        raise unless opened.file?
+        raise unless [opened.dev, opened.ino] == [path_before.dev, path_before.ino]
+
+        content = file.read
+        descriptor_after = file.stat
+        path_after = File.lstat(path)
+        identity = lambda do |stat|
+          [stat.dev, stat.ino, stat.mode, stat.nlink, stat.size, stat.mtime, stat.ctime]
+        end
+        raise unless identity.call(opened) == identity.call(descriptor_after)
+        raise unless identity.call(opened) == identity.call(path_after)
+        raise unless content.bytesize == descriptor_after.size
+
+        content
+      end
+
+      inspect_bytes.call(relative, bytes)
+    end
+
+    # A stage-0 blob can differ from the working file. Read the object itself;
+    # never resolve it through a path expression.
+    index_entries.each do |relative, object|
+      inspect_bytes.call(relative, read_blob.call(object))
+    end
+
+    commits = git_capture.call("rev-list", "--all").each_line.map(&:strip)
+    raise unless commits.uniq.length == commits.length
+    raise unless commits.all? { |object| object.match?(/\A(?:[0-9a-f]{40}|[0-9a-f]{64})\z/) }
+
+    scanned_history = Set.new
+    commits.each do |commit|
+      commit_bytes = git_capture.call("cat-file", "commit", commit)
+      tree_match = commit_bytes.match(/\Atree ((?:[0-9a-f]{40}|[0-9a-f]{64}))\r?\n/n)
+      raise unless tree_match
+      tree = tree_match[1]
+      raise unless git_capture.call("cat-file", "-t", tree) == "tree\n"
+
+      tree_output = git_capture.call(
+        "--literal-pathspecs", "ls-tree", "-r", "-z", "--full-tree", tree,
+        "--", "docs/evidence/releases"
+      )
+      parse_tree_entries.call(tree_output).each do |relative, object|
+        key = [relative.end_with?(".json".b), object]
+        next unless scanned_history.add?(key)
+
+        inspect_bytes.call(relative, read_blob.call(object))
+      end
+    end
+  rescue StandardError
+    exit 2
+  end
+' "$ROOT_DIR"
+evidence_scan_status=$?
+set -e
+case "$evidence_scan_status" in
+    0) ;;
+    3)
+        echo "Rejected template found in tracked release evidence." >&2
+        exit 1
+        ;;
+    *)
+        echo "Public-release audit could not inspect tracked release evidence." >&2
+        exit 1
+        ;;
+esac
 
 if [[ -s "$secret_hits" ]]; then
     echo "Potential credential pattern found in Git history (values suppressed):" >&2

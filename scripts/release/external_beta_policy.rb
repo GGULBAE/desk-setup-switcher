@@ -13,6 +13,8 @@ module DeskSetupExternalBetaPolicy
   INVENTORY_SCHEMA = "desk-setup-switcher.candidate-inventory/v1"
   LINEAGE_SCHEMA = "desk-setup-switcher.predecessor-lineage/v2"
   REPORT_CODES = %w[beta-01 beta-02 beta-03].freeze
+  COVERAGE_ROLES = %w[sonoma-full-lifecycle additional-apple-silicon].freeze
+  REJECTED_PLACEHOLDER_PREFIX = "<REJECTED_TEMPLATE:REPLACE_REQUIRED:".freeze
   SHA256 = /\A[0-9a-f]{64}\z/
   COMMIT = /\A[0-9a-f]{40}\z/
   VERSION = /\A(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*)){2}\z/
@@ -22,15 +24,6 @@ module DeskSetupExternalBetaPolicy
   MAX_PROVENANCE_BYTES = 16 * 1024 * 1024
 
   class PolicyError < StandardError; end
-  class DuplicateKeyError < PolicyError; end
-
-  class StrictObject < Hash
-    def []=(key, value)
-      raise DuplicateKeyError, "duplicate JSON key" if key?(key)
-
-      super
-    end
-  end
 
   module_function
 
@@ -176,18 +169,24 @@ module DeskSetupExternalBetaPolicy
     text = bytes.dup.force_encoding(Encoding::UTF_8)
     fail_policy!("#{label} is not UTF-8") unless text.valid_encoding?
     fail_policy!("#{label} contains a null byte") if text.include?("\0")
-    value = JSON.parse(
-      text,
-      allow_nan: false,
-      create_additions: false,
-      max_nesting: 32,
-      object_class: StrictObject
-    )
+    value = ReleasePolicy.parse_strict_json(text, label, max_nesting: 32)
+    fail_policy!("#{label} contains rejected template placeholders") if rejected_placeholder?(value)
     [value, digest]
-  rescue DuplicateKeyError
-    raise PolicyError, "#{label} contains duplicate JSON keys"
-  rescue JSON::ParserError, JSON::NestingError
-    raise PolicyError, "#{label} is not valid JSON"
+  rescue ReleasePolicy::PolicyError => error
+    raise PolicyError, error.message
+  end
+
+  def rejected_placeholder?(value)
+    case value
+    when Hash
+      value.any? { |key, item| rejected_placeholder?(key) || rejected_placeholder?(item) }
+    when Array
+      value.any? { |item| rejected_placeholder?(item) }
+    when String
+      value.start_with?(REJECTED_PLACEHOLDER_PREFIX)
+    else
+      false
+    end
   end
 
   def validate_inventory_item(item)
@@ -706,9 +705,7 @@ module DeskSetupExternalBetaPolicy
     }
   end
 
-  def run(argv)
-    command = argv.shift
-    fail_policy!("expected verify-set") unless command == "verify-set"
+  def run_verify_set(argv)
     options = { reports: [], print_result_json: false }
     parser = OptionParser.new do |value|
       value.banner = "Usage: external_beta_policy.rb verify-set [options]"
@@ -763,6 +760,16 @@ module DeskSetupExternalBetaPolicy
       )
     else
       puts "OK external beta set reports=3 sonoma=#{result.fetch(:sonoma_code)} build=#{result.fetch(:build_number)}"
+    end
+  end
+
+  def run(argv)
+    command = argv.shift
+    case command
+    when "verify-set"
+      run_verify_set(argv)
+    else
+      fail_policy!("expected verify-set")
     end
   end
 end

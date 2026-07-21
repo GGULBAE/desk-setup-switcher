@@ -585,6 +585,23 @@ assert_absent "$result_receipt"
 [[ ! -s "$command_log" ]] || fail "Wrong plan digest contacted GitHub."
 pass
 
+duplicate_plan="$temporary_root/duplicate-plan.json"
+ruby -e '
+  source = File.binread(ARGV.fetch(0))
+  duplicate = source.sub(/\A\{/, %({"schemaVersion":0,))
+  abort if duplicate == source
+  File.binwrite(ARGV.fetch(1), duplicate)
+' "$happy_plan" "$duplicate_plan"
+chmod 0600 "$duplicate_plan"
+new_case
+result_receipt="$receipt_dir/result.json"
+apply_case happy "$duplicate_plan" "$happy_digest"
+[[ "$invoke_status" -ne 0 ]] || fail "Duplicate-key plan receipt was accepted."
+[[ ! -e "$result_receipt" && ! -L "$result_receipt" ]] ||
+    fail "Duplicate-key plan receipt produced a result."
+[[ ! -s "$command_log" ]] || fail "Duplicate-key plan receipt contacted GitHub."
+pass
+
 new_case
 insecure_plan="$receipt_dir/insecure-plan.json"
 cp "$happy_plan" "$insecure_plan"

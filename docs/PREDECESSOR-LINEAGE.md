@@ -34,6 +34,40 @@ protected release-approver trust boundary, backed by the private sanitized
 source receipt named in the inventory. Do not describe this local check alone
 as proof of complete remote history.
 
+## Start from the policy-owned rejected shapes
+
+Preview the complete current-schema inventory and lineage variants with the
+stdout-only generator:
+
+```sh
+ruby scripts/release/external_beta_template_cli.rb \
+  --kind candidate-inventory-empty
+ruby scripts/release/external_beta_template_cli.rb \
+  --kind candidate-inventory-retained
+ruby scripts/release/external_beta_template_cli.rb \
+  --kind candidate-inventory-not-retained
+
+ruby scripts/release/external_beta_template_cli.rb \
+  --kind predecessor-lineage-none
+ruby scripts/release/external_beta_template_cli.rb \
+  --kind predecessor-lineage-recorded
+```
+
+Each command prints one deterministic JSON document and never reads candidate
+data, writes a file, calculates a digest, or infers which variant is true. The
+reserved `REJECTED_TEMPLATE` values, zero IDs, incomplete review flags, and
+other fail-closed leaves make the output invalid evidence. Choose variants
+only from the complete protected history review, add one inventory item for
+every real consumed build, and replace values only with reviewed facts.
+
+Treat stdout as a preview/copy source. Never show a plain `>` redirection to a
+canonical evidence path because it can truncate an existing record. After
+creating new files through the protected editor workflow, calculate the actual
+inventory byte digest, bind it in lineage, then bind the actual lineage digest
+in all reports and their actual digests in the set. `verify-set` remains the
+only local pass decision; the generator cannot approve a first-beta exception
+or a predecessor.
+
 ## Candidate inventory v1
 
 `candidate-inventory.json` uses

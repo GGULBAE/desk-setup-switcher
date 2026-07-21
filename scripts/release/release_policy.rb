@@ -116,8 +116,13 @@ module ReleasePolicy
     end
   end
 
-  def parse_strict_json(source, label)
-    value = JSON.parse(source, create_additions: false)
+  def parse_strict_json(source, label, max_nesting: 100)
+    value = JSON.parse(
+      source,
+      allow_nan: false,
+      create_additions: false,
+      max_nesting: max_nesting
+    )
     normalized_source = source.gsub(JSON_STRING_TOKEN) do |token|
       JSON.generate(JSON.parse(token, create_additions: false))
     end
