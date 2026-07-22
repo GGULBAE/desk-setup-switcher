@@ -2,7 +2,7 @@
 
 Original observation: 2026-07-18 16:04 KST
 
-Latest read-only recheck: 2026-07-21 14:17 KST
+Latest read-only recheck: 2026-07-22 13:48 KST
 
 ## Outcome
 
@@ -14,6 +14,51 @@ Release exists, so the unsafe path has not run.
 This was a read-only audit. It did not push a branch, create or move a tag,
 change a workflow setting, create an environment, inspect credential values,
 publish a Release, or deploy the site.
+
+## 2026-07-22 read-only recheck and containment plan
+
+At 2026-07-22 13:48 KST, authenticated GitHub GET/list requests again confirmed
+the stop condition observed at that time. Remote `master` was
+`1489b7fcb41ffa7e55a43ed65e6befc538838140`; the audited local release-control
+source `de4f805cfadf5fdfd1266d07286d27192794ca33` was its descendant, 39 commits
+ahead. Workflow `311269012` was the active historical **Release** workflow. The
+remote workflow inventory contained only CI and that legacy Release workflow;
+the signed-candidate and publication workflows were local and unpushed.
+
+That GET-only observation found:
+
+- `master` was unprotected (`protected:false` and the branch-protection request
+  returned 404), with zero repository rulesets;
+- zero environments, repository Actions secret names, repository Actions
+  variable names, `v*` tags, GitHub Releases, and Release-workflow runs;
+- immutable Releases and private vulnerability reporting disabled;
+- all Actions allowed with full-SHA pinning unenforced;
+- no Homepage, topics, Pages site, or `needs-triage` label, Discussions disabled,
+  and the description still advertising mouse and keyboard; and
+- the repository was still public with an MIT license and Issues enabled, the
+  default workflow token read-only, secret scanning and push protection
+  enabled, Dependabot security updates enabled, and the existing remote-master
+  CI successful.
+
+The corrected GET-only containment planner completed two stable observations
+and created the private receipt
+`legacy-workflow-containment-plan-de4f805-20260722.json`. Its parent directory
+was mode 0700 and the file was mode 0600. The receipt bound the exact local HEAD
+and all four expected tool blobs, recorded the workflow as active with zero tags
+and Releases, and had plan digest
+`bb53444e29871dd077d975128f0d41299d484d694429939a5e9f7daa11e0d4e6`.
+A separate `validate-plan` invocation using the same checked-in validator
+accepted those exact private bytes.
+Apply compares the current clean checkout HEAD and tool blobs with the receipt,
+so this receipt is accepted only from a clean checkout of
+`de4f805cfadf5fdfd1266d07286d27192794ca33`; any later HEAD must create and
+review a new GET-only plan.
+
+The receipt remained private, was not committed, and is planning evidence only.
+No apply operation or PUT occurred, and this recheck did not push, create or
+move a tag, dispatch a workflow, publish a Release, or make any other remote
+mutation. The active legacy workflow was therefore not contained by this
+recheck.
 
 ## 2026-07-21 read-only recheck
 
@@ -73,7 +118,8 @@ decisions exist.
 The recheck changes no conclusion below: do not push a `v*` tag, dispatch a
 release workflow, or treat the local mock/structural evidence as a protected
 remote result. The original table is retained as historical evidence; this
-section is the current pre-mutation status.
+section is the 2026-07-20 pre-mutation snapshot; the latest snapshot appears
+above.
 
 ## Audited identities
 
