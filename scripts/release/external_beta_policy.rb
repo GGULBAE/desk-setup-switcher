@@ -8,7 +8,7 @@ require "time"
 require_relative "release_policy"
 
 module DeskSetupExternalBetaPolicy
-  REPORT_SCHEMA = "desk-setup-switcher.external-beta/v2"
+  REPORT_SCHEMA = "desk-setup-switcher.external-beta/v3"
   SET_SCHEMA = "desk-setup-switcher.external-beta-set/v2"
   INVENTORY_SCHEMA = "desk-setup-switcher.candidate-inventory/v1"
   LINEAGE_SCHEMA = "desk-setup-switcher.predecessor-lineage/v3"
@@ -597,15 +597,96 @@ module DeskSetupExternalBetaPolicy
       release_manifest_sha256: manifest_sha256,
       final_dmg_sha256: dmg_identity.fetch("sha256"),
       provenance_sha256: provenance_identity.fetch("sha256"),
-      boundary_sha256: boundary_result.fetch(:digest)
+      boundary_sha256: boundary_result.fetch(:digest),
+      installation_identity: installation_identity_from_manifest(
+        manifest,
+        "predecessor release manifest installation"
+      )
     }
   end
 
-  def validate_acquisition(acquisition, label)
+  def installation_identity_from_manifest(manifest, label)
+    release = manifest.fetch("release")
+    application = manifest.fetch("application")
+    {
+      "bundleIdentifier" => exact_string(
+        application.fetch("bundleIdentifier"),
+        "#{label} bundle identifier"
+      ),
+      "version" => exact_version(release.fetch("version"), "#{label} version"),
+      "buildNumber" => parse_positive_integer(
+        release.fetch("buildNumber"),
+        "#{label} build number"
+      ),
+      "executableSHA256" => exact_sha256(
+        application.fetch("executable").fetch("sha256"),
+        "#{label} executable digest"
+      ),
+      "bundleManifestSHA256" => exact_sha256(
+        application.fetch("bundleManifest").fetch("canonicalSha256"),
+        "#{label} bundle manifest digest"
+      )
+    }
+  end
+
+  def validate_installation(installation, label, expected_identity)
+    installation = exact_object(
+      installation,
+      label,
+      %w[
+        destinationPath method copiedFromMountedDMG dmgEjectedBeforeLaunch
+        launchedFromApplications
+        bundleIdentifier version buildNumber executableSHA256 bundleManifestSHA256
+        sourceBundleManifestMatched installationEvidenceSHA256
+      ]
+    )
+    fail_policy!("#{label} destination path differs") unless
+      exact_string(installation["destinationPath"], "#{label} destination path") ==
+      "/Applications/Desk Setup Switcher.app"
+    fail_policy!("#{label} method differs") unless
+      exact_string(installation["method"], "#{label} method") ==
+      "finder-drag-from-mounted-dmg"
+    exact_true(installation["copiedFromMountedDMG"], "#{label} copied from mounted DMG")
+    exact_true(installation["dmgEjectedBeforeLaunch"], "#{label} DMG ejected before launch")
+    exact_true(installation["launchedFromApplications"], "#{label} launched from Applications")
+    exact_true(
+      installation["sourceBundleManifestMatched"],
+      "#{label} source bundle manifest match"
+    )
+
+    observed_identity = {
+      "bundleIdentifier" => exact_string(
+        installation["bundleIdentifier"],
+        "#{label} bundle identifier"
+      ),
+      "version" => exact_version(installation["version"], "#{label} version"),
+      "buildNumber" => exact_positive_integer(
+        installation["buildNumber"],
+        "#{label} build number"
+      ),
+      "executableSHA256" => exact_sha256(
+        installation["executableSHA256"],
+        "#{label} executable digest"
+      ),
+      "bundleManifestSHA256" => exact_sha256(
+        installation["bundleManifestSHA256"],
+        "#{label} bundle manifest digest"
+      )
+    }
+    fail_policy!("#{label} release identity differs") unless
+      exact_json_equal?(observed_identity, expected_identity)
+    exact_sha256(
+      installation["installationEvidenceSHA256"],
+      "#{label} evidence digest"
+    )
+    installation
+  end
+
+  def validate_acquisition(acquisition, label, expected_installation_identity)
     acquisition = exact_object(
       acquisition,
       label,
-      %w[channel browserDownloaded normalArchiveExtraction quarantinePresent quarantineManufactured quarantineRemoved quarantineEvidenceSHA256 checksumPass provenancePass gatekeeperPass openAnywayUsed]
+      %w[channel browserDownloaded normalArchiveExtraction quarantinePresent quarantineManufactured quarantineRemoved quarantineEvidenceSHA256 checksumPass provenancePass gatekeeperPass openAnywayUsed installation]
     )
     fail_policy!("#{label} channel differs") unless acquisition["channel"] == "protected-workflow-browser"
     %w[browserDownloaded normalArchiveExtraction quarantinePresent checksumPass provenancePass gatekeeperPass].each do |name|
@@ -615,6 +696,11 @@ module DeskSetupExternalBetaPolicy
       exact_false(acquisition[name], "#{label} #{name}")
     end
     exact_sha256(acquisition["quarantineEvidenceSHA256"], "#{label} quarantine evidence digest")
+    validate_installation(
+      acquisition["installation"],
+      "#{label} installation",
+      expected_installation_identity
+    )
     acquisition
   end
 
@@ -668,7 +754,11 @@ module DeskSetupExternalBetaPolicy
     )
     independence.each { |name, value| exact_true(value, "beta independence #{name}") }
 
-    validate_acquisition(report["acquisition"], "beta acquisition")
+    validate_acquisition(
+      report["acquisition"],
+      "beta acquisition",
+      expected.fetch(:candidate_installation_identity)
+    )
 
     lifecycle = exact_object(
       report["lifecycle"],
@@ -706,7 +796,11 @@ module DeskSetupExternalBetaPolicy
       upgrade["predecessorFinalDMGSHA256"] == lineage_upgrade["finalDMGSHA256"] &&
       upgrade["predecessorReleaseManifestSHA256"] == lineage_upgrade["releaseManifestSHA256"] &&
       upgrade["predecessorProvenanceBundleSHA256"] == lineage_upgrade["provenanceBundleSHA256"]
-    validate_acquisition(upgrade["predecessorAcquisition"], "beta predecessor acquisition")
+    validate_acquisition(
+      upgrade["predecessorAcquisition"],
+      "beta predecessor acquisition",
+      expected.fetch(:predecessor_installation_identity)
+    )
     %w[profilesPreserved settingsPreserved selectionPreserved backupsPreserved loginItemConsentPreserved].each do |name|
       exact_true(upgrade[name], "beta upgrade #{name}")
     end
@@ -886,7 +980,13 @@ module DeskSetupExternalBetaPolicy
       "finalDMGSHA256" => options.fetch(:final_dmg_sha256),
       "releaseManifestSHA256" => manifest_sha256
     }
-    expected = { candidate: candidate }
+    expected = {
+      candidate: candidate,
+      candidate_installation_identity: installation_identity_from_manifest(
+        manifest,
+        "release manifest installation"
+      )
+    }
     inventory, inventory_sha256 = read_strict_json(
       options.fetch(:candidate_inventory),
       "candidate inventory"
@@ -908,6 +1008,8 @@ module DeskSetupExternalBetaPolicy
       boundary_result,
       manifest_created_at
     )
+    expected[:predecessor_installation_identity] =
+      predecessor_materials.fetch(:installation_identity)
     report_subject = candidate.merge(
       "finalDMGName" => expected_dmg_name,
       "provenanceBundleName" => expected_provenance_name,

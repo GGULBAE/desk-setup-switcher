@@ -894,7 +894,7 @@ ruby -rdigest -rjson -ropen3 -rrbconfig -rtmpdir -e '
       "8f9d7ffeddecdb570ad667f18bc170e3bfffc468103d86d58281c574dfea762b"
   abort "external beta pure template source differs from the reviewed implementation" unless
     Digest::SHA256.hexdigest(template_source) ==
-      "8f5fd25b35f12e0baf91791295aba209444a653027a4cb34feaa97166143b326"
+      "877ca59e298723eacef51abf539f290dbe699215b767a871a5c52b613f8c5d93"
   abort "external beta pure template source lacks rejected placeholders" unless
     template_source.include?(%q{<REJECTED_TEMPLATE:REPLACE_REQUIRED:})
   pure_source_forbidden = /(?:`|%x|\b(?:File|IO|Dir|Process|ENV|Socket|TCPSocket|UDPSocket|UNIXSocket|Net::HTTP|Open3|Kernel|URI|Thread|Fiber|Ractor|Time|Date|Random|SecureRandom|JSON|YAML|Psych|Marshal)\b|\b(?:system|exec|spawn|fork|open|read|write|puts|print|printf|warn|abort|exit|at_exit|require|load|autoload)\b)/

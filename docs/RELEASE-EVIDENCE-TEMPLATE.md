@@ -152,7 +152,9 @@ Record each result separately. Use synthetic data and the exact final DMG above.
 | Browser-download archive and extracted-DMG `com.apple.quarantine` value recorded before open; attribute was neither added nor removed | `<not recorded>` | [ ] |
 | Final DMG SHA-256 and final-DMG provenance attestation match | `<not recorded>` | [ ] |
 | Gatekeeper identifies the Developer ID publisher; no Open Anyway workaround | `<not recorded>` | [ ] |
-| Clean first launch and menu-bar-only lifecycle | `<not recorded>` | [ ] |
+| Exact predecessor app is copied with Finder to `/Applications/Desk Setup Switcher.app`, its DMG is ejected, and installed bundle/version/build/executable/bundle-manifest identities match its release manifest | `<not recorded>` | [ ] |
+| Exact final app replaces that same path from its mounted DMG, its DMG is ejected, and installed identities match the final release manifest | `<not recorded>` | [ ] |
+| Clean first launch uses only the exact `/Applications` copy and passes the menu-bar-only lifecycle | `<not recorded>` | [ ] |
 | Launch at login is off by default; any optional opt-in is explicit | `<not recorded>` | [ ] |
 | Capture → Edit → Review explanation works without applying a setting | `<not recorded>` | [ ] |
 | Exact browser-downloaded `v0.0.9` build-1 predecessor passes quarantine/checksum/Gatekeeper/provenance checks and upgrades to exact `v0.1.0` build 2 while preserving schema-1 profiles, settings, selection, backups, and consent boundary | `<not recorded>` | [ ] |
@@ -165,7 +167,7 @@ Record each result separately. Use synthetic data and the exact final DMG above.
 
 ## External beta and release blockers
 
-Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPLATE.md), use the same final DMG SHA-256 and final-DMG provenance attestation, separately acquire the same exact predecessor DMG with real quarantine, and pass the fixed build-1-to-build-2 upgrade. Reports run on Apple Silicon within the planned macOS 14+ matrix and avoid live system-setting mutation unless separately authorized. At least one accepted report must run the full lifecycle on macOS 14 Sonoma. The actual-byte inventory, lineage, three reports, and independence-review set must validate against both restored origins and the v3 boundary; Markdown alone is not evidence.
+Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPLATE.md), use report schema v3, use the same final DMG SHA-256 and final-DMG provenance attestation, separately acquire the same exact predecessor DMG with real quarantine, install both origins to the exact `/Applications` path, eject before launch, bind both installed identities to their release manifests, and pass the fixed build-1-to-build-2 upgrade. Reports run on Apple Silicon within the planned macOS 14+ matrix and avoid live system-setting mutation unless separately authorized. At least one accepted report must run the full lifecycle on macOS 14 Sonoma. The actual-byte inventory, lineage, three reports, and independence-review set must validate against both restored origins and the v3 boundary; Markdown alone is not evidence.
 
 | Report | Tester record | macOS / coverage role | Final DMG SHA matches | DMG provenance matches | Mandatory lifecycle passes | Open P0/P1 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -176,6 +178,7 @@ Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPL
 - [ ] At least one accepted report records Apple Silicon/macOS 14.x Sonoma and passes every mandatory exact-candidate lifecycle row.
 - [ ] `candidate-inventory.json` v1 records exactly the retained protected-beta `v0.0.9`/build-1 origin below current `v0.1.0`/build 2, requires predecessor completion before the current manifest, and carries the protected completeness-review receipt digest.
 - [ ] `predecessor-lineage.json` v3 binds actual inventory, predecessor manifest/DMG/provenance, E1 boundary, predecessor tag object, and E0 digest; every report records a passed mandatory upgrade.
+- [ ] Each external-beta v3 report records separate predecessor and final installation evidence for exact `/Applications/Desk Setup Switcher.app`; both installed identities match their restored release manifests and neither launch comes from a mounted DMG.
 - [ ] `external-beta-set.json` binds the actual ordered bytes of `external-beta-01.json` through `external-beta-03.json`, identifies the Sonoma report, and records the protected no-PII independence review for three distinct external people.
 - [ ] A read-only public issue query shows zero unresolved P0/P1 issues for this candidate.
 - [ ] The maintainer records zero unresolved product P0/P1 blockers.

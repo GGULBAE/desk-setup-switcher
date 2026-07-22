@@ -978,6 +978,25 @@ run_scenario() {
         "finalDMGSHA256" => final_dmg_sha,
         "releaseManifestSHA256" => release_manifest_sha
       }
+      installation_for = lambda do |manifest_value, evidence_label|
+        installed_release = manifest_value.fetch("release")
+        installed_application = manifest_value.fetch("application")
+        {
+          "destinationPath" => "/Applications/Desk Setup Switcher.app",
+          "method" => "finder-drag-from-mounted-dmg",
+          "copiedFromMountedDMG" => true,
+          "dmgEjectedBeforeLaunch" => true,
+          "launchedFromApplications" => true,
+          "bundleIdentifier" => installed_application.fetch("bundleIdentifier"),
+          "version" => installed_release.fetch("version"),
+          "buildNumber" => Integer(installed_release.fetch("buildNumber"), 10),
+          "executableSHA256" => installed_application.fetch("executable").fetch("sha256"),
+          "bundleManifestSHA256" =>
+            installed_application.fetch("bundleManifest").fetch("canonicalSha256"),
+          "sourceBundleManifestMatched" => true,
+          "installationEvidenceSHA256" => Digest::SHA256.hexdigest(evidence_label)
+        }
+      end
       predecessor_item = {
         "outcome" => "retained",
         "version" => "0.0.9",
@@ -1079,7 +1098,7 @@ run_scenario() {
         subject.delete("candidateOriginRunAttempt")
         subject["candidateOriginRunAttempt"] = 1
         report = {
-          "schemaVersion" => "desk-setup-switcher.external-beta/v2",
+          "schemaVersion" => "desk-setup-switcher.external-beta/v3",
           "report" => {
             "reportCode" => code,
             "startedAt" => started_at.utc.iso8601,
@@ -1111,7 +1130,11 @@ run_scenario() {
             "checksumPass" => true,
             "provenancePass" => true,
             "gatekeeperPass" => true,
-            "openAnywayUsed" => false
+            "openAnywayUsed" => false,
+            "installation" => installation_for.call(
+              manifest,
+              "synthetic candidate installation #{index}"
+            )
           },
           "lifecycle" => {
             "firstLaunchPass" => true,
@@ -1145,7 +1168,11 @@ run_scenario() {
                 "checksumPass" => true,
                 "provenancePass" => true,
                 "gatekeeperPass" => true,
-                "openAnywayUsed" => false
+                "openAnywayUsed" => false,
+                "installation" => installation_for.call(
+                  predecessor_manifest,
+                  "synthetic predecessor installation #{index}"
+                )
               },
               "profilesPreserved" => true,
               "settingsPreserved" => true,
@@ -1183,6 +1210,12 @@ run_scenario() {
         reports.fetch(1).fetch("lifecycle")["diagnosticsPass"] = false
       when "beta-quarantine-invalid"
         reports.fetch(2).fetch("acquisition")["quarantineRemoved"] = true
+      when "beta-installation-failed"
+        reports.fetch(1).dig("acquisition", "installation")["copiedFromMountedDMG"] = false
+      when "beta-predecessor-installation-failed"
+        reports.fetch(1).dig(
+          "lifecycle", "upgrade", "predecessorAcquisition", "installation"
+        )["launchedFromApplications"] = false
       when "beta-independent-false"
         reports.fetch(1).fetch("independence")["noRepositoryWriteAccess"] = false
       when "beta-provenance-mismatch"
@@ -1831,7 +1864,8 @@ run_scenario() {
         candidate-inventory-byte-mismatch|candidate-inventory-schema-invalid|predecessor-build-reuse|\
         predecessor-manifest-byte-mismatch|predecessor-provenance-binding-mismatch|\
         beta-report-byte-mismatch|beta-wrong-candidate|beta-duplicate-code|beta-missing-sonoma|\
-        beta-lifecycle-failed|beta-quarantine-invalid|beta-independent-false|\
+        beta-lifecycle-failed|beta-quarantine-invalid|beta-installation-failed|\
+        beta-predecessor-installation-failed|beta-independent-false|\
         beta-provenance-mismatch|beta-set-binding-mismatch)
             grep -q 'The external-beta or predecessor-lineage evidence is invalid.' "$stderr_path" || {
                 printf 'Scenario %s did not fail at the external-beta gate.\n' "$scenario" >&2
@@ -1916,6 +1950,8 @@ run_scenario beta-duplicate-code failure 0
 run_scenario beta-missing-sonoma failure 0
 run_scenario beta-lifecycle-failed failure 0
 run_scenario beta-quarantine-invalid failure 0
+run_scenario beta-installation-failed failure 0
+run_scenario beta-predecessor-installation-failed failure 0
 run_scenario beta-independent-false failure 0
 run_scenario beta-provenance-mismatch failure 0
 run_scenario predecessor-build-reuse failure 0

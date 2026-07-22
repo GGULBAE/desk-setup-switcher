@@ -404,7 +404,7 @@ the underlying Settings screenshots or token-scope record.
     predecessor asset set.
 14. Restore both origins. Complete the clean-download lifecycle, mandatory
     predecessor acquisition and upgrade, candidate inventory v1, predecessor
-    lineage v3, three external-beta v2 reports, external-beta-set v2, protected
+    lineage v3, three external-beta v3 reports, external-beta-set v2, protected
     independence review, both zero-blocker decisions, and final public-surface
     review. Commit the six fixed inventory/lineage/beta blobs on `master`; their
     bytes and both earlier remote-controls records must not change later.

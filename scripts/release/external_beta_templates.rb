@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module DeskSetupExternalBetaTemplates
-  REPORT_SCHEMA = "desk-setup-switcher.external-beta/v2"
+  REPORT_SCHEMA = "desk-setup-switcher.external-beta/v3"
   SET_SCHEMA = "desk-setup-switcher.external-beta-set/v2"
   INVENTORY_SCHEMA = "desk-setup-switcher.candidate-inventory/v1"
   LINEAGE_SCHEMA = "desk-setup-switcher.predecessor-lineage/v3"
@@ -68,6 +68,25 @@ module DeskSetupExternalBetaTemplates
     }
   end
 
+  def placeholder_installation(prefix = nil)
+    predecessor = prefix == "predecessor"
+    label = prefix ? "#{prefix}-" : ""
+    {
+      "destinationPath" => "/Applications/Desk Setup Switcher.app",
+      "method" => "finder-drag-from-mounted-dmg",
+      "copiedFromMountedDMG" => false,
+      "dmgEjectedBeforeLaunch" => false,
+      "launchedFromApplications" => false,
+      "bundleIdentifier" => placeholder("#{label}installed-bundle-identifier"),
+      "version" => predecessor ? "0.0.9" : "0.1.0",
+      "buildNumber" => predecessor ? 1 : 2,
+      "executableSHA256" => placeholder("#{label}installed-executable-sha256"),
+      "bundleManifestSHA256" => placeholder("#{label}installed-bundle-manifest-sha256"),
+      "sourceBundleManifestMatched" => false,
+      "installationEvidenceSHA256" => placeholder("#{label}installation-evidence-sha256")
+    }
+  end
+
   def placeholder_acquisition(prefix = nil)
     label = prefix ? "#{prefix}-quarantine-evidence-sha256" : "quarantine-evidence-sha256"
     {
@@ -81,7 +100,8 @@ module DeskSetupExternalBetaTemplates
       "checksumPass" => false,
       "provenancePass" => false,
       "gatekeeperPass" => false,
-      "openAnywayUsed" => false
+      "openAnywayUsed" => false,
+      "installation" => placeholder_installation(prefix)
     }
   end
 

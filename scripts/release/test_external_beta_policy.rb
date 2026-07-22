@@ -16,6 +16,10 @@ class ExternalBetaPolicyTestSuite
   VERSION = "0.1.0"
   COMMIT = "a" * 40
   BUNDLE_IDENTIFIER = "io.github.ggullbae.DeskSetupSwitcher"
+  CURRENT_EXECUTABLE_SHA256 = "3" * 64
+  CURRENT_BUNDLE_MANIFEST_SHA256 = "4" * 64
+  PREDECESSOR_EXECUTABLE_SHA256 = "8" * 64
+  PREDECESSOR_BUNDLE_MANIFEST_SHA256 = "9" * 64
   RUN_ID = 8001
   ARTIFACT_ID = 9001
   ARTIFACT_SHA256 = "b" * 64
@@ -80,12 +84,14 @@ class ExternalBetaPolicyTestSuite
 
   def release_manifest(build_number:, version: VERSION, tag: TAG, commit: COMMIT,
                        run_id: RUN_ID, dmg_bytes: DMG_BYTES, dmg_sha256: DMG_SHA256,
-                       created_at: MANIFEST_CREATED_AT)
+                       created_at: MANIFEST_CREATED_AT,
+                       executable_sha256: CURRENT_EXECUTABLE_SHA256,
+                       bundle_manifest_sha256: CURRENT_BUNDLE_MANIFEST_SHA256)
     verification_output = {
       "appCodesign" => "valid on disk\nsatisfies its designated requirement\n",
       "dmgCodesign" => "valid on disk\nsatisfies its designated requirement\n",
-      "mountedAppCompatibility" => "Verified release app metadata and resources: architectures=arm64,x86_64; minos=arm64:14.0,x86_64:14.0; executable-sha256=#{"3" * 64}\n",
-      "signedAppCompatibility" => "Verified release app metadata and resources: architectures=arm64,x86_64; minos=arm64:14.0,x86_64:14.0; executable-sha256=#{"3" * 64}\n",
+      "mountedAppCompatibility" => "Verified release app metadata and resources: architectures=arm64,x86_64; minos=arm64:14.0,x86_64:14.0; executable-sha256=#{executable_sha256}\n",
+      "signedAppCompatibility" => "Verified release app metadata and resources: architectures=arm64,x86_64; minos=arm64:14.0,x86_64:14.0; executable-sha256=#{executable_sha256}\n",
       "spctlApp" => "accepted\nsource=Notarized Developer ID\n",
       "spctlDMG" => "accepted\nsource=Notarized Developer ID\n",
       "staplerValidate" => "The validate action worked!\n"
@@ -117,7 +123,7 @@ class ExternalBetaPolicyTestSuite
         "cdhashes" => { "arm64" => "1" * 40, "x86_64" => "2" * 40 },
         "executable" => {
           "name" => "DeskSetupSwitcher",
-          "sha256" => "3" * 64,
+          "sha256" => executable_sha256,
           "size" => 1
         },
         "designatedRequirement" => {
@@ -128,7 +134,7 @@ class ExternalBetaPolicyTestSuite
           "schemaVersion" => "desk-setup-switcher.app-bundle/v1",
           "rootName" => "Desk Setup Switcher.app",
           "entryCount" => 1,
-          "canonicalSha256" => "4" * 64
+          "canonicalSha256" => bundle_manifest_sha256
         }
       },
       "lineage" => {
@@ -246,7 +252,28 @@ class ExternalBetaPolicyTestSuite
     }
   end
 
-  def acquisition(index, offset: 1)
+  def installation(index, predecessor: false)
+    {
+      "destinationPath" => "/Applications/Desk Setup Switcher.app",
+      "method" => "finder-drag-from-mounted-dmg",
+      "copiedFromMountedDMG" => true,
+      "dmgEjectedBeforeLaunch" => true,
+      "launchedFromApplications" => true,
+      "bundleIdentifier" => BUNDLE_IDENTIFIER,
+      "version" => predecessor ? PREDECESSOR_VERSION : VERSION,
+      "buildNumber" => predecessor ? PREDECESSOR_BUILD_NUMBER : 2,
+      "executableSHA256" => predecessor ?
+        PREDECESSOR_EXECUTABLE_SHA256 : CURRENT_EXECUTABLE_SHA256,
+      "bundleManifestSHA256" => predecessor ?
+        PREDECESSOR_BUNDLE_MANIFEST_SHA256 : CURRENT_BUNDLE_MANIFEST_SHA256,
+      "sourceBundleManifestMatched" => true,
+      "installationEvidenceSHA256" => Digest::SHA256.hexdigest(
+        "synthetic #{predecessor ? 'predecessor' : 'candidate'} installation #{index}"
+      )
+    }
+  end
+
+  def acquisition(index, offset: 1, predecessor: false)
     {
       "channel" => "protected-workflow-browser",
       "browserDownloaded" => true,
@@ -258,14 +285,15 @@ class ExternalBetaPolicyTestSuite
       "checksumPass" => true,
       "provenancePass" => true,
       "gatekeeperPass" => true,
-      "openAnywayUsed" => false
+      "openAnywayUsed" => false,
+      "installation" => installation(index, predecessor: predecessor)
     }
   end
 
   def report(code:, index:, subject:, upgrade:)
     start_hour = 2 + (index * 2)
     {
-      "schemaVersion" => "desk-setup-switcher.external-beta/v2",
+      "schemaVersion" => "desk-setup-switcher.external-beta/v3",
       "report" => {
         "reportCode" => code,
         "startedAt" => format("2026-07-18T%02d:00:00Z", start_hour),
@@ -348,7 +376,9 @@ class ExternalBetaPolicyTestSuite
       run_id: PREDECESSOR_RUN_ID,
       dmg_bytes: PREDECESSOR_DMG_BYTES,
       dmg_sha256: PREDECESSOR_DMG_SHA256,
-      created_at: PREDECESSOR_MANIFEST_CREATED_AT
+      created_at: PREDECESSOR_MANIFEST_CREATED_AT,
+      executable_sha256: PREDECESSOR_EXECUTABLE_SHA256,
+      bundle_manifest_sha256: PREDECESSOR_BUNDLE_MANIFEST_SHA256
     )
     write_json(paths.fetch(:predecessor_manifest), predecessor_manifest)
     boundary = {
@@ -453,7 +483,7 @@ class ExternalBetaPolicyTestSuite
         "predecessorFinalDMGSHA256" => upgrade.fetch("finalDMGSHA256"),
         "predecessorReleaseManifestSHA256" => upgrade.fetch("releaseManifestSHA256"),
         "predecessorProvenanceBundleSHA256" => upgrade.fetch("provenanceBundleSHA256"),
-        "predecessorAcquisition" => acquisition(0, offset: 7),
+        "predecessorAcquisition" => acquisition(0, offset: 7, predecessor: true),
         "profilesPreserved" => true,
         "settingsPreserved" => true,
         "selectionPreserved" => true,
@@ -1209,6 +1239,9 @@ class ExternalBetaPolicyTestSuite
   end
 
   def test_reports
+    report_mutation("rejects the old v2 report schema") do |report|
+      report["schemaVersion"] = "desk-setup-switcher.external-beta/v2"
+    end
     report_mutation("rejects the wrong report schema") do |report|
       report["schemaVersion"] = "desk-setup-switcher.external-beta/v0"
     end
@@ -1252,6 +1285,76 @@ class ExternalBetaPolicyTestSuite
     end
     report_mutation("rejects Open Anyway") do |report|
       report.fetch("acquisition")["openAnywayUsed"] = true
+    end
+    report_mutation("rejects missing candidate installation evidence") do |report|
+      report.fetch("acquisition").delete("installation")
+    end
+    report_mutation("rejects a missing candidate installation field") do |report|
+      report.dig("acquisition", "installation").delete("version")
+    end
+    report_mutation("rejects an extra candidate installation field") do |report|
+      report.dig("acquisition", "installation")["extra"] = true
+    end
+    %w[
+      copiedFromMountedDMG dmgEjectedBeforeLaunch launchedFromApplications
+      sourceBundleManifestMatched
+    ].each do |name|
+      report_mutation("rejects false candidate installation #{name}") do |report|
+        report.dig("acquisition", "installation")[name] = false
+      end
+    end
+    report_mutation("rejects a candidate installation outside Applications") do |report|
+      report.dig("acquisition", "installation")["destinationPath"] =
+        "/Volumes/Desk Setup Switcher/Desk Setup Switcher.app"
+    end
+    report_mutation("rejects the wrong candidate installation method") do |report|
+      report.dig("acquisition", "installation")["method"] = "open-from-mounted-dmg"
+    end
+    report_mutation("rejects the wrong installed candidate version") do |report|
+      report.dig("acquisition", "installation")["version"] = PREDECESSOR_VERSION
+    end
+    report_mutation("rejects the wrong installed candidate build") do |report|
+      report.dig("acquisition", "installation")["buildNumber"] = 3
+    end
+    report_mutation("rejects a string installed candidate build") do |report|
+      report.dig("acquisition", "installation")["buildNumber"] = "2"
+    end
+    report_mutation("rejects the wrong installed candidate executable") do |report|
+      report.dig("acquisition", "installation")["executableSHA256"] = "f" * 64
+    end
+    report_mutation("rejects the wrong installed candidate bundle identifier") do |report|
+      report.dig("acquisition", "installation")["bundleIdentifier"] =
+        "io.github.ggullbae.OtherApp"
+    end
+    report_mutation("rejects the wrong installed candidate bundle manifest") do |report|
+      report.dig("acquisition", "installation")["bundleManifestSHA256"] = "f" * 64
+    end
+    report_mutation("rejects an invalid candidate installation evidence digest") do |report|
+      report.dig("acquisition", "installation")["installationEvidenceSHA256"] =
+        "not-a-sha256"
+    end
+    report_mutation("rejects missing predecessor installation evidence") do |report|
+      report.dig("lifecycle", "upgrade", "predecessorAcquisition").delete("installation")
+    end
+    report_mutation("rejects predecessor launch before DMG ejection") do |report|
+      report.dig(
+        "lifecycle",
+        "upgrade",
+        "predecessorAcquisition",
+        "installation"
+      )["dmgEjectedBeforeLaunch"] = false
+    end
+    report_mutation("rejects predecessor installation outside Applications") do |report|
+      report.dig(
+        "lifecycle",
+        "upgrade",
+        "predecessorAcquisition",
+        "installation"
+      )["destinationPath"] = "/Volumes/Predecessor/Desk Setup Switcher.app"
+    end
+    report_mutation("rejects candidate identity as predecessor installation") do |report|
+      report.dig("lifecycle", "upgrade", "predecessorAcquisition")["installation"] =
+        deep_copy(report.dig("acquisition", "installation"))
     end
     report_mutation("rejects a failed mandatory lifecycle row") do |report|
       report.fetch("lifecycle")["diagnosticsPass"] = false
@@ -1462,6 +1565,21 @@ class ExternalBetaPolicyTestSuite
   def test_fixed_predecessor_contract
     run("accepts the fixed protected v0.0.9 build-1 to v0.1.0 build-2 contract") do
       with_fixture do |fixture|
+        assert(
+          fixture.dig(:manifest, "application", "executable", "sha256") !=
+            fixture.dig(:predecessor_manifest, "application", "executable", "sha256"),
+          "current and predecessor executable fixtures must differ"
+        )
+        assert(
+          fixture.dig(:manifest, "application", "bundleManifest", "canonicalSha256") !=
+            fixture.dig(
+              :predecessor_manifest,
+              "application",
+              "bundleManifest",
+              "canonicalSha256"
+            ),
+          "current and predecessor bundle manifest fixtures must differ"
+        )
         assert_success(*arguments(fixture), build_number: 2)
       end
     end
