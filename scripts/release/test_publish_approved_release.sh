@@ -17,6 +17,25 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Exercise publisher orchestration from an isolated final-version source tree.
+# The production Git-history gate has a real-repository regression suite; this
+# mock keeps only one narrow result-propagation seam for the publisher boundary.
+publisher_target_root="$temporary_root/final-publisher-source"
+mkdir -p "$publisher_target_root/docs/releases"
+cp -R "$ROOT_DIR/scripts" "$ROOT_DIR/Config" "$publisher_target_root/"
+cp "$ROOT_DIR/docs/releases/v0.1.0.md" \
+    "$publisher_target_root/docs/releases/v0.1.0.md"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleShortVersionString 0.1.0' \
+    "$publisher_target_root/Config/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 2' \
+    "$publisher_target_root/Config/Info.plist"
+cat >>"$publisher_target_root/scripts/release/lib.sh" <<'FIXTURE_HISTORY_GATE'
+release_verify_final_pre_tag_evidence_chain() {
+    [[ "${MOCK_SCENARIO:-}" != evidence-history-gate-rejected ]]
+}
+FIXTURE_HISTORY_GATE
+publisher_target="$publisher_target_root/scripts/release/publish-approved-release.sh"
+
 mock_bin="$temporary_root/mock-bin"
 mkdir "$mock_bin"
 real_ruby="$(command -v ruby)"
@@ -89,7 +108,9 @@ case "${1:-}" in
         case "${2:-}" in
             --show-toplevel) printf '%s\n' "$MOCK_ROOT_DIR" ;;
             HEAD|"refs/tags/$MOCK_TAG^{commit}") printf '%s\n' "$MOCK_EXPECTED_COMMIT" ;;
+            "refs/tags/v0.0.9^{commit}") printf '%s\n' "$MOCK_PREDECESSOR_COMMIT" ;;
             "refs/tags/$MOCK_TAG") printf '%s\n' "$MOCK_TAG_OBJECT" ;;
+            "refs/tags/v0.0.9") printf '%s\n' "$MOCK_PREDECESSOR_TAG_OBJECT" ;;
             "$MOCK_EXPECTED_COMMIT:.github/workflows"|"$MOCK_OBSERVED_MASTER:.github/workflows"|"$MOCK_APPROVAL_COMMIT:.github/workflows")
                 if [[ "$MOCK_SCENARIO" == release-critical-drift && "$2" == "$MOCK_OBSERVED_MASTER:.github/workflows" ]]; then
                     printf '%040d\n' 39
@@ -98,9 +119,10 @@ case "${1:-}" in
                 fi ;;
             "$MOCK_EXPECTED_COMMIT:scripts/release"|"$MOCK_OBSERVED_MASTER:scripts/release"|"$MOCK_APPROVAL_COMMIT:scripts/release")
                 printf '%040d\n' 32 ;;
-            "$MOCK_OBSERVED_MASTER:.github/workflows/release.yml") printf '%s\n' "$MOCK_CANDIDATE_WORKFLOW_BLOB" ;;
+            "$MOCK_OBSERVED_MASTER:.github/workflows/signed-release-candidate.yml") printf '%s\n' "$MOCK_CANDIDATE_WORKFLOW_BLOB" ;;
             "$MOCK_OBSERVED_MASTER:.github/workflows/ci.yml") printf '%s\n' "$MOCK_CI_WORKFLOW_BLOB" ;;
             "$MOCK_OBSERVED_MASTER:.github/workflows/publish-release.yml") printf '%s\n' "$MOCK_PUBLICATION_WORKFLOW_BLOB" ;;
+            "$MOCK_OBSERVED_MASTER:.github/workflows/release.yml") printf '%s\n' "$MOCK_LEGACY_WORKFLOW_BLOB" ;;
             *) exit 80 ;;
         esac
         ;;
@@ -112,7 +134,8 @@ case "${1:-}" in
         [[ "$#" == 3 && "$2" == --allow-onelevel && "$3" == "$MOCK_TAG" ]] || exit 82
         ;;
     show-ref)
-        [[ "$#" == 4 && "$2" == --verify && "$3" == --quiet && "$4" == "refs/tags/$MOCK_TAG" ]] || exit 83
+        [[ "$#" == 4 && "$2" == --verify && "$3" == --quiet ]] || exit 83
+        [[ "$4" == "refs/tags/$MOCK_TAG" || "$4" == refs/tags/v0.0.9 ]] || exit 83
         ;;
     ls-files)
         [[ "$#" == 4 && "$2" == --error-unmatch && "$3" == -- && "$4" == "$MOCK_NOTES_RELATIVE" ]] || exit 84
@@ -122,7 +145,8 @@ case "${1:-}" in
         [[ "$#" == 3 && "$2" == --porcelain=v1 && "$3" == --untracked-files=all ]] || exit 85
         ;;
     cat-file)
-        if [[ "$#" == 3 && "$2" == -t && "$3" == "$MOCK_TAG_OBJECT" ]]; then
+        if [[ "$#" == 3 && "$2" == -t \
+            && ( "$3" == "$MOCK_TAG_OBJECT" || "$3" == "$MOCK_PREDECESSOR_TAG_OBJECT" ) ]]; then
             printf 'tag\n'
         elif [[ "$#" == 3 && "$2" == -p && "$3" == "$MOCK_TAG_OBJECT" ]]; then
             tag_evidence_digest="$MOCK_FINAL_EVIDENCE_SHA256"
@@ -278,8 +302,10 @@ case "${1:-}" in
             printf '%s\trefs/heads/master\n' "$value"
             exit 0
         fi
-        if [[ "$#" == 6 && "$2" == --exit-code && "$3" == --tags && "$4" == origin \
-            && "$5" == "refs/tags/$MOCK_TAG" && "$6" == "refs/tags/$MOCK_TAG^{}" ]]; then
+        if [[ "$#" == 8 && "$2" == --exit-code && "$3" == --tags && "$4" == origin \
+            && "$5" == "refs/tags/$MOCK_PREDECESSOR_TAG" \
+            && "$6" == "refs/tags/$MOCK_PREDECESSOR_TAG^{}" \
+            && "$7" == "refs/tags/$MOCK_TAG" && "$8" == "refs/tags/$MOCK_TAG^{}" ]]; then
             count_file="$MOCK_STATE_DIR/tag-reads"
             count="$(cat "$count_file")"
             count=$((count + 1))
@@ -290,6 +316,17 @@ case "${1:-}" in
             fi
             if [[ "$MOCK_SCENARIO" == tag-late-drift && "$count" -gt 2 ]]; then
                 value="$(printf '%040d' 7)"
+            fi
+            predecessor_value="$MOCK_PREDECESSOR_TAG_OBJECT"
+            if [[ "$MOCK_SCENARIO" == predecessor-tag-drift && "$count" -gt 1 ]] \
+                || [[ "$MOCK_SCENARIO" == predecessor-tag-post-patch-drift && "$count" -gt 3 ]]; then
+                predecessor_value="$(printf '%040d' 6)"
+            fi
+            if ! { [[ "$MOCK_SCENARIO" == predecessor-tag-delete && "$count" -gt 1 ]] \
+                || [[ "$MOCK_SCENARIO" == predecessor-tag-post-patch-delete && "$count" -gt 3 ]]; }; then
+                printf '%s\trefs/tags/%s\n' "$predecessor_value" "$MOCK_PREDECESSOR_TAG"
+                printf '%s\trefs/tags/%s^{}\n' \
+                    "$MOCK_PREDECESSOR_COMMIT" "$MOCK_PREDECESSOR_TAG"
             fi
             printf '%s\trefs/tags/%s\n' "$value" "$MOCK_TAG"
             printf '%s\trefs/tags/%s^{}\n' "$MOCK_EXPECTED_COMMIT" "$MOCK_TAG"
@@ -613,6 +650,17 @@ asset_names=(
     Desk-Setup-Switcher-0.1.0.sbom.sigstore.json
     release-manifest.provenance.sigstore.json
 )
+predecessor_asset_names=(
+    Desk-Setup-Switcher-0.0.9.dmg
+    Desk-Setup-Switcher-0.0.9.dmg.sha256
+    Desk-Setup-Switcher-0.0.9.spdx.json
+    release-manifest.json
+    notary-result.json
+    notary-log.json
+    Desk-Setup-Switcher-0.0.9.provenance.sigstore.json
+    Desk-Setup-Switcher-0.0.9.sbom.sigstore.json
+    release-manifest.provenance.sigstore.json
+)
 
 write_approval_record() {
     local destination="$1"
@@ -708,6 +756,7 @@ run_scenario() {
     local root="$temporary_root/$scenario"
     local runner_temp="$root/runner"
     local source_directory="$runner_temp/source"
+    local predecessor_source_directory="$runner_temp/predecessor"
     local remote_directory="$runner_temp/remote"
     local download_directory="$runner_temp/download"
     local state_directory="$runner_temp/state"
@@ -731,7 +780,7 @@ run_scenario() {
     local patch_hang_marker="$runner_temp/patch-hang-marker.txt"
     local stdout_path="$runner_temp/stdout.txt"
     local stderr_path="$runner_temp/stderr.txt"
-    local notes_path="$ROOT_DIR/docs/releases/v0.1.0.md"
+    local notes_path="$publisher_target_root/docs/releases/v0.1.0.md"
     local effective_scenario="$scenario"
     local master_commit
     local observed_master
@@ -742,11 +791,19 @@ run_scenario() {
     mock_now="$($real_ruby -rtime -e 'puts Time.now.utc.iso8601')"
 
     mkdir -p "$source_directory" "$remote_directory" "$state_directory"
+    mkdir -m 0700 "$predecessor_source_directory"
     printf '%s\n' "${asset_names[@]}" >"$expected_assets"
     for name in "${asset_names[@]}"; do
         printf 'mock publication artifact: %s\n' "$name" >"$source_directory/$name"
         cp "$source_directory/$name" "$remote_directory/$name"
     done
+    for name in "${predecessor_asset_names[@]}"; do
+        printf 'mock protected predecessor artifact: %s\n' "$name" \
+            >"$predecessor_source_directory/$name"
+    done
+    if [[ "$scenario" == predecessor-source-extra ]]; then
+        printf 'unexpected predecessor file\n' >"$predecessor_source_directory/unexpected.txt"
+    fi
     if [[ "$scenario" == asset-mismatch ]]; then
         first_asset="$remote_directory/${asset_names[0]}"
         "$real_ruby" -e '
@@ -761,7 +818,7 @@ run_scenario() {
     "$real_ruby" -rjson -rdigest -rtime -e '
       manifest_path, dmg_path, created_at_text, release_policy_path = ARGV
       require release_policy_path
-      created_at = Time.iso8601(created_at_text) - 7 * 86_400
+      created_at = Time.iso8601(created_at_text) - 5 * 86_400
       dmg_name = File.basename(dmg_path)
       dmg_bytes = File.binread(dmg_path)
       dmg_sha = Digest::SHA256.hexdigest(dmg_bytes)
@@ -783,7 +840,7 @@ run_scenario() {
           "commit" => "a" * 40,
           "namespace" => "https://github.com/GGULBAE/desk-setup-switcher/release-evidence/v0.1.0/#{dmg_sha}",
           "created" => created_at.utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
-          "buildNumber" => "1",
+          "buildNumber" => "2",
           "run" => {
             "id" => 8001,
             "attempt" => 1,
@@ -851,19 +908,61 @@ run_scenario() {
         "$source_directory/Desk-Setup-Switcher-0.1.0.dmg" "$mock_now" \
         "$ROOT_DIR/scripts/release/release_policy.rb"
     cp "$source_directory/release-manifest.json" "$remote_directory/release-manifest.json"
+    predecessor_final_dmg_sha="$(shasum -a 256 \
+        "$predecessor_source_directory/Desk-Setup-Switcher-0.0.9.dmg" | awk '{print $1}')"
+    "$real_ruby" -rjson -rdigest -rtime -e '
+      current_path, output_path, dmg_path, now_text, release_policy_path = ARGV
+      require release_policy_path
+      manifest = JSON.parse(File.binread(current_path), create_additions: false)
+      release = manifest.fetch("release")
+      dmg_bytes = File.binread(dmg_path)
+      dmg_sha = Digest::SHA256.hexdigest(dmg_bytes)
+      release["version"] = "0.0.9"
+      release["tag"] = "v0.0.9"
+      release["commit"] = "9" * 40
+      release["created"] = (Time.iso8601(now_text) - 12 * 86_400).utc.iso8601
+      release["buildNumber"] = "1"
+      release["namespace"] =
+        "https://github.com/GGULBAE/desk-setup-switcher/release-evidence/v0.0.9/#{dmg_sha}"
+      release["run"] = {
+        "id" => 7999,
+        "attempt" => 1,
+        "url" => "https://github.com/GGULBAE/desk-setup-switcher/actions/runs/7999"
+      }
+      manifest.fetch("lineage").fetch("notary")["archiveFilename"] = File.basename(dmg_path)
+      manifest.fetch("lineage")["finalStapledDmg"] = {
+        "name" => File.basename(dmg_path),
+        "sha256" => dmg_sha,
+        "size" => dmg_bytes.bytesize
+      }
+      manifest["assets"] = [
+        { "name" => File.basename(dmg_path), "sha256" => dmg_sha, "size" => dmg_bytes.bytesize }
+      ]
+      ReleasePolicy.validate_release_manifest_data(manifest)
+      File.binwrite(output_path, JSON.generate(manifest) + "\n")
+    ' "$source_directory/release-manifest.json" \
+        "$predecessor_source_directory/release-manifest.json" \
+        "$predecessor_source_directory/Desk-Setup-Switcher-0.0.9.dmg" "$mock_now" \
+        "$ROOT_DIR/scripts/release/release_policy.rb"
     "$real_ruby" -rjson -rdigest -rtime -e '
       inventory_path, lineage_path, set_path, beta_01_path, beta_02_path,
-        beta_03_path, manifest_path, provenance_path, final_dmg_sha, scenario,
-        now_text = ARGV
+        beta_03_path, manifest_path, provenance_path, predecessor_manifest_path,
+        predecessor_provenance_path, predecessor_dmg_path, final_dmg_sha,
+        predecessor_final_dmg_sha, scenario, now_text = ARGV
       manifest_bytes = File.binread(manifest_path)
       manifest = JSON.parse(manifest_bytes, create_additions: false)
       provenance_bytes = File.binread(provenance_path)
+      predecessor_manifest_bytes = File.binread(predecessor_manifest_path)
+      predecessor_manifest = JSON.parse(predecessor_manifest_bytes, create_additions: false)
+      predecessor_provenance_bytes = File.binread(predecessor_provenance_path)
       now = Time.iso8601(now_text)
       release = manifest.fetch("release")
       application = manifest.fetch("application")
       final_dmg = manifest.fetch("lineage").fetch("finalStapledDmg")
       release_manifest_sha = Digest::SHA256.hexdigest(manifest_bytes)
       provenance_sha = Digest::SHA256.hexdigest(provenance_bytes)
+      predecessor_manifest_sha = Digest::SHA256.hexdigest(predecessor_manifest_bytes)
+      predecessor_provenance_sha = Digest::SHA256.hexdigest(predecessor_provenance_bytes)
       candidate = {
         "repository" => "GGULBAE/desk-setup-switcher",
         "tag" => release.fetch("tag"),
@@ -879,14 +978,29 @@ run_scenario() {
         "finalDMGSHA256" => final_dmg_sha,
         "releaseManifestSHA256" => release_manifest_sha
       }
-      inventory_items = []
+      predecessor_item = {
+        "outcome" => "retained",
+        "version" => "0.0.9",
+        "buildNumber" => 1,
+        "commit" => "9" * 40,
+        "candidateOriginRunId" => 7999,
+        "candidateOriginRunAttempt" => 1,
+        "runConclusion" => "success",
+        "completedAt" => (now - 11 * 86_400).utc.iso8601,
+        "distributionState" => "protected-beta",
+        "candidateArtifactId" => 8999,
+        "candidateArtifactSHA256" => "7" * 64,
+        "finalDMGSHA256" => predecessor_final_dmg_sha,
+        "releaseManifestSHA256" => predecessor_manifest_sha
+      }
+      inventory_items = [predecessor_item]
       if scenario == "predecessor-build-reuse"
         inventory_items << {
           "outcome" => "not-retained",
-          "version" => "0.0.9",
-          "buildNumber" => 1,
-          "commit" => "9" * 40,
-          "candidateOriginRunId" => 7999,
+          "version" => "0.0.10",
+          "buildNumber" => 2,
+          "commit" => "8" * 40,
+          "candidateOriginRunId" => 7998,
           "candidateOriginRunAttempt" => 1,
           "runConclusion" => "failure",
           "completedAt" => (now - 6 * 86_400).utc.iso8601,
@@ -900,14 +1014,14 @@ run_scenario() {
           "desk-setup-switcher.candidate-inventory/v1",
         "subject" => {
           "repository" => "GGULBAE/desk-setup-switcher",
-          "workflowPath" => ".github/workflows/release.yml",
+          "workflowPath" => ".github/workflows/signed-release-candidate.yml",
           "operation" => "build-candidate",
           "currentCandidateRunId" => 8001,
-          "currentCandidateBuildNumber" => 1
+          "currentCandidateBuildNumber" => 2
         },
         "collection" => {
-          "collectedAt" => (now - 5 * 86_400).utc.iso8601,
-          "reviewedAt" => (now - 102 * 3_600).utc.iso8601,
+          "collectedAt" => (now - 114 * 3_600).utc.iso8601,
+          "reviewedAt" => (now - 108 * 3_600).utc.iso8601,
           "reviewMode" => "protected-complete-history-review",
           "reviewerRole" => "release-approver",
           "allPagesReviewed" => true,
@@ -917,17 +1031,35 @@ run_scenario() {
       }
       File.binwrite(inventory_path, JSON.generate(inventory) + "\n")
       inventory_sha = Digest::SHA256.file(inventory_path).hexdigest
+      upgrade_predecessor = {
+        "state" => "recorded",
+        "distributionKind" => "protected-beta",
+        "bundleIdentifier" => application.fetch("bundleIdentifier"),
+        "version" => "0.0.9",
+        "tag" => "v0.0.9",
+        "buildNumber" => 1,
+        "profileSchemaVersion" => 1,
+        "sourceCommit" => "9" * 40,
+        "candidateOriginRunId" => 7999,
+        "candidateOriginRunAttempt" => 1,
+        "candidateArtifactId" => 8999,
+        "candidateArtifactSHA256" => "7" * 64,
+        "artifactName" => File.basename(predecessor_dmg_path),
+        "finalDMGSHA256" => predecessor_final_dmg_sha,
+        "releaseManifestSHA256" => predecessor_manifest_sha,
+        "provenanceBundleName" => File.basename(predecessor_provenance_path),
+        "provenanceBundleSHA256" => predecessor_provenance_sha,
+        "provenanceSubjectSHA256" => predecessor_final_dmg_sha,
+        "releaseBoundaryEvidenceSHA256" => "e" * 64
+      }
+      if scenario == "predecessor-provenance-binding-mismatch"
+        upgrade_predecessor["provenanceBundleSHA256"] = "0" * 64
+      end
       lineage = {
-        "schemaVersion" => "desk-setup-switcher.predecessor-lineage/v2",
+        "schemaVersion" => "desk-setup-switcher.predecessor-lineage/v3",
         "candidate" => candidate,
         "candidateInventorySHA256" => inventory_sha,
-        "upgradePredecessor" => {
-          "state" => "none",
-          "reason" => "first-public-beta-no-installable-predecessor",
-          "candidateInventorySHA256" => inventory_sha,
-          "cleanInstallEvidenceSHA256" => "b" * 64,
-          "schema0MigrationEvidenceSHA256" => "c" * 64
-        }
+        "upgradePredecessor" => upgrade_predecessor
       }
       File.binwrite(lineage_path, JSON.generate(lineage) + "\n")
       lineage_sha = Digest::SHA256.file(lineage_path).hexdigest
@@ -947,7 +1079,7 @@ run_scenario() {
         subject.delete("candidateOriginRunAttempt")
         subject["candidateOriginRunAttempt"] = 1
         report = {
-          "schemaVersion" => "desk-setup-switcher.external-beta/v1",
+          "schemaVersion" => "desk-setup-switcher.external-beta/v2",
           "report" => {
             "reportCode" => code,
             "startedAt" => started_at.utc.iso8601,
@@ -994,8 +1126,32 @@ run_scenario() {
             "localDataRemovalPass" => true,
             "hardwareMutationPerformed" => false,
             "upgrade" => {
-              "state" => "not-applicable",
-              "reason" => "first-public-beta-no-installable-predecessor"
+              "state" => "passed",
+              "predecessorVersion" => upgrade_predecessor.fetch("version"),
+              "predecessorBuildNumber" => upgrade_predecessor.fetch("buildNumber"),
+              "predecessorFinalDMGSHA256" => upgrade_predecessor.fetch("finalDMGSHA256"),
+              "predecessorReleaseManifestSHA256" =>
+                upgrade_predecessor.fetch("releaseManifestSHA256"),
+              "predecessorProvenanceBundleSHA256" =>
+                upgrade_predecessor.fetch("provenanceBundleSHA256"),
+              "predecessorAcquisition" => {
+                "channel" => "protected-workflow-browser",
+                "browserDownloaded" => true,
+                "normalArchiveExtraction" => true,
+                "quarantinePresent" => true,
+                "quarantineManufactured" => false,
+                "quarantineRemoved" => false,
+                "quarantineEvidenceSHA256" => (index + 7).to_s * 64,
+                "checksumPass" => true,
+                "provenancePass" => true,
+                "gatekeeperPass" => true,
+                "openAnywayUsed" => false
+              },
+              "profilesPreserved" => true,
+              "settingsPreserved" => true,
+              "selectionPreserved" => true,
+              "backupsPreserved" => true,
+              "loginItemConsentPreserved" => true
             }
           },
           "issues" => {
@@ -1038,7 +1194,7 @@ run_scenario() {
       report_digests = report_paths.map { |path| Digest::SHA256.file(path).hexdigest }
       set_subject = reports.fetch(0).fetch("subject")
       beta_set = {
-        "schemaVersion" => "desk-setup-switcher.external-beta-set/v1",
+        "schemaVersion" => "desk-setup-switcher.external-beta-set/v2",
         "subject" => set_subject,
         "reports" => report_codes.each_with_index.map do |code, index|
           { "reportCode" => code, "reportSHA256" => report_digests.fetch(index) }
@@ -1081,7 +1237,10 @@ run_scenario() {
         "$external_beta_01_record" "$external_beta_02_record" "$external_beta_03_record" \
         "$source_directory/release-manifest.json" \
         "$source_directory/Desk-Setup-Switcher-0.1.0.provenance.sigstore.json" \
-        "$final_dmg_sha" "$scenario" "$mock_now"
+        "$predecessor_source_directory/release-manifest.json" \
+        "$predecessor_source_directory/Desk-Setup-Switcher-0.0.9.provenance.sigstore.json" \
+        "$predecessor_source_directory/Desk-Setup-Switcher-0.0.9.dmg" \
+        "$final_dmg_sha" "$predecessor_final_dmg_sha" "$scenario" "$mock_now"
     FIXTURE_SCENARIO="$scenario" "$real_ruby" -rjson -rtime -e '
       candidate_path, publication_path, final_candidate_path, final_publication_path, now_text,
         scenario = ARGV
@@ -1105,13 +1264,13 @@ run_scenario() {
       controls.each_with_index do |(control, permissions), index|
         final_observed = case scenario
         when "historical-final-stale"
-          now - 3 * 86_400
+          now - 10 * 86_400
         when "final-manual-stale-at-collection"
-          now - 90_001
+          now - 6 * 86_400 - 90_001
         when "final-manual-after-final-collected"
           now
         else
-          now - 7_200
+          now - 7 * 86_400
         end
         token_for = lambda do |observed|
           if index.zero?
@@ -1131,7 +1290,7 @@ run_scenario() {
         final_token = token_for.call(final_observed)
         current_token = token_for.call(now)
         if index == 1 && scenario == "final-token-short-residual"
-          final_token["expiresAt"] = (now - 901).iso8601
+          final_token["expiresAt"] = (now - 6 * 86_400 + 899).iso8601
         end
         if index == 1 && scenario == "manual-token-extra-repository"
           current_token["repositorySelection"] << "GGULBAE/other-private-repository"
@@ -1156,7 +1315,7 @@ run_scenario() {
         when "manual-stale"
           now - 2 * 86_400
         when "pre-manual-before-final-collected"
-          now - 7_200
+          now - 7 * 86_400
         when "pre-manual-after-pre-collected"
           now + 1
         else
@@ -1210,6 +1369,15 @@ run_scenario() {
       end
       rewrite.call(policy)
       rewrite.call(evidence)
+      evidence["schemaVersion"] = "desk-setup-switcher.remote-release-controls-evidence/v3"
+      evidence["phase"] = "pre-publication"
+      evidence["predecessorPreTagEvidenceSHA256"] = "1" * 64
+      evidence.dig("environments", "releaseCandidate", "deployment", "policies").replace(
+        [
+          { "name" => "v0.0.9", "type" => "tag" },
+          { "name" => "v0.1.0", "type" => "tag" }
+        ]
+      )
       evidence["collectedAt"] = if ENV["FIXTURE_SCENARIO"] == "pre-collected-after-approval"
         (Time.iso8601(pre_collected_at) + 1).iso8601
       else
@@ -1231,11 +1399,21 @@ run_scenario() {
         end
       end
       rewrite_final.call(final_evidence)
+      final_evidence["schemaVersion"] = "desk-setup-switcher.remote-release-controls-evidence/v3"
+      final_evidence["phase"] = "final-pre-tag"
+      final_evidence["predecessorPreTagEvidenceSHA256"] = "1" * 64
+      final_evidence["finalPreTagEvidenceSHA256"] = nil
+      final_evidence.dig("environments", "releaseCandidate", "deployment", "policies").replace(
+        [
+          { "name" => "v0.0.9", "type" => "tag" },
+          { "name" => "v0.1.0", "type" => "tag" }
+        ]
+      )
       pre_collected = Time.iso8601(pre_collected_at)
       final_evidence["collectedAt"] = if ENV["FIXTURE_SCENARIO"] == "historical-final-stale"
-        (pre_collected - 3 * 86_400 + 3_600).iso8601
+        (pre_collected - 9 * 86_400).iso8601
       else
-        (pre_collected - 3_600).iso8601
+        (pre_collected - 6 * 86_400).iso8601
       end
       final_manual = final_evidence.fetch("manualEvidence").fetch("items")
       final_manual.fetch(0)["sha256"] = final_candidate_manual_sha
@@ -1243,9 +1421,33 @@ run_scenario() {
       if ENV["FIXTURE_SCENARIO"] == "final-manual-digest-mismatch"
         final_manual.fetch(0)["sha256"] = "0" * 64
       end
+      predecessor_ref = {
+        "ref" => "refs/tags/v0.0.9",
+        "objectType" => "tag",
+        "objectSha" => "5" * 40,
+        "commitSha" => "9" * 40
+      }
+      release_ref = {
+        "ref" => "refs/tags/v0.1.0",
+        "objectType" => "tag",
+        "objectSha" => "8" * 40,
+        "commitSha" => "a" * 40
+      }
+      final_evidence["releaseBoundary"] = {
+        "vRefs" => { "complete" => true, "items" => [predecessor_ref] },
+        "releases" => { "complete" => true, "items" => [] }
+      }
       File.binwrite(final_output, JSON.pretty_generate(final_evidence) + "\n")
       evidence["finalPreTagEvidenceSHA256"] = Digest::SHA256.file(final_output).hexdigest
-      evidence.fetch("releaseBoundary").fetch("releases").fetch("items").fetch(0)["id"] = 7001
+      evidence["releaseBoundary"] = {
+        "vRefs" => { "complete" => true, "items" => [predecessor_ref, release_ref] },
+        "releases" => {
+          "complete" => true,
+          "items" => [
+            { "id" => 7001, "tag" => "v0.1.0", "draft" => true, "prerelease" => true }
+          ]
+        }
+      }
       manual = evidence.fetch("manualEvidence").fetch("items")
       manual.fetch(0)["sha256"] = candidate_manual_sha
       manual.fetch(1)["sha256"] = publication_manual_sha
@@ -1255,7 +1457,7 @@ run_scenario() {
       File.binwrite(policy_output, JSON.pretty_generate(policy) + "\n")
       File.binwrite(evidence_output, JSON.pretty_generate(evidence) + "\n")
     ' \
-        "$ROOT_DIR/scripts/release/fixtures/remote-controls/policy-v2.json" \
+        "$ROOT_DIR/scripts/release/fixtures/remote-controls/policy-v3.json" \
         "$ROOT_DIR/scripts/release/fixtures/remote-controls/evidence-v2-pre-publication.json" \
         "$ROOT_DIR/scripts/release/fixtures/remote-controls/evidence-v2-final-pre-tag.json" \
         "$remote_controls_policy" "$remote_controls_record" "$final_pre_tag_evidence_record" \
@@ -1264,6 +1466,41 @@ run_scenario() {
         "$(shasum -a 256 "$final_publication_manual_record" | awk '{print $1}')" \
         "$mock_now"
     final_pre_tag_evidence_sha="$(shasum -a 256 "$final_pre_tag_evidence_record" | awk '{print $1}')"
+    "$real_ruby" -rjson -rdigest -e '
+      lineage_path, set_path, boundary_path, *report_paths = ARGV
+      lineage = JSON.parse(File.binread(lineage_path), create_additions: false)
+      lineage.fetch("upgradePredecessor")["releaseBoundaryEvidenceSHA256"] =
+        Digest::SHA256.file(boundary_path).hexdigest
+      File.binwrite(lineage_path, JSON.generate(lineage) + "\n")
+      lineage_sha = Digest::SHA256.file(lineage_path).hexdigest
+      reports = report_paths.map do |path|
+        value = JSON.parse(File.binread(path), create_additions: false)
+        value.fetch("subject")["predecessorLineageSHA256"] = lineage_sha
+        File.binwrite(path, JSON.generate(value) + "\n")
+        value
+      end
+      report_sha = report_paths.map { |path| Digest::SHA256.file(path).hexdigest }
+      beta_set = JSON.parse(File.binread(set_path), create_additions: false)
+      beta_set.fetch("subject")["predecessorLineageSHA256"] = lineage_sha
+      report_sha.each_with_index do |digest, index|
+        beta_set.fetch("reports").fetch(index)["reportSHA256"] = digest
+        beta_set.fetch("independence").fetch("bindings").fetch(index)["reportSHA256"] = digest
+      end
+      File.binwrite(set_path, JSON.generate(beta_set) + "\n")
+    ' "$predecessor_lineage_record" "$external_beta_set_record" \
+        "$final_pre_tag_evidence_record" "$external_beta_01_record" \
+        "$external_beta_02_record" "$external_beta_03_record"
+    if [[ "$scenario" == predecessor-manifest-byte-mismatch ]]; then
+        printf ' ' >>"$predecessor_source_directory/release-manifest.json"
+    fi
+    if [[ "$scenario" == beta-set-binding-mismatch ]]; then
+        "$real_ruby" -rjson -e '
+          path = ARGV.fetch(0)
+          value = JSON.parse(File.binread(path), create_additions: false)
+          value.fetch("independence").fetch("bindings").fetch(0)["reportSHA256"] = "0" * 64
+          File.binwrite(path, JSON.generate(value) + "\n")
+        ' "$external_beta_set_record"
+    fi
     remote_controls_sha="$(shasum -a 256 "$remote_controls_record" | awk '{print $1}')"
     release_manifest_sha="$(shasum -a 256 "$source_directory/release-manifest.json" | awk '{print $1}')"
     final_dmg_provenance_sha="$(
@@ -1324,10 +1561,13 @@ run_scenario() {
         "LC_ALL=en_US.UTF-8"
         "MOCK_REAL_RUBY=$real_ruby"
         "MOCK_GH_RUBY=$temporary_root/mock-gh.rb"
-        "MOCK_ROOT_DIR=$ROOT_DIR"
+        "MOCK_ROOT_DIR=$publisher_target_root"
         "MOCK_TAG=v0.1.0"
+        "MOCK_PREDECESSOR_TAG=v0.0.9"
         "MOCK_TAG_OBJECT=$(printf '8%.0s' {1..40})"
         "MOCK_EXPECTED_COMMIT=$(printf 'a%.0s' {1..40})"
+        "MOCK_PREDECESSOR_COMMIT=$(printf '9%.0s' {1..40})"
+        "MOCK_PREDECESSOR_TAG_OBJECT=$(printf '5%.0s' {1..40})"
         "MOCK_APPROVAL_COMMIT=$(printf 'd%.0s' {1..40})"
         "MOCK_FINAL_EVIDENCE_COMMIT=$(printf 'f%.0s' {1..40})"
         "MOCK_OBSERVED_MASTER=$observed_master"
@@ -1335,6 +1575,7 @@ run_scenario() {
         "MOCK_CANDIDATE_WORKFLOW_BLOB=$(printf 'b%.0s' {1..40})"
         "MOCK_CI_WORKFLOW_BLOB=$(printf 'c%.0s' {1..40})"
         "MOCK_PUBLICATION_WORKFLOW_BLOB=$(printf 'd%.0s' {1..40})"
+        "MOCK_LEGACY_WORKFLOW_BLOB=$(printf 'e%.0s' {1..40})"
         "MOCK_NOTES_RELATIVE=docs/releases/v0.1.0.md"
         "MOCK_NOTES_PATH=$notes_path"
         "MOCK_APPROVAL_RELATIVE=docs/evidence/releases/v0.1.0/publication-approval.json"
@@ -1405,6 +1646,12 @@ run_scenario() {
         "RELEASE_CANDIDATE_ARTIFACT_ID=9001"
         "RELEASE_CANDIDATE_ARTIFACT_SHA256=$(printf 'b%.0s' {1..64})"
         "RELEASE_FINAL_DMG_SHA256=$final_dmg_sha"
+        "RELEASE_PREDECESSOR_COMMIT=$(printf '9%.0s' {1..40})"
+        "RELEASE_PREDECESSOR_RUN_ID=7999"
+        "RELEASE_PREDECESSOR_ARTIFACT_ID=8999"
+        "RELEASE_PREDECESSOR_ARTIFACT_SHA256=$(printf '7%.0s' {1..64})"
+        "RELEASE_PREDECESSOR_FINAL_DMG_SHA256=$predecessor_final_dmg_sha"
+        "RELEASE_PREDECESSOR_SOURCE_DIR=$predecessor_source_directory"
         "RELEASE_APPROVAL_RECORD_COMMIT=$(printf 'd%.0s' {1..40})"
         "RELEASE_APPROVAL_RECORD_SHA256=$approval_sha"
         "RELEASE_APPROVAL_RECORD_PATH=docs/evidence/releases/v0.1.0/publication-approval.json"
@@ -1416,6 +1663,9 @@ run_scenario() {
         "RELEASE_SOURCE_DIR=$source_directory"
         "RELEASE_DOWNLOAD_DIR=$download_directory"
     )
+    if [[ "$scenario" == predecessor-final-dmg-pin-mismatch ]]; then
+        environment+=("RELEASE_PREDECESSOR_FINAL_DMG_SHA256=$(printf '0%.0s' {1..64})")
+    fi
     if [[ "$scenario" == actor-mismatch ]]; then
         environment+=("GITHUB_TRIGGERING_ACTOR=other-actor")
     fi
@@ -1431,7 +1681,7 @@ run_scenario() {
 
     set +e
     if [[ "$scenario" == patch-signal-hang ]]; then
-        env -i "${environment[@]}" scripts/release/publish-approved-release.sh \
+        env -i "${environment[@]}" "$publisher_target" \
             >"$stdout_path" 2>"$stderr_path" &
         publisher_pid=$!
         marker_ready=false
@@ -1483,7 +1733,7 @@ run_scenario() {
         fi
         pass
     else
-        env -i "${environment[@]}" scripts/release/publish-approved-release.sh \
+        env -i "${environment[@]}" "$publisher_target" \
             >"$stdout_path" 2>"$stderr_path"
         status=$?
     fi
@@ -1579,6 +1829,7 @@ run_scenario() {
 
     case "$scenario" in
         candidate-inventory-byte-mismatch|candidate-inventory-schema-invalid|predecessor-build-reuse|\
+        predecessor-manifest-byte-mismatch|predecessor-provenance-binding-mismatch|\
         beta-report-byte-mismatch|beta-wrong-candidate|beta-duplicate-code|beta-missing-sonoma|\
         beta-lifecycle-failed|beta-quarantine-invalid|beta-independent-false|\
         beta-provenance-mismatch|beta-set-binding-mismatch)
@@ -1650,10 +1901,15 @@ run_scenario stale-approval failure 0
 run_scenario approval-merge-commit failure 0
 run_scenario approval-extra-path failure 0
 run_scenario release-critical-drift failure 0
+run_scenario evidence-history-gate-rejected failure 0
 run_scenario controls-evidence-invalid failure 0
 run_scenario controls-digest-mismatch failure 0
 run_scenario candidate-inventory-byte-mismatch failure 0
 run_scenario candidate-inventory-schema-invalid failure 0
+run_scenario predecessor-source-extra failure 0
+run_scenario predecessor-final-dmg-pin-mismatch failure 0
+run_scenario predecessor-manifest-byte-mismatch failure 0
+run_scenario predecessor-provenance-binding-mismatch failure 0
 run_scenario beta-report-byte-mismatch failure 0
 run_scenario beta-wrong-candidate failure 0
 run_scenario beta-duplicate-code failure 0
@@ -1697,11 +1953,15 @@ run_scenario published-before-approval failure 0
 run_scenario published-in-future failure 0
 run_scenario master-drift failure 0
 run_scenario tag-drift failure 0
+run_scenario predecessor-tag-drift failure 0
+run_scenario predecessor-tag-delete failure 0
 run_scenario master-late-drift failure 0
 run_scenario tag-late-drift failure 0
 run_scenario immutable-late-drift failure 0
 run_scenario patch-signal-hang failure 0
 run_scenario patch-failure failure 1
+run_scenario predecessor-tag-post-patch-drift failure 1
+run_scenario predecessor-tag-post-patch-delete failure 1
 run_scenario post-asset-drift failure 1
 run_scenario post-other-release-drift failure 1
 run_scenario target-drift failure 1

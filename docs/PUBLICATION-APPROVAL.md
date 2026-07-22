@@ -5,7 +5,9 @@ Desk Setup Switcher publishes `v0.1.0` only from the manual
 notarize, create a tag, prepare a draft, or deploy the site. It can perform one
 mutation only: change the already verified, exact-ID draft prerelease to a
 public prerelease with `make_latest` disabled. It then re-downloads and verifies
-the same nine assets.
+the same nine final assets. Before that mutation it restores and verifies two
+distinct attempt-1 origins: protected predecessor `v0.0.9`/build 1 and final
+candidate `v0.1.0`/build 2. It never creates or publishes a predecessor Release.
 
 This is a local, unproven publication design. It is not authorization to create
 or publish a Release. The workflow, approval record, and remote controls have
@@ -16,19 +18,23 @@ not run on GitHub, and no real approval record exists.
 Before any release tag is pushed to GitHub, all of these conditions must be
 configured and verified read-only:
 
-- the effective workflow blobs are exactly the three reviewed files at their
-  approved commits: the combined candidate/draft workflow, CI workflow, and
-  publication workflow;
-- `master`, the exact `v0.1.0` tag, and both `release-candidate` and
+- the effective workflow blobs are exactly four reviewed files at their
+  approved commits: the signed candidate/draft workflow, CI workflow,
+  publication workflow, and disabled fail-only legacy tombstone;
+- `master`, both exact annotated tags, and both `release-candidate` and
   `release-publication` environments have the reviewed protection, reviewer,
-  self-review, and administrator-bypass behavior;
-- the publication environment contains only the required protected values,
-  including a `RELEASE_ADMIN_READ_TOKEN` secret with repository Administration
+  self-review, and administrator-bypass behavior. `release-candidate` admits
+  only `v0.0.9` and `v0.1.0`; `release-publication` admits only `v0.1.0`;
+- the publication environment contains exactly the non-secret
+  `DEVELOPER_ID_APPLICATION` and `APPLE_TEAM_ID` variables plus a
+  `RELEASE_ADMIN_READ_TOKEN` secret; it contains no signing/notarization secret.
+  The token has repository Administration
   **read-only**, Actions **read-only**, Attestations **read-only**, and Contents
   **read-only**, plus GitHub's implicit Metadata **read-only**, access in exactly
-  five bounded workflow uses: the full-SHA-pinned checkout, candidate
-  restoration, pre-publication attestation verification, the publication
-  helper, and post-publication attestation verification. Inside the publication
+  six bounded workflow secret references: the full-SHA-pinned checkout, the
+  combined two-origin restoration, final-candidate attestation verification,
+  predecessor tagged-source verification, the publication helper, and
+  post-publication final-attestation verification. Inside the publication
   helper, the token is installed only through its five tracked, timeout-bounded
   GitHub read/download launcher call sites;
 - the ordinary job token retains only `contents:write` because GitHub scopes
@@ -44,15 +50,17 @@ configured and verified read-only:
 - no remote tag or Release exists before the approved first-release sequence
   begins.
 
-The v2 lifecycle policy and offline normalizer now bind all three active
-workflows, both required CI check runs/jobs from one successful check suite,
+The v3 lifecycle policy and offline normalizer bind all four workflow
+identities, both required CI check runs/jobs from one successful check suite,
 both environments, the operator/reviewer/publisher identities, the admin-read
 secret name, repository-shadow exclusions, and the exact paths, controls, and
-schema of two manual evidence records. Each phase manifest—not
-the long-lived policy—binds the fresh record-byte digests. The checked-in
-operational policy remains `configured:false`; no live
-two-pass record exists. Until it is reviewed, configured, merged, and passed
-twice—once before the tag and again after the exact draft—plus the separate
+schema of two manual evidence records. Each phase manifest—not the long-lived
+policy—binds the fresh record-byte digests. The three phases are:
+`predecessor-pre-tag` with zero refs/Releases; `final-pre-tag` with only the
+exact predecessor tag and zero Releases; and `pre-publication` with both tags
+and the exact final draft. The checked-in operational policy remains
+`configured:false`; no live two-pass record exists. Until it is reviewed,
+configured, merged, and passed at all three boundaries plus the separate
 Settings evidence, the publication workflow is deliberately **not
 release-ready**.
 
@@ -72,8 +80,9 @@ The exact record path is:
 docs/evidence/releases/v0.1.0/publication-approval.json
 ```
 
-Create it only after the immutable candidate draft, the fresh two-pass
-`pre-publication` controls manifest, clean quarantined lifecycle,
+Create it only after both immutable origin artifacts, the final candidate
+draft, the fresh two-pass `pre-publication` controls manifest, clean
+quarantined predecessor-to-final lifecycle,
 three external beta reports, public and confidential zero-P0/P1 sign-offs, and
 public-surface evidence are complete. The record must be one ordinary tracked
 blob in a reviewed commit that descends from the release tag. At dispatch:
@@ -103,7 +112,7 @@ blob in a reviewed commit that descends from the release tag. At dispatch:
   login and exactly by numeric ID where GitHub exposes it.
 
 The environment approver agreement is not proved by the approval JSON or by an
-`environment:` line in workflow YAML. It depends on the v2 API record for the
+`environment:` line in workflow YAML. It depends on the v3 API record for the
 actual deployment policy/reviewer/self-review fields and separate read-only
 Settings evidence for administrator-bypass behavior and the minimum token
 scope that GitHub's environment API does not expose.
@@ -112,12 +121,12 @@ Do not merge another commit between approval and dispatch. A changed remote
 `master` invalidates the approval and requires a newly reviewed record. From
 immediately before the pre-publication two-pass read until the publication
 PATCH and post-read finish, impose an exclusive single-writer freeze on
-`master`, the tag and Release/assets, rulesets, both environments (reviewers,
+`master`, both tags and the final Release/assets, rulesets, both environments (reviewers,
 self-review, deployment policy, and administrator bypass), workflow files and
 active states, Actions permissions, repository/environment secret and variable
 names, immutable Releases, private vulnerability reporting, labels/repository
 metadata, actor roles, and the read-token configuration. The helper re-reads
-`master`, the annotated tag, Release/assets, immutable Releases, actor identity,
+`master`, both annotated tags, final Release/assets, immutable Releases, actor identity,
 manual blobs, and approval-commit CI; the operating freeze is the fail-closed
 contract for the remaining Settings surfaces. Any observed or suspected change
 ends the attempt and requires a fresh phase snapshot and approval.
@@ -136,11 +145,15 @@ with no duplicate or extra keys. Never commit a screenshot, token, token value,
 secret value, private Settings URL, or personal path. In a protected evidence
 store, capture a new screenshot-plus-review-note bundle that visibly includes
 the phase challenge (`phase`, UTC observation time, and for pre-publication the
-Release ID, peeled commit, and direct annotated-tag object SHA). Redact it,
+Release ID, peeled final commit, and direct annotated final-tag object SHA).
+Redact it,
 review the redaction, hash the exact protected bundle bytes, and record only
 that SHA-256 as `sourceArtifactSHA256`. Merely relabelling an earlier screenshot
-is forbidden: the two controls and two phases must yield four distinct source
-artifact digests.
+is forbidden. Each phase requires two distinct control-source digests. The
+publication helper additionally requires the two `final-pre-tag` sources and
+two current `pre-publication` sources to yield four distinct digests. The
+earlier `predecessor-pre-tag` captures remain bound inside E0 and cannot be
+substituted for either later phase.
 
 The common closed shape is:
 
@@ -159,6 +172,11 @@ The common closed shape is:
   "subject": { "tag": "v0.1.0" }
 }
 ```
+
+For `predecessor-pre-tag`, change only `phase` to that exact value; its subject
+remains `{ "tag": "v0.1.0" }` because these fixed records govern the complete
+first-public-beta sequence. Capture new sources again for `final-pre-tag`; do
+not relabel the predecessor-phase files.
 
 For `release-publication-administrator-bypass-disabled-and-admin-read-token-minimum-scope`,
 `tokenPermissions` must be exactly this ordered set and no other permission:
@@ -188,7 +206,8 @@ Create a new release-specific token as part of the protected capture ceremony.
 `expiresAt` must be positive and no more than exactly 30 days. A current gate
 also requires at least 2,700 seconds (45 minutes) remaining at verification
 time; exactly 2,700 seconds is accepted and 2,699 is rejected. Historical
-`final-pre-tag` records retain the same issuance/capture and 30-day lifetime
+`predecessor-pre-tag` and `final-pre-tag` records retain the same
+issuance/capture and 30-day lifetime
 contract but are not required to remain unexpired at the later publication.
 Any additional repository, account permission, organization permission,
 repository, token type, overlong lifetime, stale issuance capture, or short
@@ -216,7 +235,7 @@ For each `pre-publication` record, replace `phase` and `subject` exactly:
 The snippets contain rejected placeholders and are templates only. IDs must be
 positive integers, SHAs lowercase and exact length, the observer must equal the
 policy operator by numeric ID/type and case-insensitive login, and the current
-phase observation must be no more than 24 hours old. The immutable tag's
+phase observation must be no more than 24 hours old. The immutable final tag's
 `final-pre-tag` records are re-read later only as strict historical baselines;
 their original freshness was required by the final-pre-tag gate and does not
 create a 24-hour whole-release deadline. The manifest binds current record
@@ -228,7 +247,7 @@ All release-control timestamps use canonical UTC (`YYYY-MM-DDTHH:MM:SSZ`) and
 must preserve this nondecreasing chronology:
 
 ```text
-final manuals observedAt ≤ final E collectedAt ≤ pre manuals observedAt ≤ pre manifest collectedAt ≤ approval approvedAt
+predecessor manuals observedAt ≤ E0 collectedAt ≤ final manuals observedAt ≤ E1 collectedAt ≤ pre-publication manuals observedAt ≤ pre-publication manifest collectedAt ≤ approval approvedAt
 ```
 
 The candidate and beta evidence independently preserve:
@@ -312,9 +331,11 @@ component code, and still requires the user's final approval.
 The approval validator proves the record's exact shape, identifiers, actual
 trusted digests, booleans, actors, ordered report set, Sonoma lifecycle binding,
 and time window. The publication helper first descriptor-reads and semantically
-validates the actual release manifest, provenance bundle bytes, candidate
-inventory, predecessor lineage, three reports, and protected
-independence-review set; then it supplies those calculated values to the
+validates the actual final manifest, DMG, and provenance bundle; the actual
+predecessor manifest, DMG, and provenance bundle; the v3 final-pre-tag boundary;
+the candidate inventory, predecessor lineage, three reports, and protected
+independence-review set. It also binds the predecessor tag object and earlier
+predecessor-pre-tag evidence digest before supplying calculated values to the
 approval validator. The release approver still owns real-world facts that a
 privacy-safe record cannot independently prove, especially whether the
 protected candidate history is exhaustive and whether the private roster
@@ -323,87 +344,104 @@ represents three distinct external people.
 `remoteControlsEvidenceSHA256` is the SHA-256 of the exact
 `remote-controls-pre-publication.json` manifest added beside this approval. The
 manifest binds the observed pre-approval `master`, exact tag commit, exact draft
-Release ID, all three workflow blobs and two anchor reads, the complete active
-workflow inventory, both environment API projections, and both manual evidence
-digests. The publication helper validates that closed schema before validating
-this digest; the approval validator does not independently interpret the
-underlying Settings screenshots or token-scope record.
+Release ID, both annotated tag objects and peeled commits, both earlier
+remote-controls evidence digests, all four workflow blobs and anchor reads, the
+complete workflow inventory, both environment API projections, and both manual
+evidence digests. The publication helper validates that closed schema before
+validating this digest; the approval validator does not independently interpret
+the underlying Settings screenshots or token-scope record.
 
 ## Publication sequence
 
-1. Establish clean commit **A** on the effective remote `master`. A contains
-   both fresh `final-pre-tag` manual records and all three reviewed workflow
-   blobs. Wait for exact-A CI and keep remote `v*` refs and Releases empty.
-2. From a clean, complete, non-shallow checkout of A, run the final-pre-tag
-   two-pass gate with an absent output path outside the repository in an
-   owner-owned mode-0700 directory. Preserve the exact resulting mode-0600
-   `remote-controls-final-pre-tag.json` bytes as external evidence **E**.
-3. Create exactly one **annotated** `v0.1.0` tag object locally, targeting A.
-   Its entire message must bind E as
-   `remote-controls-final-pre-tag-sha256: <E-SHA-256>`. Record the direct tag
-   object SHA and peeled commit A. Do **not** push, recreate, move, or force the
-   tag at this stage.
-4. Create commit **B** as the direct single-parent child of A. B adds only the
-   unchanged E bytes at
-   `docs/evidence/releases/v0.1.0/remote-controls-final-pre-tag.json` as an
-   ordinary `100644` blob; no other path may change.
-5. Integrate B into `master` with a fast-forward, rebase, or one-commit squash
-   only when the resulting history still contains the exact direct
-   single-parent A→B edge and the exact add-only E blob. A merge commit is
-   forbidden. If integration rewrites B, recheck the resulting B from scratch;
-   the recorded local tag object must still target A and bind the same E.
-6. Wait for exact-B master-push CI, then rerun the A→B semantic/history check.
-   It must prove the single introduction of E, unchanged E bytes through the
-   current first-parent tip, the exact annotated-tag digest binding, and
-   identical `.github/workflows` and `scripts/release` trees from A through the
-   checked tip.
-7. Obtain a separate, recorded authorization to push the release tag. Only then
-   push the already recorded annotated tag object for the first time. The
-   remote object SHA and peeled A commit must match exactly; never create a new
-   object during push, move the tag, or use a force update.
-8. Build one candidate in the protected `release-candidate` environment and
-   retain its attempt-1 origin artifact identity.
-9. Prepare the exact draft prerelease from that artifact. Do not rerun the
-   origin build.
-10. Complete the clean-download lifecycle, candidate inventory and predecessor
-    lineage,
-    three closed external beta reports, their protected independence-review
-    set, both zero-blocker decisions, and final public-surface review for the
-    same DMG. Commit the six fixed inventory/lineage/beta blobs on `master`; their bytes
-    must not change in the later approval-only commit.
-11. Create new protected screenshot/review-note bundles, replace both manual
-    JSON blobs with fresh `pre-publication` phase challenges and distinct source
-    digests in one reviewed docs-only master commit after the lineage/beta
-    evidence is present, and wait for that exact commit's CI. The annotated tag
-    does not move.
-12. Start the Settings single-writer freeze. From the clean refreshed-manual
-    commit, run `scripts/release/verify-remote-controls.sh --phase pre-publication
-    --release-commit <peeled-commit> --release-id <id>`. It writes only the
-    normalized manifest after two identical complete observations.
-13. Create one direct-successor commit that adds exactly
+1. Establish the clean protected `v0.0.9`/build-1 source commit **P** on the
+   effective remote `master`. P contains two fresh `predecessor-pre-tag` manual
+   records and all four reviewed workflow blobs. Wait for exact-P CI and keep
+   remote `v*` refs and Releases empty.
+2. From a clean, complete, non-shallow checkout of P, run the
+   `predecessor-pre-tag` two-pass gate with an absent output path outside the
+   repository in an owner-owned mode-0700 directory. Preserve the exact
+   mode-0600 bytes as external evidence **E0**.
+3. Create exactly one annotated `v0.0.9` tag object locally, targeting P. Its
+   entire message must be
+   `remote-controls-predecessor-pre-tag-sha256: <E0-SHA-256>`. Record the object
+   SHA and peeled P commit. Do not push, recreate, move, or force the tag.
+4. Create **P1** as P's direct single-parent child. P1 adds only unchanged E0 at
+   `docs/evidence/releases/v0.1.0/remote-controls-predecessor-pre-tag.json` as
+   an ordinary `100644` blob. Integrate it without a merge commit while
+   preserving the exact P→P1 edge, wait for exact CI, and rerun the semantic and
+   history checks.
+5. Obtain a separate authorization to push the predecessor tag. Push only the
+   already recorded object; its remote object SHA and peeled P commit must match
+   exactly.
+6. Separately authorize one attempt-1 `build-candidate` dispatch for
+   `v0.0.9`/build 1. Retain its exact nine-asset origin run, artifact ID, archive
+   digest, manifest, final DMG, and provenance bundle. Never rerun it, prepare a
+   draft from it, or create a GitHub Release for it.
+7. Establish the descendant clean `v0.1.0`/build-2 source commit **F**. The
+   `.github/workflows` and `scripts/release` trees at P and F must be
+   byte-identical. F contains fresh `final-pre-tag` manual records. Wait for
+   exact-F CI; the remote boundary must contain exactly annotated `v0.0.9` and
+   zero Releases.
+8. From F, run the `final-pre-tag` two-pass gate with the exact predecessor
+   commit and tag-object SHA. Preserve its mode-0600 bytes as **E1**. E1 must
+   bind E0's digest and the exact predecessor tag/commit boundary.
+9. Create exactly one annotated `v0.1.0` tag object locally, targeting F. Its
+   entire message must be
+   `remote-controls-final-pre-tag-sha256: <E1-SHA-256>`. Record the object SHA
+   and peeled F commit. Do not push, recreate, move, or force the tag.
+10. Create **F1** as F's direct single-parent child. F1 adds only unchanged E1
+    at `docs/evidence/releases/v0.1.0/remote-controls-final-pre-tag.json` as an
+    ordinary `100644` blob. Integrate it without a merge commit while preserving
+    the exact F→F1 edge, wait for exact CI, and rerun the semantic/history check.
+11. Obtain a separate authorization to push the final tag. Push only the
+    already recorded object; its remote object SHA and peeled F commit must match
+    exactly.
+12. Separately authorize one attempt-1 `build-candidate` dispatch for
+    `v0.1.0`/build 2 and retain its distinct exact nine-asset origin. Never rerun
+    either origin build.
+13. Prepare the exact `v0.1.0` draft from only the build-2 origin. The draft
+    contains exactly its nine assets and never incorporates or publishes the
+    predecessor asset set.
+14. Restore both origins. Complete the clean-download lifecycle, mandatory
+    predecessor acquisition and upgrade, candidate inventory v1, predecessor
+    lineage v3, three external-beta v2 reports, external-beta-set v2, protected
+    independence review, both zero-blocker decisions, and final public-surface
+    review. Commit the six fixed inventory/lineage/beta blobs on `master`; their
+    bytes and both earlier remote-controls records must not change later.
+15. Create new protected screenshot/review-note bundles, replace both manual
+    JSON blobs with fresh `pre-publication` challenges for the final tag object,
+    its peeled commit, and the exact final draft Release ID, and wait for exact
+    CI. The v3 API manifest separately binds both annotated tags and peeled
+    commits; neither tag moves.
+16. Start the Settings/repository single-writer freeze. From the clean
+    refreshed-manual commit, run the v3 `pre-publication` verifier with both
+    predecessor anchors, both final anchors, both earlier evidence digests, and
+    the exact draft ID. It writes only the normalized manifest after two
+    identical complete observations.
+17. Create one direct-successor commit that adds exactly
     `remote-controls-pre-publication.json` and `publication-approval.json`.
-    Review it, wait for its exact master-push `Verify macOS app` and `Verify
-    public site and release assets` CI jobs to pass, and keep the freeze active.
-14. Confirm the canonical UTC chronology `final manuals observedAt ≤ final E
-    collectedAt ≤ pre manuals observedAt ≤ pre manifest collectedAt ≤
-    approval approvedAt`, then dispatch `Publish
-    approved signed release` from the exact `v0.1.0` tag and supply the exact tag
-    commit, Release ID, origin run/artifact identities and digests, approval
+    Review it, wait for its exact master-push **Verify macOS app** and **Verify
+    public site and release assets** jobs to pass, and keep the freeze active.
+18. Confirm canonical UTC ordering across E0 collection, E1 collection, current
+    pre-publication manual observations, pre-publication collection, and
+    `approvedAt`. Dispatch **Publish approved signed release** from exact
+    `v0.1.0`, supplying both commit/tag-object identities, both origin
+    run/artifact/archive/final-DMG identities, Release ID, approval
     commit/digest, actors, and confirmation phrase.
-15. Approve the `release-publication` environment only after comparing those
-    inputs with the protected evidence. The workflow run must be attempt 1;
-    never use GitHub's rerun command for publication.
-16. The workflow requires one repository Release—the named draft—verifies its
-    metadata and all nine assets twice, confirms immutable Releases are enabled,
-    validates the actual lineage/beta bytes against the restored candidate and
-    approval, validates both named jobs from the approval commit's exact
-    successful master-push CI, downloads
-    every asset before mutation, performs the exact-ID PATCH, confirms
+19. Approve `release-publication` only after comparing those inputs with the
+    protected evidence. The workflow run must be attempt 1; never use GitHub's
+    rerun command for publication.
+20. The workflow restores both origins, requires one repository Release—the
+    named final draft—verifies its metadata and all nine final assets twice,
+    confirms immutable Releases, validates actual predecessor/current
+    materials and lineage/beta bytes against the approval, and validates both
+    named jobs from the approval commit's exact successful master-push CI. It
+    downloads every final asset before the sole exact-ID PATCH, confirms
     immutability, and downloads and verifies every public asset again. A later
     run never adopts a pre-existing public Release. Only the same live process
-    that sent the PATCH may resolve a missing/malformed PATCH response by an
-    immediate exact public-state read.
-17. Before dispatching publication, prepare and review a bounded public-copy
+    that sent the PATCH may resolve a missing/malformed response by an immediate
+    exact public-state read.
+21. Before dispatching publication, prepare and review a bounded public-copy
     finalization patch locally, but do not push or merge it. Record its exact
     `master` base, resulting Git tree digest, and closed file allowlist. The
     patch must include the release/site publication records, README, both guide
@@ -411,23 +449,23 @@ underlying Settings screenshots or token-scope record.
     directly required roadmap/completion/status records. It changes no site
     component code, and the immutable Release body must already be
     self-contained with no branch-lifecycle document link.
-18. Keep the freeze through the workflow's final public download verification.
+22. Keep the freeze through the workflow's final public download verification.
     After success, revoke the release-specific fine-grained PAT and remove or
     rotate `RELEASE_ADMIN_READ_TOKEN`. Record only a read-only Settings
     confirmation that the old credential is no longer active; never log its
     value. End the freeze only after this cleanup evidence is retained.
-19. After the canonical Release URL and all assets are visibly public and
+23. After the canonical Release URL and all assets are visibly public and
     verified, re-read `origin/master`. If it differs from the recorded base,
     stop and regenerate/re-review the patch; do not silently rebase it. Publish
     the prepared patch for protected review only now. Its review-head tree must
     equal the recorded tree, pass `make verify-public-surface`, and pass exactly
     the two required CI jobs.
-20. Merge through the protected branch. Read back the final `master` SHA and
+24. Merge through the protected branch. Read back the final `master` SHA and
     require its Git tree to equal the reviewed tree. Then require one
     `master`-push CI run bound to that exact SHA whose only required jobs are
     successful **Verify macOS app** and **Verify public site and release
     assets**. A pull-request run on a different SHA is not master evidence.
-21. Only after that exact master run passes may the separately approved site deploy.
+25. Only after that exact master run passes may the separately approved site deploy.
     Verify canonical and Open Graph URLs, support/security routes, download
     identity, language switching, captions, and the no-cookie/no-tracking
     boundary from a clean session. Deployment and every announcement retain

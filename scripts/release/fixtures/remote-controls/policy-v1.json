@@ -28,7 +28,7 @@
     "workflow": {
       "id": 7001,
       "name": "Signed release candidate",
-      "path": ".github/workflows/release.yml",
+      "path": ".github/workflows/signed-release-candidate.yml",
       "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     },
     "ci": {

@@ -1,8 +1,8 @@
 # Distribution
 
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
-Desk Setup Switcher has no public release. The repository can currently build and inspect an ad-hoc-signed development DMG, but that artifact is not an end-user distribution. The official `v0.1.0` public beta requires Developer ID signing, hardened runtime, secure timestamps, notarization, stapling, Gatekeeper verification, protected approval, and clean-download evidence before publication.
+Desk Setup Switcher has no public release. The repository is intentionally staged at `0.0.9`/build 1 so it can build and inspect the protected predecessor as an ad-hoc-signed development DMG; that artifact is not an end-user distribution. The official `v0.1.0`/build-2 public beta is produced only after the predecessor is retained and requires Developer ID signing, hardened runtime, secure timestamps, notarization, stapling, Gatekeeper verification, protected approval, and clean-download evidence before publication.
 
 ## Distribution classes
 
@@ -18,9 +18,9 @@ An ad-hoc signature is never promoted by changing its description. A public arti
 
 ## Current development baseline
 
-The current 2026-07-21 local release-controls candidate's no-Developer-ID path passed 4,768 deterministic checks/assertions: 507 app checks (183 XCTest cases, 323 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 4,261 release-tooling assertions (374 base release-policy, 8 Mach-O compatibility-verifier, 659 remote-controls v1 policy/normalizer, 178 remote-controls v2 lifecycle-policy, 69 remote-controls v2 collector, 407 publication-approval policy, 1,106 external-beta/inventory/lineage/template policy, 129 collector-wrapper mock, 71 draft-reconciler mock, 246 artifact-restoration mock, 496 approved-publication mock, 306 legacy-workflow-containment mock, and 212 shell/workflow guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, exact `arm64 x86_64` slices, per-slice macOS 14.0 `LC_BUILD_VERSION`, and ad-hoc signature classification passed. The 39-assertion public-release audit fixture suite and complete-history/current-asset production scan also passed after the current source and regenerated-media commits. The release-tooling evidence is simulated and structural, not a candidate-history review, external beta result, credentialed signing, notarization, protected-remote, or publication result. The package was not installed or launched.
+The current `v0.0.9`/build-1 source's 2026-07-22 no-Developer-ID path passed 5,107 deterministic checks/assertions: 507 app checks (183 XCTest cases, 323 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 4,600 release-tooling assertions (374 base release-policy, 8 Mach-O compatibility-verifier, 659 remote-controls v1 policy/normalizer, 210 remote-controls v2 lifecycle-policy, 86 remote-controls v3 lifecycle-policy, 71 remote-controls v2 collector, 17 remote-controls v3 collector, 407 publication-approval policy, 1,216 external-beta/inventory/lineage/template policy, 132 collector-wrapper mock, 19 release-evidence history, 57 draft-reconciler mock, 261 artifact-restoration mock, 545 approved-publication mock, 306 legacy-workflow-containment mock, and 232 shell/workflow guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, exact `arm64 x86_64` slices, per-slice macOS 14.0 `LC_BUILD_VERSION`, and ad-hoc signature classification passed. The 39-assertion public-release audit fixture suite and complete-history/current-asset production scan also passed on 2026-07-22 after the current source and regenerated-media commits. The release-tooling evidence is simulated and structural, not a candidate-history review, external beta result, credentialed signing, notarization, protected-remote, or publication result. The package was not installed, launched, uploaded, or published.
 
-- Current development-only DMG SHA-256: `cc1e9e6b16449f89999e402a50e6f17d07e149a6e2bd9fa903899fcfa8104147`
+- Current development-only DMG: `artifacts/Desk-Setup-Switcher-0.0.9-unsigned.dmg`, SHA-256 `45161e6b33eada2b9b820623dbe303c0e50bf5bd6c1bef3cfa2d1cf838f893ee`
 - Authoritative current record: [Completion criteria and evidence ledger](COMPLETION-CRITERIA.md)
 - Historical 496-check baseline and DMG SHA-256 `961f4044996c0f5fc0b4e8e782355da4d620c553e4c1891918d19323f6d67eac`: [Open-source release baseline audit](OPEN-SOURCE-RELEASE-BASELINE-2026-07-18.md)
 
@@ -49,8 +49,8 @@ make audit-public-release
 
 The packaging portion creates:
 
-- `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg`
-- `artifacts/Desk-Setup-Switcher-0.1.0-unsigned.dmg.sha256`
+- `artifacts/Desk-Setup-Switcher-0.0.9-unsigned.dmg`
+- `artifacts/Desk-Setup-Switcher-0.0.9-unsigned.dmg.sha256`
 
 `make package` builds the universal Release app with automatic signing disabled and applies this ad-hoc signature:
 
@@ -68,7 +68,7 @@ These checks provide development integrity evidence only. They do not authentica
 If a contributor explicitly chooses to install an ad-hoc build, verify its locally supplied checksum first:
 
 ```sh
-shasum -a 256 -c Desk-Setup-Switcher-0.1.0-unsigned.dmg.sha256
+shasum -a 256 -c Desk-Setup-Switcher-0.0.9-unsigned.dmg.sha256
 ```
 
 macOS may require an explicit **Open Anyway** decision for this development artifact. Never disable Gatekeeper globally or remove quarantine recursively. End-user documentation, the demo site, and promotional material must not link to this artifact or instruct ordinary users to bypass Gatekeeper.
@@ -77,27 +77,52 @@ macOS may require an explicit **Open Anyway** decision for this development arti
 
 The local workspace's proposed CI workflow uses a complete checkout, runs `make verify` and `make audit-public-release`, and uploads the ad-hoc DMG/checksum for 14 days. It does not receive signing or notarization secrets.
 
-The local workspace now proposes one signed-candidate workflow with two isolated manual dispatches:
+The local workspace now proposes one signed-candidate workflow with three
+isolated manual dispatches and two operation types:
 
-1. both operations run only through manual `workflow_dispatch` on the existing `v0.1.0` tag ref and require the exact expected commit plus a typed confirmation; a no-permission guard rejects mixed phase inputs before a protected job starts;
-2. both operations reference the protected environment named `release-candidate`, but keep phase-specific permissions and credentials. Only `build-candidate` receives signing/notarization values; `prepare-draft` receives no signing secret;
-3. the attempt-1 `build-candidate` run repeats preflight, `make verify`, and the public-history audit from a complete tag checkout on a GitHub-hosted runner, then builds once, signs, notarizes, staples, assesses, checksums, and records the candidate;
-4. that origin run creates an SBOM plus separate DMG-provenance, DMG-SBOM, and release-manifest-provenance attestations, then retains the exact nine assets in one immutable artifact and records its run ID, artifact ID, and archive SHA-256 **before** any Release mutation;
-5. a separate `prepare-draft` run names those three origin values. It rejects a rerun or failed origin, verifies exact workflow/repository/tag/commit/job/artifact metadata, downloads the raw artifact ZIP by ID, fails on any digest or exact-nine-entry mismatch, and verifies the signed candidate plus all three attestation bundles before Release access;
-6. only then does it create or resume the exact draft prerelease with curated English/Korean notes. It rejects changed metadata or any extra/different asset and may add only missing byte-identical candidate assets without clobber, edit, deletion, or publication; and
-7. it downloads all nine draft assets again, repeats identity and bundle verification, retains the origin artifact for the browser-download external beta path, and contains no public-release publication command.
+1. `build-candidate` runs once for annotated `v0.0.9`/build 1 and once for
+   annotated `v0.1.0`/build 2. Each dispatch runs only through
+   `workflow_dispatch` on its existing tag ref and requires the exact expected
+   commit plus the tag-specific typed confirmation; a no-permission guard
+   rejects mixed phase inputs before a protected job starts.
+2. Both build dispatches reference the protected environment named
+   `release-candidate` and receive signing/notarization values. The separate
+   `prepare-draft` operation receives no signing secret and is valid only for
+   `v0.1.0`.
+3. Each attempt-1 build repeats preflight, `make verify`, and the public-history
+   audit from a complete tag checkout on a GitHub-hosted runner, then builds
+   once, signs, notarizes, staples, assesses, checksums, and records that
+   candidate.
+4. Each origin creates an SBOM plus separate DMG-provenance, DMG-SBOM, and
+   release-manifest-provenance attestations, then retains its exact nine assets
+   in one immutable artifact and records its distinct run ID, artifact ID, and
+   archive SHA-256. The `v0.0.9` artifact is a protected upgrade source and must
+   never create a GitHub Release.
+5. A separate `prepare-draft` run names only the final build-2 origin values. It
+   rejects a rerun or failed origin, verifies exact
+   workflow/repository/tag/commit/job/artifact metadata, downloads the raw
+   artifact ZIP by ID, fails on any digest or exact-nine-entry mismatch, and
+   verifies the signed candidate plus all three attestation bundles before
+   Release access.
+6. Only then does it create or resume the exact `v0.1.0` draft prerelease with
+   curated English/Korean notes. It rejects changed metadata or any
+   extra/different asset and may add only missing byte-identical final-candidate
+   assets without clobber, edit, deletion, or publication.
+7. It downloads all nine draft assets again, repeats identity and bundle
+   verification, retains both immutable origin artifacts for the external-beta
+   path, and contains no public-release publication command.
 
-A separate proposed manual workflow performs the final publication transition. It restores the same attempt-1 artifact, verifies the candidate and attestations, validates a closed-schema approval record from the exact remote `master` HEAD, requires both named jobs from the approval commit's exact successful master-push CI, one exact draft Release, the direct annotated-tag object plus peeled commit, fresh phase-bound Settings records, and stable immutable-release settings. It downloads all nine assets before mutation and permits only one exact-ID `draft:false`, `prerelease:true`, `make_latest:false` PATCH. It then requires the public Release to be immutable and re-downloads all nine assets for a second verification. A later run refuses any already-public Release; only the process that sent a PATCH may resolve its own missing response by an immediate exact-state read. It cannot build, sign, notarize, create/move a tag, edit metadata/assets, delete a Release, or deploy the site. Its full contract and current blockers are in [Public release approval](PUBLICATION-APPROVAL.md).
+A separate proposed manual workflow performs the final publication transition. It restores both attempt-1 artifacts, verifies each manifest/DMG/provenance identity and the final candidate's attestations, validates a closed-schema approval record from the exact remote `master` HEAD, requires both named jobs from the approval commit's exact successful master-push CI, one exact `v0.1.0` draft Release, both direct annotated-tag objects plus peeled commits, fresh phase-bound Settings records, and stable immutable-release settings. It downloads the final nine draft assets before mutation and permits only one exact-ID `draft:false`, `prerelease:true`, `make_latest:false` PATCH. It then requires the public Release to be immutable and re-downloads all nine final assets for a second verification. A later run refuses any already-public Release; only the process that sent a PATCH may resolve its own missing response by an immediate exact-state read. It cannot build, sign, notarize, create/move a tag, create a predecessor Release, edit metadata/assets, delete a Release, or deploy the site. Its full contract and current blockers are in [Public release approval](PUBLICATION-APPROVAL.md).
 
 These workflows and release scripts are unproven local tooling. They have not run with Developer ID/notarization credentials, have not produced a signed candidate, have not published a protected Release, and have not been pushed. A draft/prerelease is not a public release, and source inspection cannot substitute for protected environment configuration or an actual accepted run.
 
-The two operations are separate protected jobs and may require separate environment approvals. A credential-free rehearsal must prove the actual approval prompts, self-review rule, administrator-bypass setting, origin-value handoff, build-rerun rejection, and draft-rerun recovery before any signing credential or release tag is used. This document does not assume that merely naming the environment in YAML supplies those controls.
+The three dispatches enter separate protected jobs and may require separate environment approvals. Before either tag exists, local/mock structural verification plus read-only API and manual Settings readback must prove exact-ref restrictions, reviewer/self-review and administrator-bypass behavior, origin-value handoffs, build-rerun rejection, and final-draft recovery without dispatching a candidate. There is no prompt-only rehearsal path: every `build-candidate` dispatch consumes its build number and attempt-1 origin, even if credentials are absent or approval fails. The actual prompt is therefore observed and recorded only during each separately approved, credentialed, single allowed attempt-1 build; a missing or incorrect prompt stops and invalidates the fixed path. Naming an environment in YAML does not configure or prove those controls.
 
-For `build-candidate`, all three candidate-origin inputs remain the literal sentinel `0`. After that run succeeds, the operator copies `candidate_origin_run_id`, `candidate_artifact_id`, and the bare 64-character `candidate_artifact_sha256` from its step summary into a new `prepare-draft` dispatch; values must not be guessed or taken from a different run. The draft verifier requires the REST digest `sha256:<candidate_artifact_sha256>` and independently hashes the downloaded ZIP to the same bare digest before extraction.
+For either `build-candidate`, all three candidate-origin inputs remain the literal sentinel `0`. After each run succeeds, its run ID, artifact ID, and bare 64-character archive SHA-256 are retained as that tag's immutable origin identity. Only the three values from the `v0.1.0` run may be copied into a new `prepare-draft` dispatch; values must not be guessed, mixed with the predecessor, or taken from a different run. The restoration verifier requires the REST digest `sha256:<candidate_artifact_sha256>` and independently hashes each downloaded ZIP to the same bare digest before extraction.
 
-Only attempt 1 of a `build-candidate` run may consume signing/notarization credentials or build the candidate. **Never rerun that origin run:** GitHub's full-rerun behavior removes its existing artifacts before jobs start, so the no-permission guard rejects every later build attempt and the lost origin must be replaced by a new candidate according to the incident policy. Draft preparation is a separate run bound to the origin run ID, artifact ID, and archive digest; rerunning the draft run does not own or replace the origin artifact. If the origin run was rerun, did not finish successfully, its artifact is unavailable, or any metadata/content/attestation check fails, the draft workflow stops before mutation. An existing draft is resumable only when its tag, title, full notes, draft/prerelease state, and every already-present asset exactly match the retained candidate. Missing assets may be appended, but no existing asset is replaced and no Release is edited, deleted, or published. The evidence therefore records the draft run/attempt separately while preserving the candidate's original run ID and attempt.
+Only attempt 1 of either `build-candidate` run may consume signing/notarization credentials or build that candidate. **Never rerun either origin run:** GitHub's full-rerun behavior removes its existing artifacts before jobs start, so the no-permission guard rejects every later build attempt and a lost origin invalidates the fixed release path. Draft preparation is a separate run bound to the final origin run ID, artifact ID, and archive digest; rerunning the draft run does not own or replace either origin artifact. If either required origin was rerun, did not finish successfully, is unavailable, or fails metadata/content verification, publication stops before mutation. An existing final draft is resumable only when its tag, title, full notes, draft/prerelease state, and every already-present asset exactly match the retained build-2 candidate. Missing assets may be appended, but no existing asset is replaced and no Release is edited, deleted, or published. Evidence records the draft run/attempt separately while preserving both original build runs.
 
-The release scripts fail closed on self-hosted runners. Each signing/notarization secret is scoped to its one consuming workflow step, which directly replaces the runner shell with `/bin/bash`; the script copies the value into a non-exported variable and unsets the original before `source`, `dirname`, or any other child process can run. The distinct `RELEASE_ADMIN_READ_TOKEN` is intentionally consumed in exactly five bounded read-only workflow steps: full-SHA-pinned checkout, candidate restoration, pre-publication attestation verification, the publication helper, and post-publication attestation verification. The helper itself installs that token only through five tracked, timeout-bounded GitHub read/download launcher call sites; the ordinary write token is installed only for the one exact-ID PATCH. The certificate, ephemeral Keychain, and notary key use private randomized paths below `RUNNER_TEMP`; only their non-secret path names cross steps through GitHub's `GITHUB_ENV` file. The decoded certificate is deleted immediately after import, the Keychain as soon as app and DMG signing finish, and the notary key immediately after the accepted submission log is fetched, with absence checked after every normal deletion. Catchable signing/notarization cleanup targets tracked process groups, grants a short `TERM` window, then escalates to `KILL` before status-preserving cleanup; that cleanup guarantee does not make an interrupted publication retry-safe. Any publication-side `HUP`, `INT`, `QUIT`, `TERM`, workflow cancellation, runner/host loss, or unavailable/incomplete log is incident-only. `SIGKILL` delivered to the runner shell itself, host loss, and power loss cannot be handled by a shell trap and therefore retain the GitHub-hosted ephemeral runner and `RUNNER_TEMP` teardown as the last secret-cleanup boundary. Apple's `security import` still requires the certificate passphrase as a quoted `-P` process argument for that brief isolated command; it is never logged or inherited through the child environment.
+The release scripts fail closed on self-hosted runners. Each signing/notarization secret is scoped to its one consuming workflow step, which directly replaces the runner shell with `/bin/bash`; the script copies the value into a non-exported variable and unsets the original before `source`, `dirname`, or any other child process can run. The distinct `RELEASE_ADMIN_READ_TOKEN` appears in exactly six bounded read-only workflow secret references: full-SHA-pinned checkout, combined two-origin restoration, final-candidate attestation verification, predecessor tagged-source verification, the publication helper, and post-publication final-attestation verification. The helper itself installs that token only through five tracked, timeout-bounded GitHub read/download launcher call sites; the ordinary write token is installed only for the one exact-ID PATCH. The certificate, ephemeral Keychain, and notary key use private randomized paths below `RUNNER_TEMP`; only their non-secret path names cross steps through GitHub's `GITHUB_ENV` file. The decoded certificate is deleted immediately after import, the Keychain as soon as app and DMG signing finish, and the notary key immediately after the accepted submission log is fetched, with absence checked after every normal deletion. Catchable signing/notarization cleanup targets tracked process groups, grants a short `TERM` window, then escalates to `KILL` before status-preserving cleanup; that cleanup guarantee does not make an interrupted publication retry-safe. Any publication-side `HUP`, `INT`, `QUIT`, `TERM`, workflow cancellation, runner/host loss, or unavailable/incomplete log is incident-only. `SIGKILL` delivered to the runner shell itself, host loss, and power loss cannot be handled by a shell trap and therefore retain the GitHub-hosted ephemeral runner and `RUNNER_TEMP` teardown as the last secret-cleanup boundary. Apple's `security import` still requires the certificate passphrase as a quoted `-P` process argument for that brief isolated command; it is never logged or inherited through the child environment.
 
 After certificate import, the ephemeral Keychain must expose exactly one valid codesigning identity in total, and that identity must exactly match the reviewed Developer ID Application label. An extra valid identity, a missing match, or a malformed/inconsistent `security find-identity` inventory fails closed before signing and triggers credential cleanup; the deterministic tests use synthetic identities only.
 
@@ -111,48 +136,121 @@ The apply target is intentionally separate. Only after reviewing that receipt an
 
 Containment threat boundary: this helper assumes a trusted local account, repository checkout, and local Git, Ruby, and `gh` toolchain. Its no-follow descriptor reads, Git-blob checks, bounded streaming hash/HMAC, identity checks, root-owned empty `gh` configuration, minimal child environment, and signal handling defend capture-path precreation, replacement, truncation, and ambiguous-result races during an authorized invocation. They are not a sandbox against a malicious same-UID process, hostile token-holding caller, compromised checkout/runtime, or substituted toolchain. The internal operation/plan authorization string is a fail-closed accidental-misuse guardrail, not authentication of a hostile caller.
 
-Do not push the final `v0.1.0` tag until the release-only signed path is merged and the `release-candidate` environment is actually protected. Referencing an environment in workflow YAML does not configure protection by itself. Read-only GitHub API checks on 2026-07-18, 2026-07-20, and 2026-07-21 found zero configured environments and no protection on `master`.
+Do not push either `v0.0.9` or `v0.1.0` until the release-only signed path is merged and the `release-candidate` environment is actually protected for both exact tags. Referencing an environment in workflow YAML does not configure protection by itself. Read-only GitHub API checks on 2026-07-18, 2026-07-20, and 2026-07-21 found zero configured environments and no protection on `master`.
 
 The detailed [remote release controls audit](REMOTE-RELEASE-CONTROLS-AUDIT-2026-07-18.md) additionally records zero branch/tag rulesets, disabled immutable releases and private vulnerability reporting, empty repository secret/variable name lists, the missing protected environment, the pending sole-maintainer reviewer-policy decision, stale repository metadata, and the exact containment → feature-branch → PR → read-back sequence. It inspected no credential value. That audit authorizes no remote mutation; it exists so approval can name a bounded operation and rollback path.
 
-`make verify-remote-controls REMOTE_CONTROLS_EVIDENCE_OUTPUT=/absolute/private/remote-controls-final-pre-tag.json` is the explicit final-pre-tag read-only gate. The destination must be absent, outside the repository, and inside an owner-owned mode-0700 directory; the gate atomically creates one mode-0600 normalized record there without overwriting an existing path. It is intentionally excluded from ordinary `make verify` because credentials and network state are not deterministic test inputs. Its checked-in v2 lifecycle policy is fail-closed and currently `configured:false`, so the command stops before resolving `gh` or making a GitHub request. The v2 closed schema binds the exact CI, candidate/draft, and publication workflow identities/blobs/manual triggers plus the complete paginated active-workflow inventory; the exact `Verify macOS app` and `Verify public site and release assets` required checks, check runs, and jobs from one successful master-push check suite; both protected environments and their exact tag/reviewer/self-review/deployment records; operator, reviewer, and publisher numeric identities with case-insensitive login matching; separated candidate signing names and publication read-token/verification names; repository shadow exclusions; and the exact path/control/schema contract for two manual records. Each phase manifest binds their current byte digests. A `final-pre-tag` record requires zero `v*` refs and Releases. After the exact annotated tag and draft exist, a fresh `pre-publication` two-pass record instead binds the direct tag-object SHA, peeled commit, exact draft prerelease ID, and newly captured manual digests. Only secret/variable names are emitted, persisted, normalized, compared, or recorded; no credential value is inspected or retained. GitHub's REST response still does not prove either environment's administrator-bypass setting or the admin-read token's least-privilege token configuration, so those facts remain exactly two protected Settings/manual evidence items. Calling `scripts/release/remote_controls_policy.rb` directly with a normalized fixture exercises only the offline policy component; it is not a live remote gate and must not be recorded as one.
+Remote controls use three explicit read-only gates. `make verify-remote-controls`
+is the compatibility alias for `verify-remote-controls-predecessor-pre-tag`;
+`verify-remote-controls-final-pre-tag` additionally requires the exact
+predecessor commit and annotated tag-object SHA; and
+`verify-remote-controls-pre-publication` additionally requires the final commit,
+annotated final tag-object SHA, and exact draft Release ID. Each external output
+destination must be absent, outside the repository, and inside an owner-owned
+mode-0700 directory; the gate atomically creates one mode-0600 normalized record
+without overwriting an existing path. These commands are intentionally excluded
+from ordinary `make verify` because credentials and network state are not
+deterministic test inputs.
 
-The phase order is strict. First establish clean remote-master commit **A** with both fresh `final-pre-tag` manual records and exact-A CI. Run the zero-tag/zero-Release verifier from A and preserve its mode-0600 output outside the repository as exact evidence **E**. Create the annotated tag object locally, targeting A and binding E's SHA-256, but do not push it. Create **B** as A's direct single-parent child adding only the unchanged E bytes as a `100644` blob. Integrate B into `master` only by fast-forward, rebase, or one-commit squash that leaves the exact A→B edge; never use a merge commit. After exact-B CI and a fresh A→B semantic/history recheck, obtain a separate tag-push authorization and push that already recorded tag object for the first time. Only then may the candidate and draft phases begin. After the draft, commit newly captured `pre-publication` manual records and pass CI; impose the exclusive Settings/repository single-writer freeze; run the pre-publication verifier; then add only its manifest and the approval in one direct-successor commit and pass that exact commit's CI before dispatch. All timestamps are canonical UTC and must satisfy `final manuals observedAt ≤ final E collectedAt ≤ pre manuals observedAt ≤ pre manifest collectedAt ≤ approval approvedAt`. The final-tag historical records may be older than 24 hours when publication occurs, but the current pre-publication records may not. Their four protected source artifacts must have distinct SHA-256 values. Exact JSON fields, safe value-free templates, archive/renewal rules, and the freeze surface are in [Public release approval](PUBLICATION-APPROVAL.md).
+The checked-in v3 lifecycle policy is fail-closed and currently
+`configured:false`, so an operational command stops before resolving `gh` or
+making a GitHub request. Its closed schema binds four workflow identities and
+blobs: signed candidate, CI, publication, and the disabled fail-only legacy
+tombstone. It also binds the complete workflow inventory; the exact **Verify
+macOS app** and **Verify public site and release assets** check runs/jobs from
+one successful master-push check suite; both protected environments and their
+tag/reviewer/self-review/deployment records; operator, reviewer, and publisher
+numeric identities; credential-name scopes and repository shadow exclusions;
+and the exact path/control/schema contract for two manual records. Each phase
+manifest binds its current record-byte digests.
 
-Configure the authoritative policy through a reviewed code change, not by copying the synthetic fixture. Populate every closed-schema field from reviewed read-only evidence: repository numeric and node identity plus approved metadata/state, release version/tag, candidate/draft, CI, and publication workflow IDs/names/paths/blobs, both exact CI check identities, operator and reviewer IDs/logins/types, and approval mode/count/self-review behavior. Review that diff, commit the policy together with all three workflow blobs it names, merge it through the protected `master` path, and wait for exact-commit CI. The final command must then run from a clean, complete, non-shallow checkout whose HEAD is the effective remote `master`, authenticated as the configured operator with repository-admin visibility, while no remote `v*` ref or GitHub Release exists. Capture its sanitized transcript before creating the local annotated tag object; the verifier configures nothing, pushes nothing, and does not itself authorize a tag push.
+The phase boundaries are exact: `predecessor-pre-tag` requires zero `v*` refs
+and zero Releases; `final-pre-tag` requires only the annotated `v0.0.9` ref with
+its exact object and peeled commit, the earlier evidence digest, and zero
+Releases; `pre-publication` requires both annotated tags, both earlier evidence
+digests, and exactly one `v0.1.0` draft prerelease. Only secret/variable names
+are emitted, persisted, normalized, compared, or recorded; no credential value
+is inspected or retained. GitHub's REST response still does not prove either
+environment's administrator-bypass setting or the admin-read token's
+least-privilege configuration, so those facts remain exactly two protected
+Settings/manual evidence items. Calling
+`scripts/release/remote_controls_policy.rb` directly with a normalized fixture
+exercises only the offline policy component; it is not a live remote gate and
+must not be recorded as one.
+
+The phase order is strict. First establish the protected `v0.0.9` build-1
+source commit with fresh `predecessor-pre-tag` manual records and exact-commit
+CI. Run the zero-tag/zero-Release verifier and preserve its external mode-0600
+output. Create one annotated `v0.0.9` tag object targeting that commit and
+binding the evidence digest, but do not push it. Add only the unchanged evidence
+bytes in the required direct-child commit, pass exact CI/history checks, obtain
+a separate tag-push authorization, then push that recorded object and build the
+attempt-1 predecessor origin. It remains protected evidence and never receives
+a GitHub Release.
+
+Next establish the descendant `v0.1.0` build-2 source commit while keeping
+`.github/workflows` and `scripts/release` identical across the two tagged
+commits. With exactly `v0.0.9` present and zero Releases, capture fresh
+`final-pre-tag` manual records and run the second verifier. Its evidence must
+bind the predecessor tag object and predecessor-pre-tag digest. Create one
+annotated `v0.1.0` object targeting the build-2 commit and binding that second
+digest; add only its unchanged evidence bytes in the required direct-child
+commit. After exact CI/history checks and a separate authorization, push that
+recorded object, build the distinct attempt-1 final origin, and prepare only its
+draft.
+
+After the mandatory predecessor upgrade and all final evidence, capture fresh
+`pre-publication` manual records and pass exact CI. Impose the exclusive
+Settings/repository single-writer freeze, run the third verifier, then add only
+its manifest and the approval in one direct-successor commit and pass that
+commit's CI before dispatch. All timestamps are canonical UTC and monotonic
+across predecessor-pre-tag collection, final-pre-tag collection, current
+pre-publication observations/collection, and approval. The two final-pre-tag
+manual source artifacts and two current pre-publication source artifacts must
+remain four distinct SHA-256 values. Exact JSON fields, safe value-free
+templates, archive/renewal rules, and the freeze surface are in [Public release
+approval](PUBLICATION-APPROVAL.md).
+
+Configure the authoritative policy through a reviewed code change, not by copying the synthetic fixture. Populate every closed-schema field from reviewed read-only evidence: repository numeric and node identity plus approved metadata/state, both fixed release tags/builds, signed-candidate, CI, publication, and disabled-legacy workflow IDs/names/paths/blobs, both exact CI check identities, operator, reviewer, and publisher IDs/logins/types, and approval mode/count/self-review behavior. Review that diff, commit the policy together with all four workflow blobs it names, merge it through the protected `master` path, and wait for exact-commit CI. The first operational command must then run from a clean, complete, non-shallow checkout whose HEAD is the effective remote `master`, authenticated as the configured operator with repository-admin visibility, while no remote `v*` ref or GitHub Release exists. Capture its sanitized transcript before creating the local predecessor tag object; the verifier configures nothing, pushes nothing, and does not itself authorize a tag push.
 
 Before any release tag is allowed, a repository administrator must:
 
-- create the `release-candidate` and `release-publication` environments and restrict them to the exact `v0.1.0` tag;
+- create the `release-candidate` and `release-publication` environments, restrict `release-candidate` to the exact `v0.0.9` and `v0.1.0` tags, and restrict `release-publication` to only `v0.1.0`;
 - configure the real required reviewer, publisher, and self-review behavior, then separately record each environment administrator-bypass setting from the Settings UI;
 - store only the exact signing/notarization credential names in that protected environment and prove the repository level does not shadow them;
-- store `RELEASE_ADMIN_READ_TOKEN` only in `release-publication` as an unexpired fine-grained token owned by `GGULBAE` and restricted to `GGULBAE/desk-setup-switcher`; grant exactly Actions, Attestations, Contents, repository Administration, and GitHub's implicit Metadata read-only access, with no account/organization permission or other repository; prove that no repository-level secret shadows it, and record the review without exposing the value;
+- store the shared non-secret `DEVELOPER_ID_APPLICATION` and `APPLE_TEAM_ID` variables plus `RELEASE_ADMIN_READ_TOKEN` in `release-publication`; keep all signing/notarization secrets absent there. The token must be an unexpired fine-grained token owned by `GGULBAE` and restricted to `GGULBAE/desk-setup-switcher`; grant exactly Actions, Attestations, Contents, repository Administration, and GitHub's implicit Metadata read-only access, with no account/organization permission or other repository; prove that no repository-level secret shadows it, and record the review without exposing the value;
 - protect `master` with the exact required CI/review rules and no standing bypass actor; emergency recovery is a separately approved ruleset change or disable;
 - use one `v*` creation ruleset with only the approved release-operator User as bypass and a separate no-bypass `v*` update/deletion ruleset, so tag creation authority never becomes tag-move or tag-delete authority;
 - require selected GitHub-owned Actions, full-SHA pinning, read-only default workflow tokens, and no workflow PR-review approval permission;
 - enable immutable Releases and the private reporting path required by [SECURITY.md](../SECURITY.md);
 - create `needs-triage`, apply the exact approved public repository metadata and disabled-Discussions state; and
-- merge the anchored policy/workflows, pass exact-commit CI, and keep both `v*` refs and Releases empty until the final-pre-tag check succeeds.
+- merge the anchored policy/workflows and pass exact-commit CI; keep all `v*` refs and Releases empty through `predecessor-pre-tag`, then allow only the exact predecessor ref and no Release through `final-pre-tag`.
 
 See [GOVERNANCE.md](../GOVERNANCE.md) for current roles and approval authority. GitHub documents that environment secrets remain unavailable until required approval when that protection is configured; merely referencing an environment supplies no such guarantee.
 
 ## Required public-beta trust path
 
-This path is mandatory for `v0.1.0`. Proposed local workflow and helper tooling now implement candidate build, separate additive-only draft recovery, and approval-bound exact publication from the retained attempt-1 origin artifact, but they are unpushed, unconfigured, and unproven with release credentials or a real approval; no signed candidate exists yet. The operator must use one release build as the candidate through signing, packaging, notarization, stapling, external beta, and approval. A retry after any source, resource, entitlement, or executable change is a new candidate and must restart the gate.
+This path is mandatory for `v0.1.0`. Proposed local workflow and helper tooling now implement two protected candidate builds, separate additive-only final-draft recovery, and approval-bound exact publication from two retained attempt-1 origin artifacts, but they are unpushed, unconfigured, and unproven with release credentials or a real approval; no signed candidate exists yet. The operator must preserve `v0.0.9`/build 1 as the exact protected-beta upgrade source and `v0.1.0`/build 2 as the exact final candidate. A retry after any source, resource, entitlement, or executable change creates a new candidate identity and invalidates this fixed path.
 
-“Same candidate” means the source commit, tag, app version, build number, signed executable bytes, architecture-labelled `arm64` and `x86_64` CodeDirectory hashes, designated requirement, entitlements, resources, and supported architecture set do not change after the release build. Packaging, notarization, and stapling legitimately change the DMG bytes, so the evidence record must retain the pre-notarization DMG hash and the final post-staple DMG hash rather than claiming those two containers are byte-identical. The app mounted from the final DMG must match the recorded signed app identity and resource manifest. All tester reports, the final checksum, SBOM, three attestation bundles, draft assets, and re-downloaded public asset must bind to their exact recorded subjects and the final post-staple DMG SHA-256 where applicable. Any rebuild or app-bundle change creates a new build number and invalidates earlier lifecycle and beta reports.
+“Same candidate” applies independently to each origin: its source commit, tag, app version, build number, signed executable bytes, architecture-labelled `arm64` and `x86_64` CodeDirectory hashes, designated requirement, entitlements, resources, and supported architecture set do not change after that build. Packaging, notarization, and stapling legitimately change DMG bytes, so each evidence record retains its pre-notarization and final post-staple DMG hashes rather than claiming those containers are byte-identical. The app mounted from each final DMG must match that origin's recorded signed app identity and resource manifest. Every tester report binds both the predecessor and final identities; the final checksum, SBOM, three final attestation bundles, draft assets, and re-downloaded public assets bind the final post-staple build-2 DMG where applicable. Any rebuild or app-bundle change creates a new build number and invalidates earlier lifecycle and beta reports.
 
-### 1. Freeze and audit the candidate
+Sections 1–4 apply independently to both protected origins. The predecessor and
+final app must each be built, signed, packaged, notarized, stapled, mounted, and
+verified exactly once from its own approved tag/commit. Only the handling of the
+result differs: preserve the predecessor's nine assets solely in its immutable
+origin artifact, while the final nine assets may proceed to the draft.
 
-- Start from a clean commit whose app version, build number, tag, changelog, support matrix, and completion ledger agree.
+### 1. Freeze and audit both candidate origins
+
+- For each origin, start from its clean approved commit whose app version, build number, annotated tag, changelog, support matrix, and completion ledger agree.
 - Run `make verify`, `make audit-public-release`, and `git diff --check` from a complete checkout.
 - Confirm the planned public-beta platform is Apple Silicon and the deployment target is macOS 14.0 unless later evidence changes that boundary. Do not claim macOS 14 runtime support until the exact-candidate Sonoma lifecycle gate below passes; do not claim Intel unless physical Intel verification has been recorded.
 - Audit the minimum entitlements. Hardened-runtime exceptions require an explicit justification; `com.apple.security.get-task-allow` must not be present in the release signature.
 - Confirm the Apple Developer Program team, Developer ID Application certificate, and notarization credential are available without exporting or logging secrets.
 
-### 2. Build once and sign for distribution
+### 2. Build each origin once and sign it for distribution
 
-Build the release app once. Sign nested code from the inside out if any is introduced, then sign the app with a **Developer ID Application** identity, hardened runtime, and secure timestamp. Illustrative verification commands are:
+Build each exact origin once, in its own attempt-1 protected dispatch. Sign nested code from the inside out if any is introduced, then sign that origin's app with a **Developer ID Application** identity, hardened runtime, and secure timestamp. Illustrative verification commands are:
 
 ```sh
 codesign --force --sign "$DEVELOPER_ID_APPLICATION" \
@@ -168,7 +266,7 @@ codesign --display --entitlements - "Desk Setup Switcher.app"
 
 If the audited app needs entitlements, the implemented script must add `--entitlements` with the reviewed release plist; it must not reuse debug entitlements implicitly. The release script must supply `--options runtime` and `--timestamp` when signing. It must inspect the authority chain and fail if the identity, Team ID, hardened-runtime flag, secure timestamp, or reviewed entitlement set differs from policy. Ad-hoc signing, Apple Development, and Mac App Distribution identities are not substitutes for Developer ID Application.
 
-Package that exact signed app without rebuilding it. Sign the final DMG with the reviewed Developer ID identity and a secure timestamp, then verify that the mounted app preserves the signed executable hash, both architecture-labelled CodeDirectory hashes, designated requirement, entitlements, and recorded resource manifest of the app that entered packaging:
+Package each exact signed app without rebuilding it. Sign that origin's final DMG with the reviewed Developer ID identity and a secure timestamp, then verify that the mounted app preserves the signed executable hash, both architecture-labelled CodeDirectory hashes, designated requirement, entitlements, and recorded resource manifest of the app that entered packaging. The commands below show the final filename; the predecessor run uses `Desk-Setup-Switcher-0.0.9.dmg` under the same checks:
 
 ```sh
 codesign --force --sign "$DEVELOPER_ID_APPLICATION" \
@@ -177,7 +275,7 @@ codesign --force --sign "$DEVELOPER_ID_APPLICATION" \
 codesign --verify --strict --verbose=2 "Desk-Setup-Switcher-0.1.0.dmg"
 ```
 
-### 3. Notarize, staple, and assess
+### 3. Notarize, staple, and assess each origin
 
 Use `notarytool`, not the retired `altool`, with credentials stored in a protected Keychain profile or protected CI secret. The operator flow is:
 
@@ -196,11 +294,11 @@ spctl --assess --type open --context context:primary-signature --verbose=4 \
   "Desk-Setup-Switcher-0.1.0.dmg"
 ```
 
-The implementation must parse the submission result and require `Accepted`; command exit alone is insufficient. Preserve the submission ID and redacted notary log as release evidence. Staple and validate the final DMG, mount it read-only, and assess the contained app separately with `spctl --assess --type execute --verbose=4`. Any modification after signing or notarization invalidates the candidate and restarts the path.
+The implementation must parse each origin's submission result and require `Accepted`; command exit alone is insufficient. Preserve each submission ID and redacted notary log as release evidence. Staple and validate each final DMG, mount it read-only, and assess its contained app separately with `spctl --assess --type execute --verbose=4`. Any modification after signing or notarization invalidates that origin and the fixed two-build path.
 
-### 4. Verify and attach release evidence
+### 4. Verify both origins and attach only final release evidence
 
-After stapling, compute the final SHA-256 and verify:
+After stapling each origin, compute its final SHA-256 and verify:
 
 - Developer ID authority, Team ID, hardened runtime, secure timestamps, and minimal entitlements;
 - notarization result/log and stapler validation;
@@ -212,9 +310,9 @@ After stapling, compute the final SHA-256 and verify:
 - three separate GitHub attestation bundles: final-DMG provenance, final-DMG SPDX 2.3 SBOM, and release-manifest provenance, each bound to its exact subject; and
 - tag, commit, workflow run, source tree, and artifact identity.
 
-Attach exactly nine assets to the protected draft: the signed/stapled DMG, checksum, SPDX JSON, release manifest, sanitized notary result, sanitized notary log, DMG provenance bundle, DMG SBOM bundle, and release-manifest provenance bundle. Curated English/Korean notes are the Release body, not an asset. The local workspace contains proposed SBOM, attestation, and signed-release tooling, but it has not run with protected credentials or produced an accepted candidate; none of those outputs may be claimed yet.
+Each origin produces exactly nine assets: the signed/stapled DMG, checksum, SPDX JSON, release manifest, sanitized notary result, sanitized notary log, DMG provenance bundle, DMG SBOM bundle, and release-manifest provenance bundle. Preserve the predecessor set only in its immutable attempt-1 workflow artifact and never create a Release for it. Attach exactly the final origin's nine assets to the protected `v0.1.0` draft. Curated English/Korean notes are the Release body, not an asset. The local workspace contains proposed SBOM, attestation, and signed-release tooling, but it has not run with protected credentials or produced an accepted candidate; none of those outputs may be claimed yet.
 
-Download all nine assets back through GitHub, require that no extra or missing asset exists, compare each byte-for-byte with the approved local candidate, recompute hashes, verify signatures, and verify all three attestation bundles. GitHub immutable releases are available to this repository and must be enabled before publication; the approval evidence must include a read-only confirmation of that setting. The final decision must then be serialized under the closed [public release approval contract](PUBLICATION-APPROVAL.md). Its v2 validator binds structure, identifiers, actual evidence bytes, actors, gates, and a maximum 24-hour window. The publication helper additionally interprets the actual candidate inventory, closed predecessor-lineage, external-beta set, and three reports against the restored release manifest and provenance bundle; arbitrary digest strings no longer satisfy those gates. No workflow may turn an unsigned artifact or an unapproved draft into a public release.
+Download the final draft's nine assets back through GitHub, require that no extra or missing asset exists, compare each byte-for-byte with the approved final origin, recompute hashes, verify signatures, and verify all three final attestation bundles. Separately restore and fully verify the predecessor's nine-asset origin using the predecessor tag's own code; those assets never attach to the draft. GitHub immutable releases are available to this repository and must be enabled before publication; the approval evidence must include a read-only confirmation of that setting. The final decision must then be serialized under the closed [public release approval contract](PUBLICATION-APPROVAL.md). Its v2 validator binds structure, identifiers, actual evidence bytes, actors, gates, and a maximum 24-hour window. The publication helper additionally interprets the actual candidate inventory, closed predecessor-lineage, external-beta set, and three reports against both restored release manifests and provenance bundles; arbitrary digest strings no longer satisfy those gates. No workflow may turn an unsigned artifact or an unapproved draft into a public release.
 
 ## Clean-download public-beta gate
 
@@ -235,10 +333,10 @@ audit.
 
 The lifecycle gate is itemized; one successful first launch cannot stand in for the other rows:
 
-1. Verify the published checksum before mounting.
+1. Verify the protected final-candidate checksum file before mounting.
 2. Confirm Gatekeeper identifies the Developer ID publisher and opens the app without an **Open Anyway** workaround.
 3. Verify first launch, menu-bar-only behavior, Capture → Edit → Review & Apply explanation, permissions, and launch-at-login default-off/explicit opt-in.
-4. Verify an upgrade from the recorded latest installable predecessor build preserves current profiles, settings, selection, backups, and the login-item consent boundary. Record both build numbers and hashes. For the first public beta only, the row may be not applicable when the closed inventory/lineage contains no retained `development-installed`, `protected-beta`, or `published` predecessor; clean install and schema migration remain mandatory.
+4. Verify the mandatory upgrade from the exact retained protected-beta `v0.0.9` build 1 to the exact final `v0.1.0` build 2. Browser-download and verify both origin artifacts, and prove that schema-1 profiles, settings, selection, backups, and the login-item consent boundary are preserved. Record both manifests, DMG/provenance hashes, origin identities, and quarantine evidence. There is no not-applicable variant.
 5. Verify a synthetic schema-0 document migrates to schema 1, remains semantically valid, and preserves a recoverable last-known-good backup without applying a system setting.
 6. With the app closed and only synthetic data present, exercise primary-file corruption and verify last-known-good backup recovery, quarantine behavior, and a clean relaunch. Do not upload raw profiles or diagnostics.
 7. Verify import replacement/no-overwrite export, diagnostics browse/refresh/clear, and denial isolation with redacted or synthetic values.
@@ -288,12 +386,12 @@ For each public release, complete [the release evidence template](RELEASE-EVIDEN
 - tag, commit, app version, build number, clean-worktree status, and protected approval;
 - Xcode, Swift, SDK, runner macOS, supported CPU, and deployment target;
 - `make verify`, `make audit-public-release`, `git diff --check`, remote CI, and version/tag checks;
-- exact build/sign/package candidate lineage with no rebuild between stages;
+- exact build/sign/package lineage for both the protected `v0.0.9`/build-1 predecessor and final `v0.1.0`/build-2 candidate, with no rebuild within either origin;
 - Developer ID authority/Team ID, hardened runtime, secure timestamps, and reviewed entitlements;
 - notary submission ID, accepted status, redacted log, stapling, and app/DMG Gatekeeper assessments;
 - mounted package resources, checksum, SBOM, the three subject-specific attestation bundles, and exact nine-asset re-download identity;
 - browser-download and extracted-DMG quarantine evidence, clean first launch, login default-off, upgrade, schema migration, backup recovery, import/export, diagnostics, uninstall, and optional local-data removal as separate results;
-- an actual-byte candidate inventory, closed predecessor lineage, three actual-byte-bound external beta reports, their protected independence-review set, identical final DMG/provenance identity, zero public P0/P1 issues, and confidential security-responder zero-blocker sign-off;
+- both annotated tag objects and peeled commits; predecessor-pre-tag, final-pre-tag, and pre-publication v3 evidence digests; both distinct attempt-1 origin run/artifact identities; an actual-byte candidate inventory and predecessor lineage; actual predecessor manifest/DMG/provenance/boundary files; three actual-byte-bound external beta reports with mandatory predecessor acquisition/upgrade; their protected independence-review set; identical final DMG/provenance identity; zero public P0/P1 issues; and confidential security-responder zero-blocker sign-off;
 - capability claims matched to the support matrix, with no Intel, hardware-mutation, or VoiceOver certification overclaim;
 - GitHub Release URL plus synchronized site, README, English/Korean notes, and support/security documents; and
 - immutable releases enabled before publication;

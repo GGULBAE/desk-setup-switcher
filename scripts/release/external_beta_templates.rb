@@ -1,25 +1,18 @@
 # frozen_string_literal: true
 
 module DeskSetupExternalBetaTemplates
-  REPORT_SCHEMA = "desk-setup-switcher.external-beta/v1"
-  SET_SCHEMA = "desk-setup-switcher.external-beta-set/v1"
+  REPORT_SCHEMA = "desk-setup-switcher.external-beta/v2"
+  SET_SCHEMA = "desk-setup-switcher.external-beta-set/v2"
   INVENTORY_SCHEMA = "desk-setup-switcher.candidate-inventory/v1"
-  LINEAGE_SCHEMA = "desk-setup-switcher.predecessor-lineage/v2"
+  LINEAGE_SCHEMA = "desk-setup-switcher.predecessor-lineage/v3"
   REPORT_CODES = %w[beta-01 beta-02 beta-03].freeze
   TEMPLATE_KINDS = %w[
-    candidate-inventory-empty
     candidate-inventory-retained
-    candidate-inventory-not-retained
-    predecessor-lineage-none
     predecessor-lineage-recorded
-    external-beta-report-none
     external-beta-report-recorded
     external-beta-set
   ].freeze
-  REPORT_TEMPLATE_KINDS = %w[
-    external-beta-report-none
-    external-beta-report-recorded
-  ].freeze
+  REPORT_TEMPLATE_KINDS = %w[external-beta-report-recorded].freeze
   COVERAGE_ROLES = %w[sonoma-full-lifecycle additional-apple-silicon].freeze
   REJECTED_PLACEHOLDER_PREFIX = "<REJECTED_TEMPLATE:REPLACE_REQUIRED:".freeze
 
@@ -32,10 +25,10 @@ module DeskSetupExternalBetaTemplates
   def placeholder_candidate
     {
       "repository" => placeholder("repository-owner-and-name"),
-      "tag" => placeholder("release-tag"),
+      "tag" => "v0.1.0",
       "commit" => placeholder("40-character-lowercase-commit"),
-      "version" => "0.0.0",
-      "buildNumber" => 0,
+      "version" => "0.1.0",
+      "buildNumber" => 2,
       "bundleIdentifier" => placeholder("bundle-identifier"),
       "profileSchemaVersion" => 0,
       "candidateOriginRunId" => 0,
@@ -49,56 +42,61 @@ module DeskSetupExternalBetaTemplates
 
   def placeholder_report_subject
     placeholder_candidate.merge(
-      "finalDMGName" => "Desk-Setup-Switcher-0.0.0.dmg",
-      "provenanceBundleName" => "Desk-Setup-Switcher-0.0.0.provenance.sigstore.json",
+      "finalDMGName" => "Desk-Setup-Switcher-0.1.0.dmg",
+      "provenanceBundleName" => "Desk-Setup-Switcher-0.1.0.provenance.sigstore.json",
       "provenanceBundleSHA256" => placeholder("provenance-bundle-sha256"),
       "provenanceSubjectSHA256" => placeholder("provenance-subject-sha256"),
       "predecessorLineageSHA256" => placeholder("predecessor-lineage-sha256")
     )
   end
 
-  def placeholder_inventory_item(outcome)
-    common = {
-      "outcome" => outcome,
-      "version" => "0.0.0",
-      "buildNumber" => 0,
-      "commit" => placeholder("historical-40-character-lowercase-commit"),
+  def placeholder_inventory_item
+    {
+      "outcome" => "retained",
+      "version" => "0.0.9",
+      "buildNumber" => 1,
+      "commit" => placeholder("predecessor-40-character-lowercase-commit"),
       "candidateOriginRunId" => 0,
       "candidateOriginRunAttempt" => 1,
-      "runConclusion" => placeholder("historical-run-conclusion"),
-      "completedAt" => placeholder("historical-completed-at-utc"),
-      "distributionState" => outcome == "retained" ?
-        placeholder("historical-distribution-state") : "not-distributed"
-    }
-    return common.merge(
+      "runConclusion" => "success",
+      "completedAt" => placeholder("predecessor-completed-at-utc"),
+      "distributionState" => "protected-beta",
       "candidateArtifactId" => 0,
-      "candidateArtifactSHA256" => placeholder("historical-candidate-artifact-sha256"),
-      "finalDMGSHA256" => placeholder("historical-final-dmg-sha256"),
-      "releaseManifestSHA256" => placeholder("historical-release-manifest-sha256")
-    ) if outcome == "retained"
+      "candidateArtifactSHA256" => placeholder("predecessor-candidate-artifact-sha256"),
+      "finalDMGSHA256" => placeholder("predecessor-final-dmg-sha256"),
+      "releaseManifestSHA256" => placeholder("predecessor-release-manifest-sha256")
+    }
+  end
 
-    common.merge("reason" => placeholder("historical-non-retention-reason"))
+  def placeholder_acquisition(prefix = nil)
+    label = prefix ? "#{prefix}-quarantine-evidence-sha256" : "quarantine-evidence-sha256"
+    {
+      "channel" => "protected-workflow-browser",
+      "browserDownloaded" => false,
+      "normalArchiveExtraction" => false,
+      "quarantinePresent" => false,
+      "quarantineManufactured" => false,
+      "quarantineRemoved" => false,
+      "quarantineEvidenceSHA256" => placeholder(label),
+      "checksumPass" => false,
+      "provenancePass" => false,
+      "gatekeeperPass" => false,
+      "openAnywayUsed" => false
+    }
   end
 
   def inventory(kind)
-    items = case kind
-            when "candidate-inventory-empty"
-              []
-            when "candidate-inventory-retained"
-              [placeholder_inventory_item("retained")]
-            when "candidate-inventory-not-retained"
-              [placeholder_inventory_item("not-retained")]
-            else
-              raise ArgumentError, "invalid inventory template kind"
-            end
+    raise ArgumentError, "invalid inventory template kind" unless kind == "candidate-inventory-retained"
+
+    items = [placeholder_inventory_item]
     {
       "schemaVersion" => INVENTORY_SCHEMA,
       "subject" => {
         "repository" => placeholder("repository-owner-and-name"),
-        "workflowPath" => ".github/workflows/release.yml",
+        "workflowPath" => ".github/workflows/signed-release-candidate.yml",
         "operation" => "build-candidate",
         "currentCandidateRunId" => 0,
-        "currentCandidateBuildNumber" => 0
+        "currentCandidateBuildNumber" => 2
       },
       "collection" => {
         "collectedAt" => placeholder("inventory-collected-at-utc"),
@@ -114,27 +112,27 @@ module DeskSetupExternalBetaTemplates
 
   def lineage(kind)
     upgrade = case kind
-              when "predecessor-lineage-none"
-                {
-                  "state" => "none",
-                  "reason" => "first-public-beta-no-installable-predecessor",
-                  "candidateInventorySHA256" => placeholder("candidate-inventory-sha256"),
-                  "cleanInstallEvidenceSHA256" => placeholder("clean-install-evidence-sha256"),
-                  "schema0MigrationEvidenceSHA256" => placeholder("schema0-migration-evidence-sha256")
-                }
               when "predecessor-lineage-recorded"
                 {
                   "state" => "recorded",
-                  "distributionKind" => placeholder("predecessor-distribution-kind"),
+                  "distributionKind" => "protected-beta",
                   "bundleIdentifier" => placeholder("bundle-identifier"),
-                  "version" => "0.0.0",
-                  "buildNumber" => 0,
+                  "version" => "0.0.9",
+                  "tag" => "v0.0.9",
+                  "buildNumber" => 1,
                   "profileSchemaVersion" => 0,
                   "sourceCommit" => placeholder("predecessor-40-character-lowercase-commit"),
-                  "artifactName" => "Desk-Setup-Switcher-0.0.0.dmg",
+                  "candidateOriginRunId" => 0,
+                  "candidateOriginRunAttempt" => 1,
+                  "candidateArtifactId" => 0,
+                  "candidateArtifactSHA256" => placeholder("predecessor-candidate-artifact-sha256"),
+                  "artifactName" => "Desk-Setup-Switcher-0.0.9.dmg",
                   "finalDMGSHA256" => placeholder("predecessor-final-dmg-sha256"),
-                  "identityEvidenceSHA256" => placeholder("predecessor-identity-evidence-sha256"),
-                  "installEvidenceSHA256" => placeholder("predecessor-install-evidence-sha256")
+                  "releaseManifestSHA256" => placeholder("predecessor-release-manifest-sha256"),
+                  "provenanceBundleName" => "Desk-Setup-Switcher-0.0.9.provenance.sigstore.json",
+                  "provenanceBundleSHA256" => placeholder("predecessor-provenance-bundle-sha256"),
+                  "provenanceSubjectSHA256" => placeholder("predecessor-provenance-subject-sha256"),
+                  "releaseBoundaryEvidenceSHA256" => placeholder("predecessor-release-boundary-evidence-sha256")
                 }
               else
                 raise ArgumentError, "invalid lineage template kind"
@@ -148,23 +146,22 @@ module DeskSetupExternalBetaTemplates
   end
 
   def report(kind, report_code, coverage_role)
-    upgrade = if kind == "external-beta-report-none"
-                {
-                  "state" => "not-applicable",
-                  "reason" => "first-public-beta-no-installable-predecessor"
-                }
-              else
-                {
-                  "state" => "pending",
-                  "predecessorBuildNumber" => 0,
-                  "predecessorFinalDMGSHA256" => placeholder("predecessor-final-dmg-sha256"),
-                  "profilesPreserved" => false,
-                  "settingsPreserved" => false,
-                  "selectionPreserved" => false,
-                  "backupsPreserved" => false,
-                  "loginItemConsentPreserved" => false
-                }
-              end
+    raise ArgumentError, "invalid report template kind" unless kind == "external-beta-report-recorded"
+
+    upgrade = {
+      "state" => "pending",
+      "predecessorVersion" => "0.0.9",
+      "predecessorBuildNumber" => 1,
+      "predecessorFinalDMGSHA256" => placeholder("predecessor-final-dmg-sha256"),
+      "predecessorReleaseManifestSHA256" => placeholder("predecessor-release-manifest-sha256"),
+      "predecessorProvenanceBundleSHA256" => placeholder("predecessor-provenance-bundle-sha256"),
+      "predecessorAcquisition" => placeholder_acquisition("predecessor"),
+      "profilesPreserved" => false,
+      "settingsPreserved" => false,
+      "selectionPreserved" => false,
+      "backupsPreserved" => false,
+      "loginItemConsentPreserved" => false
+    }
     {
       "schemaVersion" => REPORT_SCHEMA,
       "report" => {
@@ -187,19 +184,7 @@ module DeskSetupExternalBetaTemplates
         "noRepositoryWriteAccess" => false,
         "noReleaseSecretAccess" => false
       },
-      "acquisition" => {
-        "channel" => "protected-workflow-browser",
-        "browserDownloaded" => false,
-        "normalArchiveExtraction" => false,
-        "quarantinePresent" => false,
-        "quarantineManufactured" => false,
-        "quarantineRemoved" => false,
-        "quarantineEvidenceSHA256" => placeholder("quarantine-evidence-sha256"),
-        "checksumPass" => false,
-        "provenancePass" => false,
-        "gatekeeperPass" => false,
-        "openAnywayUsed" => false
-      },
+      "acquisition" => placeholder_acquisition,
       "lifecycle" => {
         "firstLaunchPass" => false,
         "loginItemDefaultOffPass" => false,

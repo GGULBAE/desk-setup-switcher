@@ -8,10 +8,17 @@ require "time"
 require_relative "release_policy"
 
 module DeskSetupExternalBetaPolicy
-  REPORT_SCHEMA = "desk-setup-switcher.external-beta/v1"
-  SET_SCHEMA = "desk-setup-switcher.external-beta-set/v1"
+  REPORT_SCHEMA = "desk-setup-switcher.external-beta/v2"
+  SET_SCHEMA = "desk-setup-switcher.external-beta-set/v2"
   INVENTORY_SCHEMA = "desk-setup-switcher.candidate-inventory/v1"
-  LINEAGE_SCHEMA = "desk-setup-switcher.predecessor-lineage/v2"
+  LINEAGE_SCHEMA = "desk-setup-switcher.predecessor-lineage/v3"
+  REMOTE_BOUNDARY_SCHEMA = "desk-setup-switcher.remote-release-controls-evidence/v3"
+  CURRENT_VERSION = "0.1.0"
+  CURRENT_TAG = "v0.1.0"
+  CURRENT_BUILD_NUMBER = 2
+  PREDECESSOR_VERSION = "0.0.9"
+  PREDECESSOR_TAG = "v0.0.9"
+  PREDECESSOR_BUILD_NUMBER = 1
   REPORT_CODES = %w[beta-01 beta-02 beta-03].freeze
   COVERAGE_ROLES = %w[sonoma-full-lifecycle additional-apple-silicon].freeze
   REJECTED_PLACEHOLDER_PREFIX = "<REJECTED_TEMPLATE:REPLACE_REQUIRED:".freeze
@@ -22,6 +29,8 @@ module DeskSetupExternalBetaPolicy
   MAX_JSON_BYTES = 262_144
   MAX_MANIFEST_BYTES = 16 * 1024 * 1024
   MAX_PROVENANCE_BYTES = 16 * 1024 * 1024
+  MAX_REMOTE_BOUNDARY_BYTES = 4 * 1024 * 1024
+  MAX_DMG_BYTES = 2 * 1024 * 1024 * 1024
 
   class PolicyError < StandardError; end
 
@@ -164,6 +173,39 @@ module DeskSetupExternalBetaPolicy
     raise PolicyError, "#{label} is unavailable or invalid"
   end
 
+  def read_exact_identity(path, label, max_bytes:)
+    path_stat = File.lstat(path)
+    fail_policy!("#{label} is not a regular file") unless path_stat.file? && !path_stat.symlink?
+    flags = File::RDONLY
+    flags |= File::NOFOLLOW if defined?(File::NOFOLLOW)
+    identity = nil
+    opened_identity = nil
+    File.open(path, flags) do |file|
+      before = file.stat
+      fail_policy!("#{label} descriptor is not a regular file") unless before.file?
+      fail_policy!("#{label} has an unsafe link count") unless before.nlink == 1
+      fail_policy!("#{label} path identity differs") unless
+        [before.dev, before.ino] == [path_stat.dev, path_stat.ino]
+      fail_policy!("#{label} is empty or too large") unless before.size.positive? && before.size <= max_bytes
+      before_identity = descriptor_identity(before)
+      digest = Digest::SHA256.new
+      size = 0
+      while (chunk = file.read(1024 * 1024))
+        digest.update(chunk)
+        size += chunk.bytesize
+      end
+      opened_identity = descriptor_identity(file.stat)
+      fail_policy!("#{label} changed during descriptor-bound read") unless opened_identity == before_identity
+      fail_policy!("#{label} changed size during read") unless size == before.size
+      identity = { "sha256" => digest.hexdigest, "size" => size }
+    end
+    after_path = File.lstat(path)
+    fail_policy!("#{label} path changed during read") unless descriptor_identity(after_path) == opened_identity
+    identity
+  rescue Errno::ENOENT, Errno::EACCES, Errno::EISDIR, Errno::ELOOP
+    raise PolicyError, "#{label} is unavailable or invalid"
+  end
+
   def read_strict_json(path, label, max_bytes: MAX_JSON_BYTES)
     bytes, digest = read_exact_bytes(path, label, max_bytes: max_bytes)
     text = bytes.dup.force_encoding(Encoding::UTF_8)
@@ -257,7 +299,7 @@ module DeskSetupExternalBetaPolicy
     candidate = expected.fetch(:candidate)
     expected_subject = {
       "repository" => candidate.fetch("repository"),
-      "workflowPath" => ".github/workflows/release.yml",
+      "workflowPath" => ".github/workflows/signed-release-candidate.yml",
       "operation" => "build-candidate",
       "currentCandidateRunId" => candidate.fetch("candidateOriginRunId"),
       "currentCandidateBuildNumber" => candidate.fetch("buildNumber")
@@ -292,6 +334,10 @@ module DeskSetupExternalBetaPolicy
     fail_policy!("candidate inventory is not strictly build-sorted") unless
       builds == builds.sort && builds.uniq == builds
     current_build = candidate.fetch("buildNumber")
+    fail_policy!("current candidate version differs from the fixed public beta") unless
+      candidate.fetch("version") == CURRENT_VERSION && candidate.fetch("tag") == CURRENT_TAG
+    fail_policy!("current candidate build differs from the fixed public beta") unless
+      current_build == CURRENT_BUILD_NUMBER
     fail_policy!("candidate inventory reuses or exceeds the current build") unless
       builds.all? { |build| build < current_build }
     run_ids = items.map { |item| item.dig(:data, "candidateOriginRunId") } +
@@ -306,10 +352,24 @@ module DeskSetupExternalBetaPolicy
       identities = retained.map { |item| item.dig(:data, name) } + [candidate.fetch(name)]
       fail_policy!("candidate inventory reuses candidate identity") unless identities.uniq.length == identities.length
     end
+    installable = retained.map { |item| item.fetch(:data) }.reject do |item|
+      item.fetch("distributionState") == "not-distributed"
+    end
+    fail_policy!("the fixed public beta requires exactly one installable predecessor") unless
+      installable.length == 1
+    predecessor = installable.first
+    fail_policy!("the fixed predecessor identity differs") unless
+      predecessor.fetch("version") == PREDECESSOR_VERSION &&
+      predecessor.fetch("buildNumber") == PREDECESSOR_BUILD_NUMBER &&
+      predecessor.fetch("distributionState") == "protected-beta"
     {
       inventory: inventory,
       items: items,
       retained: retained,
+      predecessor: predecessor,
+      predecessor_completed_at: items.find do |item|
+        item.fetch(:data).equal?(predecessor)
+      end.fetch(:completed_at),
       reviewed_at: reviewed_at,
       current_build: current_build
     }
@@ -330,76 +390,232 @@ module DeskSetupExternalBetaPolicy
     fail_policy!("lineage candidate inventory digest differs") unless
       lineage["candidateInventorySHA256"] == inventory_sha256
 
-    upgrade = lineage["upgradePredecessor"]
-    fail_policy!("upgrade predecessor is not an object") unless upgrade.is_a?(Hash)
-    installable = inventory_result.fetch(:retained).map { |item| item.fetch(:data) }.reject do |item|
-      item.fetch("distributionState") == "not-distributed"
+    upgrade = exact_object(
+      lineage["upgradePredecessor"],
+      "recorded upgrade predecessor",
+      %w[
+        state distributionKind bundleIdentifier version tag buildNumber profileSchemaVersion
+        sourceCommit candidateOriginRunId candidateOriginRunAttempt candidateArtifactId
+        candidateArtifactSHA256 artifactName finalDMGSHA256 releaseManifestSHA256
+        provenanceBundleName provenanceBundleSHA256 provenanceSubjectSHA256
+        releaseBoundaryEvidenceSHA256
+      ]
+    )
+    fail_policy!("upgrade predecessor state differs") unless upgrade["state"] == "recorded"
+    fail_policy!("upgrade predecessor distribution kind differs") unless
+      upgrade["distributionKind"] == "protected-beta"
+    fail_policy!("upgrade predecessor bundle identifier differs") unless
+      upgrade["bundleIdentifier"] == expected.dig(:candidate, "bundleIdentifier")
+    exact_version(upgrade["version"], "upgrade predecessor version")
+    fail_policy!("upgrade predecessor version or tag differs") unless
+      upgrade["version"] == PREDECESSOR_VERSION && upgrade["tag"] == PREDECESSOR_TAG
+    predecessor_build = exact_positive_integer(upgrade["buildNumber"], "upgrade predecessor build")
+    fail_policy!("upgrade predecessor build differs") unless predecessor_build == PREDECESSOR_BUILD_NUMBER
+    exact_nonnegative_integer(upgrade["profileSchemaVersion"], "upgrade predecessor profile schema")
+    exact_commit(upgrade["sourceCommit"], "upgrade predecessor source commit")
+    exact_positive_integer(upgrade["candidateOriginRunId"], "upgrade predecessor run ID")
+    fail_policy!("upgrade predecessor origin attempt differs") unless
+      upgrade["candidateOriginRunAttempt"].is_a?(Integer) &&
+      upgrade["candidateOriginRunAttempt"] == 1
+    exact_positive_integer(upgrade["candidateArtifactId"], "upgrade predecessor artifact ID")
+    artifact_name = exact_artifact_name(
+      upgrade["artifactName"],
+      "upgrade predecessor artifact",
+      suffix: ".dmg"
+    )
+    fail_policy!("upgrade predecessor artifact name differs") unless
+      artifact_name == "Desk-Setup-Switcher-#{PREDECESSOR_VERSION}.dmg"
+    provenance_name = exact_artifact_name(
+      upgrade["provenanceBundleName"],
+      "upgrade predecessor provenance bundle",
+      suffix: ".provenance.sigstore.json"
+    )
+    fail_policy!("upgrade predecessor provenance bundle name differs") unless
+      provenance_name == "Desk-Setup-Switcher-#{PREDECESSOR_VERSION}.provenance.sigstore.json"
+    %w[
+      candidateArtifactSHA256 finalDMGSHA256 releaseManifestSHA256
+      provenanceBundleSHA256 provenanceSubjectSHA256 releaseBoundaryEvidenceSHA256
+    ].each do |name|
+      exact_sha256(upgrade[name], "upgrade predecessor #{name}")
     end
-    case upgrade["state"]
-    when "none"
-      exact_object(
-        upgrade,
-        "absent upgrade predecessor",
-        %w[state reason candidateInventorySHA256 cleanInstallEvidenceSHA256 schema0MigrationEvidenceSHA256]
-      )
-      fail_policy!("upgrade predecessor absence reason differs") unless
-        upgrade["reason"] == "first-public-beta-no-installable-predecessor"
-      %w[candidateInventorySHA256 cleanInstallEvidenceSHA256 schema0MigrationEvidenceSHA256].each do |name|
-        exact_sha256(upgrade[name], "absent upgrade predecessor #{name}")
+    fail_policy!("upgrade predecessor provenance subject differs") unless
+      upgrade["provenanceSubjectSHA256"] == upgrade["finalDMGSHA256"]
+
+    predecessor = inventory_result.fetch(:predecessor)
+    expected_inventory_fields = {
+      "version" => "version",
+      "buildNumber" => "buildNumber",
+      "sourceCommit" => "commit",
+      "candidateOriginRunId" => "candidateOriginRunId",
+      "candidateOriginRunAttempt" => "candidateOriginRunAttempt",
+      "candidateArtifactId" => "candidateArtifactId",
+      "candidateArtifactSHA256" => "candidateArtifactSHA256",
+      "finalDMGSHA256" => "finalDMGSHA256",
+      "releaseManifestSHA256" => "releaseManifestSHA256"
+    }
+    fail_policy!("upgrade predecessor differs from the retained inventory item") unless
+      expected_inventory_fields.all? do |lineage_name, inventory_name|
+        upgrade.fetch(lineage_name) == predecessor.fetch(inventory_name)
       end
-      fail_policy!("upgrade predecessor inventory digest differs") unless
-        upgrade["candidateInventorySHA256"] == inventory_sha256
-      fail_policy!("an installable candidate requires an upgrade predecessor") unless installable.empty?
-    when "recorded"
-      exact_object(
-        upgrade,
-        "recorded upgrade predecessor",
-        %w[state distributionKind bundleIdentifier version buildNumber profileSchemaVersion sourceCommit artifactName finalDMGSHA256 identityEvidenceSHA256 installEvidenceSHA256]
-      )
-      kind = upgrade["distributionKind"]
-      unless %w[development-evidence protected-beta public-release].include?(kind)
-        fail_policy!("upgrade predecessor distribution kind is invalid")
-      end
-      fail_policy!("upgrade predecessor bundle identifier differs") unless
-        upgrade["bundleIdentifier"] == expected.dig(:candidate, "bundleIdentifier")
-      exact_version(upgrade["version"], "upgrade predecessor version")
-      predecessor_build = exact_positive_integer(upgrade["buildNumber"], "upgrade predecessor build")
-      fail_policy!("upgrade predecessor does not precede the candidate") unless
-        predecessor_build < inventory_result.fetch(:current_build)
-      exact_nonnegative_integer(upgrade["profileSchemaVersion"], "upgrade predecessor profile schema")
-      exact_commit(upgrade["sourceCommit"], "upgrade predecessor source commit")
-      artifact_name = exact_artifact_name(
-        upgrade["artifactName"],
-        "upgrade predecessor artifact",
-        suffix: ".dmg"
-      )
-      fail_policy!("upgrade predecessor artifact name differs") unless
-        artifact_name == "Desk-Setup-Switcher-#{upgrade.fetch('version')}.dmg"
-      %w[finalDMGSHA256 identityEvidenceSHA256 installEvidenceSHA256].each do |name|
-        exact_sha256(upgrade[name], "upgrade predecessor #{name}")
-      end
-      fail_policy!("recorded upgrade predecessor is absent from candidate inventory") if installable.empty?
-      latest = installable.max_by { |item| item.fetch("buildNumber") }
-      expected_kind = {
-        "development-installed" => "development-evidence",
-        "protected-beta" => "protected-beta",
-        "published" => "public-release"
-      }.fetch(latest.fetch("distributionState"))
-      fail_policy!("upgrade predecessor is not the latest installable candidate") unless
-        kind == expected_kind &&
-        predecessor_build == latest.fetch("buildNumber") &&
-        upgrade["version"] == latest.fetch("version") &&
-        upgrade["sourceCommit"] == latest.fetch("commit") &&
-        upgrade["finalDMGSHA256"] == latest.fetch("finalDMGSHA256")
-    else
-      fail_policy!("upgrade predecessor state is invalid")
-    end
 
     {
       lineage: lineage,
       observed_at: inventory_result.fetch(:reviewed_at),
       upgrade: upgrade
     }
+  end
+
+  def validate_release_boundary(path, upgrade, expected_tag_object, expected_pre_tag_digest)
+    boundary, digest = read_strict_json(
+      path,
+      "predecessor release boundary",
+      max_bytes: MAX_REMOTE_BOUNDARY_BYTES
+    )
+    exact_object(
+      boundary,
+      "predecessor release boundary",
+      %w[
+        actions anchorReads authenticatedViewer candidateWorkflow ci ciWorkflow collectedAt
+        environments finalPreTagEvidenceSHA256 labels legacyWorkflow manualEvidence phase
+        predecessorPreTagEvidenceSHA256 publicationWorkflow releaseBoundary repository
+        repositoryConfiguration rulesets schemaVersion security workflowInventory
+      ]
+    )
+    fail_policy!("predecessor release boundary schema differs") unless
+      boundary["schemaVersion"] == REMOTE_BOUNDARY_SCHEMA
+    fail_policy!("predecessor release boundary phase differs") unless boundary["phase"] == "final-pre-tag"
+    fail_policy!("predecessor release boundary has an unexpected final-pre-tag digest") unless
+      boundary["finalPreTagEvidenceSHA256"].nil?
+    fail_policy!("predecessor pre-tag evidence digest differs") unless
+      boundary["predecessorPreTagEvidenceSHA256"] == expected_pre_tag_digest
+    collected_at = exact_timestamp(boundary["collectedAt"], "predecessor release boundary collection time")
+    release_boundary = exact_object(
+      boundary["releaseBoundary"],
+      "predecessor release boundary state",
+      %w[releases vRefs]
+    )
+    refs = exact_object(
+      release_boundary["vRefs"],
+      "predecessor release boundary tag references",
+      %w[complete items]
+    )
+    exact_true(refs["complete"], "predecessor release boundary tag completeness")
+    ref = exact_array(refs["items"], "predecessor release boundary tag references", length: 1).first
+    exact_object(ref, "predecessor release boundary tag reference", %w[commitSha objectSha objectType ref])
+    exact_commit(ref["commitSha"], "predecessor release boundary peeled commit")
+    exact_commit(ref["objectSha"], "predecessor release boundary tag object")
+    fail_policy!("predecessor release boundary tag differs") unless ref == {
+      "ref" => "refs/tags/#{PREDECESSOR_TAG}",
+      "objectType" => "tag",
+      "objectSha" => expected_tag_object,
+      "commitSha" => upgrade.fetch("sourceCommit")
+    }
+    releases = exact_object(
+      release_boundary["releases"],
+      "predecessor GitHub Releases",
+      %w[complete items]
+    )
+    exact_true(releases["complete"], "predecessor GitHub Release completeness")
+    fail_policy!("a predecessor GitHub Release exists") unless
+      exact_array(releases["items"], "predecessor GitHub Releases").empty?
+    fail_policy!("predecessor release boundary digest differs") unless
+      digest == upgrade.fetch("releaseBoundaryEvidenceSHA256")
+    { digest: digest, collected_at: collected_at }
+  end
+
+  def validate_predecessor_materials(options, expected, inventory_result, lineage_result,
+                                     boundary_result, current_manifest_created_at)
+    manifest, manifest_sha256 = read_strict_json(
+      options.fetch(:predecessor_release_manifest),
+      "predecessor release manifest",
+      max_bytes: MAX_MANIFEST_BYTES
+    )
+    begin
+      ReleasePolicy.validate_release_manifest_data(manifest)
+    rescue ReleasePolicy::PolicyError
+      raise PolicyError, "predecessor release manifest is invalid"
+    end
+    upgrade = lineage_result.fetch(:upgrade)
+    predecessor = inventory_result.fetch(:predecessor)
+    fail_policy!("predecessor release manifest digest differs") unless
+      manifest_sha256 == upgrade.fetch("releaseManifestSHA256") &&
+      manifest_sha256 == predecessor.fetch("releaseManifestSHA256")
+
+    release = manifest.fetch("release")
+    repository = expected.dig(:candidate, "repository")
+    expected_namespace =
+      "https://github.com/#{repository}/release-evidence/#{PREDECESSOR_TAG}/#{upgrade.fetch('finalDMGSHA256')}"
+    expected_run_url =
+      "https://github.com/#{repository}/actions/runs/#{upgrade.fetch('candidateOriginRunId')}"
+    fail_policy!("predecessor release manifest identity differs") unless
+      release.fetch("version") == PREDECESSOR_VERSION &&
+      release.fetch("tag") == PREDECESSOR_TAG &&
+      release.fetch("commit") == upgrade.fetch("sourceCommit") &&
+      release.fetch("buildNumber") == PREDECESSOR_BUILD_NUMBER.to_s &&
+      release.fetch("namespace") == expected_namespace &&
+      release.dig("run", "id") == upgrade.fetch("candidateOriginRunId") &&
+      release.dig("run", "attempt") == 1 &&
+      release.dig("run", "url") == expected_run_url
+    fail_policy!("predecessor application bundle identifier differs") unless
+      manifest.dig("application", "bundleIdentifier") == upgrade.fetch("bundleIdentifier")
+
+    final_dmg = manifest.dig("lineage", "finalStapledDmg")
+    fail_policy!("predecessor manifest final DMG differs") unless
+      final_dmg.fetch("name") == upgrade.fetch("artifactName") &&
+      final_dmg.fetch("sha256") == upgrade.fetch("finalDMGSHA256")
+    dmg_identity = read_exact_identity(
+      options.fetch(:predecessor_dmg),
+      "predecessor final DMG",
+      max_bytes: MAX_DMG_BYTES
+    )
+    fail_policy!("predecessor final DMG path name differs") unless
+      File.basename(options.fetch(:predecessor_dmg)) == upgrade.fetch("artifactName")
+    fail_policy!("predecessor final DMG bytes differ") unless
+      dmg_identity["sha256"] == final_dmg.fetch("sha256") &&
+      dmg_identity["size"] == final_dmg.fetch("size")
+
+    provenance_identity = read_exact_identity(
+      options.fetch(:predecessor_provenance_bundle),
+      "predecessor final DMG provenance bundle",
+      max_bytes: MAX_PROVENANCE_BYTES
+    )
+    fail_policy!("predecessor provenance bundle path name differs") unless
+      File.basename(options.fetch(:predecessor_provenance_bundle)) == upgrade.fetch("provenanceBundleName")
+    fail_policy!("predecessor provenance bundle bytes differ") unless
+      provenance_identity["sha256"] == upgrade.fetch("provenanceBundleSHA256")
+    fail_policy!("predecessor provenance subject differs") unless
+      upgrade.fetch("provenanceSubjectSHA256") == dmg_identity["sha256"]
+
+    predecessor_created_at = exact_timestamp(release.fetch("created"), "predecessor manifest creation time")
+    boundary_time = boundary_result.fetch(:collected_at)
+    fail_policy!("predecessor release boundary predates predecessor evidence") unless
+      inventory_result.fetch(:predecessor_completed_at) <= boundary_time &&
+      predecessor_created_at <= boundary_time
+    fail_policy!("predecessor release boundary does not precede the final candidate") unless
+      boundary_time < current_manifest_created_at
+    {
+      release_manifest_sha256: manifest_sha256,
+      final_dmg_sha256: dmg_identity.fetch("sha256"),
+      provenance_sha256: provenance_identity.fetch("sha256"),
+      boundary_sha256: boundary_result.fetch(:digest)
+    }
+  end
+
+  def validate_acquisition(acquisition, label)
+    acquisition = exact_object(
+      acquisition,
+      label,
+      %w[channel browserDownloaded normalArchiveExtraction quarantinePresent quarantineManufactured quarantineRemoved quarantineEvidenceSHA256 checksumPass provenancePass gatekeeperPass openAnywayUsed]
+    )
+    fail_policy!("#{label} channel differs") unless acquisition["channel"] == "protected-workflow-browser"
+    %w[browserDownloaded normalArchiveExtraction quarantinePresent checksumPass provenancePass gatekeeperPass].each do |name|
+      exact_true(acquisition[name], "#{label} #{name}")
+    end
+    %w[quarantineManufactured quarantineRemoved openAnywayUsed].each do |name|
+      exact_false(acquisition[name], "#{label} #{name}")
+    end
+    exact_sha256(acquisition["quarantineEvidenceSHA256"], "#{label} quarantine evidence digest")
+    acquisition
   end
 
   def validate_environment(environment)
@@ -452,19 +668,7 @@ module DeskSetupExternalBetaPolicy
     )
     independence.each { |name, value| exact_true(value, "beta independence #{name}") }
 
-    acquisition = exact_object(
-      report["acquisition"],
-      "beta acquisition",
-      %w[channel browserDownloaded normalArchiveExtraction quarantinePresent quarantineManufactured quarantineRemoved quarantineEvidenceSHA256 checksumPass provenancePass gatekeeperPass openAnywayUsed]
-    )
-    fail_policy!("beta acquisition channel differs") unless acquisition["channel"] == "protected-workflow-browser"
-    %w[browserDownloaded normalArchiveExtraction quarantinePresent checksumPass provenancePass gatekeeperPass].each do |name|
-      exact_true(acquisition[name], "beta acquisition #{name}")
-    end
-    %w[quarantineManufactured quarantineRemoved openAnywayUsed].each do |name|
-      exact_false(acquisition[name], "beta acquisition #{name}")
-    end
-    exact_sha256(acquisition["quarantineEvidenceSHA256"], "beta quarantine evidence digest")
+    validate_acquisition(report["acquisition"], "beta acquisition")
 
     lifecycle = exact_object(
       report["lifecycle"],
@@ -477,28 +681,34 @@ module DeskSetupExternalBetaPolicy
     exact_false(lifecycle["hardwareMutationPerformed"], "beta lifecycle hardware mutation")
     upgrade = lifecycle["upgrade"]
     lineage_upgrade = lineage_result.fetch(:upgrade)
-    if lineage_upgrade.fetch("state") == "none"
-      exact_object(upgrade, "beta upgrade result", %w[state reason])
-      fail_policy!("beta upgrade not-applicable result differs") unless
-        upgrade == {
-          "state" => "not-applicable",
-          "reason" => "first-public-beta-no-installable-predecessor"
-        }
-    else
-      exact_object(
-        upgrade,
-        "beta upgrade result",
-        %w[state predecessorBuildNumber predecessorFinalDMGSHA256 profilesPreserved settingsPreserved selectionPreserved backupsPreserved loginItemConsentPreserved]
-      )
-      fail_policy!("beta upgrade did not pass") unless upgrade["state"] == "passed"
-      exact_positive_integer(upgrade["predecessorBuildNumber"], "beta upgrade predecessor build")
-      fail_policy!("beta upgrade predecessor build differs") unless
-        upgrade["predecessorBuildNumber"] == lineage_upgrade["buildNumber"]
-      fail_policy!("beta upgrade predecessor digest differs") unless
-        upgrade["predecessorFinalDMGSHA256"] == lineage_upgrade["finalDMGSHA256"]
-      %w[profilesPreserved settingsPreserved selectionPreserved backupsPreserved loginItemConsentPreserved].each do |name|
-        exact_true(upgrade[name], "beta upgrade #{name}")
-      end
+    exact_object(
+      upgrade,
+      "beta upgrade result",
+      %w[
+        state predecessorVersion predecessorBuildNumber predecessorFinalDMGSHA256
+        predecessorReleaseManifestSHA256 predecessorProvenanceBundleSHA256
+        predecessorAcquisition profilesPreserved settingsPreserved selectionPreserved
+        backupsPreserved loginItemConsentPreserved
+      ]
+    )
+    fail_policy!("beta upgrade did not pass") unless upgrade["state"] == "passed"
+    exact_version(upgrade["predecessorVersion"], "beta upgrade predecessor version")
+    exact_positive_integer(upgrade["predecessorBuildNumber"], "beta upgrade predecessor build")
+    %w[
+      predecessorFinalDMGSHA256 predecessorReleaseManifestSHA256
+      predecessorProvenanceBundleSHA256
+    ].each do |name|
+      exact_sha256(upgrade[name], "beta upgrade #{name}")
+    end
+    fail_policy!("beta upgrade predecessor identity differs") unless
+      upgrade["predecessorVersion"] == lineage_upgrade["version"] &&
+      upgrade["predecessorBuildNumber"] == lineage_upgrade["buildNumber"] &&
+      upgrade["predecessorFinalDMGSHA256"] == lineage_upgrade["finalDMGSHA256"] &&
+      upgrade["predecessorReleaseManifestSHA256"] == lineage_upgrade["releaseManifestSHA256"] &&
+      upgrade["predecessorProvenanceBundleSHA256"] == lineage_upgrade["provenanceBundleSHA256"]
+    validate_acquisition(upgrade["predecessorAcquisition"], "beta predecessor acquisition")
+    %w[profilesPreserved settingsPreserved selectionPreserved backupsPreserved loginItemConsentPreserved].each do |name|
+      exact_true(upgrade[name], "beta upgrade #{name}")
     end
 
     issues = exact_object(
@@ -626,6 +836,11 @@ module DeskSetupExternalBetaPolicy
       max_bytes: MAX_PROVENANCE_BYTES
     )
     fail_policy!("final DMG provenance bundle is empty") if provenance_bytes.empty?
+    current_dmg_identity = read_exact_identity(
+      options.fetch(:final_dmg),
+      "final candidate DMG",
+      max_bytes: MAX_DMG_BYTES
+    )
 
     release = manifest.fetch("release")
     application = manifest.fetch("application")
@@ -643,9 +858,17 @@ module DeskSetupExternalBetaPolicy
     fail_policy!("release manifest final DMG differs") unless final_dmg["sha256"] == options.fetch(:final_dmg_sha256)
     build_number = parse_positive_integer(release.fetch("buildNumber"), "release manifest build number")
     version = release.fetch("version")
+    fail_policy!("release manifest does not identify the fixed public beta") unless
+      version == CURRENT_VERSION && options.fetch(:tag) == CURRENT_TAG &&
+      build_number == CURRENT_BUILD_NUMBER
     expected_dmg_name = "Desk-Setup-Switcher-#{version}.dmg"
     expected_provenance_name = "Desk-Setup-Switcher-#{version}.provenance.sigstore.json"
     fail_policy!("release manifest final DMG name differs") unless final_dmg["name"] == expected_dmg_name
+    fail_policy!("final candidate DMG path name differs") unless
+      File.basename(options.fetch(:final_dmg)) == expected_dmg_name
+    fail_policy!("final candidate DMG bytes differ") unless
+      current_dmg_identity["sha256"] == final_dmg["sha256"] &&
+      current_dmg_identity["size"] == final_dmg["size"]
     manifest_created_at = exact_timestamp(release["created"], "release manifest creation time")
 
     candidate = {
@@ -671,6 +894,20 @@ module DeskSetupExternalBetaPolicy
     inventory_result = validate_inventory(inventory, expected, manifest_created_at)
     lineage, lineage_sha256 = read_strict_json(options.fetch(:predecessor_lineage), "predecessor lineage")
     lineage_result = validate_lineage(lineage, expected, inventory_result, inventory_sha256)
+    boundary_result = validate_release_boundary(
+      options.fetch(:predecessor_release_boundary),
+      lineage_result.fetch(:upgrade),
+      options.fetch(:predecessor_tag_object),
+      options.fetch(:predecessor_pre_tag_evidence_sha256)
+    )
+    predecessor_materials = validate_predecessor_materials(
+      options,
+      expected,
+      inventory_result,
+      lineage_result,
+      boundary_result,
+      manifest_created_at
+    )
     report_subject = candidate.merge(
       "finalDMGName" => expected_dmg_name,
       "provenanceBundleName" => expected_provenance_name,
@@ -699,6 +936,10 @@ module DeskSetupExternalBetaPolicy
       lineage_sha256: lineage_sha256,
       release_manifest_sha256: manifest_sha256,
       provenance_sha256: provenance_sha256,
+      predecessor_release_manifest_sha256: predecessor_materials.fetch(:release_manifest_sha256),
+      predecessor_final_dmg_sha256: predecessor_materials.fetch(:final_dmg_sha256),
+      predecessor_provenance_sha256: predecessor_materials.fetch(:provenance_sha256),
+      predecessor_release_boundary_sha256: predecessor_materials.fetch(:boundary_sha256),
       sonoma_code: set_result.fetch(:sonoma_code),
       set_created_at: set_result.fetch(:created_at).utc.iso8601,
       build_number: build_number
@@ -710,7 +951,16 @@ module DeskSetupExternalBetaPolicy
     parser = OptionParser.new do |value|
       value.banner = "Usage: external_beta_policy.rb verify-set [options]"
       value.on("--release-manifest FILE") { |item| options[:release_manifest] = item }
+      value.on("--final-dmg FILE") { |item| options[:final_dmg] = item }
       value.on("--provenance-bundle FILE") { |item| options[:provenance_bundle] = item }
+      value.on("--predecessor-release-manifest FILE") { |item| options[:predecessor_release_manifest] = item }
+      value.on("--predecessor-provenance-bundle FILE") { |item| options[:predecessor_provenance_bundle] = item }
+      value.on("--predecessor-dmg FILE") { |item| options[:predecessor_dmg] = item }
+      value.on("--predecessor-release-boundary FILE") { |item| options[:predecessor_release_boundary] = item }
+      value.on("--predecessor-tag-object SHA") { |item| options[:predecessor_tag_object] = item }
+      value.on("--predecessor-pre-tag-evidence-sha256 SHA") do |item|
+        options[:predecessor_pre_tag_evidence_sha256] = item
+      end
       value.on("--candidate-inventory FILE") { |item| options[:candidate_inventory] = item }
       value.on("--predecessor-lineage FILE") { |item| options[:predecessor_lineage] = item }
       value.on("--set-manifest FILE") { |item| options[:set_manifest] = item }
@@ -727,13 +977,25 @@ module DeskSetupExternalBetaPolicy
     end
     parser.parse!(argv)
     fail_policy!("unexpected arguments") unless argv.empty?
-    required = %i[release_manifest provenance_bundle candidate_inventory predecessor_lineage set_manifest repository tag commit candidate_run_id candidate_artifact_id candidate_artifact_sha256 final_dmg_sha256 profile_schema_version]
+    required = %i[
+      release_manifest final_dmg provenance_bundle predecessor_release_manifest
+      predecessor_provenance_bundle predecessor_dmg predecessor_release_boundary
+      predecessor_tag_object predecessor_pre_tag_evidence_sha256 candidate_inventory
+      predecessor_lineage set_manifest repository tag commit
+      candidate_run_id candidate_artifact_id candidate_artifact_sha256 final_dmg_sha256
+      profile_schema_version
+    ]
     fail_policy!("required external beta inputs are missing") unless required.all? { |name| options.key?(name) }
     fail_policy!("exactly three external beta reports are required") unless options.fetch(:reports).length == 3
     exact_string(options.fetch(:repository), "expected repository")
     fail_policy!("expected repository is invalid") unless REPOSITORY.match?(options.fetch(:repository))
     exact_string(options.fetch(:tag), "expected tag")
     exact_commit(options.fetch(:commit), "expected release commit")
+    exact_commit(options.fetch(:predecessor_tag_object), "expected predecessor tag object")
+    exact_sha256(
+      options.fetch(:predecessor_pre_tag_evidence_sha256),
+      "expected predecessor pre-tag evidence digest"
+    )
     options[:candidate_run_id] = parse_positive_integer(options.fetch(:candidate_run_id), "expected candidate run ID")
     options[:candidate_artifact_id] = parse_positive_integer(options.fetch(:candidate_artifact_id), "expected candidate artifact ID")
     options[:profile_schema_version] = parse_positive_integer(options.fetch(:profile_schema_version), "expected profile schema version")
@@ -745,11 +1007,15 @@ module DeskSetupExternalBetaPolicy
       sonoma_index = REPORT_CODES.index(result.fetch(:sonoma_code))
       puts JSON.generate(
         {
-          "schemaVersion" => "desk-setup-switcher.external-beta-verification/v2",
+          "schemaVersion" => "desk-setup-switcher.external-beta-verification/v3",
           "releaseManifestSHA256" => result.fetch(:release_manifest_sha256),
           "finalDMGProvenanceSHA256" => result.fetch(:provenance_sha256),
           "candidateInventorySHA256" => result.fetch(:inventory_sha256),
           "predecessorLineageSHA256" => result.fetch(:lineage_sha256),
+          "predecessorReleaseManifestSHA256" => result.fetch(:predecessor_release_manifest_sha256),
+          "predecessorFinalDMGSHA256" => result.fetch(:predecessor_final_dmg_sha256),
+          "predecessorFinalDMGProvenanceSHA256" => result.fetch(:predecessor_provenance_sha256),
+          "predecessorReleaseBoundarySHA256" => result.fetch(:predecessor_release_boundary_sha256),
           "externalBetaSetSHA256" => result.fetch(:set_sha256),
           "externalBetaReportSHA256" => result.fetch(:report_digests),
           "sonomaGateReportCode" => result.fetch(:sonoma_code),

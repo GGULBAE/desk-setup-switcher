@@ -45,7 +45,7 @@
       "releaseWorkflow": {
         "id": 7001,
         "name": "Signed release candidate",
-        "path": ".github/workflows/release.yml",
+        "path": ".github/workflows/signed-release-candidate.yml",
         "state": "active",
         "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "triggers": [
@@ -74,7 +74,7 @@
       "releaseWorkflow": {
         "id": 7001,
         "name": "Signed release candidate",
-        "path": ".github/workflows/release.yml",
+        "path": ".github/workflows/signed-release-candidate.yml",
         "state": "active",
         "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "triggers": [
@@ -98,7 +98,7 @@
   "workflow": {
     "id": 7001,
     "name": "Signed release candidate",
-    "path": ".github/workflows/release.yml",
+    "path": ".github/workflows/signed-release-candidate.yml",
     "state": "active",
     "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",

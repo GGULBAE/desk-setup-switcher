@@ -20,6 +20,7 @@ class RemoteControlsPolicyV2Test
   CANDIDATE_BLOB = "b" * 40
   CI_BLOB = "c" * 40
   PUBLICATION_BLOB = "d" * 40
+  LEGACY_BLOB = "e" * 40
 
   def initialize
     @tests = 0
@@ -48,7 +49,8 @@ class RemoteControlsPolicyV2Test
       "--expected-commit", COMMIT,
       "--expected-workflow-blob", CANDIDATE_BLOB,
       "--expected-ci-workflow-blob", CI_BLOB,
-      "--expected-publication-workflow-blob", PUBLICATION_BLOB
+      "--expected-publication-workflow-blob", PUBLICATION_BLOB,
+      "--expected-legacy-workflow-blob", LEGACY_BLOB
     ]
     if pre_publication
       result.concat(
@@ -125,12 +127,13 @@ class RemoteControlsPolicyV2Test
       )
     end
 
-    run("returns the reviewed publication workflow ID only with all three blobs") do
+    run("returns the reviewed publication workflow ID only with all four blobs") do
       assert_success(
         "--publication-workflow-id", POLICY,
         "--expected-workflow-blob", CANDIDATE_BLOB,
         "--expected-ci-workflow-blob", CI_BLOB,
         "--expected-publication-workflow-blob", PUBLICATION_BLOB,
+        "--expected-legacy-workflow-blob", LEGACY_BLOB,
         expected: "7002\n"
       )
     end
@@ -142,7 +145,8 @@ class RemoteControlsPolicyV2Test
         "--ci-workflow-id", POLICY,
         "--expected-workflow-blob", CANDIDATE_BLOB,
         "--expected-ci-workflow-blob", CI_BLOB,
-        "--expected-publication-workflow-blob", PUBLICATION_BLOB
+        "--expected-publication-workflow-blob", PUBLICATION_BLOB,
+        "--expected-legacy-workflow-blob", LEGACY_BLOB
       )
       assert(status.success?, "C-locale anchors failed: #{stderr}")
       assert(stderr.empty?, "C-locale success wrote stderr")
@@ -172,6 +176,9 @@ class RemoteControlsPolicyV2Test
       "binds publication workflow name" => lambda { |v| v["release"]["publicationWorkflow"]["name"] = "Other" },
       "binds publication workflow path" => lambda { |v| v["release"]["publicationWorkflow"]["path"] = ".github/workflows/other.yml" },
       "binds publication workflow blob" => lambda { |v| v["release"]["publicationWorkflow"]["blobSha"] = "0" * 40 },
+      "binds retired workflow name" => lambda { |v| v["release"]["legacyWorkflow"]["name"] = "Other" },
+      "binds retired workflow path" => lambda { |v| v["release"]["legacyWorkflow"]["path"] = ".github/workflows/other.yml" },
+      "binds retired workflow blob" => lambda { |v| v["release"]["legacyWorkflow"]["blobSha"] = "0" * 40 },
       "requires both reviewed CI checks" => lambda { |v| v["release"]["ci"]["checks"].pop },
       "binds the public-surface CI app" => lambda { |v| v["release"]["ci"]["checks"][1]["appId"] = 1 },
       "binds publisher numeric identity" => lambda { |v| v["actors"]["publisher"]["id"] = 9999 },
@@ -198,7 +205,12 @@ class RemoteControlsPolicyV2Test
       "requires active publication workflow state" => lambda { |v| v["publicationWorkflow"]["state"] = "disabled_manually" },
       "requires manual-only publication trigger" => lambda { |v| v["publicationWorkflow"]["triggers"] << "push" },
       "requires publication contents-write route" => lambda { |v| v["publicationWorkflow"]["contentsWrite"] = false },
-      "rejects any fourth active workflow" => lambda { |v| v["workflowInventory"]["items"] << v["ciWorkflow"].merge("id" => 7999, "name" => "Extra", "path" => ".github/workflows/extra.yml") },
+      "requires two retired workflow anchor reads" => lambda { |v| v["anchorReads"][0].delete("legacyWorkflow") },
+      "rejects retired workflow anchor drift" => lambda { |v| v["anchorReads"][1]["legacyWorkflow"]["blobSha"] = "0" * 40 },
+      "requires the retired workflow to remain disabled" => lambda { |v| v["legacyWorkflow"]["state"] = "active" },
+      "requires manual-only retired workflow trigger" => lambda { |v| v["legacyWorkflow"]["triggers"] << "push" },
+      "forbids contents-write on the retired workflow" => lambda { |v| v["legacyWorkflow"]["contentsWrite"] = true },
+      "rejects any unexpected workflow" => lambda { |v| v["workflowInventory"]["items"] << v["ciWorkflow"].merge("id" => 7999, "name" => "Extra", "path" => ".github/workflows/extra.yml") },
       "requires exact publication environment reviewer" => lambda { |v| v["environments"]["releasePublication"]["protection"]["reviewers"][0]["id"] = 9999 },
       "requires exact publication tag deployment policy" => lambda { |v| v["environments"]["releasePublication"]["deployment"]["policies"][0]["name"] = "v0.1.1" },
       "separates publication secrets from signing secrets" => lambda { |v| v["environments"]["releasePublication"]["secrets"]["names"] << "DEVELOPER_ID_CERTIFICATE_BASE64" },

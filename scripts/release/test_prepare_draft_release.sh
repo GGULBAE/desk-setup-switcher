@@ -21,6 +21,36 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Draft preparation is a fixed v0.1.0/build-2 operation even while the checked
+# out source is intentionally staged as the v0.0.9/build-1 predecessor. Run the
+# production helper from an isolated final-version fixture instead of mutating
+# the repository Config during tests.
+target_root="$temporary_root/final-source"
+mkdir -p \
+    "$target_root/scripts/release" \
+    "$target_root/scripts/lib" \
+    "$target_root/Config" \
+    "$target_root/docs/releases"
+cp "$RELEASE_SCRIPTS_DIR/prepare-draft-release.sh" \
+    "$RELEASE_SCRIPTS_DIR/lib.sh" \
+    "$RELEASE_SCRIPTS_DIR/release_policy.rb" \
+    "$target_root/scripts/release/"
+cp "$ROOT_DIR/scripts/lib/common.sh" "$target_root/scripts/lib/common.sh"
+cp "$ROOT_DIR/Config/Info.plist" "$target_root/Config/Info.plist"
+cp "$ROOT_DIR/docs/releases/v0.1.0.md" "$target_root/docs/releases/v0.1.0.md"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleShortVersionString 0.1.0' \
+    "$target_root/Config/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 2' "$target_root/Config/Info.plist"
+# This suite verifies only that draft preparation propagates a production
+# evidence-chain gate result. Actual Git topology is exercised by the focused
+# release-evidence-history suite instead of being reimplemented by this mock.
+cat >>"$target_root/scripts/release/lib.sh" <<'FIXTURE_CHAIN_GATE'
+release_verify_final_pre_tag_evidence_chain() {
+    [[ "${MOCK_SCENARIO:-}" != evidence-chain-rejected ]]
+}
+FIXTURE_CHAIN_GATE
+prepare_draft_target="$target_root/scripts/release/prepare-draft-release.sh"
+
 mock_bin="$temporary_root/mock-bin"
 mkdir "$mock_bin"
 real_ruby="$(command -v ruby)"
@@ -84,18 +114,6 @@ case "${1:-}" in
                     printf '%s\n' "$MOCK_TAG_OBJECT"
                 fi ;;
             "refs/remotes/origin/master^{commit}") printf '%s\n' "$MOCK_MASTER_COMMIT" ;;
-            "$MOCK_EXPECTED_COMMIT:.github/workflows"|"$MOCK_MASTER_COMMIT:.github/workflows")
-                printf '%040d\n' 31 ;;
-            "$MOCK_EXPECTED_COMMIT:scripts/release"|"$MOCK_MASTER_COMMIT:scripts/release")
-                if [[ "$MOCK_SCENARIO" == final-evidence-critical-tree-drift \
-                    && "$2" == "$MOCK_MASTER_COMMIT:scripts/release" ]]; then
-                    printf '%040d\n' 39
-                else
-                    printf '%040d\n' 32
-                fi ;;
-            "$MOCK_EXPECTED_COMMIT:.github/workflows/release.yml") printf '%s\n' "$MOCK_CANDIDATE_WORKFLOW_BLOB" ;;
-            "$MOCK_EXPECTED_COMMIT:.github/workflows/ci.yml") printf '%s\n' "$MOCK_CI_WORKFLOW_BLOB" ;;
-            "$MOCK_EXPECTED_COMMIT:.github/workflows/publish-release.yml") printf '%s\n' "$MOCK_PUBLICATION_WORKFLOW_BLOB" ;;
             *) exit 91 ;;
         esac
         ;;
@@ -126,97 +144,9 @@ case "${1:-}" in
             else
                 exit 96
             fi
-        elif [[ "$#" == 3 && "$2" == -p && "$3" == "$MOCK_TAG_OBJECT" ]]; then
-            tag_digest="$MOCK_FINAL_EVIDENCE_DIGEST"
-            if [[ "$MOCK_SCENARIO" == final-evidence-tag-digest-mismatch ]]; then
-                tag_digest="$(printf '0%.0s' {1..64})"
-            fi
-            printf 'object %s\ntype commit\ntag %s\ntagger Synthetic <synthetic@example.invalid> 0 +0000\n\nremote-controls-final-pre-tag-sha256: %s\n' \
-                "$MOCK_EXPECTED_COMMIT" "$MOCK_TAG" "$tag_digest"
         else
             exit 96
         fi
-        ;;
-    merge-base)
-        [[ "$#" == 4 && "$2" == --is-ancestor && "$3" == "$MOCK_EXPECTED_COMMIT" \
-            && "$4" == "$MOCK_MASTER_COMMIT" ]] || exit 108
-        ;;
-    log)
-        [[ "$#" == 7 && "$2" == --full-history && "$3" == --format=%H && "$4" == --reverse \
-            && "$5" == "$MOCK_EXPECTED_COMMIT..$MOCK_MASTER_COMMIT" && "$6" == -- \
-            && "$7" == "$MOCK_FINAL_EVIDENCE_PATH" ]] || exit 109
-        printf '%s\n' "$MOCK_FINAL_EVIDENCE_COMMIT"
-        if [[ "$MOCK_SCENARIO" == final-evidence-two-introductions ]]; then
-            printf '%040d\n' 17
-        fi
-        ;;
-    rev-list)
-        if [[ "$#" == 3 && "$2" == --first-parent && "$3" == "$MOCK_MASTER_COMMIT" ]]; then
-            printf '%s\n' "$MOCK_MASTER_COMMIT"
-            if [[ "$MOCK_SCENARIO" != final-evidence-second-parent ]]; then
-                printf '%s\n' "$MOCK_FINAL_EVIDENCE_COMMIT"
-            fi
-            printf '%s\n' "$MOCK_EXPECTED_COMMIT"
-            exit 0
-        fi
-        [[ "$#" == 5 && "$2" == --parents && "$3" == -n && "$4" == 1 \
-            && "$5" == "$MOCK_FINAL_EVIDENCE_COMMIT" ]] || exit 110
-        printf '%s %s' "$MOCK_FINAL_EVIDENCE_COMMIT" "$MOCK_EXPECTED_COMMIT"
-        if [[ "$MOCK_SCENARIO" == final-evidence-merge-introduction ]]; then
-            printf ' %040d' 18
-        fi
-        printf '\n'
-        ;;
-    diff-tree)
-        [[ "$#" == 6 && "$2" == --no-commit-id && "$3" == --name-status && "$4" == -r \
-            && "$5" == "$MOCK_EXPECTED_COMMIT" && "$6" == "$MOCK_FINAL_EVIDENCE_COMMIT" ]] || exit 111
-        printf 'A\t%s\n' "$MOCK_FINAL_EVIDENCE_PATH"
-        if [[ "$MOCK_SCENARIO" == final-evidence-extra-path ]]; then
-            printf 'M\tdocs/DISTRIBUTION.md\n'
-        fi
-        ;;
-    ls-tree)
-        [[ "$#" == 4 && "$3" == -- ]] || exit 112
-        case "$4" in
-            "$MOCK_FINAL_EVIDENCE_PATH")
-                [[ "$2" == "$MOCK_FINAL_EVIDENCE_COMMIT" || "$2" == "$MOCK_MASTER_COMMIT" ]] || exit 112
-                blob_number=19
-                if [[ "$MOCK_SCENARIO" == final-evidence-blob-drift && "$2" == "$MOCK_MASTER_COMMIT" ]]; then
-                    blob_number=20
-                fi
-                printf '100644 blob %040d\t%s\n' "$blob_number" "$MOCK_FINAL_EVIDENCE_PATH" ;;
-            "$MOCK_CANDIDATE_MANUAL_PATH")
-                [[ "$2" == "$MOCK_EXPECTED_COMMIT" ]] || exit 112
-                printf '100644 blob %040d\t%s\n' 21 "$MOCK_CANDIDATE_MANUAL_PATH" ;;
-            "$MOCK_PUBLICATION_MANUAL_PATH")
-                [[ "$2" == "$MOCK_EXPECTED_COMMIT" ]] || exit 112
-                printf '100644 blob %040d\t%s\n' 22 "$MOCK_PUBLICATION_MANUAL_PATH" ;;
-            *) exit 112 ;;
-        esac
-        ;;
-    show)
-        [[ "$#" == 2 ]] || exit 113
-        case "$2" in
-            "$MOCK_FINAL_EVIDENCE_COMMIT:$MOCK_FINAL_EVIDENCE_PATH")
-                if [[ "$MOCK_SCENARIO" == final-evidence-invalid ]]; then
-                    printf '{}\n'
-                else
-                    exec /bin/cat "$MOCK_FINAL_EVIDENCE_SOURCE"
-                fi ;;
-            "$MOCK_EXPECTED_COMMIT:scripts/release/remote_controls_policy.rb")
-                exec /bin/cat "$MOCK_POLICY_VALIDATOR_SOURCE" ;;
-            "$MOCK_EXPECTED_COMMIT:scripts/release/release_policy.rb")
-                exec /bin/cat "$MOCK_RELEASE_POLICY_SOURCE" ;;
-            "$MOCK_EXPECTED_COMMIT:scripts/release/collect_remote_controls_evidence.rb")
-                exec /bin/cat "$MOCK_COLLECTOR_SOURCE" ;;
-            "$MOCK_EXPECTED_COMMIT:scripts/release/remote-controls-policy.json")
-                exec /bin/cat "$MOCK_POLICY_SOURCE" ;;
-            "$MOCK_EXPECTED_COMMIT:$MOCK_CANDIDATE_MANUAL_PATH")
-                exec /bin/cat "$MOCK_CANDIDATE_MANUAL_SOURCE" ;;
-            "$MOCK_EXPECTED_COMMIT:$MOCK_PUBLICATION_MANUAL_PATH")
-                exec /bin/cat "$MOCK_PUBLICATION_MANUAL_SOURCE" ;;
-            *) exit 113 ;;
-        esac
         ;;
     ls-remote)
         [[ "$#" == 6 && "$2" == --exit-code && "$3" == --tags && "$4" == origin \
@@ -436,71 +366,21 @@ chmod 0755 "$mock_bin/dirname" "$mock_bin/ruby" "$mock_bin/cp" "$mock_bin/git" "
 
 expected_commit=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 master_commit=cccccccccccccccccccccccccccccccccccccccc
-final_evidence_commit=dddddddddddddddddddddddddddddddddddddddd
-final_evidence_path="docs/evidence/releases/v0.1.0/remote-controls-final-pre-tag.json"
-candidate_manual_path="docs/evidence/releases/v0.1.0/release-candidate-admin-bypass.json"
-publication_manual_path="docs/evidence/releases/v0.1.0/release-publication-admin-token-scope.json"
-manual_fixture_root="$temporary_root/final-manual-fixtures"
-candidate_manual_source="$manual_fixture_root/release-candidate-admin-bypass.json"
-publication_manual_source="$manual_fixture_root/release-publication-admin-token-scope.json"
-final_evidence_source="$manual_fixture_root/remote-controls-final-pre-tag.json"
-mkdir -m 0700 "$manual_fixture_root"
-"$real_ruby" -rjson -rdigest -e '
-  evidence_fixture, evidence_output, candidate_output, publication_output = ARGV
-  actor = { "id" => 1001, "login" => "synthetic-operator", "type" => "User" }
-  base = {
-    "schemaVersion" => "desk-setup-switcher.manual-release-control-evidence/v1",
-    "phase" => "final-pre-tag",
-    "observedAt" => "2026-07-17T23:30:00Z",
-    "observer" => actor,
-    "administratorBypassEnabled" => false,
-    "redactionReviewed" => true,
-    "subject" => { "tag" => "v0.1.0" }
-  }
-  candidate = base.merge(
-    "control" => "release-candidate-administrator-bypass-disabled",
-    "sourceArtifactSHA256" => "1" * 64,
-    "tokenPermissions" => [],
-    "token" => nil
-  )
-  publication = base.merge(
-    "control" => "release-publication-administrator-bypass-disabled-and-admin-read-token-minimum-scope",
-    "sourceArtifactSHA256" => "2" * 64,
-    "tokenPermissions" => %w[actions:read administration:read attestations:read contents:read metadata:read],
-    "token" => {
-      "type" => "fine-grained-personal-access-token",
-      "resourceOwner" => "synthetic-operator",
-      "repositorySelection" => ["synthetic-operator/desk-setup-switcher"],
-      "accountPermissions" => [],
-      "organizationPermissions" => [],
-      "issuedAt" => "2026-07-17T23:20:00Z",
-      "expiresAt" => "2026-08-16T00:00:00Z"
-    }
-  )
-  File.binwrite(candidate_output, JSON.generate(candidate) + "\n")
-  File.binwrite(publication_output, JSON.generate(publication) + "\n")
-  evidence = JSON.parse(File.binread(evidence_fixture), allow_nan: false)
-  items = evidence.fetch("manualEvidence").fetch("items")
-  items.fetch(0)["sha256"] = Digest::SHA256.file(candidate_output).hexdigest
-  items.fetch(1)["sha256"] = Digest::SHA256.file(publication_output).hexdigest
-  File.binwrite(evidence_output, JSON.pretty_generate(evidence) + "\n")
-' "$ROOT_DIR/scripts/release/fixtures/remote-controls/evidence-v2-final-pre-tag.json" \
-    "$final_evidence_source" "$candidate_manual_source" "$publication_manual_source"
-final_evidence_digest="$(shasum -a 256 "$final_evidence_source" | awk '{print $1}')"
-tag="v$VERSION"
+release_version=0.1.0
+tag="v$release_version"
 notes_relative="docs/releases/$tag.md"
-notes_path="$ROOT_DIR/$notes_relative"
+notes_path="$target_root/$notes_relative"
 title="Desk Setup Switcher $tag public beta"
-dmg_name="Desk-Setup-Switcher-$VERSION.dmg"
+dmg_name="Desk-Setup-Switcher-$release_version.dmg"
 asset_names=(
     "$dmg_name"
     "$dmg_name.sha256"
-    "Desk-Setup-Switcher-$VERSION.spdx.json"
+    "Desk-Setup-Switcher-$release_version.spdx.json"
     release-manifest.json
     notary-result.json
     notary-log.json
-    "Desk-Setup-Switcher-$VERSION.provenance.sigstore.json"
-    "Desk-Setup-Switcher-$VERSION.sbom.sigstore.json"
+    "Desk-Setup-Switcher-$release_version.provenance.sigstore.json"
+    "Desk-Setup-Switcher-$release_version.sbom.sigstore.json"
     release-manifest.provenance.sigstore.json
 )
 
@@ -532,7 +412,7 @@ setup_case() {
     done
 
     case "$scenario" in
-        absent|interrupted-upload|api-failure|remote-tag-drift|remote-tag-object-drift|remote-peeled-missing|local-lightweight-tag|local-extra|local-symlink|local-nonregular|final-evidence-two-introductions|final-evidence-merge-introduction|final-evidence-second-parent|final-evidence-extra-path|final-evidence-blob-drift|final-evidence-critical-tree-drift|final-evidence-tag-digest-mismatch|final-evidence-invalid) ;;
+        absent|interrupted-upload|api-failure|remote-tag-drift|remote-tag-object-drift|remote-peeled-missing|local-lightweight-tag|local-extra|local-symlink|local-nonregular|evidence-chain-rejected) ;;
         partial|mismatched-asset)
             printf '1\n' >"$case_root/state/exists"
             printf '%s\n' "${asset_names[0]}" "${asset_names[1]}" >"$case_root/state/asset-names"
@@ -607,25 +487,10 @@ run_target_with_attempts() {
         "RELEASE_NOTES_PATH=$notes_relative" \
         "RELEASE_SOURCE_DIR=$candidate_directory" \
         "RELEASE_DOWNLOAD_DIR=$download_directory" \
-        "MOCK_ROOT_DIR=$ROOT_DIR" \
+        "MOCK_ROOT_DIR=$target_root" \
         "MOCK_EXPECTED_COMMIT=$expected_commit" \
         "MOCK_TAG_OBJECT=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
         "MOCK_MASTER_COMMIT=$master_commit" \
-        "MOCK_FINAL_EVIDENCE_COMMIT=$final_evidence_commit" \
-        "MOCK_FINAL_EVIDENCE_PATH=$final_evidence_path" \
-        "MOCK_FINAL_EVIDENCE_DIGEST=$final_evidence_digest" \
-        "MOCK_FINAL_EVIDENCE_SOURCE=$final_evidence_source" \
-        "MOCK_POLICY_SOURCE=$ROOT_DIR/scripts/release/fixtures/remote-controls/policy-v2.json" \
-        "MOCK_POLICY_VALIDATOR_SOURCE=$ROOT_DIR/scripts/release/remote_controls_policy.rb" \
-        "MOCK_RELEASE_POLICY_SOURCE=$ROOT_DIR/scripts/release/release_policy.rb" \
-        "MOCK_COLLECTOR_SOURCE=$ROOT_DIR/scripts/release/collect_remote_controls_evidence.rb" \
-        "MOCK_CANDIDATE_MANUAL_PATH=$candidate_manual_path" \
-        "MOCK_PUBLICATION_MANUAL_PATH=$publication_manual_path" \
-        "MOCK_CANDIDATE_MANUAL_SOURCE=$candidate_manual_source" \
-        "MOCK_PUBLICATION_MANUAL_SOURCE=$publication_manual_source" \
-        "MOCK_CANDIDATE_WORKFLOW_BLOB=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
-        "MOCK_CI_WORKFLOW_BLOB=cccccccccccccccccccccccccccccccccccccccc" \
-        "MOCK_PUBLICATION_WORKFLOW_BLOB=dddddddddddddddddddddddddddddddddddddddd" \
         "MOCK_TAG=$tag" \
         "MOCK_SCENARIO=$scenario" \
         "MOCK_RELEASE_NOTES_RELATIVE=$notes_relative" \
@@ -640,7 +505,7 @@ run_target_with_attempts() {
         "MOCK_SECRET_PROBE=$case_root/secret-probe.log" \
         "MOCK_EXPECTED_GH_TOKEN_SHA256=$runtime_gh_token_sha256" \
         "MOCK_REAL_RUBY=$real_ruby" \
-        "$RELEASE_SCRIPTS_DIR/prepare-draft-release.sh"
+        "$prepare_draft_target"
 }
 
 run_target() {
@@ -772,17 +637,7 @@ for scenario in \
     run_failure_case "$scenario"
 done
 
-for scenario in \
-    final-evidence-two-introductions \
-    final-evidence-merge-introduction \
-    final-evidence-second-parent \
-    final-evidence-extra-path \
-    final-evidence-blob-drift \
-    final-evidence-critical-tree-drift \
-    final-evidence-tag-digest-mismatch \
-    final-evidence-invalid; do
-    run_failure_case "$scenario"
-done
+run_failure_case evidence-chain-rejected
 
 # Candidate provenance must always remain pinned to attempt 1, while a current
 # retry may have a larger positive attempt number.

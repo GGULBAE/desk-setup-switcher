@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "desk-setup-switcher.remote-release-controls-policy/v2",
+  "schemaVersion": "desk-setup-switcher.remote-release-controls-policy/v3",
   "phase": "release-lifecycle",
   "configured": false
 }

@@ -13,6 +13,7 @@ real_ruby="$(command -v ruby)" || {
 }
 runtime_gh_token="$($real_ruby -rsecurerandom -e 'STDOUT.write(SecureRandom.hex(32))')"
 runtime_gh_token_sha256="$(printf '%s' "$runtime_gh_token" | shasum -a 256 | awk '{print $1}')"
+wrapper_timeout_seconds=90
 
 pass() {
     assertions=$((assertions + 1))
@@ -75,9 +76,11 @@ cp "$SCRIPT_DIR/lib.sh" "$test_repository/scripts/release/"
 cp "$SCRIPT_DIR/collect_remote_controls_evidence.rb" "$test_repository/scripts/release/"
 cp "$SCRIPT_DIR/remote_controls_policy.rb" "$test_repository/scripts/release/"
 cp "$SCRIPT_DIR/release_policy.rb" "$test_repository/scripts/release/"
-cp "$SCRIPT_DIR/fixtures/remote-controls/policy-v2.json" \
+cp "$SCRIPT_DIR/fixtures/remote-controls/policy-v3.json" \
     "$test_repository/scripts/release/fixtures/remote-controls/"
 cp "$ROOT_DIR/.github/workflows/release.yml" "$test_repository/.github/workflows/release.yml"
+cp "$ROOT_DIR/.github/workflows/signed-release-candidate.yml" \
+    "$test_repository/.github/workflows/signed-release-candidate.yml"
 cp "$ROOT_DIR/.github/workflows/ci.yml" "$test_repository/.github/workflows/ci.yml"
 cp "$ROOT_DIR/.github/workflows/publish-release.yml" \
     "$test_repository/.github/workflows/publish-release.yml"
@@ -88,7 +91,7 @@ ruby -rjson -rtime -e '
   now = Time.now.utc
   base = {
     "schemaVersion" => "desk-setup-switcher.manual-release-control-evidence/v1",
-    "phase" => "final-pre-tag",
+    "phase" => "predecessor-pre-tag",
     "observedAt" => now.iso8601,
     "observer" => { "id" => 1001, "login" => "GGULBAE", "type" => "User" },
     "administratorBypassEnabled" => false,
@@ -129,13 +132,14 @@ git -C "$test_repository" init -q
 git -C "$test_repository" checkout -q -b master
 git -C "$test_repository" config user.name 'Synthetic Collector Test'
 git -C "$test_repository" config user.email 'collector@example.invalid'
-workflow_blob="$(git -C "$test_repository" hash-object .github/workflows/release.yml)"
+workflow_blob="$(git -C "$test_repository" hash-object .github/workflows/signed-release-candidate.yml)"
+legacy_workflow_blob="$(git -C "$test_repository" hash-object .github/workflows/release.yml)"
 ci_workflow_blob="$(git -C "$test_repository" hash-object .github/workflows/ci.yml)"
 publication_workflow_blob="$(
     git -C "$test_repository" hash-object .github/workflows/publish-release.yml
 )"
 ruby -rjson -e '
-  source, output, blob, ci_blob, publication_blob = ARGV
+  source, output, blob, ci_blob, publication_blob, legacy_blob = ARGV
   policy = JSON.parse(File.read(source))
   repository = policy.fetch("repository")
   repository["fullName"] = "GGULBAE/desk-setup-switcher"
@@ -146,13 +150,15 @@ ruby -rjson -e '
   policy.fetch("release").fetch("candidateWorkflow")["blobSha"] = blob
   policy.fetch("release").fetch("ci").fetch("workflow")["blobSha"] = ci_blob
   policy.fetch("release").fetch("publicationWorkflow")["blobSha"] = publication_blob
+  policy.fetch("release").fetch("legacyWorkflow")["blobSha"] = legacy_blob
   File.write(output, JSON.pretty_generate(policy) + "\n", mode: "w", perm: 0o600)
 ' \
-    "$test_repository/scripts/release/fixtures/remote-controls/policy-v2.json" \
+    "$test_repository/scripts/release/fixtures/remote-controls/policy-v3.json" \
     "$test_repository/scripts/release/remote-controls-policy.json" \
     "$workflow_blob" \
     "$ci_workflow_blob" \
-    "$publication_workflow_blob"
+    "$publication_workflow_blob" \
+    "$legacy_workflow_blob"
 
 git -C "$test_repository" add -- .
 git -C "$test_repository" commit -q -m 'Synthetic remote controls fixture'
@@ -220,9 +226,12 @@ end
 
 commit = ENV.fetch("MOCK_COMMIT")
 blob = ENV.fetch("MOCK_WORKFLOW_BLOB")
+legacy_blob = ENV.fetch("MOCK_LEGACY_WORKFLOW_BLOB")
 ci_blob = ENV.fetch("MOCK_CI_WORKFLOW_BLOB")
 publication_blob = ENV.fetch("MOCK_PUBLICATION_WORKFLOW_BLOB")
 release_tag_object = ENV.fetch("MOCK_RELEASE_TAG_OBJECT", "8" * 40)
+predecessor_tag_object = ENV.fetch("MOCK_PREDECESSOR_TAG_OBJECT", "7" * 40)
+predecessor_commit = ENV.fetch("MOCK_PREDECESSOR_COMMIT", commit)
 repository = "GGULBAE/desk-setup-switcher"
 actor = { "id" => 1001, "login" => "GGULBAE", "type" => "User" }
 reviewer = { "id" => 1002, "login" => "synthetic-reviewer", "type" => "User" }
@@ -361,24 +370,42 @@ when "/repos/GGULBAE/desk-setup-switcher/git/ref/heads/master"
                commit
              end
   json.call("ref" => "refs/heads/master", "object" => { "type" => "commit", "sha" => observed })
-when %r{\A/repos/GGULBAE/desk-setup-switcher/contents/\.github/workflows/release\.yml\?ref=([0-9a-f]{40})\z}
+when %r{\A/repos/GGULBAE/desk-setup-switcher/contents/\.github/workflows/signed-release-candidate\.yml\?ref=([0-9a-f]{40})\z}
   anchored_commit = Regexp.last_match(1)
   content = Base64.strict_encode64(File.binread(ENV.fetch("MOCK_WORKFLOW_PATH")))
   json.call(
     "commit_sha" => anchored_commit,
     "type" => "file",
-    "path" => ".github/workflows/release.yml",
+    "path" => ".github/workflows/signed-release-candidate.yml",
     "sha" => blob,
     "encoding" => "base64",
     "content" => content
   )
-when "/repos/GGULBAE/desk-setup-switcher/actions/workflows/release.yml"
+when "/repos/GGULBAE/desk-setup-switcher/actions/workflows/signed-release-candidate.yml"
   state = ENV["MOCK_MODE"] == "workflow-state-drift" && occurrence == 2 ? "disabled_manually" : "active"
   json.call(
     "id" => 7001,
     "name" => "Signed release candidate",
-    "path" => ".github/workflows/release.yml",
+    "path" => ".github/workflows/signed-release-candidate.yml",
     "state" => state
+  )
+when %r{\A/repos/GGULBAE/desk-setup-switcher/contents/\.github/workflows/release\.yml\?ref=([0-9a-f]{40})\z}
+  anchored_commit = Regexp.last_match(1)
+  content = Base64.strict_encode64(File.binread(ENV.fetch("MOCK_LEGACY_WORKFLOW_PATH")))
+  json.call(
+    "commit_sha" => anchored_commit,
+    "type" => "file",
+    "path" => ".github/workflows/release.yml",
+    "sha" => legacy_blob,
+    "encoding" => "base64",
+    "content" => content
+  )
+when "/repos/GGULBAE/desk-setup-switcher/actions/workflows/release.yml"
+  json.call(
+    "id" => 7003,
+    "name" => "Retired legacy release workflow",
+    "path" => ".github/workflows/release.yml",
+    "state" => "disabled_manually"
   )
 when %r{\A/repos/GGULBAE/desk-setup-switcher/contents/\.github/workflows/ci\.yml\?ref=([0-9a-f]{40})\z}
   anchored_commit = Regexp.last_match(1)
@@ -448,7 +475,13 @@ when "/repos/GGULBAE/desk-setup-switcher/environments/release-candidate"
     "deployment_branch_policy" => { "protected_branches" => false, "custom_branch_policies" => true }
   )
 when "/repos/GGULBAE/desk-setup-switcher/environments/release-candidate/deployment-branch-policies?per_page=30"
-  json.call("total_count" => 1, "items" => [{ "name" => "v0.1.0", "type" => "tag" }])
+  json.call(
+    "total_count" => 2,
+    "items" => [
+      { "name" => "v0.0.9", "type" => "tag" },
+      { "name" => "v0.1.0", "type" => "tag" }
+    ]
+  )
 when "/repos/GGULBAE/desk-setup-switcher/environments/release-candidate/secrets?per_page=30"
   json.call("total_count" => 3, "names" => ["APPLE_NOTARY_API_KEY_BASE64"])
   json.call("total_count" => 3, "names" => %w[DEVELOPER_ID_CERTIFICATE_BASE64 DEVELOPER_ID_CERTIFICATE_PASSWORD])
@@ -500,8 +533,9 @@ when "/repos/GGULBAE/desk-setup-switcher/labels/needs-triage"
 when "/repos/GGULBAE/desk-setup-switcher/actions/workflows?per_page=100"
   workflows = [
     { "id" => ci_workflow_id, "name" => "CI", "path" => ".github/workflows/ci.yml", "state" => "active" },
-    { "id" => 7001, "name" => "Signed release candidate", "path" => ".github/workflows/release.yml", "state" => "active" },
-    { "id" => publication_workflow_id, "name" => "Publish approved signed release", "path" => ".github/workflows/publish-release.yml", "state" => "active" }
+    { "id" => 7001, "name" => "Signed release candidate", "path" => ".github/workflows/signed-release-candidate.yml", "state" => "active" },
+    { "id" => publication_workflow_id, "name" => "Publish approved signed release", "path" => ".github/workflows/publish-release.yml", "state" => "active" },
+    { "id" => 7003, "name" => "Retired legacy release workflow", "path" => ".github/workflows/release.yml", "state" => "disabled_manually" }
   ]
   if ENV["MOCK_MODE"] == "workflow-inventory-drift" && occurrence == 2
     workflows.fetch(2)["state"] = "disabled_manually"
@@ -514,6 +548,13 @@ when "/repos/GGULBAE/desk-setup-switcher/actions/workflows?per_page=100"
   json.call("total_count" => total, "items" => workflows.first(2))
   json.call("total_count" => total, "items" => workflows.drop(2)) unless ENV["MOCK_MODE"] == "workflow-inventory-truncated"
 when "/repos/GGULBAE/desk-setup-switcher/git/matching-refs/tags/v?per_page=100"
+  if %w[final-pre-tag pre-publication].include?(ENV.fetch("MOCK_PHASE"))
+    json.call(
+      "ref" => "refs/tags/v0.0.9",
+      "object_type" => "tag",
+      "object_sha" => predecessor_tag_object
+    )
+  end
   if ENV.fetch("MOCK_PHASE") == "pre-publication"
     json.call(
       "ref" => "refs/tags/v0.1.0",
@@ -521,6 +562,19 @@ when "/repos/GGULBAE/desk-setup-switcher/git/matching-refs/tags/v?per_page=100"
       "object_sha" => release_tag_object
     )
   end
+when "/repos/GGULBAE/desk-setup-switcher/commits/tags/v0.0.9"
+  abort "predecessor commit requested before the tag exists" if
+    ENV.fetch("MOCK_PHASE") == "predecessor-pre-tag"
+  json.call("commit_sha" => predecessor_commit)
+when "/repos/GGULBAE/desk-setup-switcher/git/tags/#{predecessor_tag_object}"
+  abort "predecessor object requested before the tag exists" if
+    ENV.fetch("MOCK_PHASE") == "predecessor-pre-tag"
+  json.call(
+    "tag_object_sha" => predecessor_tag_object,
+    "tag" => "v0.0.9",
+    "target_type" => "commit",
+    "target_sha" => predecessor_commit
+  )
 when "/repos/GGULBAE/desk-setup-switcher/commits/tags/v0.1.0"
   abort "tag commit requested outside pre-publication" unless ENV.fetch("MOCK_PHASE") == "pre-publication"
   json.call("commit_sha" => ENV.fetch("MOCK_RELEASE_COMMIT"))
@@ -653,7 +707,8 @@ if [[ "$#" -ge 1 && "$1" == */remote_controls_policy.rb ]]; then
     if [[ "${MOCK_MODE:-}" == policy-preflight-internal-error && " $* " == *' --check-policy '* ]]; then
         exit 70
     fi
-    if [[ "${MOCK_MODE:-}" == policy-final-internal-error && " $* " == *' --policy '* ]]; then
+    if [[ "${MOCK_MODE:-}" == policy-final-internal-error \
+        && " $* " == *' --evidence '*'/evidence-2.json '* ]]; then
         exit 70
     fi
     if [[ "${MOCK_MODE:-}" == policy-validator-local-race && " $* " == *' --policy '* ]]; then
@@ -683,13 +738,24 @@ run_wrapper() {
     local stderr_path="$3"
     local mock_phase="final-pre-tag"
     local final_evidence_output="$temporary_root/$mode.final-pre-tag.json"
+    local predecessor_evidence_output="$temporary_root/$mode.predecessor-pre-tag.json"
     local wrapper_pid_path="$temporary_root/$mode.wrapper.pid"
     shift 3
-    if [[ " $* " == *' pre-publication '* ]]; then
+    if [[ " $* " == *' predecessor-pre-tag '* ]]; then
+        mock_phase="predecessor-pre-tag"
+        rm -f -- "$predecessor_evidence_output"
+        set -- --phase predecessor-pre-tag --evidence-output "$predecessor_evidence_output"
+    elif [[ " $* " == *' pre-publication '* ]]; then
         mock_phase="pre-publication"
+        set -- --predecessor-commit "$predecessor_commit" \
+            --predecessor-tag-object "$predecessor_tag_object" \
+            --release-tag-object "$release_tag_object" "$@"
     else
         rm -f -- "$final_evidence_output"
-        set -- --phase final-pre-tag --evidence-output "$final_evidence_output" "$@"
+        set -- --phase final-pre-tag \
+            --predecessor-commit "$predecessor_commit" \
+            --predecessor-tag-object "$predecessor_tag_object" \
+            --evidence-output "$final_evidence_output" "$@"
     fi
     printf 'Remote controls collector scenario: %s (%s)\n' "$mode" "$mock_phase" >&2
     : >"$mock_log"
@@ -705,23 +771,28 @@ run_wrapper() {
         "MOCK_MODE=$mode" \
         "MOCK_PHASE=$mock_phase" \
         "MOCK_COMMIT=$expected_commit" \
+        "MOCK_PREDECESSOR_COMMIT=${predecessor_commit:-$expected_commit}" \
+        "MOCK_PREDECESSOR_TAG_OBJECT=${predecessor_tag_object:-7777777777777777777777777777777777777777}" \
         "MOCK_RELEASE_COMMIT=$release_commit" \
         "MOCK_RELEASE_TAG_OBJECT=${release_tag_object:-8888888888888888888888888888888888888888}" \
         "MOCK_RELEASE_ID=12345" \
         "MOCK_WORKFLOW_BLOB=$workflow_blob" \
-        "MOCK_WORKFLOW_PATH=$test_repository/.github/workflows/release.yml" \
+        "MOCK_WORKFLOW_PATH=$test_repository/.github/workflows/signed-release-candidate.yml" \
+        "MOCK_LEGACY_WORKFLOW_BLOB=$legacy_workflow_blob" \
+        "MOCK_LEGACY_WORKFLOW_PATH=$test_repository/.github/workflows/release.yml" \
         "MOCK_CI_WORKFLOW_BLOB=$ci_workflow_blob" \
         "MOCK_CI_WORKFLOW_PATH=$test_repository/.github/workflows/ci.yml" \
         "MOCK_PUBLICATION_WORKFLOW_BLOB=$publication_workflow_blob" \
         "MOCK_PUBLICATION_WORKFLOW_PATH=$test_repository/.github/workflows/publish-release.yml" \
         "MOCK_REAL_RUBY=$real_ruby" \
         "MOCK_GH_TOKEN_SHA256=$runtime_gh_token_sha256" \
+        "REMOTE_CONTROLS_TEST_WRAPPER_TIMEOUT_SECONDS=$wrapper_timeout_seconds" \
         "RAW_VARIABLE_MARKER=$raw_marker" \
         "GH_TOKEN=$runtime_gh_token" \
         GH_DEBUG=api \
         DEBUG=1 \
         "$real_ruby" -e '
-          timeout = 30
+          timeout = Integer(ENV.fetch("REMOTE_CONTROLS_TEST_WRAPPER_TIMEOUT_SECONDS"), 10)
           pid = Process.spawn(*ARGV, pgroup: true)
           File.write(ENV.fetch("MOCK_WRAPPER_PID_PATH"), "#{pid}\n", mode: "w", perm: 0o600)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
@@ -761,6 +832,9 @@ assert_evidence_unavailable_mode() {
     local stdout_path="$temporary_root/$mode.stdout"
     local stderr_path="$temporary_root/$mode.stderr"
     run_wrapper "$mode" "$stdout_path" "$stderr_path"
+    if [[ "$last_status" == 124 ]]; then
+        fail "Collector scenario $mode exceeded the ${wrapper_timeout_seconds}-second test timeout before a verdict."
+    fi
     assert_equal 70 "$last_status" "$label"
     assert_empty "$stdout_path"
     assert_equal 'ERROR: remote controls evidence unavailable' \
@@ -781,13 +855,62 @@ assert_policy_mismatch_mode() {
         "$label (stable error)"
 }
 
+predecessor_stdout="$temporary_root/predecessor-success.stdout"
+predecessor_stderr="$temporary_root/predecessor-success.stderr"
+run_wrapper predecessor-success "$predecessor_stdout" "$predecessor_stderr" predecessor-pre-tag
+assert_equal 0 "$last_status" \
+    "Complete predecessor-pre-tag evidence did not pass (stderr=$(tr -d '\n' <"$predecessor_stderr"))."
+assert_empty "$predecessor_stderr"
+predecessor_external_output="$temporary_root/predecessor-success.predecessor-pre-tag.json"
+[[ -f "$predecessor_external_output" && ! -L "$predecessor_external_output" && \
+    "$(stat -f %Lp "$predecessor_external_output")" == 600 ]] || \
+    fail "The protected predecessor-pre-tag output was not one mode-0600 file."
+predecessor_external_sha256="$(shasum -a 256 "$predecessor_external_output" | awk '{print $1}')"
+assert_matches '^[0-9a-f]{64}$' "$predecessor_external_sha256" \
+    "The predecessor-pre-tag digest was invalid."
+predecessor_commit="$expected_commit"
+git -C "$test_repository" tag -a v0.0.9 \
+    -m "remote-controls-predecessor-pre-tag-sha256: $predecessor_external_sha256" \
+    "$predecessor_commit"
+predecessor_tag_object="$(git -C "$test_repository" rev-parse refs/tags/v0.0.9)"
+[[ "$(git -C "$test_repository" cat-file -t "$predecessor_tag_object")" == tag ]] || \
+    fail "Synthetic predecessor tag is not annotated."
+predecessor_tracked_output="$test_repository/docs/evidence/releases/v0.1.0/remote-controls-predecessor-pre-tag.json"
+cp -- "$predecessor_external_output" "$predecessor_tracked_output"
+chmod 0600 "$predecessor_tracked_output"
+git -C "$test_repository" add -- \
+    docs/evidence/releases/v0.1.0/remote-controls-predecessor-pre-tag.json
+git -C "$test_repository" commit -q -m 'Record predecessor pre-tag controls evidence'
+[[ "$(git -C "$test_repository" rev-parse HEAD^)" == "$predecessor_commit" ]] || \
+    fail "Predecessor evidence is not the direct child of the predecessor tag commit."
+ruby -rjson -rtime -e '
+  directory = ARGV.fetch(0)
+  %w[release-candidate-admin-bypass.json release-publication-admin-token-scope.json].each_with_index do |name, index|
+    path = File.join(directory, name)
+    value = JSON.parse(File.binread(path), allow_nan: false, create_additions: false)
+    observed = Time.now.utc
+    value["phase"] = "final-pre-tag"
+    value["observedAt"] = observed.iso8601
+    value["sourceArtifactSHA256"] = (index + 3).to_s * 64
+    if value["token"]
+      value["token"]["issuedAt"] = (observed - 60).iso8601
+      value["token"]["expiresAt"] = (observed + 29 * 86_400).iso8601
+    end
+    File.binwrite(path, JSON.generate(value) + "\n")
+  end
+' "$test_repository/docs/evidence/releases/v0.1.0"
+git -C "$test_repository" add -- docs/evidence/releases/v0.1.0
+git -C "$test_repository" commit -q -m 'Refresh final-pre-tag manual controls'
+expected_commit="$(git -C "$test_repository" rev-parse HEAD)"
+release_commit="$expected_commit"
+
 success_stdout="$temporary_root/success.stdout"
 success_stderr="$temporary_root/success.stderr"
 run_wrapper success "$success_stdout" "$success_stderr"
 assert_equal 0 "$last_status" \
     "Complete mock evidence did not pass (status=$last_status, stderr=$(tr -d '\n' <"$success_stderr"))."
 assert_empty "$success_stderr"
-expected_success_pattern="^OK remote-controls phase=final-pre-tag repository=GGULBAE/desk-setup-switcher observed_master=$expected_commit release_workflow_blob=$workflow_blob ci_workflow_blob=$ci_workflow_blob publication_workflow_blob=$publication_workflow_blob publication_workflow_id=7002 ci_run_id=70001 ci_run_attempt=2 ci_job_id=10001 checks=2 manual_gates=2 evidence_sha256=[0-9a-f]{64} evidence_record=protected-external-output$"
+expected_success_pattern="^OK remote-controls phase=final-pre-tag repository=GGULBAE/desk-setup-switcher observed_master=$expected_commit release_workflow_blob=$workflow_blob ci_workflow_blob=$ci_workflow_blob publication_workflow_blob=$publication_workflow_blob legacy_workflow_blob=$legacy_workflow_blob publication_workflow_id=7002 ci_run_id=70001 ci_run_attempt=2 ci_job_id=10001 checks=2 manual_gates=2 evidence_sha256=[0-9a-f]{64} evidence_record=protected-external-output$"
 assert_matches "$expected_success_pattern" "$(tr -d '\n' <"$success_stdout")" \
     "Success summary was not exact."
 final_pre_tag_external_output="$temporary_root/success.final-pre-tag.json"
@@ -838,7 +961,7 @@ pass
 
 ruby -rjson -e '
   calls = File.readlines(ARGV.fetch(0), chomp: true).map { |line| JSON.parse(line) }
-  raise unless calls.length == 74
+  raise unless calls.length == 82
   headers = [
     "Accept: application/vnd.github+json",
     "X-GitHub-Api-Version: 2026-03-10",
@@ -868,20 +991,24 @@ ruby -rjson -e '
   end
   ordered_endpoints = calls.map { |call| call.find { |item| item.start_with?("/") } }
   raise unless ordered_endpoints.first == "/repos/GGULBAE/desk-setup-switcher/git/ref/heads/master"
-  raise unless ordered_endpoints[1].include?("/contents/.github/workflows/release.yml?ref=")
-  raise unless ordered_endpoints[2] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/release.yml"
-  raise unless ordered_endpoints[3].include?("/contents/.github/workflows/ci.yml?ref=")
-  raise unless ordered_endpoints[4] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/ci.yml"
-  raise unless ordered_endpoints[5].include?("/contents/.github/workflows/publish-release.yml?ref=")
-  raise unless ordered_endpoints[6] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/publish-release.yml"
-  raise unless ordered_endpoints[-7] == "/repos/GGULBAE/desk-setup-switcher/git/ref/heads/master"
+  raise unless ordered_endpoints[1].include?("/contents/.github/workflows/signed-release-candidate.yml?ref=")
+  raise unless ordered_endpoints[2] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/signed-release-candidate.yml"
+  raise unless ordered_endpoints[3].include?("/contents/.github/workflows/release.yml?ref=")
+  raise unless ordered_endpoints[4] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/release.yml"
+  raise unless ordered_endpoints[5].include?("/contents/.github/workflows/ci.yml?ref=")
+  raise unless ordered_endpoints[6] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/ci.yml"
+  raise unless ordered_endpoints[7].include?("/contents/.github/workflows/publish-release.yml?ref=")
+  raise unless ordered_endpoints[8] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/publish-release.yml"
+  raise unless ordered_endpoints[-9] == "/repos/GGULBAE/desk-setup-switcher/git/ref/heads/master"
+  raise unless ordered_endpoints[-8].include?("/contents/.github/workflows/signed-release-candidate.yml?ref=")
+  raise unless ordered_endpoints[-7] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/signed-release-candidate.yml"
   raise unless ordered_endpoints[-6].include?("/contents/.github/workflows/release.yml?ref=")
   raise unless ordered_endpoints[-5] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/release.yml"
   raise unless ordered_endpoints[-4].include?("/contents/.github/workflows/ci.yml?ref=")
   raise unless ordered_endpoints[-3] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/ci.yml"
   raise unless ordered_endpoints[-2].include?("/contents/.github/workflows/publish-release.yml?ref=")
   raise unless ordered_endpoints[-1] == "/repos/GGULBAE/desk-setup-switcher/actions/workflows/publish-release.yml"
-  raise unless ordered_endpoints[7, 30] == ordered_endpoints[37, 30]
+  raise unless ordered_endpoints[9, 32] == ordered_endpoints[41, 32]
   counts = ordered_endpoints.tally
   raise unless counts.values.all? { |count| count == 2 }
   endpoints = calls.to_h { |call| [call.find { |item| item.start_with?("/") }, call] }
@@ -906,7 +1033,7 @@ ruby -rjson -e '
   content_calls = calls.select do |call|
     call.any? { |item| item.include?("/contents/.github/workflows/") && item.include?("?ref=") }
   end
-  raise unless master_calls.length == 2 && content_calls.length == 6
+  raise unless master_calls.length == 2 && content_calls.length == 8
   content_calls.each do |call|
     endpoint = call.find { |item| item.start_with?("/") }
     raise unless endpoint.match?(/\?ref=[0-9a-f]{40}\z/)
@@ -1174,7 +1301,7 @@ ruby -rjson -rtime -e '
     value = JSON.parse(File.binread(path), allow_nan: false, create_additions: false)
     value["phase"] = "pre-publication"
     value["observedAt"] = Time.now.utc.iso8601
-    value["sourceArtifactSHA256"] = (index + 3).to_s * 64
+    value["sourceArtifactSHA256"] = (index + 5).to_s * 64
     value["subject"] = {
       "peeledCommit" => release_commit,
       "releaseId" => 12_345,
@@ -1258,7 +1385,7 @@ ruby -rjson -rtime -e '
     path = File.join(directory, name)
     value = JSON.parse(File.binread(path), allow_nan: false, create_additions: false)
     value["observedAt"] = Time.now.utc.iso8601
-    value["sourceArtifactSHA256"] = (index + 1).to_s * 64
+    value["sourceArtifactSHA256"] = (index + 3).to_s * 64
     File.binwrite(path, JSON.generate(value) + "\n")
   end
 ' "$test_repository/docs/evidence/releases/v0.1.0"
@@ -1282,7 +1409,7 @@ ruby -rjson -rtime -e '
     path = File.join(directory, name)
     value = JSON.parse(File.binread(path), allow_nan: false, create_additions: false)
     value["observedAt"] = Time.now.utc.iso8601
-    value["sourceArtifactSHA256"] = (index + 3).to_s * 64
+    value["sourceArtifactSHA256"] = (index + 5).to_s * 64
     File.binwrite(path, JSON.generate(value) + "\n")
   end
 ' "$test_repository/docs/evidence/releases/v0.1.0"
@@ -1297,35 +1424,48 @@ run_wrapper success "$pre_success_stdout" "$pre_success_stderr" \
 assert_equal 0 "$last_status" \
     "Complete pre-publication evidence did not pass (stderr=$(tr -d '\n' <"$pre_success_stderr"))."
 assert_empty "$pre_success_stderr"
-pre_success_pattern="^OK remote-controls phase=pre-publication repository=GGULBAE/desk-setup-switcher observed_master=$expected_commit release_workflow_blob=$workflow_blob ci_workflow_blob=$ci_workflow_blob publication_workflow_blob=$publication_workflow_blob publication_workflow_id=7002 ci_run_id=70001 ci_run_attempt=2 ci_job_id=10001 checks=2 manual_gates=2 evidence_sha256=[0-9a-f]{64} evidence_record=docs/evidence/releases/v0.1.0/remote-controls-pre-publication.json$"
+pre_success_pattern="^OK remote-controls phase=pre-publication repository=GGULBAE/desk-setup-switcher observed_master=$expected_commit release_workflow_blob=$workflow_blob ci_workflow_blob=$ci_workflow_blob publication_workflow_blob=$publication_workflow_blob legacy_workflow_blob=$legacy_workflow_blob publication_workflow_id=7002 ci_run_id=70001 ci_run_attempt=2 ci_job_id=10001 checks=2 manual_gates=2 evidence_sha256=[0-9a-f]{64} evidence_record=docs/evidence/releases/v0.1.0/remote-controls-pre-publication.json$"
 assert_matches "$pre_success_pattern" "$(tr -d '\n' <"$pre_success_stdout")" \
     "Pre-publication success summary was not exact."
 ruby -rjson -rdigest -e '
-  path, expected_commit, release_commit, tag_object, expected_digest = ARGV
+  path, expected_commit, predecessor_commit, predecessor_tag_object,
+    release_commit, tag_object, predecessor_digest, final_digest, expected_digest = ARGV
   stat = File.lstat(path)
   raise unless stat.file? && !stat.symlink? && (stat.mode & 0o777) == 0o600
   value = JSON.parse(File.binread(path), allow_nan: false, create_additions: false)
-  raise unless value.fetch("schemaVersion") == "desk-setup-switcher.remote-release-controls-evidence/v2"
+  raise unless value.fetch("schemaVersion") == "desk-setup-switcher.remote-release-controls-evidence/v3"
   raise unless value.fetch("phase") == "pre-publication"
+  raise unless value.fetch("predecessorPreTagEvidenceSHA256") == predecessor_digest
+  raise unless value.fetch("finalPreTagEvidenceSHA256") == final_digest
   raise unless value.dig("anchorReads", 0, "master", "commitSha") == expected_commit
-  raise unless value.dig("releaseBoundary", "vRefs", "items") == [{
-    "ref" => "refs/tags/v0.1.0", "objectType" => "tag",
-    "objectSha" => tag_object, "commitSha" => release_commit
-  }]
+  raise unless value.dig("releaseBoundary", "vRefs", "items") == [
+    {
+      "ref" => "refs/tags/v0.0.9", "objectType" => "tag",
+      "objectSha" => predecessor_tag_object, "commitSha" => predecessor_commit
+    },
+    {
+      "ref" => "refs/tags/v0.1.0", "objectType" => "tag",
+      "objectSha" => tag_object, "commitSha" => release_commit
+    }
+  ]
   raise unless value.dig("releaseBoundary", "releases", "items") == [{
     "id" => 12345, "tag" => "v0.1.0", "draft" => true, "prerelease" => true
   }]
   raise unless Digest::SHA256.file(path).hexdigest == expected_digest
-' "$pre_publication_output" "$expected_commit" "$release_commit" "$release_tag_object" \
+' "$pre_publication_output" "$expected_commit" \
+    "$predecessor_commit" "$predecessor_tag_object" \
+    "$release_commit" "$release_tag_object" \
+    "$predecessor_external_sha256" "$final_pre_tag_external_sha256" \
     "$(sed -n 's/.* evidence_sha256=\([0-9a-f]\{64\}\) .*/\1/p' "$pre_success_stdout")" \
     || fail "The persisted pre-publication manifest was not exact."
 pass
 ruby -rjson -e '
   calls = File.readlines(ARGV.fetch(0), chomp: true).map { |line| JSON.parse(line) }
-  raise unless calls.length == 78
+  raise unless calls.length == 86
   endpoints = calls.map { |call| call.find { |item| item.start_with?("/") } }
+  raise unless endpoints.count { |endpoint| endpoint.end_with?("/commits/tags/v0.0.9") } == 2
   raise unless endpoints.count { |endpoint| endpoint.end_with?("/commits/tags/v0.1.0") } == 2
-  raise unless endpoints.count { |endpoint| endpoint.include?("/git/tags/") } == 2
+  raise unless endpoints.count { |endpoint| endpoint.include?("/git/tags/") } == 4
   raise unless endpoints.count { |endpoint| endpoint.end_with?("/releases?per_page=100") } == 2
   raise unless endpoints.count { |endpoint| endpoint.end_with?("/actions/workflows?per_page=100") } == 2
 ' "$mock_log" || fail "Pre-publication did not execute two complete remote reads."

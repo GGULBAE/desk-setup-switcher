@@ -74,7 +74,13 @@ pass
 ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_policy_v2.rb"
 pass
 
+ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_policy_v3.rb"
+pass
+
 ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector_v2.rb"
+pass
+
+ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector_v3.rb"
 pass
 
 ruby "$RELEASE_SCRIPTS_DIR/test_publication_policy.rb"
@@ -89,12 +95,17 @@ pass
 "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector.sh"
 pass
 
+"$RELEASE_SCRIPTS_DIR/test_release_evidence_history.sh"
+pass
+
 "$RELEASE_SCRIPTS_DIR/test_prepare_draft_release.sh"
 pass
 
 "$RELEASE_SCRIPTS_DIR/test_restore_candidate_artifact.sh"
 pass
 
+# The publisher suite owns its isolated v0.1.0/build-2 target fixture because
+# this checkout remains the deliberate v0.0.9/build-1 predecessor.
 "$RELEASE_SCRIPTS_DIR/test_publish_approved_release.sh"
 pass
 
@@ -156,23 +167,25 @@ cat >"$preflight_mock_bin/git" <<'MOCK_PREFLIGHT_GIT'
 set -euo pipefail
 commit=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tag_object=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+release_tag="${MOCK_PREFLIGHT_TAG:?}"
 case "${1:-}" in
     rev-parse)
         [[ "${2:-}" == --verify && "$#" == 3 ]] || exit 91
-        case "$3" in
-            HEAD^{commit}|refs/tags/v0.1.0^{commit}) printf '%s\n' "$commit" ;;
-            refs/tags/v0.1.0)
-                if [[ "${MOCK_PREFLIGHT_TAG_KIND:-annotated}" == lightweight ]]; then
-                    printf '%s\n' "$commit"
-                else
-                    printf '%s\n' "$tag_object"
-                fi ;;
-            *) exit 91 ;;
-        esac
+        if [[ "$3" == HEAD^{commit} || "$3" == "refs/tags/$release_tag^{commit}" ]]; then
+            printf '%s\n' "$commit"
+        elif [[ "$3" == "refs/tags/$release_tag" ]]; then
+            if [[ "${MOCK_PREFLIGHT_TAG_KIND:-annotated}" == lightweight ]]; then
+                printf '%s\n' "$commit"
+            else
+                printf '%s\n' "$tag_object"
+            fi
+        else
+            exit 91
+        fi
         ;;
     show-ref)
         [[ "$#" == 4 && "$2" == --verify && "$3" == --quiet ]] || exit 92
-        [[ "$4" == refs/tags/v0.1.0 ]] || exit 1
+        [[ "$4" == "refs/tags/$release_tag" ]] || exit 1
         ;;
     cat-file)
         [[ "$#" == 3 && "$2" == -t ]] || exit 93
@@ -191,21 +204,56 @@ case "${1:-}" in
 esac
 MOCK_PREFLIGHT_GIT
 chmod 0755 "$preflight_mock_bin/git"
+preflight_fixture_root="$temporary_root/preflight-fixture"
+mkdir -p \
+    "$preflight_fixture_root/scripts/release" \
+    "$preflight_fixture_root/scripts/lib" \
+    "$preflight_fixture_root/Config"
+cp "$RELEASE_SCRIPTS_DIR/preflight.sh" "$preflight_fixture_root/scripts/release/preflight.sh"
+cp "$RELEASE_SCRIPTS_DIR/lib.sh" "$preflight_fixture_root/scripts/release/lib.sh"
+cp "$ROOT_DIR/scripts/lib/common.sh" "$preflight_fixture_root/scripts/lib/common.sh"
+cp "$ROOT_DIR/Config/Info.plist" "$preflight_fixture_root/Config/Info.plist"
+fixture_preflight="$preflight_fixture_root/scripts/release/preflight.sh"
 preflight_environment=(
     env -i
     "PATH=$preflight_mock_bin:$PATH"
     "HOME=${HOME:-/tmp}"
     "TMPDIR=${TMPDIR:-/tmp}"
     "DEVELOPER_DIR=$DEVELOPER_DIR"
-    RELEASE_TAG=v0.1.0
     EXPECTED_COMMIT=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    'RELEASE_CONFIRMATION=prepare signed draft v0.1.0'
 )
-"${preflight_environment[@]}" "$RELEASE_SCRIPTS_DIR/preflight.sh" \
-    >"$temporary_root/preflight-annotated.stdout"
-assert_contains "$temporary_root/preflight-annotated.stdout" "Release preflight passed"
-assert_fails "${preflight_environment[@]}" MOCK_PREFLIGHT_TAG_KIND=lightweight \
-    "$RELEASE_SCRIPTS_DIR/preflight.sh"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleShortVersionString 0.0.9' \
+    "$preflight_fixture_root/Config/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 1' \
+    "$preflight_fixture_root/Config/Info.plist"
+"${preflight_environment[@]}" \
+    MOCK_PREFLIGHT_TAG=v0.0.9 \
+    RELEASE_TAG=v0.0.9 \
+    RELEASE_OPERATION=build-candidate \
+    'RELEASE_CONFIRMATION=build protected candidate v0.0.9' \
+    "$fixture_preflight" >"$temporary_root/preflight-predecessor-annotated.stdout"
+assert_contains "$temporary_root/preflight-predecessor-annotated.stdout" \
+    "Release preflight passed for v0.0.9"
+assert_fails "${preflight_environment[@]}" \
+    MOCK_PREFLIGHT_TAG=v0.0.9 \
+    MOCK_PREFLIGHT_TAG_KIND=lightweight \
+    RELEASE_TAG=v0.0.9 \
+    RELEASE_OPERATION=build-candidate \
+    'RELEASE_CONFIRMATION=build protected candidate v0.0.9' \
+    "$fixture_preflight"
+
+/usr/libexec/PlistBuddy -c 'Set :CFBundleShortVersionString 0.1.0' \
+    "$preflight_fixture_root/Config/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 2' \
+    "$preflight_fixture_root/Config/Info.plist"
+"${preflight_environment[@]}" \
+    MOCK_PREFLIGHT_TAG=v0.1.0 \
+    RELEASE_TAG=v0.1.0 \
+    RELEASE_OPERATION=prepare-draft \
+    'RELEASE_CONFIRMATION=prepare signed draft v0.1.0' \
+    "$fixture_preflight" >"$temporary_root/preflight-final-annotated.stdout"
+assert_contains "$temporary_root/preflight-final-annotated.stdout" \
+    "Release preflight passed for v0.1.0"
 
 cleanup_environment=(
     env -i
@@ -559,13 +607,15 @@ pass
 printf 'tamper\n' >>"$fixture_app/Contents/Resources/value.txt"
 assert_fails "$RELEASE_SCRIPTS_DIR/compare-bundle-manifest.sh" "$first_manifest" "$fixture_app"
 
-workflow=.github/workflows/release.yml
+workflow=.github/workflows/signed-release-candidate.yml
 publication_workflow=.github/workflows/publish-release.yml
 prepare_draft="$RELEASE_SCRIPTS_DIR/prepare-draft-release.sh"
 restore_candidate="$RELEASE_SCRIPTS_DIR/restore-candidate-artifact.sh"
 verify_candidate="$RELEASE_SCRIPTS_DIR/verify-candidate.sh"
 verify_downloaded="$RELEASE_SCRIPTS_DIR/verify-downloaded-candidate.sh"
 publication_helper="$RELEASE_SCRIPTS_DIR/publish-approved-release.sh"
+remote_controls_verifier="$RELEASE_SCRIPTS_DIR/verify-remote-controls.sh"
+release_library="$RELEASE_SCRIPTS_DIR/lib.sh"
 publication_policy="$RELEASE_SCRIPTS_DIR/publication_policy.rb"
 external_beta_policy="$RELEASE_SCRIPTS_DIR/external_beta_policy.rb"
 external_beta_template_cli="$RELEASE_SCRIPTS_DIR/external_beta_template_cli.rb"
@@ -600,6 +650,10 @@ assert_not_contains "$workflow" "gh release edit"
 assert_not_contains "$workflow" "gh release delete"
 assert_not_contains "$workflow" "--clobber"
 assert_not_contains "$workflow" "unsigned"
+assert_contains "$release_library" "release_verify_first_parent_commit_once()"
+assert_contains "$remote_controls_verifier" "release_verify_predecessor_pre_tag_evidence_chain"
+assert_contains "$remote_controls_verifier" "release_verify_final_pre_tag_evidence_chain"
+assert_contains "$publication_helper" "release_verify_final_pre_tag_evidence_chain"
 assert_not_contains "$workflow" "artifacts/*.dmg"
 assert_not_contains "$workflow" "RELEASE_SIGNING_KEYCHAIN:"
 assert_contains "$workflow" "run: exec /bin/bash scripts/release/import-signing-certificate.sh"
@@ -609,7 +663,12 @@ assert_not_contains "$workflow" "run: make release-candidate"
 assert_contains "$publication_workflow" "workflow_dispatch:"
 assert_contains "$publication_workflow" "environment: release-publication"
 assert_contains "$publication_workflow" "group: signed-release-candidate-v0.1.0"
-assert_contains "$publication_workflow" "run: exec /bin/bash scripts/release/restore-candidate-artifact.sh"
+assert_contains "$publication_workflow" "predecessor_origin_run_id:"
+assert_contains "$publication_workflow" "predecessor_artifact_id:"
+assert_contains "$publication_workflow" "predecessor_artifact_sha256:"
+assert_contains "$publication_workflow" "predecessor_final_dmg_sha256:"
+assert_contains "$publication_workflow" "RELEASE_RESTORE_KIND=candidate /bin/bash scripts/release/restore-candidate-artifact.sh"
+assert_contains "$publication_workflow" "RELEASE_RESTORE_KIND=predecessor /bin/bash scripts/release/restore-candidate-artifact.sh"
 assert_contains "$publication_workflow" "run: exec /bin/bash scripts/release/publish-approved-release.sh"
 assert_contains "$publication_workflow" "RELEASE_ADMIN_READ_TOKEN: \${{ secrets.RELEASE_ADMIN_READ_TOKEN }}"
 assert_contains "$publication_workflow" "make verify-downloaded-release"
@@ -631,7 +690,9 @@ ruby -ryaml -rjson -e '
   inputs = triggers.fetch("workflow_dispatch").fetch("inputs")
   expected_inputs = %w[
     tag expected_commit release_id candidate_origin_run_id candidate_artifact_id
-    candidate_artifact_sha256 final_dmg_sha256 approval_record_commit
+    candidate_artifact_sha256 final_dmg_sha256 predecessor_commit
+    predecessor_origin_run_id predecessor_artifact_id predecessor_artifact_sha256
+    predecessor_final_dmg_sha256 approval_record_commit
     approval_record_sha256 approver_login publisher_login confirmation
   ]
   abort "publication input schema differs" unless inputs.keys.sort == expected_inputs.sort
@@ -656,13 +717,15 @@ ruby -ryaml -rjson -e '
   steps = publish.fetch("steps")
   names = steps.map { |step| step.fetch("name") }
   checkout = names.index("Check out the immutable release tag")
-  restore = names.index("Restore the exact candidate from its origin artifact")
+  restore = names.index("Restore the exact current and predecessor candidates")
   preverify = names.index("Verify origin candidate and all attestations before publication")
+  predecessor_verify = names.index("Verify protected predecessor and all attestations before publication")
   mutate = names.index("Publish only the exact approved Release ID")
   postverify = names.index("Verify public redownload and all attestations")
   abort "publication verification/mutation order differs" unless
-    [checkout, restore, preverify, mutate, postverify].all? &&
-      checkout < restore && restore < preverify && preverify < mutate && mutate < postverify
+    [checkout, restore, preverify, predecessor_verify, mutate, postverify].all? &&
+      checkout < restore && restore < preverify && preverify < predecessor_verify &&
+      predecessor_verify < mutate && mutate < postverify
   checkout_step = steps.fetch(checkout)
   abort "publication checkout action is not the sole reviewed action" unless
     checkout_step.fetch("uses") ==
@@ -673,10 +736,42 @@ ruby -ryaml -rjson -e '
     "ref" => "${{ inputs.tag }}", "fetch-depth" => 0, "persist-credentials" => false,
     "token" => read_token
   }
-  [restore, preverify, postverify].each do |index|
+  [restore, preverify, predecessor_verify, postverify].each do |index|
     abort "publication read step does not use the protected read-only credential" unless
       steps.fetch(index).fetch("env").fetch("GH_TOKEN") == read_token
   end
+  restore_script = steps.fetch(restore).fetch("run")
+  abort "publication restoration does not bind both protected candidates in one read boundary" unless
+    restore_script.lines.grep(/restore-candidate-artifact\.sh/).map(&:strip) == [
+      "RELEASE_RESTORE_KIND=candidate /bin/bash scripts/release/restore-candidate-artifact.sh",
+      "RELEASE_RESTORE_KIND=predecessor /bin/bash scripts/release/restore-candidate-artifact.sh"
+    ]
+  predecessor_script = steps.fetch(predecessor_verify).fetch("run")
+  predecessor_markers = [
+    %q{predecessor_read_token="${GH_TOKEN:-}"},
+    %q{unset GH_TOKEN GITHUB_TOKEN GH_HOST GH_DEBUG DEBUG GH_ENTERPRISE_TOKEN},
+    %q{export -n predecessor_read_token},
+    %q{predecessor_ref=refs/tags/v0.0.9},
+    %q{[[ "$predecessor_tag_commit" != "$RELEASE_PREDECESSOR_COMMIT" ]]},
+    %q{mktemp -d "$RUNNER_TEMP/desk-setup-predecessor-verify.XXXXXX"},
+    %q{git worktree add --detach "$worktree" "$RELEASE_PREDECESSOR_COMMIT"},
+    %q{git worktree remove --force "$worktree"},
+    %q{git worktree prune},
+    %q{RELEASE_TAG=v0.0.9},
+    %q{EXPECTED_COMMIT="$RELEASE_PREDECESSOR_COMMIT"},
+    %q{RELEASE_CANDIDATE_RUN_ID="$RELEASE_PREDECESSOR_RUN_ID"},
+    %q{RELEASE_CANDIDATE_RUN_ATTEMPT=1},
+    %q{RELEASE_SOURCE_DIR="$predecessor_source"},
+    %q{RELEASE_DOWNLOAD_DIR="$predecessor_source"},
+    %q{GH_TOKEN="$predecessor_read_token"},
+    %q{/bin/bash scripts/release/verify-downloaded-candidate.sh}
+  ]
+  abort "protected predecessor verification is incomplete" unless
+    predecessor_markers.all? { |marker| predecessor_script.include?(marker) } &&
+      predecessor_script.index(%q{git show-ref --verify --quiet "$predecessor_ref"}) <
+        predecessor_script.index(%q{git worktree add --detach}) &&
+      predecessor_script.index(%q{git worktree add --detach}) <
+        predecessor_script.index(%q{/bin/bash scripts/release/verify-downloaded-candidate.sh})
   publish_step = steps.fetch(mutate)
   abort "publication helper invocation differs" unless
     publish_step.fetch("run") == "exec /bin/bash scripts/release/publish-approved-release.sh"
@@ -686,7 +781,7 @@ ruby -ryaml -rjson -e '
     publish_step.fetch("env").fetch("GH_TOKEN") == "${{ github.token }}"
   serialized = JSON.generate(workflow)
   abort "admin-read secret reference count differs" unless
-    serialized.scan(read_token).length == 5
+    serialized.scan(read_token).length == 6
   abort "job write token reference count differs" unless
     serialized.scan("${{ github.token }}").length == 1
   abort "publication workflow gained a signing secret" if
@@ -718,6 +813,10 @@ ruby -rdigest -rjson -ropen3 -rrbconfig -rtmpdir -e '
     helper.match?(/--method (?:POST|PUT|DELETE)/)
   abort "publication helper does not bind approval commit to master" unless
     helper.include?(%q{[[ "$RELEASE_APPROVAL_RECORD_COMMIT" == "$initial_master" ]]})
+  abort "publication helper does not recheck both immutable tag identities" unless
+    helper.include?(%q{"refs/tags/$predecessor_tag" "refs/tags/$predecessor_tag^{}"}) &&
+      helper.include?(%q{"refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}"}) &&
+      helper.lines.count { |line| line.strip == "require_remote_tags" } == 6
   abort "publication helper can hide another repository Release" unless
     helper.include?(%q{raise unless releases.length == 1})
   abort "publication helper does not enforce an exact confirmation" unless
@@ -742,8 +841,22 @@ ruby -rdigest -rjson -ropen3 -rrbconfig -rtmpdir -e '
   abort "publication helper does not run actual-byte beta validation" unless
     helper.include?(%q{external_beta_policy.rb" verify-set}) &&
       helper.include?(%q{--release-manifest "$candidate_snapshot/release-manifest.json"}) &&
+      helper.include?(%q{--final-dmg "$candidate_snapshot/$dmg_name"}) &&
+      helper.include?(%q{--predecessor-release-manifest "$predecessor_snapshot/release-manifest.json"}) &&
+      helper.include?(%q{--predecessor-provenance-bundle}) &&
+      helper.include?(%q{"$predecessor_snapshot/$predecessor_provenance_name"}) &&
+      helper.include?(%q{--predecessor-dmg "$predecessor_snapshot/$predecessor_dmg_name"}) &&
+      helper.include?(%q{--predecessor-release-boundary "$final_pre_tag_evidence"}) &&
+      helper.include?(%q{--predecessor-tag-object "$predecessor_tag_object"}) &&
+      helper.include?(%q{--predecessor-pre-tag-evidence-sha256}) &&
       helper.include?(%q{--candidate-inventory "$candidate_inventory_evidence"}) &&
       helper.scan(/--report "\$\{external_beta_report_evidence\[[012]\]\}"/).length == 3
+  abort "publication helper does not replay the v3 predecessor lifecycle before PATCH" unless
+    helper.include?(%q{--expected-phase pre-publication}) &&
+      helper.include?(%q{--expected-phase final-pre-tag}) &&
+      helper.scan(/--expected-predecessor-commit "\$RELEASE_PREDECESSOR_COMMIT"/).length == 2 &&
+      helper.scan(/--expected-predecessor-tag-object "\$predecessor_tag_object"/).length == 2 &&
+      helper.include?(%q{--expected-final-pre-tag-evidence-sha256})
   generator_entrypoints = %w[external_beta_template_cli.rb external_beta_templates.rb print-template]
   abort "publication path invokes the rejected-template generator" if
     [helper, workflow_source, publication_workflow_source].any? do |source|
@@ -781,7 +894,7 @@ ruby -rdigest -rjson -ropen3 -rrbconfig -rtmpdir -e '
       "8f9d7ffeddecdb570ad667f18bc170e3bfffc468103d86d58281c574dfea762b"
   abort "external beta pure template source differs from the reviewed implementation" unless
     Digest::SHA256.hexdigest(template_source) ==
-      "fe040b97175fb94ac1e68ab667fc3cb563218589dfb91dbc9971fb7b1c333bd6"
+      "8f5fd25b35f12e0baf91791295aba209444a653027a4cb34feaa97166143b326"
   abort "external beta pure template source lacks rejected placeholders" unless
     template_source.include?(%q{<REJECTED_TEMPLATE:REPLACE_REQUIRED:})
   pure_source_forbidden = /(?:`|%x|\b(?:File|IO|Dir|Process|ENV|Socket|TCPSocket|UDPSocket|UNIXSocket|Net::HTTP|Open3|Kernel|URI|Thread|Fiber|Ractor|Time|Date|Random|SecureRandom|JSON|YAML|Psych|Marshal)\b|\b(?:system|exec|spawn|fork|open|read|write|puts|print|printf|warn|abort|exit|at_exit|require|load|autoload)\b)/
@@ -802,12 +915,8 @@ ruby -rdigest -rjson -ropen3 -rrbconfig -rtmpdir -e '
     template_cli_source.lines.grep(/^    warn /).map(&:chomp) == expected_template_cli_errors &&
       template_cli_source.lines.grep(/^    exit 1$/).length == 3
   template_variants = [
-    %w[--kind candidate-inventory-empty],
     %w[--kind candidate-inventory-retained],
-    %w[--kind candidate-inventory-not-retained],
-    %w[--kind predecessor-lineage-none],
     %w[--kind predecessor-lineage-recorded],
-    %w[--kind external-beta-report-none --report-code beta-01 --coverage-role sonoma-full-lifecycle],
     %w[--kind external-beta-report-recorded --report-code beta-02 --coverage-role additional-apple-silicon],
     %w[--kind external-beta-set --sonoma-report-code beta-01]
   ]
@@ -864,11 +973,11 @@ ruby -rdigest -rjson -ropen3 -rrbconfig -rtmpdir -e '
   abort "external beta policy contains process, network, or file mutation primitives" if
     forbidden_mutation.call(beta_policy)
   expected_file_apis = {
-    "File.basename" => 1,
-    "File.lstat" => 2,
-    "File::RDONLY" => 1,
-    "File::NOFOLLOW" => 2,
-    "File.open" => 1
+    "File.basename" => 4,
+    "File.lstat" => 4,
+    "File::RDONLY" => 2,
+    "File::NOFOLLOW" => 4,
+    "File.open" => 2
   }
   observed_file_apis = beta_policy.scan(/\bFile(?:\.|::)[A-Za-z_][A-Za-z0-9_]*/).tally
   abort "external beta policy file API inventory differs" unless
@@ -876,7 +985,7 @@ ruby -rdigest -rjson -ropen3 -rrbconfig -rtmpdir -e '
   expected_flag_assignments = [
     "    flags = File::RDONLY",
     "    flags |= File::NOFOLLOW if defined?(File::NOFOLLOW)"
-  ]
+  ] * 2
   observed_flag_assignments = beta_policy.lines.grep(/^\s*flags\s*(?:=|\|=)/).map(&:chomp)
   abort "external beta policy read-only flags differ" unless
     observed_flag_assignments == expected_flag_assignments
@@ -952,6 +1061,13 @@ assert_before "$prepare_draft" "unset GH_TOKEN GITHUB_TOKEN" 'source "$(dirname 
 assert_contains "$restore_candidate" 'github_token="${GH_TOKEN:-}"'
 assert_contains "$restore_candidate" "unset GH_TOKEN"
 assert_contains "$restore_candidate" "RELEASE_CANDIDATE_ARTIFACT_SHA256"
+assert_contains "$restore_candidate" 'restore_kind="${RELEASE_RESTORE_KIND:-candidate}"'
+assert_contains "$restore_candidate" "RELEASE_PREDECESSOR_ARTIFACT_SHA256"
+assert_contains "$restore_candidate" "RELEASE_PREDECESSOR_FINAL_DMG_SHA256"
+assert_contains "$restore_candidate" "origin_version=0.0.9"
+assert_contains "$restore_candidate" "origin_build_number=1"
+assert_contains "$restore_candidate" "origin_tag=v0.0.9"
+assert_contains "$restore_candidate" '.github/workflows/signed-release-candidate.yml'
 assert_not_contains "$restore_candidate" "gh release"
 assert_contains "$verify_downloaded" "unset github_token"
 assert_contains "$verify_downloaded" 'github_token="${GH_TOKEN:-}"'
@@ -1032,8 +1148,10 @@ private_evidence_root="$(mktemp -d "$temporary_root/remote-controls-output.XXXXX
 chmod 0700 "$private_evidence_root"
 private_evidence_output="$private_evidence_root/remote-controls-final-pre-tag.json"
 remote_controls_dry_run="$temporary_root/remote-controls-make-dry-run.txt"
-make -n --no-print-directory verify-remote-controls \
+make -n --no-print-directory verify-remote-controls-final-pre-tag \
     REMOTE_CONTROLS_EVIDENCE_OUTPUT="$private_evidence_output" \
+    PREDECESSOR_COMMIT=7777777777777777777777777777777777777777 \
+    PREDECESSOR_TAG_OBJECT=8888888888888888888888888888888888888888 \
     >"$remote_controls_dry_run" 2>&1
 if grep -F -q -- "$private_evidence_output" "$remote_controls_dry_run"; then
     release_die "The remote-controls make dry run disclosed its private evidence path."

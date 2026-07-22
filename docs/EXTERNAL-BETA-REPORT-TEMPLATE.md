@@ -6,8 +6,8 @@ Do not include a personal name, account name, home path, serial number, device U
 
 ## Machine evidence that actually closes the gate
 
-Markdown checkboxes or three arbitrary digest strings do not close the gate.
-Before approval, commit these six ordinary JSON blobs on the reviewed
+Markdown checkboxes or arbitrary digest strings do not close the gate. Before
+approval, commit these six ordinary inventory/report JSON blobs on the reviewed
 pre-approval `master` commit:
 
 ```text
@@ -19,15 +19,24 @@ docs/evidence/releases/<tag>/candidate-inventory.json
 docs/evidence/releases/<tag>/predecessor-lineage.json
 ```
 
-Each report uses `desk-setup-switcher.external-beta/v1`. It contains only
+They depend on two earlier tracked v3 remote-controls records at the fixed
+`v0.1.0` evidence path: `remote-controls-predecessor-pre-tag.json` and
+`remote-controls-final-pre-tag.json`. The verifier also requires the actual
+current and predecessor candidate files restored from their distinct immutable
+attempt-1 origin artifacts. A six-file commit by itself therefore does not
+close the gate.
+
+Each report uses `desk-setup-switcher.external-beta/v2`. It contains only
 closed, privacy-safe fields for report time, exact candidate identity, broad
 environment class, independence assertions, browser/quarantine acquisition,
 mandatory lifecycle results, zero-blocker state, and tester attestation. It
-binds the actual release-manifest, candidate archive, final DMG, provenance
-bundle, and predecessor-lineage byte digests. The report codes are exactly
-`beta-01`, `beta-02`, and `beta-03`.
+binds the actual current release manifest, candidate archive, final DMG,
+provenance bundle, and predecessor-lineage byte digests. Its mandatory upgrade
+result additionally binds the actual `v0.0.9` predecessor manifest, DMG, and
+provenance identities. The report codes are exactly `beta-01`, `beta-02`, and
+`beta-03`.
 
-The set uses `desk-setup-switcher.external-beta-set/v1`. It orders the three
+The set uses `desk-setup-switcher.external-beta-set/v2`. It orders the three
 actual report-byte digests, names the real Sonoma gate report, and records a
 protected release-approver review of a private roster. Only salted/private
 roster commitments and bundle digests enter the repository; personal identity
@@ -37,11 +46,12 @@ prove the bindings and assertions, not the real-world identities themselves;
 that last fact remains the protected reviewer trust boundary.
 
 The candidate inventory uses `desk-setup-switcher.candidate-inventory/v1` and
-the lineage uses `desk-setup-switcher.predecessor-lineage/v2`. Together they
-represent retained and non-retained prior protected candidates without fake
-artifact hashes, bind the actual inventory bytes, and select the latest
-installable predecessor. Inventory completeness remains a protected reviewer
-trust boundary; the local validator does not query GitHub.
+the lineage uses `desk-setup-switcher.predecessor-lineage/v3`. For this release
+they encode one fixed transition: retained protected-beta `v0.0.9`/build 1 into
+final `v0.1.0`/build 2. They bind the actual inventory, predecessor manifest,
+predecessor DMG, predecessor provenance, and v3 remote-boundary bytes. There is
+no empty-inventory or no-predecessor variant. Inventory completeness remains a
+protected reviewer trust boundary; the local validator does not query GitHub.
 
 ## Generate rejected-placeholder JSON safely
 
@@ -53,29 +63,25 @@ evidence digest, and never marks a gate complete. Every document contains reserv
 `<REJECTED_TEMPLATE:REPLACE_REQUIRED:...>` values plus independent false or
 invalid gates. `verify-set` rejects the reserved values explicitly.
 
-Available complete-document shapes are:
+Available complete-document shapes are exactly:
 
 | Kind | Extra options | Use |
 | --- | --- | --- |
-| `candidate-inventory-empty` | none | Reviewed history has no earlier consumed build |
-| `candidate-inventory-retained` | none | Inventory with one retained-item shape; duplicate the item only for real reviewed rows |
-| `candidate-inventory-not-retained` | none | Inventory with one non-retained-item shape |
-| `predecessor-lineage-none` | none | No installable predecessor after complete review |
-| `predecessor-lineage-recorded` | none | Latest installable predecessor is recorded |
-| `external-beta-report-none` | `--report-code`, `--coverage-role` | Report paired with approved first-beta no-predecessor lineage |
-| `external-beta-report-recorded` | `--report-code`, `--coverage-role` | Report paired with a recorded predecessor |
+| `candidate-inventory-retained` | none | Fixed retained `v0.0.9`/build-1 predecessor item and `v0.1.0`/build-2 subject |
+| `predecessor-lineage-recorded` | none | Fixed protected-beta predecessor with actual material/boundary bindings |
+| `external-beta-report-recorded` | `--report-code`, `--coverage-role` | Mandatory acquisition and upgrade from the recorded predecessor |
 | `external-beta-set` | `--sonoma-report-code` | Protected review of the three completed reports |
 
 Preview the required shape in the terminal:
 
 ```sh
 ruby scripts/release/external_beta_template_cli.rb \
-  --kind external-beta-report-none \
+  --kind external-beta-report-recorded \
   --report-code beta-01 \
   --coverage-role sonoma-full-lifecycle
 
 ruby scripts/release/external_beta_template_cli.rb \
-  --kind external-beta-report-none \
+  --kind external-beta-report-recorded \
   --report-code beta-02 \
   --coverage-role additional-apple-silicon
 
@@ -84,10 +90,10 @@ ruby scripts/release/external_beta_template_cli.rb \
   --sonoma-report-code beta-01
 ```
 
-Use `external-beta-report-recorded` instead when lineage records an installable
-predecessor. Generate the third report with `beta-03`; each code appears once,
-and only the report that actually ran the full macOS 14 lifecycle may be named
-as the Sonoma report.
+Generate the third recorded report with `beta-03`; each code appears once, and
+only the report that actually ran the full macOS 14 lifecycle may be named as
+the Sonoma report. Every report must acquire and upgrade from the same exact
+protected predecessor.
 
 The stdout is a structure reference, not evidence. Inspect it first, then copy
 it into a new file through the protected review/editor workflow. Do not use a
@@ -103,20 +109,30 @@ Only its successful descriptor-bound result may feed publication approval; a
 generated document, edited document, or calculated digest by itself closes no
 gate.
 
-The publication helper re-reads all six files as descriptor-bound ordinary
-files, validates their exact schema and chronology, calculates their actual
-SHA-256 values, and cross-checks them with the restored release candidate and
-`publication-approval/v2` immediately before the sole publication mutation.
-Missing/extra/duplicate fields, report reuse, a wrong candidate, failed
-quarantine or lifecycle state, missing Sonoma coverage, a non-independent
-tester, unresolved P0/P1, or changed bytes stop publication.
+The publication helper re-reads the six inventory/report files as
+descriptor-bound ordinary files, then validates them together with the actual
+current release manifest, DMG, and provenance bundle; the actual predecessor
+manifest, DMG, and provenance bundle; the predecessor tag object; the earlier
+predecessor-pre-tag evidence digest; and the v3 final-pre-tag boundary. It
+calculates their actual SHA-256 values and cross-checks them with the restored
+origins and `publication-approval/v2` immediately before the sole publication
+mutation. Missing/extra/duplicate fields, report reuse, a wrong candidate or
+predecessor, failed quarantine/upgrade/lifecycle state, missing Sonoma coverage,
+a non-independent tester, unresolved P0/P1, or changed bytes stop publication.
 
 The same deterministic check can be rehearsed without GitHub mutation:
 
 ```sh
 ruby scripts/release/external_beta_policy.rb verify-set \
   --release-manifest artifacts/release/release-manifest.json \
+  --final-dmg artifacts/release/Desk-Setup-Switcher-0.1.0.dmg \
   --provenance-bundle artifacts/release/Desk-Setup-Switcher-0.1.0.provenance.sigstore.json \
+  --predecessor-release-manifest artifacts/predecessor/release-manifest.json \
+  --predecessor-dmg artifacts/predecessor/Desk-Setup-Switcher-0.0.9.dmg \
+  --predecessor-provenance-bundle artifacts/predecessor/Desk-Setup-Switcher-0.0.9.provenance.sigstore.json \
+  --predecessor-release-boundary docs/evidence/releases/v0.1.0/remote-controls-final-pre-tag.json \
+  --predecessor-tag-object '<exact-v0.0.9-annotated-tag-object>' \
+  --predecessor-pre-tag-evidence-sha256 '<predecessor-pre-tag-evidence-sha256>' \
   --candidate-inventory docs/evidence/releases/v0.1.0/candidate-inventory.json \
   --predecessor-lineage docs/evidence/releases/v0.1.0/predecessor-lineage.json \
   --set-manifest docs/evidence/releases/v0.1.0/external-beta-set.json \
@@ -147,11 +163,15 @@ mount, publish, or mutate a system setting.
 | Hardware class | Apple Silicon, broad class only |
 | Minimum-OS coverage role | Sonoma 14.x gate / additional Apple Silicon report |
 | Clean account/Mac basis | `<not recorded>` |
-| Candidate version/build | `<not recorded>` |
+| Final candidate version/build | `0.1.0` / `2` |
 | Commit and protected workflow run | `<not recorded>` |
 | Workflow artifact ID | `<not recorded>` |
 | Final DMG expected SHA-256 | `<not recorded>` |
 | Final-DMG provenance attestation bundle/URL and subject digest | `<not recorded>` |
+| Predecessor version/build | `0.0.9` / `1` |
+| Predecessor commit, tag-object SHA, and protected origin run/artifact | `<not recorded>` |
+| Predecessor final DMG, manifest, and provenance SHA-256 values | `<not recorded>` |
+| Predecessor-pre-tag and final-pre-tag boundary SHA-256 values | `<not recorded>` |
 
 ## Browser download and quarantine validity
 
@@ -161,6 +181,8 @@ mount, publish, or mutate a system setting.
 - [ ] The tester did not add, delete, copy around, or otherwise manufacture the quarantine attribute.
 - [ ] The extracted DMG SHA-256 equals the expected final SHA-256.
 - [ ] The final-DMG provenance attestation verifies that same final SHA-256 and protected workflow run.
+- [ ] The tester separately browser-downloaded the exact retained `v0.0.9` predecessor origin artifact and extracted it through the normal macOS path.
+- [ ] Before mounting, the predecessor DMG had its own real, unmanufactured `com.apple.quarantine` attribute; its checksum, Gatekeeper assessment, and provenance subject match the recorded predecessor manifest and lineage.
 
 Sanitized quarantine evidence: `<not recorded>`
 
@@ -177,7 +199,7 @@ Use synthetic profile names and values. Do not choose Apply or mutate display, a
 | Clean first launch | Menu-bar-only app appears normally | `<not recorded>` | [ ] |
 | Login default | Launch at login is off | `<not recorded>` | [ ] |
 | Three-step explanation | Capture → Edit → Review is understandable; the localized Beta text-and-shield status explicitly says Apply/rollback are not hardware-verified and says to check System Settings afterward; at reduced height or large text, scroll through the plan until Cancel/Apply are reachable, then stop without activating Apply | `<not recorded>` | [ ] |
-| Upgrade | Recorded installable predecessor upgrades without losing schema-1 profiles, settings, selection, backups, or consent state; only a validator-approved first-public-beta lineage may record not applicable | `<not recorded>` | [ ] |
+| Upgrade | Exact protected `v0.0.9` build 1, obtained and verified as recorded above, upgrades to exact `v0.1.0` build 2 without losing schema-1 profiles, settings, selection, backups, or consent state | `<not recorded>` | [ ] |
 | Schema migration | Synthetic schema 0 migrates to schema 1 without system-setting mutation | `<not recorded>` | [ ] |
 | Backup recovery | With app closed, synthetic primary corruption recovers last-known-good and quarantines safely | `<not recorded>` | [ ] |
 | Import/export | Import replacement and no-overwrite export behave as documented | `<not recorded>` | [ ] |
@@ -200,19 +222,16 @@ Use the definitions in [Distribution](DISTRIBUTION.md): P0 stops testing/publica
 ## Tester attestation
 
 - [ ] I tested the version/build, final DMG SHA-256, and final-DMG provenance attestation recorded above.
+- [ ] I separately acquired and verified the recorded `v0.0.9` predecessor DMG, manifest, provenance subject, and quarantine evidence before performing the mandatory upgrade.
 - [ ] I used a browser-downloaded workflow artifact whose extracted DMG actually retained quarantine.
 - [ ] I did not use Open Anyway, disable Gatekeeper, remove quarantine, or receive repository push/secrets access.
 - [ ] My recorded minimum-OS coverage role is accurate; if this is the Sonoma gate report, the recorded macOS version is 14.x and every mandatory lifecycle row above passed.
 - [ ] I removed personal/device/network/location/path data from this report.
 - [ ] I understand that this report does not provide hardware-mutation evidence.
 
-When [the predecessor-lineage contract](PREDECESSOR-LINEAGE.md) proves there is
-no installable predecessor for the first public beta, record the upgrade result
-as `not-applicable` with the exact reason
-`first-public-beta-no-installable-predecessor`. Clean install, schema migration,
-recovery, import/export, diagnostics, and uninstall still must pass. If any
-retained inventory item was development-installed, protected-beta installed,
-or published, that exception is rejected and the latest installable
-predecessor must be tested.
+The upgrade result is always `passed`; `not-applicable` and
+`first-public-beta-no-installable-predecessor` are invalid. The predecessor must
+be the fixed retained protected-beta `v0.0.9` build 1 described by [the
+predecessor-lineage contract](PREDECESSOR-LINEAGE.md).
 
 Tester code/date: `<not recorded>`

@@ -105,16 +105,21 @@ The release workflow on remote `master` currently:
   notarization, stapling, SBOM, provenance, redownload verification, or
   publication approval.
 
-The reviewed local workflow instead uses manual `workflow_dispatch`, requires
-the exact existing `v0.1.0` tag and commit plus a confirmation phrase, references
-`release-candidate`, builds the signed/notarized/stapled candidate, and creates
-only a draft prerelease. It is not effective remotely yet.
+The reviewed local signed-candidate workflow instead uses manual
+`workflow_dispatch` and exact existing annotated tag/commit pairs. Separate
+`build-candidate` runs create and retain the signed/notarized/stapled
+`v0.0.9`/build-1 predecessor origin and `v0.1.0`/build-2 final origin. Only a
+third `prepare-draft` dispatch may restore the final origin and create or
+additively resume its exact draft prerelease. The predecessor never creates a
+Release. This workflow is not effective remotely yet.
 
-**Invariant:** do not create or push any remote `v*` tag until GitHub serves the
-reviewed manual workflow from the default branch and a read-only check proves
-that the old automatic publisher cannot run. The later local annotated tag
-object is created only after clean A and external E exist, and it is not pushed
-at creation time.
+**Invariant:** do not create or push either remote `v*` tag until GitHub serves
+the reviewed manual workflow from the default branch and a read-only check
+proves that the old automatic publisher cannot run. The predecessor annotated
+tag targets clean P and binds the later add-only E0 evidence introduction; the
+final annotated tag targets clean F after P→P1 has landed and binds the later
+add-only E1 introduction. Each local tag object is reviewed and separately
+approved before its first push, and neither tag may be moved or deleted.
 
 ## Current repository controls
 
@@ -191,15 +196,15 @@ or promotional post unless that action is named separately.
    bypass actor. Do not grant the operator a path to move or delete an existing
    release tag, and do not test either rule with a release tag.
 4. **Create the release gates.** Create both `release-candidate` and
-   `release-publication`, restrict each to the exact `v0.1.0` tag, configure the
+   `release-publication`. Restrict `release-candidate` to exactly `v0.0.9` and
+   `v0.1.0`; restrict `release-publication` to only `v0.1.0`. Configure the
    required reviewers and publisher, explicitly decide self-review and
    administrator-bypass behavior, and leave both without credentials until
    read-back proves the protection.
 5. **Push code only to a feature branch.** After local verification and explicit
-   approval for that push, record and push the exact current
-   `codex/public-beta-release` HEAD. It must contain pre-repair tip `01db3ac`,
-   the exact-two-check gate repair, and this read-only recheck closure. Use
-   `--no-follow-tags`; do not update `master` directly.
+   approval for that push, record and push the exact reviewed release-controls
+   HEAD. Use `--no-follow-tags`; do not update `master` directly and do not
+   create either protected release tag during integration.
 6. **Open, strengthen, and verify a PR.** Target `master` and let the PR run both
    updated read-only jobs. Read back the new `Verify public site and release
    assets` check and its GitHub Actions app ID, then update the still-active
@@ -209,14 +214,19 @@ or promotional post unless that action is named separately.
    `make verify` plus the complete history/asset audit and the second verifies
    the site and release media. Preserve the reviewed commit ancestry with a
    merge commit if the evidence continues to name those commit IDs.
-7. **Prove the merged default branch.** Wait for post-merge CI, then read the
-   workflow back from GitHub while it remains disabled. Confirm
-   `workflow_dispatch` is its only trigger, the old unsigned publisher is absent,
-   the expected workflow blob is effective, and tags/Releases are still empty.
-8. **Re-enable only the reviewed workflow.** Under a new explicit approval,
-   re-enable `.github/workflows/release.yml`, now named `Signed release candidate`,
-   without dispatching it. Read its state and default-branch content back again;
-   require `active`, the reviewed blob, and `workflow_dispatch` as the only trigger.
+7. **Prove both merged workflow identities.** Wait for post-merge CI, then read
+   both paths back from GitHub. `.github/workflows/release.yml` must be the
+   reviewed fail-only **Retired legacy release workflow**, remain
+   `disabled_manually`, have no token permissions or release command, and never
+   be re-enabled. `.github/workflows/signed-release-candidate.yml` must be the
+   distinct reviewed manual candidate path. Confirm the unsafe tag trigger and
+   unsigned publisher are absent and tags/Releases remain empty.
+8. **Activate only the new signed-candidate workflow.** Under a new explicit
+   approval, activate `.github/workflows/signed-release-candidate.yml` without
+   dispatching it. Read its state and default-branch content back; require
+   `active`, the reviewed blob, and `workflow_dispatch` as the only trigger.
+   Read the legacy path again and require it to remain disabled. No procedure in
+   this repository authorizes re-enabling the legacy workflow.
 9. **Finish repository controls.** Enable private vulnerability reporting and
    immutable Releases. Require selected GitHub-owned Actions and full-SHA
    pinning, a read-only default workflow token, and no workflow PR-review
@@ -225,60 +235,74 @@ or promotional post unless that action is named separately.
    value back.
 10. **Configure protected values without exposing them.** Add the four signing
     variables and three signing/notarization secrets below directly to
-    `release-candidate`. Add the separate minimum-scope
-    `RELEASE_ADMIN_READ_TOKEN` only to `release-publication`. Never paste values
-    into issues, PRs, task messages, commands, fixtures, or logs.
-11. **Synchronize evidence and anchor the policy.** After read-back confirms the
+    `release-candidate`. Add only the shared `DEVELOPER_ID_APPLICATION` and
+    `APPLE_TEAM_ID` variables plus the separate minimum-scope
+    `RELEASE_ADMIN_READ_TOKEN` secret to `release-publication`. Never paste
+    values into issues, PRs, task messages, commands, fixtures, or logs.
+11. **Synchronize evidence and anchor the v3 policy.** After read-back confirms the
     changed settings, update `SECURITY.md`, support/governance/distribution/
     readiness documents, and the completion ledger through another reviewed PR.
     Populate every authoritative-policy field from reviewed read-only evidence:
-    repository numeric/node identity and approved metadata/state; CI, candidate,
-    and publication workflow IDs/names/paths/blobs; both release environments;
+    repository numeric/node identity and approved metadata/state; CI,
+    signed-candidate, publication, and disabled-legacy workflow
+    IDs/names/paths/blobs; both release environments; both fixed tags/builds;
     release and both CI-check identities; actor
     IDs/logins/types, and the approval mode/count/self-review setting. Do not copy
-    synthetic fixture identities. Review and merge that policy with all three
-    candidate/draft, CI, and publication workflow blobs it names,
-    then wait for exact-commit CI. The later clean A commit containing the final
-    manual records becomes `EXPECTED_COMMIT`.
-12. **Establish A and run the final-pre-tag read-only gate.** Through the
-    protected reviewed path, establish clean remote-master commit **A** with the
-    two fresh closed-schema `final-pre-tag` manual records, both environments'
-    administrator-bypass state, the publication token's repository-only
-    least-privilege configuration, and all three reviewed workflow blobs. Wait
-    for exact-A CI. From a clean, complete, non-shallow checkout whose HEAD is A,
-    authenticate as the configured operator with repository-admin visibility
-    and run
-    `make verify-remote-controls REMOTE_CONTROLS_EVIDENCE_OUTPUT=/absolute/private/remote-controls-final-pre-tag.json`
+    synthetic fixture identities. Review and merge that policy with all four
+    workflow blobs it names, then wait for exact-commit CI.
+12. **Run the predecessor-pre-tag read-only gate.** Through the protected
+    reviewed path, establish the clean `v0.0.9`/build-1 source commit with two
+    fresh closed-schema `predecessor-pre-tag` manual records and all four
+    reviewed workflow blobs. Wait for exact-commit CI. From a clean, complete,
+    non-shallow checkout authenticated as the configured operator with
+    repository-admin visibility, run
+    `make verify-remote-controls-predecessor-pre-tag REMOTE_CONTROLS_EVIDENCE_OUTPUT=/absolute/private/remote-controls-predecessor-pre-tag.json`
     while remote `v*` refs and Releases remain empty. Preserve the exact
-    mode-0600 output outside the repository as **E** and record the sanitized
-    `manual_gates=2` transcript. The command performs local reads and
-    authenticated GETs only; it configures, pushes, tags, dispatches, and
-    approves nothing.
-13. **Bind E before the first tag push.** Create the annotated `v0.1.0` tag
-    object locally against A with the exact E-digest message, record its object
-    SHA and peeled A commit, and do not push it. Create **B** as A's direct
-    single-parent child adding only unchanged E at the fixed evidence path as
-    `100644`. Integrate B into `master` by fast-forward, rebase, or one-commit
-    squash only when the resulting graph preserves the exact A→B edge; never
-    use a merge commit. Wait for exact-B CI and repeat the A→B semantic/history
-    check. Then stop for a separate tag-push approval. Only that approval may
-    authorize the first push of the already recorded tag object, followed by a
-    separately approved signed-workflow dispatch, environment approval, and
-    draft preparation. Publication remains another boundary after exact-candidate
-    lifecycle and beta evidence.
-14. **Use the v2 pre-publication path after the draft.** Record both the direct
-    annotated-tag object SHA and peeled commit. After lifecycle/beta evidence,
-    capture new protected Settings bundles and replace both manual records with
-    fresh `pre-publication` phase/tag-object/commit/Release-ID challenges in one
-    reviewed docs-only master commit; wait for CI. Freeze every release-relevant
-    GitHub Settings surface, run the two-pass pre-publication verifier, then add
-    only its manifest and the approval record in one direct-successor commit.
-    That approval commit's exact master-push CI must pass before dispatch. Every
-    timestamp is canonical UTC and must satisfy `final manuals observedAt ≤
-    final E collectedAt ≤ pre manuals observedAt ≤ pre manifest collectedAt
-    ≤ approval approvedAt`. This v2 lifecycle is a later
-    design correction; it does not retroactively turn the 2026-07-18 historical
-    read-only observations into publication evidence.
+    mode-0600 output and sanitized `manual_gates=2` transcript. The command
+    performs only local reads and authenticated GETs.
+13. **Bind and build the protected predecessor.** Create one annotated
+    `v0.0.9` tag object targeting the build-1 commit with the exact message
+    `remote-controls-predecessor-pre-tag-sha256: <digest>`. Record its object SHA
+    and peeled commit; do not push it. Create the required direct-child commit
+    that adds only the unchanged evidence bytes at
+    `docs/evidence/releases/v0.1.0/remote-controls-predecessor-pre-tag.json` as
+    `100644`. Integrate without a merge commit while preserving that exact edge,
+    wait for exact CI, and rerun the semantic/history check. Obtain a separate
+    tag-push authorization, push only the recorded tag object, then separately
+    authorize one attempt-1 `build-candidate` dispatch for `v0.0.9`. Retain its
+    exact nine-asset origin; never prepare a draft or GitHub Release for it.
+14. **Run the final-pre-tag gate.** Establish the descendant `v0.1.0`/build-2
+    source commit with `.github/workflows` and `scripts/release` byte-identical
+    to the predecessor tagged commit. Capture fresh `final-pre-tag` manual
+    records and wait for exact CI. With exactly the annotated `v0.0.9` ref and
+    zero Releases, run
+    `make verify-remote-controls-final-pre-tag` with the exact predecessor
+    commit, predecessor tag-object SHA, and a new absent external output. The v3
+    result must bind the predecessor-pre-tag evidence digest and predecessor
+    tag/commit boundary.
+15. **Bind and build the final candidate.** Create one annotated `v0.1.0` tag
+    object targeting the build-2 commit with the exact message
+    `remote-controls-final-pre-tag-sha256: <digest>`. Add only the unchanged
+    evidence at
+    `docs/evidence/releases/v0.1.0/remote-controls-final-pre-tag.json` in the
+    required direct-child commit, integrate without a merge commit, wait for
+    exact CI, and rerun the semantic/history check. Obtain a separate tag-push
+    authorization, push only that recorded object, then separately authorize
+    the attempt-1 build and final-only draft preparation. Preserve both origin
+    artifacts; never rerun either build.
+16. **Use the v3 pre-publication path after the draft.** Complete the mandatory
+    predecessor upgrade and all lifecycle/beta evidence. Capture new protected
+    Settings bundles and replace both manual records with fresh
+    `pre-publication` phase challenges for the final tag object/peeled commit and
+    the exact final draft Release ID in one reviewed docs-only commit; wait for
+    CI. The v3 API manifest separately binds both tags and peeled commits. Freeze
+    every release-relevant GitHub Settings surface, run the two-pass
+    pre-publication verifier, then add only its manifest and the approval record
+    in one direct-successor commit. That approval commit's exact master-push CI
+    must pass before dispatch. Every timestamp is canonical UTC and ordered
+    across the predecessor-pre-tag, final-pre-tag, pre-publication, and approval
+    stages. This v3 lifecycle does not retroactively turn any 2026-07-18,
+    2026-07-20, or 2026-07-21 observation into release evidence.
 
 Required protected environment variables:
 
@@ -293,14 +317,17 @@ Required protected environment secrets:
 - `DEVELOPER_ID_CERTIFICATE_PASSWORD`
 - `APPLE_NOTARY_API_KEY_BASE64`
 
-The publication environment additionally contains only
+The publication environment contains only the shared non-secret
+`DEVELOPER_ID_APPLICATION` and `APPLE_TEAM_ID` variables plus
 `RELEASE_ADMIN_READ_TOKEN`, a repository-scoped fine-grained read token with
 exactly Actions, Administration, Attestations, Contents, and implicit Metadata
-read access. It has exactly five bounded workflow uses: pinned checkout,
-candidate restoration, pre-publication attestation verification, the
-publication helper, and post-publication attestation verification. Within the
+read access. It has exactly six bounded workflow secret references: pinned
+checkout, combined two-origin restoration, final-candidate attestation
+verification, predecessor tagged-source verification, the publication helper,
+and post-publication final-attestation verification. Within the
 helper, it is installed only through five tracked, timeout-bounded GitHub
 read/download launcher call sites; it is never the publication write token.
+No signing/notarization secret is present in `release-publication`.
 
 The repository currently has one collaborator. Turning on prevent-self-review
 with only `GGULBAE` as reviewer would deadlock the job. Before remote setup, choose
@@ -361,12 +388,12 @@ must name the reviewer policy and must continue to prohibit all tag, Release,
 site, signing/notarization, installation, live hardware mutation, and promotion
 actions.
 
-The local branch now also carries an explicit `make verify-remote-controls`
-final-pre-tag verifier. Its deterministic fixtures test the intended ready
-state, while the authoritative policy remains intentionally unconfigured until
-its complete repository, candidate/draft-workflow, CI-workflow,
-publication-workflow, operator, reviewer, publisher, and approval identity is
-reviewed;
+The local branch now also carries explicit v3 `predecessor-pre-tag`,
+`final-pre-tag`, and `pre-publication` verifiers. Their deterministic fixtures
+test the intended ready states, while the authoritative policy remains
+intentionally unconfigured until its complete repository, signed-candidate,
+CI, publication, disabled-legacy, operator, reviewer, publisher, and approval
+identity is reviewed;
 therefore a live invocation must fail before its first GitHub request today. The
 wrapper performs authenticated GETs and projects variable responses to names
 before evidence is written; the collector consumes only those name projections,
@@ -379,4 +406,4 @@ is retained in evidence. Even a future API pass
 leaves the environment administrator-bypass switch as one separately recorded
 Settings-screen gate because the documented REST response does not expose that
 state. Direct normalized-evidence policy output remains offline component
-evidence and cannot replace step 12.
+evidence and cannot replace steps 12, 14, or 16.

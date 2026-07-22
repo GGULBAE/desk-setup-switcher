@@ -20,28 +20,28 @@ Follow [Distribution](DISTRIBUTION.md), [Governance](../GOVERNANCE.md), the [sup
 
 ## Candidate freeze and verification
 
-First establish clean remote-master commit **A** with the two fresh
-`final-pre-tag` manual JSON records defined by [the public release approval
-contract](PUBLICATION-APPROVAL.md), then wait for exact-A CI. From a clean,
-complete, non-shallow checkout of A, run
-`make verify-remote-controls REMOTE_CONTROLS_EVIDENCE_OUTPUT=/absolute/private/remote-controls-final-pre-tag.json`
-while remote `v*` refs and Releases are still empty. The parent directory must
-be owner-owned mode 0700, the output path must be absent and outside the
-repository, and the resulting mode-0600 bytes are exact external evidence
-**E**. Create the annotated `v0.1.0` tag object locally against A with the exact
-E digest-binding message, but do not push it. Create **B** as A's direct
-single-parent child adding only unchanged E at
-`docs/evidence/releases/v0.1.0/remote-controls-final-pre-tag.json` as `100644`.
-Integrate B without a merge commit, wait for exact-B CI, and rerun the A→B
-semantic/history check. A separate authorization is required before the first
-push of that already recorded tag object. E cannot be regenerated after local
-tag creation. The verifier configures nothing, pushes nothing, and does not
-authorize the later tag push.
+The fixed lineage has two separately approved freezes. First establish the
+clean `v0.0.9`/build-1 commit, run `predecessor-pre-tag` while refs/Releases are
+empty, bind the resulting external evidence **E0** in one annotated predecessor
+tag, and add only unchanged E0 in the required direct-child evidence commit.
+After exact CI/history verification and a separate tag-push authorization,
+retain the attempt-1 predecessor origin; never create a Release for it.
 
-- [ ] The tag equals `v` plus `CFBundleShortVersionString`; `CFBundleVersion` is a positive candidate-unique build number.
-- [ ] The commit and submodules/dependencies are fixed, the checkout is complete and non-shallow, and the worktree is clean.
-- [ ] `make verify`, `make audit-public-release`, and `git diff --check` pass on that commit.
-- [ ] Remote CI passes the required checks for that exact commit.
+Next establish the descendant `v0.1.0`/build-2 commit with identical
+`.github/workflows` and `scripts/release` trees. Run `final-pre-tag` while the
+remote contains exactly annotated `v0.0.9` and zero Releases. Bind the resulting
+external evidence **E1** in one annotated final tag and add only unchanged E1
+in its required direct-child evidence commit. After exact CI/history
+verification and a separate tag-push authorization, retain the distinct
+attempt-1 final origin and prepare only its draft. External outputs require an
+absent path outside the repository under an owner-owned mode-0700 directory and
+are created mode 0600. A verifier configures, pushes, tags, dispatches, and
+approves nothing.
+
+- [ ] The predecessor is exactly annotated `v0.0.9`, app version `0.0.9`, build 1; the final candidate is exactly annotated `v0.1.0`, app version `0.1.0`, build 2.
+- [ ] Both commits and submodules/dependencies are fixed, each checkout is complete and non-shallow, and each worktree is clean.
+- [ ] `make verify`, `make audit-public-release`, and `git diff --check` pass on both exact tagged commits.
+- [ ] Remote CI passes the required checks for both exact commits and both add-only evidence commits.
 - [ ] The planned initial target remains Apple Silicon with a macOS 14.0 deployment target; no Intel or unverified Sonoma runtime claim is present.
 - [ ] Release entitlements are reviewed, minimal, recorded below, and omit `com.apple.security.get-task-allow`.
 
@@ -53,12 +53,22 @@ authorize the later tag push.
 | Release entitlement manifest/hash | `<not recorded>` |
 | Supported architecture/deployment target evidence | `<not recorded>` |
 
-## One-candidate lineage
+## Two protected candidate origins
 
-The release app is built once. Signing, packaging, notarization, and stapling may change signatures and DMG bytes but must not rebuild or change the app. A rebuild, resource change, entitlement change, executable change, or build-number change creates a new candidate and invalidates every downstream row and beta report.
+Each app is built once in its own attempt-1 origin. Signing, packaging,
+notarization, and stapling may change signatures and DMG bytes but must not
+rebuild or change that app. A rebuild, resource change, entitlement change,
+executable change, or build-number change creates a new identity and invalidates
+the fixed predecessor-to-final path and every downstream beta report.
 
 | Identity | Recorded value |
 | --- | --- |
+| Predecessor tag/commit and direct tag-object SHA | `<not recorded>` |
+| Predecessor origin run/artifact ID/archive SHA-256 | `<not recorded>` |
+| Predecessor release manifest/final DMG/provenance bundle SHA-256 | `<not recorded>` |
+| Predecessor signed executable and architecture-labelled CodeDirectory hashes | `<not recorded>` |
+| Final tag/commit and direct tag-object SHA | `<not recorded>` |
+| Final origin run/artifact ID/archive SHA-256 | `<not recorded>` |
 | Signed executable SHA-256 | `<not recorded>` |
 | Signed app CodeDirectory hashes, keyed by `arm64` and `x86_64` | `<not recorded>` |
 | Designated requirement | `<not recorded>` |
@@ -77,18 +87,18 @@ The release app is built once. Signing, packaging, notarization, and stapling ma
 | DMG SPDX 2.3 SBOM bundle filename/hash, predicate type, and verified subject digest | `<not recorded>` |
 | Release-manifest provenance bundle filename/hash and verified subject digest | `<not recorded>` |
 
-- [ ] The app and DMG pass strict `codesign` verification.
-- [ ] The notary result was parsed as `Accepted`; command exit alone was not used as proof.
-- [ ] The final DMG passes stapler validation and Gatekeeper assessment.
-- [ ] The app mounted from the final DMG passes Gatekeeper assessment and matches the signed executable, both architecture-labelled CodeDirectory hashes, designated requirement, entitlements, and resource manifest above.
-- [ ] No rebuild or app-bundle change occurred between the recorded release build and the final stapled DMG.
+- [ ] Both apps and DMGs pass strict `codesign` verification.
+- [ ] Both notary results were parsed as `Accepted`; command exit alone was not used as proof.
+- [ ] Both final DMGs pass stapler validation and Gatekeeper assessment.
+- [ ] Each app mounted from its final DMG passes Gatekeeper assessment and matches that origin's signed executable, architecture-labelled CodeDirectory hashes, designated requirement, entitlements, and resource manifest.
+- [ ] No rebuild or app-bundle change occurred within either recorded origin.
 
 ## Protected remote controls and draft
 
 | Control | Evidence link or read-only result |
 | --- | --- |
 | Default-branch protection and required CI | `<not recorded>` |
-| Final gate output from `make verify-remote-controls REMOTE_CONTROLS_EVIDENCE_OUTPUT=…`, exact commit, all three candidate/draft, CI, and publication workflow blobs, one pinned CI run/check-suite ID, both required check-run IDs, and both required job IDs | `<not recorded>` |
+| v3 `predecessor-pre-tag`, `final-pre-tag`, and `pre-publication` outputs; exact commits; signed-candidate, CI, publication, and disabled-legacy workflow blobs; one pinned CI run/check-suite ID; both required check-run IDs; and both required job IDs | `<not recorded>` |
 | Release-tag creation rule and exact operator-only bypass | `<not recorded>` |
 | No-bypass release-tag update/deletion rule | `<not recorded>` |
 | Protected `release-candidate` environment | `<not recorded>` |
@@ -103,18 +113,18 @@ The release app is built once. Signing, packaging, notarization, and stapling ma
 | Catchable cancellation/tracked-child cleanup result | `<not recorded; result only>` |
 | Private vulnerability reporting enabled/tested | `<not recorded>` |
 | Immutable releases enabled | `<not recorded>` |
-| Protected `build-candidate` origin run/attempt | `<not recorded; origin attempt must be 1 and never rerun>` |
-| Immutable artifact ID/archive SHA-256 | `<not recorded; bind to the exact origin run>` |
+| Protected predecessor `build-candidate` origin run/attempt and immutable artifact ID/archive SHA-256 | `<not recorded; v0.0.9/build 1, attempt 1, never rerun>` |
+| Protected final `build-candidate` origin run/attempt and immutable artifact ID/archive SHA-256 | `<not recorded; v0.1.0/build 2, attempt 1, never rerun>` |
 | Separate `prepare-draft` verification run/attempt | `<not recorded; distinguish from candidate origin>` |
 | Protected draft Release URL/ID | `<not recorded>` |
 
 - [ ] A read-only query proves the effective remote workflow cannot publish an unsigned artifact or bypass approval.
-- [ ] The two final-pre-tag records use protected screenshot/review-note bundles with visible phase/UTC challenge, false administrator bypass, distinct source SHA-256 values, exact policy operator, and no committed raw screenshot or token; then the final-pre-tag API verifier passes with zero drift and reports `manual_gates=2`.
-- [ ] The recorded result came from `make verify-remote-controls REMOTE_CONTROLS_EVIDENCE_OUTPUT=/absolute/private/…`; direct `remote_controls_policy.rb` normalized-evidence output is offline component evidence and is not accepted as the final gate.
-- [ ] The release manifest records `runner-environment=github-hosted`; each signing/notarization secret had one direct-exec consumer and was absent from unrelated child environments. The distinct admin-read token had exactly five bounded workflow uses, and the publication helper installed it only through five tracked, timeout-bounded GitHub read/download launcher call sites.
+- [ ] Each of the three v3 phases uses fresh protected screenshot/review-note bundles with visible phase/UTC challenge, false administrator bypass, distinct per-phase source SHA-256 values, exact policy operator, and no committed raw screenshot or token; each two-pass API verifier passes with zero drift and reports `manual_gates=2`.
+- [ ] E0 came from `verify-remote-controls-predecessor-pre-tag`, E1 from `verify-remote-controls-final-pre-tag`, and the final manifest from `verify-remote-controls-pre-publication`; direct `remote_controls_policy.rb` output is offline component evidence and cannot replace any gate.
+- [ ] The release manifest records `runner-environment=github-hosted`; each signing/notarization secret had one direct-exec consumer and was absent from unrelated child environments. The distinct admin-read token appeared in exactly six bounded workflow secret references, and the publication helper installed it only through five tracked, timeout-bounded GitHub read/download launcher call sites.
 - [ ] The manifest contains `signedAppCompatibility` and `mountedAppCompatibility` records bound to the exact executable SHA-256. Both prove exactly `arm64,x86_64`, both slices report the repository-declared macOS minimum in `LC_BUILD_VERSION`, and the two records are identical.
 - [ ] Normal completion and one catchable signing/notarization-cancellation probe confirm no decoded release credential or tracked notarization child remains. Do not claim shell cleanup for `SIGKILL` or host loss, and do not treat cleanup evidence as publication retry authorization.
-- [ ] The immutable exact-nine-asset workflow artifact was finalized before the first Release mutation. Its ID/archive digest and attempt-1 origin run are recorded, and the origin build run was never rerun.
+- [ ] Both immutable exact-nine-asset workflow artifacts were finalized and their distinct IDs/archive digests and attempt-1 origins are recorded; neither origin build was rerun and the predecessor never created a Release.
 - [ ] The separate draft run proved the origin workflow/repository/commit/job/artifact metadata, downloaded the raw archive by ID, matched its SHA-256, extracted exactly nine regular files, and verified the signed candidate plus all three attestation bundles before mutation.
 - [ ] If draft recovery ran, every pre-existing asset first compared byte-for-byte with that artifact, only missing names were appended without clobber, and no Release edit/delete/publication or tag mutation occurred. Record each draft attempt separately.
 - [ ] The protected draft contains exactly the nine assets below. Curated English/Korean notes are the Release body, not a tenth asset.
@@ -145,7 +155,7 @@ Record each result separately. Use synthetic data and the exact final DMG above.
 | Clean first launch and menu-bar-only lifecycle | `<not recorded>` | [ ] |
 | Launch at login is off by default; any optional opt-in is explicit | `<not recorded>` | [ ] |
 | Capture → Edit → Review explanation works without applying a setting | `<not recorded>` | [ ] |
-| Upgrade from recorded installable predecessor preserves schema-1 profiles, settings, selection, backups, and consent boundary, or validated first-beta lineage records not applicable | `<not recorded>` | [ ] |
+| Exact browser-downloaded `v0.0.9` build-1 predecessor passes quarantine/checksum/Gatekeeper/provenance checks and upgrades to exact `v0.1.0` build 2 while preserving schema-1 profiles, settings, selection, backups, and consent boundary | `<not recorded>` | [ ] |
 | Synthetic schema 0→1 migration and last-known-good creation | `<not recorded>` | [ ] |
 | Synthetic primary corruption recovers the last-known-good backup and quarantines safely | `<not recorded>` | [ ] |
 | Import replacement and exclusive/no-overwrite export | `<not recorded>` | [ ] |
@@ -155,7 +165,7 @@ Record each result separately. Use synthetic data and the exact final DMG above.
 
 ## External beta and release blockers
 
-Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPLATE.md), use the same final DMG SHA-256 and final-DMG provenance attestation, run on Apple Silicon within the planned macOS 14+ matrix, preserve real quarantine, and avoid live system-setting mutation unless separately authorized. At least one accepted report must run the full exact-candidate lifecycle on macOS 14 Sonoma. The actual-byte candidate inventory, predecessor lineage, three closed JSON reports, and protected independence-review set described in [the lineage contract](PREDECESSOR-LINEAGE.md) must validate against the restored release manifest and provenance bytes; Markdown alone is not accepted evidence.
+Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPLATE.md), use the same final DMG SHA-256 and final-DMG provenance attestation, separately acquire the same exact predecessor DMG with real quarantine, and pass the fixed build-1-to-build-2 upgrade. Reports run on Apple Silicon within the planned macOS 14+ matrix and avoid live system-setting mutation unless separately authorized. At least one accepted report must run the full lifecycle on macOS 14 Sonoma. The actual-byte inventory, lineage, three reports, and independence-review set must validate against both restored origins and the v3 boundary; Markdown alone is not evidence.
 
 | Report | Tester record | macOS / coverage role | Final DMG SHA matches | DMG provenance matches | Mandatory lifecycle passes | Open P0/P1 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -164,8 +174,8 @@ Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPL
 | Beta 3 | `<not recorded>` | `<not recorded>` | [ ] | [ ] | [ ] | `<not recorded>` |
 
 - [ ] At least one accepted report records Apple Silicon/macOS 14.x Sonoma and passes every mandatory exact-candidate lifecycle row.
-- [ ] `candidate-inventory.json` records retained and non-retained prior protected runs in strictly increasing, unique build order, requires every completion to predate the current manifest, binds the current run/build, and carries the protected completeness-review receipt digest.
-- [ ] `predecessor-lineage.json` v2 binds the actual inventory bytes and current candidate; the latest installable retained predecessor or the first-beta not-applicable state is consistent.
+- [ ] `candidate-inventory.json` v1 records exactly the retained protected-beta `v0.0.9`/build-1 origin below current `v0.1.0`/build 2, requires predecessor completion before the current manifest, and carries the protected completeness-review receipt digest.
+- [ ] `predecessor-lineage.json` v3 binds actual inventory, predecessor manifest/DMG/provenance, E1 boundary, predecessor tag object, and E0 digest; every report records a passed mandatory upgrade.
 - [ ] `external-beta-set.json` binds the actual ordered bytes of `external-beta-01.json` through `external-beta-03.json`, identifies the Sonoma report, and records the protected no-PII independence review for three distinct external people.
 - [ ] A read-only public issue query shows zero unresolved P0/P1 issues for this candidate.
 - [ ] The maintainer records zero unresolved product P0/P1 blockers.
@@ -181,16 +191,14 @@ Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPL
 - [ ] The bilingual site passes deployed no-tracking/no-cookie and clean-session link checks.
 - [ ] Repository description, topics, Homepage, and social preview match the approved copy.
 - [ ] The release approver explicitly approves the final artifact, tag, notes, and Release publication. The synchronized public-copy finalization patch, exact HTTPS site-origin record, site deployment, and promotion remain separate final user approvals.
-- [ ] Clean A contains the final manual records and all three reviewed workflow blobs; exact-A CI passed before E was collected.
-- [ ] Final external E was created once at mode 0600, and B is A's direct single-parent child whose only change adds the unchanged E bytes at the fixed path as `100644`.
-- [ ] The tag is annotated and targets A; its direct object SHA, peeled commit, and exact E-digest message are recorded. The object was created locally before B, was not pushed then, and did not move.
-- [ ] B reached `master` without a merge commit; exact-B CI and the A→B semantic/history recheck passed before a separate tag-push authorization allowed the first push of the already recorded object.
+- [ ] Protected commit P, external E0, annotated `v0.0.9`, and direct-child E0 commit satisfy the exact add-only history and digest-message contract before the separately authorized predecessor tag push/build.
+- [ ] Final commit F, external E1, annotated `v0.1.0`, and direct-child E1 commit satisfy the exact add-only history and digest-message contract before the separately authorized final tag push/build; critical workflow/script trees match P.
 - [ ] After the exact draft exists, both manual records are replaced in a reviewed docs-only master commit with new `pre-publication` phase/tag-object/peeled-commit/Release-ID challenges, canonical UTC observations no older than 24 hours, and two new source-artifact digests distinct from each other and both final-pre-tag baselines; exact-commit CI passes.
 - [ ] The exclusive single-writer freeze covers master/tag/Release/assets, rulesets, both environments and bypass/reviewer/deployment settings, workflow state, Actions permissions, secret/variable names, immutable/security/labels/metadata, actor roles, and token configuration from before the two-pass read through the PATCH and post-read.
-- [ ] The fresh two-pass `pre-publication` controls manifest binds the direct tag object, peeled tag commit and Release ID, all three active workflow blobs/routes, both environment deployment/reviewer records, and the two current manual evidence digests.
+- [ ] The fresh v3 `pre-publication` manifest binds both direct tag objects and peeled commits, E0 and E1 digests, the final Release ID, all four workflow identities/routes, both environment deployment/reviewer records, and the two current manual evidence digests.
 - [ ] Before the final remote-controls snapshot, the reviewed pre-approval master already contains the unchanged candidate inventory, predecessor lineage, three external-beta reports, and external-beta set.
 - [ ] The closed-schema `publication-approval.json` follows [PUBLICATION-APPROVAL.md](PUBLICATION-APPROVAL.md), binds the actual release manifest, final-DMG provenance bundle, candidate inventory, predecessor lineage, beta set, ordered report bytes, Sonoma lifecycle report, and pre-publication controls manifest, and is added with that controls manifest in one reviewed direct-successor commit that changes only those two allowlisted evidence paths, remains inside its maximum 24-hour approval window, and passes the exact approval commit's master-push `Verify macOS app` and `Verify public site and release assets` CI jobs.
-- [ ] Every timestamp is canonical UTC and the records satisfy `final manuals observedAt ≤ final E collectedAt ≤ pre manuals observedAt ≤ pre manifest collectedAt ≤ approval approvedAt`.
+- [ ] Every timestamp is canonical UTC and ordered across predecessor-pre-tag collection, final-pre-tag collection, current pre-publication observations/collection, and approval.
 - [ ] The publication workflow, `release-publication` protection/actors, administrator-bypass evidence, and exact fine-grained `RELEASE_ADMIN_READ_TOKEN` contract are bound without exposing a credential value: owner `GGULBAE`, repository selection only `GGULBAE/desk-setup-switcher`, unexpired, no account/organization permissions, and exactly Actions/Administration/Attestations/Contents/Metadata read-only.
 - [ ] A later run refuses an already-public Release. Same-process recovery is limited to the originating PATCH's ambiguous response. `HUP`, `INT`, `QUIT`, `TERM`, workflow cancellation, runner/host loss, unavailable or incomplete logs, and any public or post-process ambiguous state are incident-only.
 - [ ] The maintainer separately approves each promotional post.

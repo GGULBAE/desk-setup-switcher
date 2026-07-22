@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "desk-setup-switcher.remote-release-controls-policy/v2",
+  "schemaVersion": "desk-setup-switcher.remote-release-controls-policy/v3",
   "phase": "release-lifecycle",
   "configured": true,
   "repository": {
@@ -25,6 +25,7 @@
   "release": {
     "version": "0.1.0",
     "tag": "v0.1.0",
+    "predecessorTag": "v0.0.9",
     "candidateWorkflow": {
       "id": 7001,
       "name": "Signed release candidate",

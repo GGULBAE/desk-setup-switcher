@@ -78,24 +78,42 @@ release_require_absent_path() {
     }
 }
 
-release_verify_final_pre_tag_evidence_chain() {
+release_verify_first_parent_commit_once() {
+    local repository="$1"
+    local history_tip="$2"
+    local expected_commit="$3"
+
+    [[ -d "$repository" && ! -L "$repository" \
+        && "$history_tip" =~ ^[0-9a-f]{40}$ \
+        && "$expected_commit" =~ ^[0-9a-f]{40}$ ]] || return 1
+    git -C "$repository" rev-list --first-parent "$history_tip" 2>/dev/null \
+        | ruby -e '
+          expected = ARGV.fetch(0)
+          rows = STDIN.each_line(chomp: true).to_a
+          raise unless rows.count(expected) == 1
+        ' "$expected_commit" >/dev/null 2>&1
+}
+
+release_verify_predecessor_pre_tag_evidence_chain() {
     local release_tag="$1"
     local tag_commit="$2"
     local tag_object="$3"
     local history_tip="$4"
     local evidence_path introduction_commits introduction_commit parent_row
     local introduction_diff introduction_tree tip_tree evidence_digest
-    local critical_path tag_tree tip_critical_tree first_parent_history
-    local candidate_workflow_blob ci_workflow_blob publication_workflow_blob
-    local validation_parent validation_root validation_status
-    local candidate_manual_path publication_manual_path manual_path manual_tree
-    local manual_contract_fields manual_operator_id manual_operator_login manual_collected_at
-    evidence_path="docs/evidence/releases/$release_tag/remote-controls-final-pre-tag.json"
-    candidate_manual_path="docs/evidence/releases/$release_tag/release-candidate-admin-bypass.json"
-    publication_manual_path="docs/evidence/releases/$release_tag/release-publication-admin-token-scope.json"
+    local critical_path tag_tree tip_critical_tree
+    local candidate_workflow_blob ci_workflow_blob publication_workflow_blob legacy_workflow_blob
+    local repository_root validation_parent validation_root validation_status
+    evidence_path="docs/evidence/releases/v0.1.0/remote-controls-predecessor-pre-tag.json"
 
-    [[ "$release_tag" == v0.1.0 && "$tag_commit" =~ ^[0-9a-f]{40}$ \
-        && "$tag_object" =~ ^[0-9a-f]{40}$ && "$history_tip" =~ ^[0-9a-f]{40}$ ]] || return 1
+    [[ "$release_tag" == v0.0.9 && "$tag_commit" =~ ^[0-9a-f]{40}$ \
+        && "$tag_object" =~ ^[0-9a-f]{40}$ && "$history_tip" =~ ^[0-9a-f]{40}$ ]] \
+        || return 1
+    repository_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
+    [[ "$(git rev-parse "refs/tags/$release_tag" 2>/dev/null)" == "$tag_object" \
+        && "$(git cat-file -t "$tag_object" 2>/dev/null)" == tag \
+        && "$(git rev-parse "refs/tags/$release_tag^{commit}" 2>/dev/null)" == "$tag_commit" ]] \
+        || return 1
     git merge-base --is-ancestor "$tag_commit" "$history_tip" || return 1
     introduction_commits="$(git log --full-history --format=%H --reverse \
         "$tag_commit..$history_tip" -- "$evidence_path")" || return 1
@@ -107,13 +125,164 @@ release_verify_final_pre_tag_evidence_chain() {
     ' "$introduction_commits" 2>/dev/null)" || return 1
     parent_row="$(git rev-list --parents -n 1 "$introduction_commit")" || return 1
     [[ "$parent_row" == "$introduction_commit $tag_commit" ]] || return 1
-    first_parent_history="$(git rev-list --first-parent "$history_tip")" || return 1
-    ruby -e '
-      expected, source = ARGV
-      rows = source.split("\n", -1)
+    release_verify_first_parent_commit_once \
+        "$repository_root" "$history_tip" "$introduction_commit" || return 1
+    introduction_diff="$(git diff-tree --no-commit-id --name-status -r \
+        "$tag_commit" "$introduction_commit")" || return 1
+    [[ "$introduction_diff" == $'A\t'"$evidence_path" ]] || return 1
+    introduction_tree="$(git ls-tree "$introduction_commit" -- "$evidence_path")" || return 1
+    [[ "$introduction_tree" =~ ^100644\ blob\ [0-9a-f]{40}$'\t' \
+        && "${introduction_tree#*$'\t'}" == "$evidence_path" ]] || return 1
+    tip_tree="$(git ls-tree "$history_tip" -- "$evidence_path")" || return 1
+    [[ "$tip_tree" == "$introduction_tree" ]] || return 1
+    for critical_path in .github/workflows scripts/release; do
+        tag_tree="$(git rev-parse "$tag_commit:$critical_path")" || return 1
+        tip_critical_tree="$(git rev-parse "$history_tip:$critical_path")" || return 1
+        [[ "$tag_tree" =~ ^[0-9a-f]{40}$ && "$tip_critical_tree" == "$tag_tree" ]] \
+            || return 1
+    done
+    evidence_digest="$(git show "$introduction_commit:$evidence_path" \
+        | shasum -a 256 | awk '{print $1}')" || return 1
+    [[ "$evidence_digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+    git cat-file -p "$tag_object" | ruby -e '
+      digest = ARGV.fetch(0)
+      _headers, separator, message = STDIN.read.partition("\n\n")
+      expected = "remote-controls-predecessor-pre-tag-sha256: #{digest}\n"
+      raise unless separator == "\n\n" && message == expected
+    ' "$evidence_digest" >/dev/null 2>&1 || return 1
+
+    candidate_workflow_blob="$(git rev-parse \
+        "$tag_commit:.github/workflows/signed-release-candidate.yml")" || return 1
+    ci_workflow_blob="$(git rev-parse "$tag_commit:.github/workflows/ci.yml")" || return 1
+    publication_workflow_blob="$(git rev-parse \
+        "$tag_commit:.github/workflows/publish-release.yml")" || return 1
+    legacy_workflow_blob="$(git rev-parse \
+        "$tag_commit:.github/workflows/release.yml")" || return 1
+    [[ "$candidate_workflow_blob" =~ ^[0-9a-f]{40}$ \
+        && "$ci_workflow_blob" =~ ^[0-9a-f]{40}$ \
+        && "$publication_workflow_blob" =~ ^[0-9a-f]{40}$ \
+        && "$legacy_workflow_blob" =~ ^[0-9a-f]{40}$ ]] || return 1
+
+    validation_parent="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+    [[ -d "$validation_parent" && ! -L "$validation_parent" ]] || return 1
+    validation_root="$(mktemp -d \
+        "$validation_parent/desk-setup-predecessor-evidence-validation.XXXXXX")" || return 1
+    chmod 0700 "$validation_root" || {
+        rm -rf -- "$validation_root" >/dev/null 2>&1 || true
+        return 1
+    }
+    validation_status=0
+    git show "$tag_commit:scripts/release/remote_controls_policy.rb" \
+        >"$validation_root/remote_controls_policy.rb" || validation_status=1
+    git show "$tag_commit:scripts/release/release_policy.rb" \
+        >"$validation_root/release_policy.rb" || validation_status=1
+    git show "$tag_commit:scripts/release/remote-controls-policy.json" \
+        >"$validation_root/policy.json" || validation_status=1
+    git show "$introduction_commit:$evidence_path" \
+        >"$validation_root/evidence.json" || validation_status=1
+    if [[ "$validation_status" == 0 ]]; then
+        ruby "$validation_root/remote_controls_policy.rb" \
+            --policy "$validation_root/policy.json" \
+            --evidence "$validation_root/evidence.json" \
+            --expected-phase predecessor-pre-tag \
+            --expected-commit "$tag_commit" \
+            --expected-workflow-blob "$candidate_workflow_blob" \
+            --expected-ci-workflow-blob "$ci_workflow_blob" \
+            --expected-publication-workflow-blob "$publication_workflow_blob" \
+            --expected-legacy-workflow-blob "$legacy_workflow_blob" \
+            >/dev/null 2>&1 || validation_status=1
+    fi
+    rm -rf -- "$validation_root" >/dev/null 2>&1 || validation_status=1
+    [[ "$validation_status" == 0 ]]
+}
+
+release_verify_final_pre_tag_evidence_chain() {
+    local release_tag="$1"
+    local tag_commit="$2"
+    local tag_object="$3"
+    local history_tip="$4"
+    local evidence_path introduction_commits introduction_commit parent_row
+    local introduction_diff introduction_tree tip_tree evidence_digest
+    local critical_path tag_tree tip_critical_tree predecessor_critical_tree
+    local candidate_workflow_blob ci_workflow_blob publication_workflow_blob
+    local legacy_workflow_blob predecessor_workflow_blob predecessor_ci_workflow_blob
+    local predecessor_publication_workflow_blob predecessor_legacy_workflow_blob
+    local predecessor_tag predecessor_tag_object predecessor_commit predecessor_evidence_path
+    local predecessor_evidence_digest predecessor_introduction_commits
+    local predecessor_introduction_commit predecessor_parent_row predecessor_introduction_diff
+    local predecessor_introduction_tree predecessor_tag_tree predecessor_tip_tree
+    local repository_root validation_parent validation_root validation_status
+    local candidate_manual_path publication_manual_path manual_path manual_tree
+    local manual_contract_fields manual_operator_id manual_operator_login manual_collected_at
+
+    if [[ "$release_tag" == v0.0.9 ]]; then
+        release_verify_predecessor_pre_tag_evidence_chain \
+            "$release_tag" "$tag_commit" "$tag_object" "$history_tip"
+        return $?
+    fi
+
+    evidence_path="docs/evidence/releases/$release_tag/remote-controls-final-pre-tag.json"
+    predecessor_tag="v0.0.9"
+    predecessor_evidence_path="docs/evidence/releases/$release_tag/remote-controls-predecessor-pre-tag.json"
+    candidate_manual_path="docs/evidence/releases/$release_tag/release-candidate-admin-bypass.json"
+    publication_manual_path="docs/evidence/releases/$release_tag/release-publication-admin-token-scope.json"
+
+    [[ "$release_tag" == v0.1.0 && "$tag_commit" =~ ^[0-9a-f]{40}$ \
+        && "$tag_object" =~ ^[0-9a-f]{40}$ && "$history_tip" =~ ^[0-9a-f]{40}$ ]] || return 1
+    repository_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
+    git merge-base --is-ancestor "$tag_commit" "$history_tip" || return 1
+    predecessor_tag_object="$(git rev-parse "refs/tags/$predecessor_tag")" || return 1
+    [[ "$predecessor_tag_object" =~ ^[0-9a-f]{40}$ \
+        && "$(git cat-file -t "$predecessor_tag_object")" == tag ]] || return 1
+    predecessor_commit="$(git rev-parse "refs/tags/$predecessor_tag^{commit}")" || return 1
+    [[ "$predecessor_commit" =~ ^[0-9a-f]{40}$ ]] || return 1
+    git merge-base --is-ancestor "$predecessor_commit" "$tag_commit" || return 1
+    predecessor_introduction_commits="$(git log --full-history --format=%H --reverse \
+        "$predecessor_commit..$tag_commit" -- "$predecessor_evidence_path")" || return 1
+    predecessor_introduction_commit="$(ruby -e '
+      rows = ARGV.fetch(0).split("\n", -1)
       rows.pop if rows.last == ""
-      raise unless rows.count(expected) == 1
-    ' "$introduction_commit" "$first_parent_history" >/dev/null 2>&1 || return 1
+      raise unless rows.length == 1 && rows.fetch(0).match?(/\A[0-9a-f]{40}\z/)
+      puts rows.fetch(0)
+    ' "$predecessor_introduction_commits" 2>/dev/null)" || return 1
+    predecessor_parent_row="$(git rev-list --parents -n 1 "$predecessor_introduction_commit")" \
+        || return 1
+    [[ "$predecessor_parent_row" == \
+        "$predecessor_introduction_commit $predecessor_commit" ]] || return 1
+    release_verify_first_parent_commit_once \
+        "$repository_root" "$tag_commit" "$predecessor_introduction_commit" || return 1
+    predecessor_introduction_diff="$(git diff-tree --no-commit-id --name-status -r \
+        "$predecessor_commit" "$predecessor_introduction_commit")" || return 1
+    [[ "$predecessor_introduction_diff" == $'A\t'"$predecessor_evidence_path" ]] || return 1
+    predecessor_introduction_tree="$(git ls-tree "$predecessor_introduction_commit" -- \
+        "$predecessor_evidence_path")" || return 1
+    [[ "$predecessor_introduction_tree" =~ ^100644\ blob\ [0-9a-f]{40}$'\t' ]] || return 1
+    predecessor_tag_tree="$(git ls-tree "$tag_commit" -- "$predecessor_evidence_path")" || return 1
+    [[ "$predecessor_tag_tree" == "$predecessor_introduction_tree" ]] || return 1
+    predecessor_tip_tree="$(git ls-tree "$history_tip" -- "$predecessor_evidence_path")" || return 1
+    [[ "$predecessor_tip_tree" == "$predecessor_introduction_tree" ]] || return 1
+    predecessor_evidence_digest="$(git show \
+        "$predecessor_introduction_commit:$predecessor_evidence_path" \
+        | shasum -a 256 | awk '{print $1}')" || return 1
+    [[ "$predecessor_evidence_digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+    git cat-file -p "$predecessor_tag_object" | ruby -e '
+      digest = ARGV.fetch(0)
+      _headers, separator, message = STDIN.read.partition("\n\n")
+      expected = "remote-controls-predecessor-pre-tag-sha256: #{digest}\n"
+      raise unless separator == "\n\n" && message == expected
+    ' "$predecessor_evidence_digest" >/dev/null 2>&1 || return 1
+    introduction_commits="$(git log --full-history --format=%H --reverse \
+        "$tag_commit..$history_tip" -- "$evidence_path")" || return 1
+    introduction_commit="$(ruby -e '
+      rows = ARGV.fetch(0).split("\n", -1)
+      rows.pop if rows.last == ""
+      raise unless rows.length == 1 && rows.fetch(0).match?(/\A[0-9a-f]{40}\z/)
+      puts rows.fetch(0)
+    ' "$introduction_commits" 2>/dev/null)" || return 1
+    parent_row="$(git rev-list --parents -n 1 "$introduction_commit")" || return 1
+    [[ "$parent_row" == "$introduction_commit $tag_commit" ]] || return 1
+    release_verify_first_parent_commit_once \
+        "$repository_root" "$history_tip" "$introduction_commit" || return 1
     introduction_diff="$(git diff-tree --no-commit-id --name-status -r \
         "$tag_commit" "$introduction_commit")" || return 1
     [[ "$introduction_diff" == $'A\t'"$evidence_path" ]] || return 1
@@ -125,7 +294,10 @@ release_verify_final_pre_tag_evidence_chain() {
     for critical_path in .github/workflows scripts/release; do
         tag_tree="$(git rev-parse "$tag_commit:$critical_path")" || return 1
         tip_critical_tree="$(git rev-parse "$history_tip:$critical_path")" || return 1
-        [[ "$tag_tree" =~ ^[0-9a-f]{40}$ && "$tip_critical_tree" == "$tag_tree" ]] || return 1
+        predecessor_critical_tree="$(git rev-parse "$predecessor_commit:$critical_path")" \
+            || return 1
+        [[ "$tag_tree" =~ ^[0-9a-f]{40}$ && "$tip_critical_tree" == "$tag_tree" \
+            && "$predecessor_critical_tree" == "$tag_tree" ]] || return 1
     done
     evidence_digest="$(git show "$introduction_commit:$evidence_path" \
         | shasum -a 256 | awk '{print $1}')" || return 1
@@ -138,13 +310,28 @@ release_verify_final_pre_tag_evidence_chain() {
     ' "$evidence_digest" >/dev/null 2>&1 || return 1
 
     candidate_workflow_blob="$(git rev-parse \
-        "$tag_commit:.github/workflows/release.yml")" || return 1
+        "$tag_commit:.github/workflows/signed-release-candidate.yml")" || return 1
     ci_workflow_blob="$(git rev-parse "$tag_commit:.github/workflows/ci.yml")" || return 1
     publication_workflow_blob="$(git rev-parse \
         "$tag_commit:.github/workflows/publish-release.yml")" || return 1
+    legacy_workflow_blob="$(git rev-parse \
+        "$tag_commit:.github/workflows/release.yml")" || return 1
+    predecessor_workflow_blob="$(git rev-parse \
+        "$predecessor_commit:.github/workflows/signed-release-candidate.yml")" || return 1
+    predecessor_ci_workflow_blob="$(git rev-parse \
+        "$predecessor_commit:.github/workflows/ci.yml")" || return 1
+    predecessor_publication_workflow_blob="$(git rev-parse \
+        "$predecessor_commit:.github/workflows/publish-release.yml")" || return 1
+    predecessor_legacy_workflow_blob="$(git rev-parse \
+        "$predecessor_commit:.github/workflows/release.yml")" || return 1
     [[ "$candidate_workflow_blob" =~ ^[0-9a-f]{40}$ \
         && "$ci_workflow_blob" =~ ^[0-9a-f]{40}$ \
-        && "$publication_workflow_blob" =~ ^[0-9a-f]{40}$ ]] || return 1
+        && "$publication_workflow_blob" =~ ^[0-9a-f]{40}$ \
+        && "$legacy_workflow_blob" =~ ^[0-9a-f]{40}$ \
+        && "$predecessor_workflow_blob" == "$candidate_workflow_blob" \
+        && "$predecessor_ci_workflow_blob" == "$ci_workflow_blob" \
+        && "$predecessor_publication_workflow_blob" == "$publication_workflow_blob" \
+        && "$predecessor_legacy_workflow_blob" == "$legacy_workflow_blob" ]] || return 1
 
     validation_parent="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
     [[ -d "$validation_parent" && ! -L "$validation_parent" ]] || return 1
@@ -165,6 +352,8 @@ release_verify_final_pre_tag_evidence_chain() {
         >"$validation_root/policy.json" || validation_status=1
     git show "$introduction_commit:$evidence_path" \
         >"$validation_root/evidence.json" || validation_status=1
+    git show "$predecessor_introduction_commit:$predecessor_evidence_path" \
+        >"$validation_root/predecessor-evidence.json" || validation_status=1
     for manual_path in "$candidate_manual_path" "$publication_manual_path"; do
         manual_tree="$(git ls-tree "$tag_commit" -- "$manual_path")" || validation_status=1
         [[ "$manual_tree" =~ ^100644\ blob\ [0-9a-f]{40}$'\t' \
@@ -177,11 +366,28 @@ release_verify_final_pre_tag_evidence_chain() {
     if [[ "$validation_status" == 0 ]]; then
         ruby "$validation_root/remote_controls_policy.rb" \
             --policy "$validation_root/policy.json" \
+            --evidence "$validation_root/predecessor-evidence.json" \
+            --expected-phase predecessor-pre-tag \
+            --expected-commit "$predecessor_commit" \
+            --expected-workflow-blob "$predecessor_workflow_blob" \
+            --expected-ci-workflow-blob "$predecessor_ci_workflow_blob" \
+            --expected-publication-workflow-blob "$predecessor_publication_workflow_blob" \
+            --expected-legacy-workflow-blob "$predecessor_legacy_workflow_blob" \
+            >/dev/null 2>&1 || validation_status=1
+    fi
+    if [[ "$validation_status" == 0 ]]; then
+        ruby "$validation_root/remote_controls_policy.rb" \
+            --policy "$validation_root/policy.json" \
             --evidence "$validation_root/evidence.json" \
+            --expected-phase final-pre-tag \
             --expected-commit "$tag_commit" \
             --expected-workflow-blob "$candidate_workflow_blob" \
             --expected-ci-workflow-blob "$ci_workflow_blob" \
             --expected-publication-workflow-blob "$publication_workflow_blob" \
+            --expected-legacy-workflow-blob "$legacy_workflow_blob" \
+            --expected-predecessor-commit "$predecessor_commit" \
+            --expected-predecessor-tag-object "$predecessor_tag_object" \
+            --expected-predecessor-pre-tag-evidence-sha256 "$predecessor_evidence_digest" \
             >/dev/null 2>&1 || validation_status=1
     fi
     if [[ "$validation_status" == 0 ]]; then

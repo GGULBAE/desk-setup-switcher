@@ -58,7 +58,8 @@ class RemoteControlsCollectorV2Test
     run("derives exact trigger and contents-write projections from all reviewed workflows") do
       expected = {
         ".github/workflows/ci.yml" => [["pull_request", "push", "workflow_dispatch"], false],
-        ".github/workflows/release.yml" => [["workflow_dispatch"], true],
+        ".github/workflows/release.yml" => [["workflow_dispatch"], false],
+        ".github/workflows/signed-release-candidate.yml" => [["workflow_dispatch"], true],
         ".github/workflows/publish-release.yml" => [["workflow_dispatch"], true]
       }
       expected.each do |path, (triggers, contents_write)|
@@ -70,14 +71,15 @@ class RemoteControlsCollectorV2Test
 
     workflows = [
       { "id" => 7000, "name" => "CI", "path" => ".github/workflows/ci.yml", "state" => "active" },
-      { "id" => 7001, "name" => "Signed release candidate", "path" => ".github/workflows/release.yml", "state" => "active" },
-      { "id" => 7002, "name" => "Publish approved signed release", "path" => ".github/workflows/publish-release.yml", "state" => "active" }
+      { "id" => 7001, "name" => "Signed release candidate", "path" => ".github/workflows/signed-release-candidate.yml", "state" => "active" },
+      { "id" => 7002, "name" => "Publish approved signed release", "path" => ".github/workflows/publish-release.yml", "state" => "active" },
+      { "id" => 7003, "name" => "Retired legacy release workflow", "path" => ".github/workflows/release.yml", "state" => "disabled_manually" }
     ]
 
-    run("normalizes a complete paginated active workflow inventory") do
+    run("normalizes the complete paginated workflow inventory including the retired route") do
       pages = [
-        { "total_count" => 3, "items" => workflows.first(2) },
-        { "total_count" => 3, "items" => workflows.last(1) }
+        { "total_count" => 4, "items" => workflows.first(2) },
+        { "total_count" => 4, "items" => workflows.last(2) }
       ]
       inventory = RemoteControlsCollector.normalize_active_workflow_inventory(pages)
       equal(true, inventory["complete"])
@@ -87,7 +89,7 @@ class RemoteControlsCollectorV2Test
     run("rejects paginated workflow inventory truncation") do
       unavailable do
         RemoteControlsCollector.normalize_active_workflow_inventory(
-          [{ "total_count" => 4, "items" => workflows }]
+          [{ "total_count" => 5, "items" => workflows }]
         )
       end
     end
@@ -96,20 +98,20 @@ class RemoteControlsCollectorV2Test
       unavailable do
         RemoteControlsCollector.normalize_active_workflow_inventory(
           [
-            { "total_count" => 4, "items" => workflows.first(2) },
-            { "total_count" => 4, "items" => [workflows.last, workflows.first.dup] }
+            { "total_count" => 5, "items" => workflows.first(2) },
+            { "total_count" => 5, "items" => [workflows.last, workflows.first.dup, workflows[2]] }
           ]
         )
       end
     end
 
-    run("retains only active routes while completing the full API inventory") do
+    run("retains disabled routes while completing the full API inventory") do
       disabled = { "id" => 7999, "name" => "Old", "path" => ".github/workflows/old.yml", "state" => "disabled_manually" }
       inventory = RemoteControlsCollector.normalize_active_workflow_inventory(
-        [{ "total_count" => 4, "items" => workflows + [disabled] }]
+        [{ "total_count" => 5, "items" => workflows + [disabled] }]
       )
-      equal(3, inventory["items"].length)
-      assert(inventory["items"].none? { |item| item["id"] == 7999 })
+      equal(5, inventory["items"].length)
+      assert(inventory["items"].any? { |item| item["id"] == 7999 })
     end
 
     run("selects one suite and the primary job from the exact two-job CI") do
@@ -463,7 +465,7 @@ class RemoteControlsCollectorV2Test
     run("CLI truncation failures remain value-free and stable") do
       Dir.mktmpdir do |directory|
         path = File.join(directory, "workflows.jsonl")
-        File.binwrite(path, JSON.generate("total_count" => 4, "items" => workflows) + "\n")
+        File.binwrite(path, JSON.generate("total_count" => 5, "items" => workflows) + "\n")
         assert_cli_failure("active-workflow-inventory", "--input", path, forbidden: [directory, "7000"])
       end
     end

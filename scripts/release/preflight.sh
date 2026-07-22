@@ -9,16 +9,26 @@ cd "$ROOT_DIR"
 release_require_single_line RELEASE_TAG
 release_require_single_line EXPECTED_COMMIT
 release_require_single_line RELEASE_CONFIRMATION
+release_require_single_line RELEASE_OPERATION
 
 expected_tag="v$VERSION"
 [[ "$RELEASE_TAG" == "$expected_tag" ]] || {
     release_die "RELEASE_TAG must exactly match the bundle version ($expected_tag)."
 }
+case "$RELEASE_TAG:$VERSION:$BUILD_NUMBER" in
+    v0.0.9:0.0.9:1|v0.1.0:0.1.0:2) ;;
+    *) release_die "The release tag, bundle version, and protected build number are not an approved pair." ;;
+esac
 [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
     release_die "EXPECTED_COMMIT must be a full lowercase 40-character commit SHA."
 }
-[[ "$RELEASE_CONFIRMATION" == "prepare signed draft $RELEASE_TAG" ]] || {
-    release_die "The signed-draft confirmation phrase does not match."
+case "$RELEASE_OPERATION" in
+    build-candidate) expected_confirmation="build protected candidate $RELEASE_TAG" ;;
+    prepare-draft) expected_confirmation="prepare signed draft $RELEASE_TAG" ;;
+    *) release_die "RELEASE_OPERATION is not a supported preflight operation." ;;
+esac
+[[ "$RELEASE_CONFIRMATION" == "$expected_confirmation" ]] || {
+    release_die "The release-operation confirmation phrase does not match."
 }
 
 head_commit="$(git rev-parse --verify HEAD^{commit})"

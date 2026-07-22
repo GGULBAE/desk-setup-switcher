@@ -24,6 +24,20 @@ class ExternalBetaPolicyTestSuite
   PROVENANCE_BYTES = "synthetic Sigstore provenance bundle\n"
   PROFILE_SCHEMA_VERSION = 1
   MANIFEST_CREATED_AT = "2026-07-18T00:00:00Z"
+  PREDECESSOR_VERSION = "0.0.9"
+  PREDECESSOR_TAG = "v0.0.9"
+  PREDECESSOR_BUILD_NUMBER = 1
+  PREDECESSOR_COMMIT = "9" * 40
+  PREDECESSOR_RUN_ID = 7999
+  PREDECESSOR_ARTIFACT_ID = 8999
+  PREDECESSOR_ARTIFACT_SHA256 = "7" * 64
+  PREDECESSOR_TAG_OBJECT = "8" * 40
+  PREDECESSOR_PRE_TAG_EVIDENCE_SHA256 = "6" * 64
+  PREDECESSOR_DMG_BYTES = "synthetic predecessor final stapled DMG\n"
+  PREDECESSOR_DMG_SHA256 = Digest::SHA256.hexdigest(PREDECESSOR_DMG_BYTES)
+  PREDECESSOR_PROVENANCE_BYTES = "synthetic predecessor Sigstore provenance bundle\n"
+  PREDECESSOR_MANIFEST_CREATED_AT = "2026-07-17T22:00:00Z"
+  PREDECESSOR_BOUNDARY_COLLECTED_AT = "2026-07-17T23:30:00Z"
 
   class TestFailure < StandardError; end
 
@@ -64,7 +78,9 @@ class ExternalBetaPolicyTestSuite
     Digest::SHA256.file(path).hexdigest
   end
 
-  def release_manifest(build_number:)
+  def release_manifest(build_number:, version: VERSION, tag: TAG, commit: COMMIT,
+                       run_id: RUN_ID, dmg_bytes: DMG_BYTES, dmg_sha256: DMG_SHA256,
+                       created_at: MANIFEST_CREATED_AT)
     verification_output = {
       "appCodesign" => "valid on disk\nsatisfies its designated requirement\n",
       "dmgCodesign" => "valid on disk\nsatisfies its designated requirement\n",
@@ -78,16 +94,16 @@ class ExternalBetaPolicyTestSuite
       "schemaVersion" => "desk-setup-switcher.release-evidence/v1",
       "generator" => "scripts/release/release_policy.rb",
       "release" => {
-        "version" => VERSION,
-        "tag" => TAG,
-        "commit" => COMMIT,
-        "namespace" => "https://github.com/#{REPOSITORY}/release-evidence/#{TAG}/#{DMG_SHA256}",
-        "created" => MANIFEST_CREATED_AT,
+        "version" => version,
+        "tag" => tag,
+        "commit" => commit,
+        "namespace" => "https://github.com/#{REPOSITORY}/release-evidence/#{tag}/#{dmg_sha256}",
+        "created" => created_at,
         "buildNumber" => build_number.to_s,
         "run" => {
-          "id" => RUN_ID,
+          "id" => run_id,
           "attempt" => 1,
-          "url" => "https://github.com/#{REPOSITORY}/actions/runs/#{RUN_ID}"
+          "url" => "https://github.com/#{REPOSITORY}/actions/runs/#{run_id}"
         }
       },
       "toolchain" => {
@@ -116,19 +132,19 @@ class ExternalBetaPolicyTestSuite
         }
       },
       "lineage" => {
-        "preNotaryDmg" => { "sha256" => "5" * 64, "size" => DMG_BYTES.bytesize },
+        "preNotaryDmg" => { "sha256" => "5" * 64, "size" => dmg_bytes.bytesize },
         "notary" => {
           "id" => "12345678-1234-4234-8234-123456789abc",
           "status" => "Accepted",
-          "archiveFilename" => "Desk-Setup-Switcher-#{VERSION}.dmg",
+          "archiveFilename" => "Desk-Setup-Switcher-#{version}.dmg",
           "submittedSha256" => "5" * 64,
           "logSha256" => "6" * 64,
           "logSize" => 1
         },
         "finalStapledDmg" => {
-          "name" => "Desk-Setup-Switcher-#{VERSION}.dmg",
-          "sha256" => DMG_SHA256,
-          "size" => DMG_BYTES.bytesize
+          "name" => "Desk-Setup-Switcher-#{version}.dmg",
+          "sha256" => dmg_sha256,
+          "size" => dmg_bytes.bytesize
         }
       },
       "verifications" => verification_output.keys.sort.map do |name|
@@ -143,9 +159,9 @@ class ExternalBetaPolicyTestSuite
       end,
       "assets" => [
         {
-          "name" => "Desk-Setup-Switcher-#{VERSION}.dmg",
-          "sha256" => DMG_SHA256,
-          "size" => DMG_BYTES.bytesize
+          "name" => "Desk-Setup-Switcher-#{version}.dmg",
+          "sha256" => dmg_sha256,
+          "size" => dmg_bytes.bytesize
         }
       ]
     }
@@ -169,21 +185,23 @@ class ExternalBetaPolicyTestSuite
     }
   end
 
-  def retained_inventory_item(state: "published", build_number: 1)
+  def retained_inventory_item(state: "protected-beta", build_number: 1,
+                              release_manifest_sha256: "9" * 64,
+                              final_dmg_sha256: PREDECESSOR_DMG_SHA256)
     {
       "outcome" => "retained",
       "version" => "0.0.9",
       "buildNumber" => build_number,
-      "commit" => "9" * 40,
-      "candidateOriginRunId" => 7998 + build_number,
+      "commit" => PREDECESSOR_COMMIT,
+      "candidateOriginRunId" => PREDECESSOR_RUN_ID,
       "candidateOriginRunAttempt" => 1,
       "runConclusion" => "success",
       "completedAt" => "2026-07-17T23:00:00Z",
       "distributionState" => state,
-      "candidateArtifactId" => 8998 + build_number,
-      "candidateArtifactSHA256" => ((build_number + 6) % 10).to_s * 64,
-      "finalDMGSHA256" => ((build_number + 7) % 10).to_s * 64,
-      "releaseManifestSHA256" => ((build_number + 8) % 10).to_s * 64
+      "candidateArtifactId" => PREDECESSOR_ARTIFACT_ID,
+      "candidateArtifactSHA256" => PREDECESSOR_ARTIFACT_SHA256,
+      "finalDMGSHA256" => final_dmg_sha256,
+      "releaseManifestSHA256" => release_manifest_sha256
     }
   end
 
@@ -202,27 +220,52 @@ class ExternalBetaPolicyTestSuite
     }
   end
 
-  def upgrade_predecessor(kind:, item: nil)
+  def upgrade_predecessor(kind:, item: nil, provenance_sha256: "d" * 64,
+                          boundary_sha256: "e" * 64)
     item ||= retained_inventory_item(state: "development-installed")
     {
       "state" => "recorded",
       "distributionKind" => kind,
       "bundleIdentifier" => BUNDLE_IDENTIFIER,
       "version" => item.fetch("version"),
+      "tag" => PREDECESSOR_TAG,
       "buildNumber" => item.fetch("buildNumber"),
       "profileSchemaVersion" => PROFILE_SCHEMA_VERSION,
       "sourceCommit" => item.fetch("commit"),
+      "candidateOriginRunId" => item.fetch("candidateOriginRunId"),
+      "candidateOriginRunAttempt" => item.fetch("candidateOriginRunAttempt"),
+      "candidateArtifactId" => item.fetch("candidateArtifactId"),
+      "candidateArtifactSHA256" => item.fetch("candidateArtifactSHA256"),
       "artifactName" => "Desk-Setup-Switcher-#{item.fetch('version')}.dmg",
       "finalDMGSHA256" => item.fetch("finalDMGSHA256"),
-      "identityEvidenceSHA256" => "d" * 64,
-      "installEvidenceSHA256" => "e" * 64
+      "releaseManifestSHA256" => item.fetch("releaseManifestSHA256"),
+      "provenanceBundleName" => "Desk-Setup-Switcher-#{item.fetch('version')}.provenance.sigstore.json",
+      "provenanceBundleSHA256" => provenance_sha256,
+      "provenanceSubjectSHA256" => item.fetch("finalDMGSHA256"),
+      "releaseBoundaryEvidenceSHA256" => boundary_sha256
+    }
+  end
+
+  def acquisition(index, offset: 1)
+    {
+      "channel" => "protected-workflow-browser",
+      "browserDownloaded" => true,
+      "normalArchiveExtraction" => true,
+      "quarantinePresent" => true,
+      "quarantineManufactured" => false,
+      "quarantineRemoved" => false,
+      "quarantineEvidenceSHA256" => ((index + offset) % 10).to_s * 64,
+      "checksumPass" => true,
+      "provenancePass" => true,
+      "gatekeeperPass" => true,
+      "openAnywayUsed" => false
     }
   end
 
   def report(code:, index:, subject:, upgrade:)
     start_hour = 2 + (index * 2)
     {
-      "schemaVersion" => "desk-setup-switcher.external-beta/v1",
+      "schemaVersion" => "desk-setup-switcher.external-beta/v2",
       "report" => {
         "reportCode" => code,
         "startedAt" => format("2026-07-18T%02d:00:00Z", start_hour),
@@ -243,19 +286,7 @@ class ExternalBetaPolicyTestSuite
         "noRepositoryWriteAccess" => true,
         "noReleaseSecretAccess" => true
       },
-      "acquisition" => {
-        "channel" => "protected-workflow-browser",
-        "browserDownloaded" => true,
-        "normalArchiveExtraction" => true,
-        "quarantinePresent" => true,
-        "quarantineManufactured" => false,
-        "quarantineRemoved" => false,
-        "quarantineEvidenceSHA256" => (index + 1).to_s * 64,
-        "checksumPass" => true,
-        "provenancePass" => true,
-        "gatekeeperPass" => true,
-        "openAnywayUsed" => false
-      },
+      "acquisition" => acquisition(index),
       "lifecycle" => {
         "firstLaunchPass" => true,
         "loginItemDefaultOffPass" => true,
@@ -286,18 +317,78 @@ class ExternalBetaPolicyTestSuite
     }
   end
 
-  def build_fixture(directory, build_number: 1, predecessor: :none)
+  def build_fixture(directory, build_number: 2, predecessor: :protected)
     paths = {
       manifest: File.join(directory, "release-manifest.json"),
+      dmg: File.join(directory, "Desk-Setup-Switcher-#{VERSION}.dmg"),
       provenance: File.join(directory, "Desk-Setup-Switcher-#{VERSION}.provenance.sigstore.json"),
+      predecessor_manifest: File.join(directory, "predecessor-release-manifest.json"),
+      predecessor_dmg: File.join(directory, "Desk-Setup-Switcher-#{PREDECESSOR_VERSION}.dmg"),
+      predecessor_provenance: File.join(
+        directory,
+        "Desk-Setup-Switcher-#{PREDECESSOR_VERSION}.provenance.sigstore.json"
+      ),
+      predecessor_boundary: File.join(directory, "remote-controls-final-pre-tag.json"),
       inventory: File.join(directory, "candidate-inventory.json"),
       lineage: File.join(directory, "predecessor-lineage.json"),
       set: File.join(directory, "external-beta-set.json"),
       reports: %w[01 02 03].map { |code| File.join(directory, "external-beta-#{code}.json") }
     }
+    File.binwrite(paths.fetch(:dmg), DMG_BYTES)
     File.binwrite(paths.fetch(:provenance), PROVENANCE_BYTES)
+    File.binwrite(paths.fetch(:predecessor_dmg), PREDECESSOR_DMG_BYTES)
+    File.binwrite(paths.fetch(:predecessor_provenance), PREDECESSOR_PROVENANCE_BYTES)
     manifest = release_manifest(build_number: build_number)
     write_json(paths.fetch(:manifest), manifest)
+    predecessor_manifest = release_manifest(
+      build_number: PREDECESSOR_BUILD_NUMBER,
+      version: PREDECESSOR_VERSION,
+      tag: PREDECESSOR_TAG,
+      commit: PREDECESSOR_COMMIT,
+      run_id: PREDECESSOR_RUN_ID,
+      dmg_bytes: PREDECESSOR_DMG_BYTES,
+      dmg_sha256: PREDECESSOR_DMG_SHA256,
+      created_at: PREDECESSOR_MANIFEST_CREATED_AT
+    )
+    write_json(paths.fetch(:predecessor_manifest), predecessor_manifest)
+    boundary = {
+      "schemaVersion" => "desk-setup-switcher.remote-release-controls-evidence/v3",
+      "phase" => "final-pre-tag",
+      "collectedAt" => PREDECESSOR_BOUNDARY_COLLECTED_AT,
+      "finalPreTagEvidenceSHA256" => nil,
+      "predecessorPreTagEvidenceSHA256" => PREDECESSOR_PRE_TAG_EVIDENCE_SHA256,
+      "repository" => {},
+      "authenticatedViewer" => {},
+      "anchorReads" => {},
+      "candidateWorkflow" => {},
+      "ciWorkflow" => {},
+      "legacyWorkflow" => {},
+      "publicationWorkflow" => {},
+      "workflowInventory" => {},
+      "rulesets" => {},
+      "environments" => {},
+      "repositoryConfiguration" => {},
+      "manualEvidence" => {},
+      "security" => {},
+      "actions" => {},
+      "labels" => {},
+      "ci" => {},
+      "releaseBoundary" => {
+        "vRefs" => {
+          "complete" => true,
+          "items" => [
+            {
+              "ref" => "refs/tags/#{PREDECESSOR_TAG}",
+              "objectType" => "tag",
+              "objectSha" => PREDECESSOR_TAG_OBJECT,
+              "commitSha" => PREDECESSOR_COMMIT
+            }
+          ]
+        },
+        "releases" => { "complete" => true, "items" => [] }
+      }
+    }
+    write_json(paths.fetch(:predecessor_boundary), boundary)
     candidate_value = candidate(digest(paths.fetch(:manifest)), build_number)
 
     inventory_items = []
@@ -316,25 +407,53 @@ class ExternalBetaPolicyTestSuite
         "reason" => "first-public-beta-no-installable-predecessor"
       }
     when :published
-      item = retained_inventory_item(state: "published")
+      item = retained_inventory_item(
+        state: "published",
+        release_manifest_sha256: digest(paths.fetch(:predecessor_manifest))
+      )
       inventory_items << item
-      upgrade = upgrade_predecessor(kind: "public-release", item: item)
+      upgrade = upgrade_predecessor(
+        kind: "public-release",
+        item: item,
+        provenance_sha256: digest(paths.fetch(:predecessor_provenance)),
+        boundary_sha256: digest(paths.fetch(:predecessor_boundary))
+      )
     when :protected
-      item = retained_inventory_item(state: "protected-beta")
+      item = retained_inventory_item(
+        state: "protected-beta",
+        release_manifest_sha256: digest(paths.fetch(:predecessor_manifest))
+      )
       inventory_items << item
-      upgrade = upgrade_predecessor(kind: "protected-beta", item: item)
+      upgrade = upgrade_predecessor(
+        kind: "protected-beta",
+        item: item,
+        provenance_sha256: digest(paths.fetch(:predecessor_provenance)),
+        boundary_sha256: digest(paths.fetch(:predecessor_boundary))
+      )
     when :development
-      item = retained_inventory_item(state: "development-installed")
+      item = retained_inventory_item(
+        state: "development-installed",
+        release_manifest_sha256: digest(paths.fetch(:predecessor_manifest))
+      )
       inventory_items << item
-      upgrade = upgrade_predecessor(kind: "development-evidence", item: item)
+      upgrade = upgrade_predecessor(
+        kind: "development-evidence",
+        item: item,
+        provenance_sha256: digest(paths.fetch(:predecessor_provenance)),
+        boundary_sha256: digest(paths.fetch(:predecessor_boundary))
+      )
     else
       raise "unknown predecessor fixture"
     end
     if upgrade&.fetch("state") == "recorded"
       report_upgrade = {
         "state" => "passed",
+        "predecessorVersion" => upgrade.fetch("version"),
         "predecessorBuildNumber" => upgrade.fetch("buildNumber"),
         "predecessorFinalDMGSHA256" => upgrade.fetch("finalDMGSHA256"),
+        "predecessorReleaseManifestSHA256" => upgrade.fetch("releaseManifestSHA256"),
+        "predecessorProvenanceBundleSHA256" => upgrade.fetch("provenanceBundleSHA256"),
+        "predecessorAcquisition" => acquisition(0, offset: 7),
         "profilesPreserved" => true,
         "settingsPreserved" => true,
         "selectionPreserved" => true,
@@ -347,7 +466,7 @@ class ExternalBetaPolicyTestSuite
       "schemaVersion" => "desk-setup-switcher.candidate-inventory/v1",
       "subject" => {
         "repository" => REPOSITORY,
-        "workflowPath" => ".github/workflows/release.yml",
+        "workflowPath" => ".github/workflows/signed-release-candidate.yml",
         "operation" => "build-candidate",
         "currentCandidateRunId" => RUN_ID,
         "currentCandidateBuildNumber" => build_number
@@ -374,7 +493,7 @@ class ExternalBetaPolicyTestSuite
       }
     end
     lineage = {
-      "schemaVersion" => "desk-setup-switcher.predecessor-lineage/v2",
+      "schemaVersion" => "desk-setup-switcher.predecessor-lineage/v3",
       "candidate" => deep_copy(candidate_value),
       "candidateInventorySHA256" => inventory_sha256,
       "upgradePredecessor" => upgrade
@@ -395,7 +514,7 @@ class ExternalBetaPolicyTestSuite
     report_digests = paths.fetch(:reports).map { |path| digest(path) }
 
     set = {
-      "schemaVersion" => "desk-setup-switcher.external-beta-set/v1",
+      "schemaVersion" => "desk-setup-switcher.external-beta-set/v2",
       "subject" => deep_copy(report_subject),
       "reports" => %w[beta-01 beta-02 beta-03].each_with_index.map do |code, index|
         { "reportCode" => code, "reportSHA256" => report_digests.fetch(index) }
@@ -434,6 +553,8 @@ class ExternalBetaPolicyTestSuite
     {
       paths: paths,
       manifest: manifest,
+      predecessor_manifest: predecessor_manifest,
+      boundary: boundary,
       inventory: inventory,
       lineage: lineage,
       reports: reports,
@@ -450,12 +571,21 @@ class ExternalBetaPolicyTestSuite
       artifact_id: ARTIFACT_ID.to_s,
       artifact_sha256: ARTIFACT_SHA256,
       dmg_sha256: DMG_SHA256,
+      predecessor_tag_object: PREDECESSOR_TAG_OBJECT,
+      predecessor_pre_tag_sha256: PREDECESSOR_PRE_TAG_EVIDENCE_SHA256,
       profile_schema_version: PROFILE_SCHEMA_VERSION.to_s
     }.merge(overrides)
     [
       "verify-set",
       "--release-manifest", fixture.dig(:paths, :manifest),
+      "--final-dmg", fixture.dig(:paths, :dmg),
       "--provenance-bundle", fixture.dig(:paths, :provenance),
+      "--predecessor-release-manifest", fixture.dig(:paths, :predecessor_manifest),
+      "--predecessor-provenance-bundle", fixture.dig(:paths, :predecessor_provenance),
+      "--predecessor-dmg", fixture.dig(:paths, :predecessor_dmg),
+      "--predecessor-release-boundary", fixture.dig(:paths, :predecessor_boundary),
+      "--predecessor-tag-object", values.fetch(:predecessor_tag_object),
+      "--predecessor-pre-tag-evidence-sha256", values.fetch(:predecessor_pre_tag_sha256),
       "--candidate-inventory", fixture.dig(:paths, :inventory),
       "--predecessor-lineage", fixture.dig(:paths, :lineage),
       "--set-manifest", fixture.dig(:paths, :set),
@@ -564,7 +694,7 @@ class ExternalBetaPolicyTestSuite
     end
   end
 
-  def assert_success(*arguments, build_number: 1)
+  def assert_success(*arguments, build_number: 2)
     stdout, stderr, status = cli(*arguments)
     assert(status.success?, "expected success: #{stderr.inspect}")
     assert_equal("OK external beta set reports=3 sonoma=beta-01 build=#{build_number}\n", stdout)
@@ -587,13 +717,13 @@ class ExternalBetaPolicyTestSuite
     forbidden.each { |text| assert(!stderr.include?(text), "failure leaked sensitive input") }
   end
 
-  def with_fixture(build_number: 1, predecessor: :none)
+  def with_fixture(build_number: 2, predecessor: :protected)
     Dir.mktmpdir do |directory|
       yield build_fixture(directory, build_number: build_number, predecessor: predecessor), directory
     end
   end
 
-  def report_mutation(name, index: 1, build_number: 1, predecessor: :none)
+  def report_mutation(name, index: 1, build_number: 2, predecessor: :protected)
     run(name) do
       with_fixture(build_number: build_number, predecessor: predecessor) do |fixture|
         yield fixture.fetch(:reports).fetch(index)
@@ -613,7 +743,7 @@ class ExternalBetaPolicyTestSuite
     end
   end
 
-  def lineage_mutation(name, build_number: 1, predecessor: :none)
+  def lineage_mutation(name, build_number: 2, predecessor: :protected)
     run(name) do
       with_fixture(build_number: build_number, predecessor: predecessor) do |fixture|
         yield fixture.fetch(:lineage)
@@ -623,7 +753,7 @@ class ExternalBetaPolicyTestSuite
     end
   end
 
-  def inventory_mutation(name, build_number: 1, predecessor: :none)
+  def inventory_mutation(name, build_number: 2, predecessor: :protected)
     run(name) do
       with_fixture(build_number: build_number, predecessor: predecessor) do |fixture|
         yield fixture.fetch(:inventory)
@@ -668,30 +798,16 @@ class ExternalBetaPolicyTestSuite
   def test_rejected_template_generation
     run("prints every closed template variant with the production schema shape") do
       Dir.mktmpdir do |directory|
-        none_directory = File.join(directory, "none")
-        failed_directory = File.join(directory, "failed")
-        recorded_directory = File.join(directory, "recorded")
-        [none_directory, failed_directory, recorded_directory].each { |path| FileUtils.mkdir_p(path) }
-        none = build_fixture(none_directory)
-        failed = build_fixture(failed_directory, build_number: 2, predecessor: :failed)
-        recorded = build_fixture(recorded_directory, build_number: 2, predecessor: :published)
+        fixture = build_fixture(directory)
         cases = [
-          ["candidate-inventory-empty", {}, none.fetch(:inventory)],
-          ["candidate-inventory-retained", {}, recorded.fetch(:inventory)],
-          ["candidate-inventory-not-retained", {}, failed.fetch(:inventory)],
-          ["predecessor-lineage-none", {}, none.fetch(:lineage)],
-          ["predecessor-lineage-recorded", {}, recorded.fetch(:lineage)],
-          [
-            "external-beta-report-none",
-            { report_code: "beta-01", coverage_role: "sonoma-full-lifecycle" },
-            none.fetch(:reports).fetch(0)
-          ],
+          ["candidate-inventory-retained", {}, fixture.fetch(:inventory)],
+          ["predecessor-lineage-recorded", {}, fixture.fetch(:lineage)],
           [
             "external-beta-report-recorded",
             { report_code: "beta-02", coverage_role: "additional-apple-silicon" },
-            recorded.fetch(:reports).fetch(1)
+            fixture.fetch(:reports).fetch(1)
           ],
-          ["external-beta-set", { sonoma_report_code: "beta-01" }, none.fetch(:set)]
+          ["external-beta-set", { sonoma_report_code: "beta-01" }, fixture.fetch(:set)]
         ]
         cases.each do |kind, options, expected|
           template, = template_output(kind, **options)
@@ -702,12 +818,8 @@ class ExternalBetaPolicyTestSuite
 
     run("prints deterministic private-data-free rejected placeholders") do
       cases = [
-        ["candidate-inventory-empty", {}],
         ["candidate-inventory-retained", {}],
-        ["candidate-inventory-not-retained", {}],
-        ["predecessor-lineage-none", {}],
         ["predecessor-lineage-recorded", {}],
-        ["external-beta-report-none", { report_code: "beta-01", coverage_role: "sonoma-full-lifecycle" }],
         ["external-beta-report-recorded", { report_code: "beta-03", coverage_role: "additional-apple-silicon" }],
         ["external-beta-set", { sonoma_report_code: "beta-01" }]
       ]
@@ -739,12 +851,12 @@ class ExternalBetaPolicyTestSuite
           environment,
           RbConfig.ruby,
           TEMPLATE_SCRIPT,
-          *template_arguments("candidate-inventory-empty"),
+          *template_arguments("candidate-inventory-retained"),
           chdir: working_directory
         )
         assert(status.success?, "environment-isolation template failed")
         assert(stderr.empty?, "environment-isolation template wrote stderr")
-        _, expected = template_output("candidate-inventory-empty")
+        _, expected = template_output("candidate-inventory-retained")
         assert_equal(expected, stdout, "template output depends on host environment")
         assert_equal([], Dir.children(working_directory), "template generator wrote a file")
         assert(!stdout.include?("SENSITIVE_TEMPLATE"), "template output leaked the host environment")
@@ -753,31 +865,20 @@ class ExternalBetaPolicyTestSuite
 
     run("rejects every generated template before it can close the beta gate") do
       cases = [
-        ["candidate-inventory-empty", {}, :none, :inventory, "candidate inventory"],
-        ["candidate-inventory-retained", {}, :published, :inventory, "candidate inventory"],
-        ["candidate-inventory-not-retained", {}, :failed, :inventory, "candidate inventory"],
-        ["predecessor-lineage-none", {}, :none, :lineage, "predecessor lineage"],
-        ["predecessor-lineage-recorded", {}, :published, :lineage, "predecessor lineage"],
-        [
-          "external-beta-report-none",
-          { report_code: "beta-01", coverage_role: "sonoma-full-lifecycle" },
-          :none,
-          [:reports, 0],
-          "external beta report"
-        ],
+        ["candidate-inventory-retained", {}, :protected, :inventory, "candidate inventory"],
+        ["predecessor-lineage-recorded", {}, :protected, :lineage, "predecessor lineage"],
         [
           "external-beta-report-recorded",
           { report_code: "beta-02", coverage_role: "additional-apple-silicon" },
-          :published,
+          :protected,
           [:reports, 1],
           "external beta report"
         ],
-        ["external-beta-set", { sonoma_report_code: "beta-01" }, :none, :set, "external beta set"]
+        ["external-beta-set", { sonoma_report_code: "beta-01" }, :protected, :set, "external beta set"]
       ]
       cases.each do |kind, options, predecessor, target, label|
         Dir.mktmpdir do |directory|
-          build_number = predecessor == :none ? 1 : 2
-          fixture = build_fixture(directory, build_number: build_number, predecessor: predecessor)
+          fixture = build_fixture(directory, predecessor: predecessor)
           _, bytes = template_output(kind, **options)
           path = if target.is_a?(Array)
                    fixture.dig(:paths, target.fetch(0), target.fetch(1))
@@ -797,23 +898,23 @@ class ExternalBetaPolicyTestSuite
       end
     end
 
-    run("completes generated first-beta shapes with synthetic leaves and verifies the set") do
+    run("completes generated fixed-upgrade shapes with synthetic leaves and verifies the set") do
       with_fixture do |fixture|
-        inventory, = template_output("candidate-inventory-empty")
-        lineage, = template_output("predecessor-lineage-none")
+        inventory, = template_output("candidate-inventory-retained")
+        lineage, = template_output("predecessor-lineage-recorded")
         reports = [
           template_output(
-            "external-beta-report-none",
+            "external-beta-report-recorded",
             report_code: "beta-01",
             coverage_role: "sonoma-full-lifecycle"
           ).first,
           template_output(
-            "external-beta-report-none",
+            "external-beta-report-recorded",
             report_code: "beta-02",
             coverage_role: "additional-apple-silicon"
           ).first,
           template_output(
-            "external-beta-report-none",
+            "external-beta-report-recorded",
             report_code: "beta-03",
             coverage_role: "additional-apple-silicon"
           ).first
@@ -842,10 +943,10 @@ class ExternalBetaPolicyTestSuite
       cases = [
         [[], "External beta template error: template kind is missing\n"],
         [template_arguments("SENSITIVE_KIND"), "External beta template error: template kind is invalid\n"],
-        [template_arguments("external-beta-report-none"), "External beta template error: report template options are missing\n"],
+        [template_arguments("external-beta-report-recorded"), "External beta template error: report template options are missing\n"],
         [
           template_arguments(
-            "external-beta-report-none",
+            "external-beta-report-recorded",
             report_code: "SENSITIVE_CODE",
             coverage_role: "sonoma-full-lifecycle"
           ),
@@ -853,7 +954,7 @@ class ExternalBetaPolicyTestSuite
         ],
         [
           template_arguments(
-            "external-beta-report-none",
+            "external-beta-report-recorded",
             report_code: "beta-01",
             coverage_role: "SENSITIVE_ROLE"
           ),
@@ -865,19 +966,19 @@ class ExternalBetaPolicyTestSuite
           "External beta template error: template Sonoma report code is invalid\n"
         ],
         [
-          template_arguments("candidate-inventory-empty", report_code: "beta-01"),
+          template_arguments("candidate-inventory-retained", report_code: "beta-01"),
           "External beta template error: template options differ for this kind\n"
         ],
         [
-          ["--kind", "candidate-inventory-empty", "--kind", "SENSITIVE_KIND"],
+          ["--kind", "candidate-inventory-retained", "--kind", "SENSITIVE_KIND"],
           "External beta template error: template option is repeated\n"
         ],
         [
-          ["--kind", "candidate-inventory-empty", "SENSITIVE_ARGUMENT"],
+          ["--kind", "candidate-inventory-retained", "SENSITIVE_ARGUMENT"],
           "External beta template error: unexpected arguments\n"
         ],
         [
-          ["--kind", "candidate-inventory-empty", "--output", "SENSITIVE_PATH"],
+          ["--kind", "candidate-inventory-retained", "--output", "SENSITIVE_PATH"],
           "External beta template error: invalid command line.\n"
         ]
       ]
@@ -888,80 +989,6 @@ class ExternalBetaPolicyTestSuite
         assert(stdout.empty?, "invalid template command wrote stdout")
         assert_equal(expected_stderr, stderr)
         assert(!stderr.include?("SENSITIVE"), "invalid template command leaked an input value")
-      end
-    end
-  end
-
-  def test_success_paths
-    run("accepts a byte-bound first public beta with no installable predecessor") do
-      with_fixture do |fixture|
-        assert_success(*arguments(fixture))
-      end
-    end
-
-    {
-      "published predecessor" => :published,
-      "protected beta predecessor" => :protected,
-      "development evidence predecessor" => :development
-    }.each do |name, predecessor|
-      run("accepts a build-2 upgrade from #{name}") do
-        with_fixture(build_number: 2, predecessor: predecessor) do |fixture|
-          assert_success(*arguments(fixture), build_number: 2)
-        end
-      end
-    end
-
-    run("accepts a non-retained failed build with no installable predecessor") do
-      with_fixture(build_number: 2, predecessor: :failed) do |fixture|
-        assert_success(*arguments(fixture), build_number: 2)
-      end
-    end
-
-    run("accepts a monotonic build-number gap in a complete reviewed inventory") do
-      with_fixture(build_number: 3, predecessor: :published) do |fixture|
-        assert_success(*arguments(fixture), build_number: 3)
-      end
-    end
-
-    run("returns only descriptor-bound verification facts as canonical JSON") do
-      with_fixture do |fixture|
-        stdout, stderr, status = cli(*arguments(fixture), "--print-result-json")
-        assert(status.success?, "expected JSON result success: #{stderr.inspect}")
-        assert(stderr.empty?, "JSON result wrote stderr")
-        result = JSON.parse(stdout, create_additions: false)
-        assert_equal(
-          %w[
-            buildNumber candidateInventorySHA256 externalBetaReportSHA256
-            externalBetaSetCreatedAt externalBetaSetSHA256 finalDMGProvenanceSHA256
-            predecessorLineageSHA256 releaseManifestSHA256 schemaVersion sonomaGateReportCode
-            sonomaGateReportSHA256
-          ].sort,
-          result.keys.sort
-        )
-        assert_equal("desk-setup-switcher.external-beta-verification/v2", result.fetch("schemaVersion"))
-        assert_equal(digest(fixture.dig(:paths, :manifest)), result.fetch("releaseManifestSHA256"))
-        assert_equal(digest(fixture.dig(:paths, :provenance)), result.fetch("finalDMGProvenanceSHA256"))
-        assert_equal(digest(fixture.dig(:paths, :inventory)), result.fetch("candidateInventorySHA256"))
-        assert_equal(digest(fixture.dig(:paths, :lineage)), result.fetch("predecessorLineageSHA256"))
-        assert_equal(digest(fixture.dig(:paths, :set)), result.fetch("externalBetaSetSHA256"))
-        assert_equal(fixture.dig(:paths, :reports).map { |path| digest(path) }, result.fetch("externalBetaReportSHA256"))
-        assert_equal("beta-01", result.fetch("sonomaGateReportCode"))
-        assert_equal(result.fetch("externalBetaReportSHA256").fetch(0), result.fetch("sonomaGateReportSHA256"))
-        assert_equal("2026-07-18T09:00:00Z", result.fetch("externalBetaSetCreatedAt"))
-        assert_equal(1, result.fetch("buildNumber"))
-      end
-    end
-
-    run("accepts semantically identical JSON object key ordering") do
-      with_fixture do |fixture|
-        report_value = fixture.fetch(:reports).fetch(1)
-        report_value["subject"] = report_value.fetch("subject").to_a.reverse.to_h
-        write_json(fixture.dig(:paths, :reports, 1), report_value)
-        report_sha256 = digest(fixture.dig(:paths, :reports, 1))
-        fixture.dig(:set, "reports", 1)["reportSHA256"] = report_sha256
-        fixture.dig(:set, "independence", "bindings", 1)["reportSHA256"] = report_sha256
-        write_json(fixture.dig(:paths, :set), fixture.fetch(:set))
-        assert_success(*arguments(fixture))
       end
     end
   end
@@ -1160,8 +1187,8 @@ class ExternalBetaPolicyTestSuite
       end
     end
 
-    run("accepts schema 0 for an installable predecessor") do
-      with_fixture(build_number: 2, predecessor: :published) do |fixture|
+    run("accepts schema 0 for the protected predecessor") do
+      with_fixture(build_number: 2, predecessor: :protected) do |fixture|
         fixture.dig(:lineage, "upgradePredecessor")["profileSchemaVersion"] = 0
         write_json(fixture.dig(:paths, :lineage), fixture.fetch(:lineage))
         lineage_sha256 = digest(fixture.dig(:paths, :lineage))
@@ -1432,9 +1459,153 @@ class ExternalBetaPolicyTestSuite
     end
   end
 
+  def test_fixed_predecessor_contract
+    run("accepts the fixed protected v0.0.9 build-1 to v0.1.0 build-2 contract") do
+      with_fixture do |fixture|
+        assert_success(*arguments(fixture), build_number: 2)
+      end
+    end
+
+    run("returns every actual predecessor byte identity") do
+      with_fixture do |fixture|
+        stdout, stderr, status = cli(*arguments(fixture), "--print-result-json")
+        assert(status.success?, "expected JSON result success: #{stderr.inspect}")
+        assert(stderr.empty?, "JSON result wrote stderr")
+        value = JSON.parse(stdout, create_additions: false)
+        assert_equal("desk-setup-switcher.external-beta-verification/v3", value.fetch("schemaVersion"))
+        assert_equal(digest(fixture.dig(:paths, :predecessor_manifest)), value.fetch("predecessorReleaseManifestSHA256"))
+        assert_equal(digest(fixture.dig(:paths, :predecessor_dmg)), value.fetch("predecessorFinalDMGSHA256"))
+        assert_equal(digest(fixture.dig(:paths, :predecessor_provenance)), value.fetch("predecessorFinalDMGProvenanceSHA256"))
+        assert_equal(digest(fixture.dig(:paths, :predecessor_boundary)), value.fetch("predecessorReleaseBoundarySHA256"))
+        assert_equal(2, value.fetch("buildNumber"))
+      end
+    end
+
+    {
+      "current DMG" => :dmg,
+      "predecessor manifest" => :predecessor_manifest,
+      "predecessor DMG" => :predecessor_dmg,
+      "predecessor provenance" => :predecessor_provenance,
+      "predecessor release boundary" => :predecessor_boundary
+    }.each do |label, key|
+      run("rejects changed #{label} bytes") do
+        with_fixture do |fixture|
+          File.open(fixture.dig(:paths, key), "ab") { |file| file.write("changed\n") }
+          assert_failure(*arguments(fixture))
+        end
+      end
+
+      run("rejects a symlink #{label}") do
+        with_fixture do |fixture|
+          path = fixture.dig(:paths, key)
+          target = "#{path}.target"
+          FileUtils.mv(path, target)
+          File.symlink(target, path)
+          assert_failure(*arguments(fixture))
+        end
+      end
+
+      run("rejects a hard-linked #{label}") do
+        with_fixture do |fixture|
+          path = fixture.dig(:paths, key)
+          target = "#{path}.target"
+          FileUtils.mv(path, target)
+          File.link(target, path)
+          assert_failure(*arguments(fixture))
+        end
+      end
+
+      run("rejects an empty #{label}") do
+        with_fixture do |fixture|
+          File.truncate(fixture.dig(:paths, key), 0)
+          assert_failure(*arguments(fixture))
+        end
+      end
+    end
+
+    %i[dmg predecessor_dmg].each do |key|
+      run("rejects an oversized #{key.to_s.tr('_', ' ')}") do
+        with_fixture do |fixture|
+          File.truncate(fixture.dig(:paths, key), (2 * 1024 * 1024 * 1024) + 1)
+          assert_failure(*arguments(fixture))
+        end
+      end
+    end
+
+    run("rejects any predecessor GitHub Release even with rebound boundary bytes") do
+      with_fixture do |fixture|
+        fixture.dig(:boundary, "releaseBoundary", "releases", "items") << { "id" => 7001 }
+        write_json(fixture.dig(:paths, :predecessor_boundary), fixture.fetch(:boundary))
+        fixture.dig(:lineage, "upgradePredecessor")["releaseBoundaryEvidenceSHA256"] =
+          digest(fixture.dig(:paths, :predecessor_boundary))
+        rewrite_lineage_and_downstream!(fixture)
+        assert_failure(*arguments(fixture))
+      end
+    end
+
+    run("rejects a lightweight or different predecessor tag boundary") do
+      with_fixture do |fixture|
+        ref = fixture.dig(:boundary, "releaseBoundary", "vRefs", "items", 0)
+        ref["objectType"] = "commit"
+        write_json(fixture.dig(:paths, :predecessor_boundary), fixture.fetch(:boundary))
+        fixture.dig(:lineage, "upgradePredecessor")["releaseBoundaryEvidenceSHA256"] =
+          digest(fixture.dig(:paths, :predecessor_boundary))
+        rewrite_lineage_and_downstream!(fixture)
+        assert_failure(*arguments(fixture))
+      end
+    end
+
+    run("rejects a predecessor boundary for a different independently supplied tag object") do
+      with_fixture do |fixture|
+        assert_failure(
+          *arguments(fixture, overrides: { predecessor_tag_object: "f" * 40 })
+        )
+      end
+    end
+
+    run("rejects a predecessor boundary for a different predecessor pre-tag digest") do
+      with_fixture do |fixture|
+        assert_failure(
+          *arguments(fixture, overrides: { predecessor_pre_tag_sha256: "f" * 64 })
+        )
+      end
+    end
+
+    report_mutation("rejects a report bound to different predecessor manifest bytes") do |report|
+      report.dig("lifecycle", "upgrade")["predecessorReleaseManifestSHA256"] = "f" * 64
+    end
+    report_mutation("rejects failed predecessor provenance acquisition") do |report|
+      report.dig("lifecycle", "upgrade", "predecessorAcquisition")["provenancePass"] = false
+    end
+  end
+
+  def test_current_recorded_templates
+    run("prints current recorded lineage report and set schema shapes") do
+      with_fixture do |fixture|
+        cases = [
+          ["predecessor-lineage-recorded", {}, fixture.fetch(:lineage)],
+          [
+            "external-beta-report-recorded",
+            { report_code: "beta-01", coverage_role: "sonoma-full-lifecycle" },
+            fixture.fetch(:reports).fetch(0)
+          ],
+          ["external-beta-set", { sonoma_report_code: "beta-01" }, fixture.fetch(:set)]
+        ]
+        cases.each do |kind, options, expected|
+          template, = template_output(kind, **options)
+          assert_equal(json_shape(expected), json_shape(template), "#{kind} schema shape differs")
+          assert(json_strings(template).any? do |item|
+            item.start_with?("<REJECTED_TEMPLATE:REPLACE_REQUIRED:")
+          end, "#{kind} lacks rejected placeholders")
+        end
+      end
+    end
+  end
+
   def execute
     test_rejected_template_generation
-    test_success_paths
+    test_current_recorded_templates
+    test_fixed_predecessor_contract
     test_candidate_binding
     test_lineage
     test_reports

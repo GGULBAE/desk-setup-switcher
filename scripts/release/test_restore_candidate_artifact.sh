@@ -175,11 +175,15 @@ chmod 0755 "$mock_bin/dirname" "$mock_bin/basename" "$mock_bin/mktemp" \
     "$mock_bin/mv" "$mock_bin/gh"
 
 expected_commit=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+current_commit="$expected_commit"
 origin_run_id=12345
+current_candidate_run_id="$origin_run_id"
 current_run_id=99999
 artifact_id=67890
+current_candidate_artifact_id="$artifact_id"
 repository_id=456789
 tag="v$VERSION"
+current_tag="$tag"
 artifact_name="desk-setup-switcher-$tag-signed-candidate-$origin_run_id-attempt-1"
 dmg_name="Desk-Setup-Switcher-$VERSION.dmg"
 asset_names=(
@@ -203,6 +207,7 @@ child_log=""
 command_log=""
 archive_digest=""
 download_archive=""
+expected_predecessor_dmg_sha256=""
 preexisting_destination=absent
 
 create_test_archive() {
@@ -261,7 +266,7 @@ write_api_fixtures() {
 
       run = {
         "id" => run_id,
-        "path" => ".github/workflows/release.yml@#{tag}",
+        "path" => ".github/workflows/signed-release-candidate.yml@#{tag}",
         "event" => "workflow_dispatch",
         "status" => "completed",
         "conclusion" => "success",
@@ -275,7 +280,7 @@ write_api_fixtures() {
       case scenario
       when "run-id-mismatch" then run["id"] += 1
       when "run-path-mismatch" then run["path"] = ".github/workflows/other.yml"
-      when "run-path-ref-mismatch" then run["path"] = ".github/workflows/release.yml@main"
+      when "run-path-ref-mismatch" then run["path"] = ".github/workflows/signed-release-candidate.yml@main"
       when "run-event-mismatch" then run["event"] = "push"
       when "run-not-completed" then run["status"] = "in_progress"; run["conclusion"] = nil
       when "run-attempt-mismatch" then run["run_attempt"] = 2
@@ -387,6 +392,43 @@ setup_case() {
     for name in "${asset_names[@]}"; do
         printf 'exact restored candidate asset: %s\n' "$name" >"$expected_directory/$name"
     done
+    if [[ "$scenario" == predecessor-* ]]; then
+        expected_predecessor_dmg_sha256="$(shasum -a 256 \
+            "$expected_directory/$dmg_name" | awk '{print $1}')"
+        local predecessor_build=1
+        if [[ "$scenario" == predecessor-manifest-build-mismatch ]]; then
+            predecessor_build=2
+        fi
+        "$real_ruby" -rjson -e '
+          path, repository, version, tag, build, commit, run_id_text,
+            dmg_name, dmg_sha, dmg_path = ARGV
+          run_id = Integer(run_id_text, 10)
+          manifest = {
+            "release" => {
+              "version" => version,
+              "tag" => tag,
+              "buildNumber" => build,
+              "commit" => commit,
+              "run" => {
+                "id" => run_id,
+                "attempt" => 1,
+                "url" => "https://github.com/#{repository}/actions/runs/#{run_id}"
+              }
+            },
+            "lineage" => {
+              "finalStapledDmg" => {
+                "name" => dmg_name,
+                "sha256" => dmg_sha,
+                "size" => File.size(dmg_path)
+              }
+            }
+          }
+          File.binwrite(path, JSON.generate(manifest) + "\n")
+        ' "$expected_directory/release-manifest.json" GGULBAE/desk-setup-switcher \
+            0.0.9 v0.0.9 "$predecessor_build" "$expected_commit" "$origin_run_id" \
+            "$dmg_name" "$expected_predecessor_dmg_sha256" \
+            "$expected_directory/$dmg_name"
+    fi
 
     create_test_archive "$scenario" "$case_root/archive.zip"
     archive_digest="$(shasum -a 256 "$case_root/archive.zip" | awk '{print $1}')"
@@ -433,6 +475,8 @@ run_target_with_overrides() {
     local current_id="$4"
     local operation="${5:-prepare-draft}"
     local protected_environment="${6:-release-candidate}"
+    local restore_kind="${7:-candidate}"
+    local predecessor_final_dmg_sha256="${8:-$(printf '%064d' 0)}"
     env -i \
         "PATH=$mock_bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" \
         "HOME=${HOME:-/tmp}" \
@@ -442,8 +486,8 @@ run_target_with_overrides() {
         GITHUB_ACTIONS=true \
         GITHUB_EVENT_NAME=workflow_dispatch \
         GITHUB_REF_TYPE=tag \
-        "GITHUB_REF=refs/tags/$tag" \
-        "GITHUB_REF_NAME=$tag" \
+        "GITHUB_REF=refs/tags/$current_tag" \
+        "GITHUB_REF_NAME=$current_tag" \
         "RELEASE_PROTECTED_ENVIRONMENT=$protected_environment" \
         GITHUB_REPOSITORY=GGULBAE/desk-setup-switcher \
         "GITHUB_RUN_ID=$current_id" \
@@ -453,14 +497,21 @@ run_target_with_overrides() {
         "GH_TOKEN=$runtime_gh_token" \
         "GITHUB_TOKEN=$runtime_github_alias_token" \
         "github_token=$runtime_lowercase_alias_token" \
-        "RELEASE_CANDIDATE_RUN_ID=$origin_run_id" \
-        "RELEASE_CANDIDATE_ARTIFACT_ID=$artifact_id" \
+        "RELEASE_CANDIDATE_RUN_ID=$current_candidate_run_id" \
+        "RELEASE_CANDIDATE_ARTIFACT_ID=$current_candidate_artifact_id" \
         "RELEASE_CANDIDATE_ARTIFACT_SHA256=$candidate_digest" \
         "RELEASE_CANDIDATE_RUN_ATTEMPT=$candidate_attempt" \
         "RELEASE_OPERATION=$operation" \
-        "RELEASE_TAG=$tag" \
-        "EXPECTED_COMMIT=$expected_commit" \
+        "RELEASE_TAG=$current_tag" \
+        "EXPECTED_COMMIT=$current_commit" \
         "RELEASE_SOURCE_DIR=$source_directory" \
+        "RELEASE_RESTORE_KIND=$restore_kind" \
+        "RELEASE_PREDECESSOR_COMMIT=$expected_commit" \
+        "RELEASE_PREDECESSOR_RUN_ID=$origin_run_id" \
+        "RELEASE_PREDECESSOR_ARTIFACT_ID=$artifact_id" \
+        "RELEASE_PREDECESSOR_ARTIFACT_SHA256=$candidate_digest" \
+        "RELEASE_PREDECESSOR_FINAL_DMG_SHA256=$predecessor_final_dmg_sha256" \
+        "RELEASE_PREDECESSOR_SOURCE_DIR=$source_directory" \
         "MOCK_REAL_RUBY=$real_ruby" \
         "MOCK_SCENARIO=$scenario" \
         "MOCK_ORIGIN_RUN_ID=$origin_run_id" \
@@ -525,10 +576,12 @@ run_success_case() {
     local scenario="$1"
     local operation="${2:-prepare-draft}"
     local protected_environment="${3:-release-candidate}"
+    local restore_kind="${4:-candidate}"
     local name first_child
     setup_case "$scenario"
     if ! run_target_with_overrides "$scenario" 1 "$archive_digest" "$current_run_id" \
-        "$operation" "$protected_environment" >"$case_root/stdout" 2>"$case_root/stderr"; then
+        "$operation" "$protected_environment" "$restore_kind" \
+        "$expected_predecessor_dmg_sha256" >"$case_root/stdout" 2>"$case_root/stderr"; then
         sed -n '1,100p' "$case_root/stderr" >&2
         fail "Expected artifact restoration failed: $scenario"
     fi
@@ -536,6 +589,12 @@ run_success_case() {
         fail "Successful restoration did not retain one candidate directory."
     }
     pass
+    if [[ "$restore_kind" == predecessor ]]; then
+        [[ "$(stat -f '%Lp' "$source_directory")" == 700 ]] || {
+            fail "The restored predecessor directory is not private."
+        }
+        pass
+    fi
     "$real_ruby" -e '
       directory, *expected = ARGV
       abort unless Dir.children(directory).sort == expected.sort
@@ -690,5 +749,55 @@ fi
 }
 pass
 assert_no_credential_leak "$case_root/stderr"
+
+# Publication restores one separately pinned protected predecessor. Its mutable
+# origin identity changes below; the current release tag, commit, and candidate
+# run stay fixed so the helper must prove that the two candidates are distinct.
+expected_commit=9999999999999999999999999999999999999999
+origin_run_id=70009
+artifact_id=80009
+tag=v0.0.9
+artifact_name="desk-setup-switcher-$tag-signed-candidate-$origin_run_id-attempt-1"
+dmg_name=Desk-Setup-Switcher-0.0.9.dmg
+asset_names=(
+    "$dmg_name"
+    "$dmg_name.sha256"
+    Desk-Setup-Switcher-0.0.9.spdx.json
+    release-manifest.json
+    notary-result.json
+    notary-log.json
+    Desk-Setup-Switcher-0.0.9.provenance.sigstore.json
+    Desk-Setup-Switcher-0.0.9.sbom.sigstore.json
+    release-manifest.provenance.sigstore.json
+)
+
+run_success_case predecessor-success publish-release release-publication predecessor
+
+setup_case predecessor-final-dmg-pin-mismatch
+if run_target_with_overrides predecessor-final-dmg-pin-mismatch 1 "$archive_digest" \
+    "$current_run_id" publish-release release-publication predecessor \
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+    >"$case_root/stdout" 2>"$case_root/stderr"; then
+    fail "A predecessor with the wrong final DMG pin was accepted."
+fi
+[[ ! -e "$source_directory" && ! -L "$source_directory" && ! -s "$case_root/stdout" ]] || {
+    fail "Predecessor DMG pin validation exposed an output."
+}
+pass
+assert_no_credential_leak "$case_root/stderr"
+assert_commands_are_read_only
+
+setup_case predecessor-manifest-build-mismatch
+if run_target_with_overrides predecessor-manifest-build-mismatch 1 "$archive_digest" \
+    "$current_run_id" publish-release release-publication predecessor \
+    "$expected_predecessor_dmg_sha256" >"$case_root/stdout" 2>"$case_root/stderr"; then
+    fail "A predecessor manifest with the wrong build was accepted."
+fi
+[[ ! -e "$source_directory" && ! -L "$source_directory" && ! -s "$case_root/stdout" ]] || {
+    fail "Predecessor manifest validation exposed an output."
+}
+pass
+assert_no_credential_leak "$case_root/stderr"
+assert_commands_are_read_only
 
 printf 'Candidate artifact restoration mock tests passed (%d assertions).\n' "$assertions"

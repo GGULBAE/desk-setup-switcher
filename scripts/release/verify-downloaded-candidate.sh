@@ -77,7 +77,7 @@ provenance_bundle="$download_directory/Desk-Setup-Switcher-$VERSION.provenance.s
 sbom_bundle="$download_directory/Desk-Setup-Switcher-$VERSION.sbom.sigstore.json"
 manifest_path="$download_directory/release-manifest.json"
 manifest_bundle="$download_directory/release-manifest.provenance.sigstore.json"
-signer_workflow="$GITHUB_REPOSITORY/.github/workflows/release.yml"
+signer_workflow="$GITHUB_REPOSITORY/.github/workflows/signed-release-candidate.yml"
 source_ref="refs/tags/$RELEASE_TAG"
 
 GH_CONFIG_DIR="$gh_config_directory" GH_TOKEN="$github_token" gh attestation verify "$dmg_path" \

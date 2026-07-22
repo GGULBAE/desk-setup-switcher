@@ -21,18 +21,59 @@ case "${RELEASE_OPERATION:-}" in
 esac
 release_require_execution_context "$protected_environment"
 
-release_require_single_line RELEASE_CANDIDATE_RUN_ID
-release_require_single_line RELEASE_CANDIDATE_ARTIFACT_ID
-release_require_single_line RELEASE_CANDIDATE_ARTIFACT_SHA256
-release_require_single_line RELEASE_CANDIDATE_RUN_ATTEMPT
 release_require_single_line RELEASE_OPERATION
 release_require_single_line RELEASE_TAG
 release_require_single_line EXPECTED_COMMIT
 release_require_single_line GITHUB_REPOSITORY
 release_require_single_line GITHUB_REF
 release_require_single_line GITHUB_REF_NAME
-release_require_single_line RELEASE_SOURCE_DIR
 release_require_env GITHUB_RUN_ATTEMPT
+
+restore_kind="${RELEASE_RESTORE_KIND:-candidate}"
+case "$restore_kind" in
+    candidate)
+        release_require_single_line RELEASE_CANDIDATE_RUN_ID
+        release_require_single_line RELEASE_CANDIDATE_ARTIFACT_ID
+        release_require_single_line RELEASE_CANDIDATE_ARTIFACT_SHA256
+        release_require_single_line RELEASE_CANDIDATE_RUN_ATTEMPT
+        release_require_single_line RELEASE_SOURCE_DIR
+        origin_version="$VERSION"
+        origin_build_number="$BUILD_NUMBER"
+        origin_tag="$RELEASE_TAG"
+        origin_commit="$EXPECTED_COMMIT"
+        origin_run_id="$RELEASE_CANDIDATE_RUN_ID"
+        origin_run_attempt="$RELEASE_CANDIDATE_RUN_ATTEMPT"
+        origin_artifact_id="$RELEASE_CANDIDATE_ARTIFACT_ID"
+        origin_artifact_sha256="$RELEASE_CANDIDATE_ARTIFACT_SHA256"
+        requested_source="$RELEASE_SOURCE_DIR"
+        expected_final_dmg_sha256=""
+        ;;
+    predecessor)
+        [[ "$RELEASE_OPERATION" == publish-release ]] || {
+            release_die "Predecessor restoration is restricted to publication review."
+        }
+        for name in \
+            RELEASE_PREDECESSOR_COMMIT \
+            RELEASE_PREDECESSOR_RUN_ID \
+            RELEASE_PREDECESSOR_ARTIFACT_ID \
+            RELEASE_PREDECESSOR_ARTIFACT_SHA256 \
+            RELEASE_PREDECESSOR_FINAL_DMG_SHA256 \
+            RELEASE_PREDECESSOR_SOURCE_DIR; do
+            release_require_single_line "$name"
+        done
+        origin_version=0.0.9
+        origin_build_number=1
+        origin_tag=v0.0.9
+        origin_commit="$RELEASE_PREDECESSOR_COMMIT"
+        origin_run_id="$RELEASE_PREDECESSOR_RUN_ID"
+        origin_run_attempt=1
+        origin_artifact_id="$RELEASE_PREDECESSOR_ARTIFACT_ID"
+        origin_artifact_sha256="$RELEASE_PREDECESSOR_ARTIFACT_SHA256"
+        requested_source="$RELEASE_PREDECESSOR_SOURCE_DIR"
+        expected_final_dmg_sha256="$RELEASE_PREDECESSOR_FINAL_DMG_SHA256"
+        ;;
+    *) release_die "Unknown candidate restoration kind." ;;
+esac
 
 [[ -n "$github_token" && "$github_token" != *$'\n'* && "$github_token" != *$'\r'* ]] || {
     release_die "The GitHub artifact credential is missing or malformed."
@@ -51,28 +92,39 @@ done
 [[ "$RELEASE_TAG" == "v$VERSION" ]] || {
     release_die "RELEASE_TAG does not match the bundle version."
 }
-[[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
-    release_die "EXPECTED_COMMIT has an invalid format."
+[[ "$origin_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    release_die "The origin commit has an invalid format."
 }
-[[ "$RELEASE_CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]] || {
-    release_die "RELEASE_CANDIDATE_RUN_ID must be a positive integer."
+[[ "$origin_run_id" =~ ^[1-9][0-9]*$ ]] || {
+    release_die "The origin run ID must be a positive integer."
 }
-[[ "$RELEASE_CANDIDATE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || {
-    release_die "RELEASE_CANDIDATE_ARTIFACT_ID must be a positive integer."
+[[ "$origin_artifact_id" =~ ^[1-9][0-9]*$ ]] || {
+    release_die "The origin artifact ID must be a positive integer."
 }
-[[ "$RELEASE_CANDIDATE_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
-    release_die "RELEASE_CANDIDATE_ARTIFACT_SHA256 must be one lowercase SHA-256 digest."
+[[ "$origin_artifact_sha256" =~ ^[0-9a-f]{64}$ ]] || {
+    release_die "The origin artifact SHA-256 must be one lowercase digest."
 }
-[[ "$RELEASE_CANDIDATE_RUN_ATTEMPT" == 1 ]] || {
+[[ "$origin_run_attempt" == 1 ]] || {
     release_die "The restored candidate must originate from workflow attempt 1."
 }
+if [[ "$restore_kind" == predecessor ]]; then
+    [[ "$expected_final_dmg_sha256" =~ ^[0-9a-f]{64}$ ]] || {
+        release_die "The predecessor final DMG SHA-256 is invalid."
+    }
+    [[ "$origin_commit" != "$EXPECTED_COMMIT" ]] || {
+        release_die "The predecessor and current commits must differ."
+    }
+    [[ "$origin_run_id" != "${RELEASE_CANDIDATE_RUN_ID:-}" ]] || {
+        release_die "The predecessor and current candidate runs must differ."
+    }
+fi
 [[ "$RELEASE_OPERATION" == prepare-draft || "$RELEASE_OPERATION" == publish-release ]] || {
     release_die "Candidate restoration is restricted to a reviewed release operation."
 }
 [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ && "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
     release_die "The current workflow run identity is invalid."
 }
-[[ "$GITHUB_RUN_ID" != "$RELEASE_CANDIDATE_RUN_ID" ]] || {
+[[ "$GITHUB_RUN_ID" != "$origin_run_id" ]] || {
     release_die "Candidate restoration must run separately from the origin build."
 }
 [[ "$GITHUB_REF" == "refs/tags/$RELEASE_TAG" && "$GITHUB_REF_NAME" == "$RELEASE_TAG" ]] || {
@@ -82,9 +134,9 @@ done
     release_die "RUNNER_TEMP is missing or is a symlink."
 }
 
-case "$RELEASE_SOURCE_DIR" in
-    /*) requested_source_directory="$RELEASE_SOURCE_DIR" ;;
-    *) requested_source_directory="$ROOT_DIR/$RELEASE_SOURCE_DIR" ;;
+case "$requested_source" in
+    /*) requested_source_directory="$requested_source" ;;
+    *) requested_source_directory="$ROOT_DIR/$requested_source" ;;
 esac
 release_require_absent_path "$requested_source_directory"
 
@@ -106,19 +158,19 @@ case "$source_directory" in
 esac
 release_require_absent_path "$source_directory"
 
-dmg_name="Desk-Setup-Switcher-$VERSION.dmg"
+dmg_name="Desk-Setup-Switcher-$origin_version.dmg"
 asset_names=(
     "$dmg_name"
     "$dmg_name.sha256"
-    "Desk-Setup-Switcher-$VERSION.spdx.json"
+    "Desk-Setup-Switcher-$origin_version.spdx.json"
     release-manifest.json
     notary-result.json
     notary-log.json
-    "Desk-Setup-Switcher-$VERSION.provenance.sigstore.json"
-    "Desk-Setup-Switcher-$VERSION.sbom.sigstore.json"
+    "Desk-Setup-Switcher-$origin_version.provenance.sigstore.json"
+    "Desk-Setup-Switcher-$origin_version.sbom.sigstore.json"
     release-manifest.provenance.sigstore.json
 )
-artifact_name="desk-setup-switcher-$RELEASE_TAG-signed-candidate-$RELEASE_CANDIDATE_RUN_ID-attempt-1"
+artifact_name="desk-setup-switcher-$origin_tag-signed-candidate-$origin_run_id-attempt-1"
 
 temporary_root="$(mktemp -d "$RUNNER_TEMP/desk-setup-candidate-restore.XXXXXX")"
 run_response="$temporary_root/origin-run.json"
@@ -162,7 +214,7 @@ github_api_to_file() {
 }
 
 github_api_to_file \
-    "/repos/$GITHUB_REPOSITORY/actions/runs/$RELEASE_CANDIDATE_RUN_ID" \
+    "/repos/$GITHUB_REPOSITORY/actions/runs/$origin_run_id" \
     "$run_response"
 
 if ! ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-json \
@@ -178,7 +230,7 @@ if ! ruby -rjson -e '
     raise unless run.is_a?(Hash)
     raise unless run["id"] == run_id
     workflow_path, separator, workflow_ref = run["path"].to_s.partition("@")
-    raise unless workflow_path == ".github/workflows/release.yml"
+    raise unless workflow_path == ".github/workflows/signed-release-candidate.yml"
     raise unless separator.empty? || [tag, "refs/tags/#{tag}"].include?(workflow_ref)
     raise unless run["event"] == "workflow_dispatch"
     raise unless run["status"] == "completed" && run["conclusion"] == "success"
@@ -199,8 +251,8 @@ if ! ruby -rjson -e '
   rescue StandardError
     exit 1
   end
-' "$run_response" "$RELEASE_CANDIDATE_RUN_ID" "$EXPECTED_COMMIT" \
-    "$GITHUB_REPOSITORY" "$RELEASE_TAG" "$repository_id_path" \
+' "$run_response" "$origin_run_id" "$origin_commit" \
+    "$GITHUB_REPOSITORY" "$origin_tag" "$repository_id_path" \
     >/dev/null 2>"$parse_error"; then
     release_die "The origin workflow run does not match the pinned candidate identity."
 fi
@@ -212,7 +264,7 @@ IFS= read -r repository_id <"$repository_id_path" || true
 }
 
 github_api_to_file \
-    "/repos/$GITHUB_REPOSITORY/actions/artifacts/$RELEASE_CANDIDATE_ARTIFACT_ID" \
+    "/repos/$GITHUB_REPOSITORY/actions/artifacts/$origin_artifact_id" \
     "$artifact_response"
 
 if ! ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-json \
@@ -251,15 +303,15 @@ if ! ruby -rjson -e '
   rescue StandardError
     exit 1
   end
-' "$artifact_response" "$RELEASE_CANDIDATE_ARTIFACT_ID" "$artifact_name" \
-    "$RELEASE_CANDIDATE_ARTIFACT_SHA256" "$RELEASE_CANDIDATE_RUN_ID" \
-    "$EXPECTED_COMMIT" "$GITHUB_REPOSITORY" "$repository_id" "$RELEASE_TAG" \
+' "$artifact_response" "$origin_artifact_id" "$artifact_name" \
+    "$origin_artifact_sha256" "$origin_run_id" \
+    "$origin_commit" "$GITHUB_REPOSITORY" "$repository_id" "$origin_tag" \
     "$artifact_size_path" >/dev/null 2>"$parse_error"; then
     release_die "The artifact record does not match the pinned candidate identity."
 fi
 
 github_api_to_file \
-    "/repos/$GITHUB_REPOSITORY/actions/runs/$RELEASE_CANDIDATE_RUN_ID/attempts/1/jobs?per_page=100" \
+    "/repos/$GITHUB_REPOSITORY/actions/runs/$origin_run_id/attempts/1/jobs?per_page=100" \
     "$jobs_response"
 
 if ! ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-json \
@@ -292,13 +344,13 @@ if ! ruby -rjson -e '
   rescue StandardError
     exit 1
   end
-' "$jobs_response" "$RELEASE_CANDIDATE_RUN_ID" "$EXPECTED_COMMIT" \
+' "$jobs_response" "$origin_run_id" "$origin_commit" \
     >/dev/null 2>"$parse_error"; then
     release_die "The origin build job is not one successful GitHub-hosted candidate build."
 fi
 
 github_api_to_file \
-    "/repos/$GITHUB_REPOSITORY/actions/artifacts/$RELEASE_CANDIDATE_ARTIFACT_ID/zip" \
+    "/repos/$GITHUB_REPOSITORY/actions/artifacts/$origin_artifact_id/zip" \
     "$archive_path"
 [[ -f "$archive_path" && ! -L "$archive_path" && -s "$archive_path" ]] || {
     release_die "The candidate artifact archive is empty or invalid."
@@ -313,7 +365,7 @@ if ! ruby -e 'exit(File.size(ARGV.fetch(0)) == Integer(ARGV.fetch(1), 10) ? 0 : 
     "$archive_path" "$artifact_size" >/dev/null 2>"$parse_error"; then
     release_die "The downloaded artifact size differs from its GitHub record."
 fi
-[[ "$(release_sha256 "$archive_path")" == "$RELEASE_CANDIDATE_ARTIFACT_SHA256" ]] || {
+[[ "$(release_sha256 "$archive_path")" == "$origin_artifact_sha256" ]] || {
     release_die "The downloaded artifact digest differs from its pinned digest."
 }
 
@@ -460,10 +512,47 @@ if ! ruby -rjson -e '
     release_die "The extracted candidate is not the exact archive inventory."
 fi
 
+if [[ "$restore_kind" == predecessor ]]; then
+    [[ "$(release_sha256 "$staging_directory/$dmg_name")" == "$expected_final_dmg_sha256" ]] || {
+        release_die "The predecessor final DMG differs from its pinned digest."
+    }
+    if ! ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-json \
+        --json "$staging_directory/release-manifest.json" >/dev/null 2>"$parse_error"; then
+        release_die "The predecessor release manifest is not strict JSON."
+    fi
+    if ! ruby -rjson -rdigest -e '
+      begin
+        manifest_path, dmg_path, repository, version, tag, build, commit,
+          run_id_text, expected_dmg_sha = ARGV
+        manifest = JSON.parse(File.binread(manifest_path), allow_nan: false, create_additions: false)
+        release = manifest.fetch("release")
+        run = release.fetch("run")
+        final_dmg = manifest.fetch("lineage").fetch("finalStapledDmg")
+        run_id = Integer(run_id_text, 10)
+        dmg_bytes = File.binread(dmg_path)
+        raise unless release.fetch("version") == version && release.fetch("tag") == tag
+        raise unless release.fetch("buildNumber") == build && release.fetch("commit") == commit
+        raise unless run.fetch("id") == run_id && run.fetch("attempt") == 1
+        raise unless run.fetch("url") == "https://github.com/#{repository}/actions/runs/#{run_id}"
+        raise unless final_dmg.fetch("name") == File.basename(dmg_path)
+        raise unless final_dmg.fetch("sha256") == expected_dmg_sha
+        raise unless final_dmg.fetch("size") == dmg_bytes.bytesize
+        raise unless Digest::SHA256.hexdigest(dmg_bytes) == expected_dmg_sha
+      rescue StandardError
+        exit 1
+      end
+    ' "$staging_directory/release-manifest.json" "$staging_directory/$dmg_name" \
+        "$GITHUB_REPOSITORY" "$origin_version" "$origin_tag" "$origin_build_number" \
+        "$origin_commit" "$origin_run_id" "$expected_final_dmg_sha256" \
+        >/dev/null 2>"$parse_error"; then
+        release_die "The predecessor manifest does not match the pinned origin and final DMG."
+    fi
+fi
+
 release_require_absent_path "$source_directory"
 if ! mv -- "$staging_directory" "$source_directory" 2>"$parse_error"; then
     release_die "The verified candidate could not be retained atomically."
 fi
 staging_directory=""
 
-printf 'Restored exact signed candidate from origin run %s.\n' "$RELEASE_CANDIDATE_RUN_ID"
+printf 'Restored exact signed %s from origin run %s.\n' "$restore_kind" "$origin_run_id"

@@ -59,9 +59,19 @@
       "candidateWorkflow": {
         "id": 7001,
         "name": "Signed release candidate",
-        "path": ".github/workflows/release.yml",
+        "path": ".github/workflows/signed-release-candidate.yml",
         "state": "active",
         "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "triggers": [
+          "workflow_dispatch"
+        ]
+      },
+      "legacyWorkflow": {
+        "id": 7003,
+        "name": "Retired legacy release workflow",
+        "path": ".github/workflows/release.yml",
+        "state": "disabled_manually",
+        "blobSha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "triggers": [
           "workflow_dispatch"
         ]
@@ -98,9 +108,19 @@
       "candidateWorkflow": {
         "id": 7001,
         "name": "Signed release candidate",
-        "path": ".github/workflows/release.yml",
+        "path": ".github/workflows/signed-release-candidate.yml",
         "state": "active",
         "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "triggers": [
+          "workflow_dispatch"
+        ]
+      },
+      "legacyWorkflow": {
+        "id": 7003,
+        "name": "Retired legacy release workflow",
+        "path": ".github/workflows/release.yml",
+        "state": "disabled_manually",
+        "blobSha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "triggers": [
           "workflow_dispatch"
         ]
@@ -423,7 +443,7 @@
   "candidateWorkflow": {
     "id": 7001,
     "name": "Signed release candidate",
-    "path": ".github/workflows/release.yml",
+    "path": ".github/workflows/signed-release-candidate.yml",
     "state": "active",
     "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -431,6 +451,18 @@
       "workflow_dispatch"
     ],
     "contentsWrite": true
+  },
+  "legacyWorkflow": {
+    "id": 7003,
+    "name": "Retired legacy release workflow",
+    "path": ".github/workflows/release.yml",
+    "state": "disabled_manually",
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "blobSha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "triggers": [
+      "workflow_dispatch"
+    ],
+    "contentsWrite": false
   },
   "publicationWorkflow": {
     "id": 7002,
@@ -474,9 +506,21 @@
         "contentsWrite": true
       },
       {
+        "id": 7003,
+        "name": "Retired legacy release workflow",
+        "path": ".github/workflows/release.yml",
+        "state": "disabled_manually",
+        "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "blobSha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "triggers": [
+          "workflow_dispatch"
+        ],
+        "contentsWrite": false
+      },
+      {
         "id": 7001,
         "name": "Signed release candidate",
-        "path": ".github/workflows/release.yml",
+        "path": ".github/workflows/signed-release-candidate.yml",
         "state": "active",
         "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "blobSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",

@@ -48,6 +48,12 @@ for name in \
     RELEASE_CANDIDATE_ARTIFACT_ID \
     RELEASE_CANDIDATE_ARTIFACT_SHA256 \
     RELEASE_FINAL_DMG_SHA256 \
+    RELEASE_PREDECESSOR_COMMIT \
+    RELEASE_PREDECESSOR_RUN_ID \
+    RELEASE_PREDECESSOR_ARTIFACT_ID \
+    RELEASE_PREDECESSOR_ARTIFACT_SHA256 \
+    RELEASE_PREDECESSOR_FINAL_DMG_SHA256 \
+    RELEASE_PREDECESSOR_SOURCE_DIR \
     RELEASE_APPROVAL_RECORD_COMMIT \
     RELEASE_APPROVAL_RECORD_SHA256 \
     RELEASE_APPROVAL_RECORD_PATH \
@@ -100,6 +106,9 @@ same_github_login() {
 [[ "$RELEASE_TAG" == "v$VERSION" ]] || {
     release_die "RELEASE_TAG does not match the bundle version."
 }
+[[ "$VERSION:$BUILD_NUMBER" == 0.1.0:2 ]] || {
+    release_die "Publication is restricted to the fixed v0.1.0 build 2 candidate."
+}
 [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
     release_die "EXPECTED_COMMIT has an invalid format."
 }
@@ -109,6 +118,13 @@ same_github_login() {
 [[ "$RELEASE_CANDIDATE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || release_die "Candidate artifact ID is invalid."
 [[ "$RELEASE_CANDIDATE_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] || release_die "Candidate archive digest is invalid."
 [[ "$RELEASE_FINAL_DMG_SHA256" =~ ^[0-9a-f]{64}$ ]] || release_die "Final DMG digest is invalid."
+[[ "$RELEASE_PREDECESSOR_COMMIT" =~ ^[0-9a-f]{40}$ ]] || release_die "Predecessor commit is invalid."
+[[ "$RELEASE_PREDECESSOR_RUN_ID" =~ ^[1-9][0-9]*$ ]] || release_die "Predecessor run ID is invalid."
+[[ "$RELEASE_PREDECESSOR_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || release_die "Predecessor artifact ID is invalid."
+[[ "$RELEASE_PREDECESSOR_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] || release_die "Predecessor archive digest is invalid."
+[[ "$RELEASE_PREDECESSOR_FINAL_DMG_SHA256" =~ ^[0-9a-f]{64}$ ]] || release_die "Predecessor final DMG digest is invalid."
+[[ "$RELEASE_PREDECESSOR_COMMIT" != "$EXPECTED_COMMIT" ]] || release_die "Predecessor and current commits must differ."
+[[ "$RELEASE_PREDECESSOR_RUN_ID" != "$RELEASE_CANDIDATE_RUN_ID" ]] || release_die "Predecessor and current candidate runs must differ."
 [[ "$RELEASE_APPROVAL_RECORD_COMMIT" =~ ^[0-9a-f]{40}$ ]] || release_die "Approval-record commit is invalid."
 [[ "$RELEASE_APPROVAL_RECORD_SHA256" =~ ^[0-9a-f]{64}$ ]] || release_die "Approval-record digest is invalid."
 [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ && "$GITHUB_RUN_ATTEMPT" == 1 ]] || {
@@ -116,6 +132,9 @@ same_github_login() {
 }
 [[ "$GITHUB_RUN_ID" != "$RELEASE_CANDIDATE_RUN_ID" ]] || {
     release_die "Publication must run separately from the candidate origin."
+}
+[[ "$GITHUB_RUN_ID" != "$RELEASE_PREDECESSOR_RUN_ID" ]] || {
+    release_die "Publication must run separately from the predecessor origin."
 }
 [[ "$RELEASE_CONFIRMATION" == "publish approved $RELEASE_TAG release $RELEASE_ID" ]] || {
     release_die "The final publication confirmation phrase does not match."
@@ -155,6 +174,10 @@ case "$RELEASE_SOURCE_DIR" in
     /*) source_directory="$RELEASE_SOURCE_DIR" ;;
     *) source_directory="$ROOT_DIR/$RELEASE_SOURCE_DIR" ;;
 esac
+case "$RELEASE_PREDECESSOR_SOURCE_DIR" in
+    /*) predecessor_source_directory="$RELEASE_PREDECESSOR_SOURCE_DIR" ;;
+    *) predecessor_source_directory="$ROOT_DIR/$RELEASE_PREDECESSOR_SOURCE_DIR" ;;
+esac
 case "$RELEASE_DOWNLOAD_DIR" in
     /*) download_directory="$RELEASE_DOWNLOAD_DIR" ;;
     *) download_directory="$ROOT_DIR/$RELEASE_DOWNLOAD_DIR" ;;
@@ -163,6 +186,9 @@ notes_path="$ROOT_DIR/$RELEASE_NOTES_PATH"
 
 [[ -d "$source_directory" && ! -L "$source_directory" ]] || {
     release_die "Release source directory is missing or unsafe."
+}
+[[ -d "$predecessor_source_directory" && ! -L "$predecessor_source_directory" ]] || {
+    release_die "Predecessor source directory is missing or unsafe."
 }
 [[ -f "$notes_path" && ! -L "$notes_path" && -s "$notes_path" ]] || {
     release_die "Curated release notes must be one nonempty regular file."
@@ -193,15 +219,31 @@ esac
 
 git check-ref-format --allow-onelevel "$RELEASE_TAG" >/dev/null || release_die "RELEASE_TAG is invalid."
 git show-ref --verify --quiet "refs/tags/$RELEASE_TAG" || release_die "The local release tag is missing."
+git show-ref --verify --quiet "refs/tags/v0.0.9" || release_die "The local predecessor tag is missing."
 tag_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" || release_die "The local tag commit is unavailable."
 tag_object="$(git rev-parse "refs/tags/$RELEASE_TAG")" || release_die "The local tag object is unavailable."
+predecessor_tag_commit="$(git rev-parse 'refs/tags/v0.0.9^{commit}')" || {
+    release_die "The local predecessor tag commit is unavailable."
+}
+predecessor_tag_object="$(git rev-parse 'refs/tags/v0.0.9')" || {
+    release_die "The local predecessor tag object is unavailable."
+}
 checkout_commit="$(git rev-parse HEAD)" || release_die "The checkout commit is unavailable."
 [[ "$tag_object" =~ ^[0-9a-f]{40}$ ]] || release_die "The local tag object is invalid."
+[[ "$predecessor_tag_object" =~ ^[0-9a-f]{40}$ ]] || {
+    release_die "The local predecessor tag object is invalid."
+}
 [[ "$(git cat-file -t "$tag_object" 2>/dev/null)" == tag ]] || {
     release_die "The release tag must be one annotated tag object."
 }
+[[ "$(git cat-file -t "$predecessor_tag_object" 2>/dev/null)" == tag ]] || {
+    release_die "The predecessor tag must be one annotated tag object."
+}
 [[ "$tag_commit" == "$EXPECTED_COMMIT" && "$checkout_commit" == "$EXPECTED_COMMIT" ]] || {
     release_die "The local tag, checkout, and expected commit differ."
+}
+[[ "$predecessor_tag_commit" == "$RELEASE_PREDECESSOR_COMMIT" ]] || {
+    release_die "The predecessor tag and pinned predecessor commit differ."
 }
 tracked_notes="$(git ls-files --error-unmatch -- "$RELEASE_NOTES_PATH")" || {
     release_die "Curated release notes are not tracked."
@@ -213,6 +255,10 @@ tracked_notes="$(git ls-files --error-unmatch -- "$RELEASE_NOTES_PATH")" || {
 
 dmg_name="Desk-Setup-Switcher-$VERSION.dmg"
 provenance_name="Desk-Setup-Switcher-$VERSION.provenance.sigstore.json"
+predecessor_version=0.0.9
+predecessor_tag=v0.0.9
+predecessor_dmg_name="Desk-Setup-Switcher-$predecessor_version.dmg"
+predecessor_provenance_name="Desk-Setup-Switcher-$predecessor_version.provenance.sigstore.json"
 asset_names=(
     "$dmg_name"
     "$dmg_name.sha256"
@@ -222,6 +268,17 @@ asset_names=(
     notary-log.json
     "$provenance_name"
     "Desk-Setup-Switcher-$VERSION.sbom.sigstore.json"
+    release-manifest.provenance.sigstore.json
+)
+predecessor_asset_names=(
+    "$predecessor_dmg_name"
+    "$predecessor_dmg_name.sha256"
+    "Desk-Setup-Switcher-$predecessor_version.spdx.json"
+    release-manifest.json
+    notary-result.json
+    notary-log.json
+    "$predecessor_provenance_name"
+    "Desk-Setup-Switcher-$predecessor_version.sbom.sigstore.json"
     release-manifest.provenance.sigstore.json
 )
 
@@ -240,9 +297,27 @@ ruby -e '
 [[ "$(release_sha256 "$source_directory/$dmg_name")" == "$RELEASE_FINAL_DMG_SHA256" ]] || {
     release_die "The source DMG differs from the approved final digest."
 }
+ruby -e '
+  directory, *expected = ARGV
+  stat = File.lstat(directory)
+  abort unless stat.directory? && !stat.symlink? && (stat.mode & 0o777) == 0o700
+  actual = Dir.children(directory)
+  abort unless actual.sort == expected.sort
+  expected.each do |name|
+    item = File.lstat(File.join(directory, name))
+    abort unless item.file? && !item.symlink? && item.size.positive?
+  end
+' "$predecessor_source_directory" "${predecessor_asset_names[@]}" >/dev/null || {
+    release_die "The predecessor source is not one private exact nine-asset candidate."
+}
+[[ "$(release_sha256 "$predecessor_source_directory/$predecessor_dmg_name")" == \
+    "$RELEASE_PREDECESSOR_FINAL_DMG_SHA256" ]] || {
+    release_die "The predecessor source DMG differs from its pinned final digest."
+}
 
 temporary_root="$(mktemp -d "$RUNNER_TEMP/desk-setup-release-publication.XXXXXX")"
 candidate_snapshot="$temporary_root/candidate"
+predecessor_snapshot="$temporary_root/predecessor"
 notes_snapshot="$temporary_root/release-notes.md"
 approval_record="$temporary_root/publication-approval.json"
 approval_tree="$temporary_root/approval-tree.txt"
@@ -322,7 +397,7 @@ cleanup() {
 trap cleanup EXIT
 release_install_exit_signal_traps
 
-mkdir -m 0700 "$candidate_snapshot" "$pre_download" "$gh_config_directory"
+mkdir -m 0700 "$candidate_snapshot" "$predecessor_snapshot" "$pre_download" "$gh_config_directory"
 for name in "${asset_names[@]}"; do
     cp -- "$source_directory/$name" "$candidate_snapshot/$name"
     [[ -f "$source_directory/$name" && ! -L "$source_directory/$name" ]] || {
@@ -330,6 +405,15 @@ for name in "${asset_names[@]}"; do
     }
     cmp -s "$source_directory/$name" "$candidate_snapshot/$name" || {
         release_die "A source candidate asset changed during snapshotting."
+    }
+done
+for name in "${predecessor_asset_names[@]}"; do
+    cp -- "$predecessor_source_directory/$name" "$predecessor_snapshot/$name"
+    [[ -f "$predecessor_source_directory/$name" && ! -L "$predecessor_source_directory/$name" ]] || {
+        release_die "A predecessor source asset changed during snapshotting."
+    }
+    cmp -s "$predecessor_source_directory/$name" "$predecessor_snapshot/$name" || {
+        release_die "A predecessor source asset changed during snapshotting."
     }
 done
 [[ "$(release_sha256 "$candidate_snapshot/$dmg_name")" == "$RELEASE_FINAL_DMG_SHA256" ]] || {
@@ -357,28 +441,38 @@ read_remote_master() {
     }
 }
 
-require_remote_tag() {
+require_remote_tags() {
     : >"$remote_tag_refs"
     printf 'Publication verification: protected remote read in progress.\n' >&2
     if ! release_run_tracked_timeout 90 git ls-remote --exit-code --tags origin \
+        "refs/tags/$predecessor_tag" "refs/tags/$predecessor_tag^{}" \
         "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}" \
         >"$remote_tag_refs" 2>"$remote_error"; then
-        release_die "The remote release tag could not be read."
+        release_die "The remote predecessor/release tags could not be read."
     fi
     ruby -e '
-      expected_commit, expected_object, tag, path = ARGV
-      direct_ref = "refs/tags/#{tag}"
-      peeled_ref = "#{direct_ref}^{}"
+      path, *identity_fields = ARGV
       rows = File.readlines(path, chomp: true).map { |line| line.split("\t", -1) }
       abort unless rows.all? { |row| row.length == 2 && row[0].match?(/\A[0-9a-f]{40}\z/) }
-      abort unless rows.all? { |row| [direct_ref, peeled_ref].include?(row[1]) }
-      direct = rows.select { |row| row[1] == direct_ref }
-      peeled = rows.select { |row| row[1] == peeled_ref }
-      abort unless direct.length == 1 && peeled.length == 1 && rows.length == 2
-      abort unless direct.fetch(0).fetch(0) == expected_object
-      abort unless peeled.fetch(0).fetch(0) == expected_commit
-    ' "$EXPECTED_COMMIT" "$tag_object" "$RELEASE_TAG" "$remote_tag_refs" \
-        2>"$parse_error" || release_die "The remote release tag moved or is ambiguous."
+      identities = identity_fields.each_slice(3).to_a
+      abort unless identities.length == 2 && identities.all? { |identity| identity.length == 3 }
+      expected_refs = identities.flat_map do |tag, _expected_object, _expected_commit|
+        ["refs/tags/#{tag}", "refs/tags/#{tag}^{}"]
+      end
+      abort unless rows.length == expected_refs.length && rows.map(&:last).sort == expected_refs.sort
+      identities.each do |tag, expected_object, expected_commit|
+        direct_ref = "refs/tags/#{tag}"
+        peeled_ref = "#{direct_ref}^{}"
+        direct = rows.select { |row| row[1] == direct_ref }
+        peeled = rows.select { |row| row[1] == peeled_ref }
+        abort unless direct.length == 1 && peeled.length == 1
+        abort unless direct.fetch(0).fetch(0) == expected_object
+        abort unless peeled.fetch(0).fetch(0) == expected_commit
+      end
+    ' "$remote_tag_refs" \
+        "$predecessor_tag" "$predecessor_tag_object" "$RELEASE_PREDECESSOR_COMMIT" \
+        "$RELEASE_TAG" "$tag_object" "$EXPECTED_COMMIT" \
+        2>"$parse_error" || release_die "A remote predecessor/release tag moved or is ambiguous."
 }
 
 github_get() {
@@ -817,6 +911,13 @@ git cat-file -e "$observed_master^{commit}" 2>"$parse_error" || {
 git merge-base --is-ancestor "$EXPECTED_COMMIT" "$observed_master" || {
     release_die "The controls snapshot commit does not descend from the release commit."
 }
+(
+    cd "$ROOT_DIR"
+    release_verify_final_pre_tag_evidence_chain \
+        "$RELEASE_TAG" "$EXPECTED_COMMIT" "$tag_object" "$observed_master"
+) || {
+    release_die "The predecessor/final pre-tag evidence history is invalid."
+}
 # The final-pre-tag record is collected while A is a clean future tag target.
 # After its digest is fixed, the local annotated tag candidate targets A and the
 # record enters history exactly once in direct child B as the only changed path;
@@ -985,7 +1086,7 @@ materialize_exact_blob \
     release_die "The approval record differs from its explicitly approved digest."
 }
 remote_controls_manifest_sha256="$(release_sha256 "$remote_controls_evidence")"
-expected_candidate_workflow_blob="$(git rev-parse "$observed_master:.github/workflows/release.yml" 2>"$parse_error")" || {
+expected_candidate_workflow_blob="$(git rev-parse "$observed_master:.github/workflows/signed-release-candidate.yml" 2>"$parse_error")" || {
     release_die "The observed candidate workflow blob is unavailable."
 }
 expected_ci_workflow_blob="$(git rev-parse "$observed_master:.github/workflows/ci.yml" 2>"$parse_error")" || {
@@ -994,11 +1095,35 @@ expected_ci_workflow_blob="$(git rev-parse "$observed_master:.github/workflows/c
 expected_publication_workflow_blob="$(git rev-parse "$observed_master:.github/workflows/publish-release.yml" 2>"$parse_error")" || {
     release_die "The observed publication workflow blob is unavailable."
 }
+expected_legacy_workflow_blob="$(git rev-parse "$observed_master:.github/workflows/release.yml" 2>"$parse_error")" || {
+    release_die "The observed retired legacy workflow blob is unavailable."
+}
+remote_controls_root_fields="$(ruby -rjson -rdigest -e '
+  pre_path, final_path = ARGV
+  pre = JSON.parse(File.binread(pre_path), allow_nan: false, create_additions: false)
+  final = JSON.parse(File.binread(final_path), allow_nan: false, create_additions: false)
+  sha = /\A[0-9a-f]{64}\z/
+  predecessor_digest = pre.fetch("predecessorPreTagEvidenceSHA256")
+  final_digest = pre.fetch("finalPreTagEvidenceSHA256")
+  final_predecessor_digest = final.fetch("predecessorPreTagEvidenceSHA256")
+  raise unless [predecessor_digest, final_digest, final_predecessor_digest].all? do |digest|
+    digest.is_a?(String) && sha.match?(digest)
+  end
+  raise unless predecessor_digest == final_predecessor_digest
+  raise unless final.fetch("finalPreTagEvidenceSHA256").nil?
+  raise unless final_digest == Digest::SHA256.file(final_path).hexdigest
+  puts [predecessor_digest, final_digest].join("\t")
+' "$remote_controls_evidence" "$final_pre_tag_evidence" 2>"$parse_error")" || {
+    release_die "The remote-controls lifecycle evidence chain is invalid."
+}
+IFS=$'\t' read -r expected_predecessor_pre_tag_evidence_sha256 \
+    expected_final_pre_tag_evidence_sha256 <<<"$remote_controls_root_fields"
 ci_workflow_id="$(ruby "$RELEASE_SCRIPTS_DIR/remote_controls_policy.rb" \
     --ci-workflow-id "$remote_controls_policy" \
     --expected-workflow-blob "$expected_candidate_workflow_blob" \
     --expected-ci-workflow-blob "$expected_ci_workflow_blob" \
     --expected-publication-workflow-blob "$expected_publication_workflow_blob" \
+    --expected-legacy-workflow-blob "$expected_legacy_workflow_blob" \
     2>"$parse_error")" || {
     release_die "The reviewed CI workflow identity is unavailable."
 }
@@ -1008,13 +1133,21 @@ ci_workflow_id="$(ruby "$RELEASE_SCRIPTS_DIR/remote_controls_policy.rb" \
 ruby "$RELEASE_SCRIPTS_DIR/remote_controls_policy.rb" \
     --policy "$remote_controls_policy" \
     --evidence "$remote_controls_evidence" \
+    --expected-phase pre-publication \
     --expected-commit "$observed_master" \
     --expected-workflow-blob "$expected_candidate_workflow_blob" \
     --expected-ci-workflow-blob "$expected_ci_workflow_blob" \
     --expected-publication-workflow-blob "$expected_publication_workflow_blob" \
+    --expected-legacy-workflow-blob "$expected_legacy_workflow_blob" \
+    --expected-predecessor-commit "$RELEASE_PREDECESSOR_COMMIT" \
+    --expected-predecessor-tag-object "$predecessor_tag_object" \
+    --expected-predecessor-pre-tag-evidence-sha256 \
+    "$expected_predecessor_pre_tag_evidence_sha256" \
     --expected-release-commit "$EXPECTED_COMMIT" \
     --expected-release-id "$RELEASE_ID" \
-    --expected-release-tag-object "$tag_object" >/dev/null 2>"$parse_error" || {
+    --expected-release-tag-object "$tag_object" \
+    --expected-final-pre-tag-evidence-sha256 \
+    "$expected_final_pre_tag_evidence_sha256" >/dev/null 2>"$parse_error" || {
     release_die "The reviewed pre-publication remote-controls manifest is invalid."
 }
 ruby "$RELEASE_SCRIPTS_DIR/remote_controls_policy.rb" \
@@ -1104,18 +1237,27 @@ manual_manifest_fields="$(ruby -rjson -e '
     release_die "The reviewed manual-control manifest binding is invalid."
 }
 IFS=$'\t' read -r expected_candidate_manual_sha256 expected_publication_manual_sha256 \
-    expected_final_pre_tag_evidence_sha256 pre_publication_collected_at \
+    manual_final_pre_tag_evidence_sha256 pre_publication_collected_at \
     <<<"$manual_manifest_fields"
+[[ "$manual_final_pre_tag_evidence_sha256" == "$expected_final_pre_tag_evidence_sha256" ]] || {
+    release_die "The manual-control manifest has a different final-pre-tag evidence root."
+}
 [[ "$(release_sha256 "$final_pre_tag_evidence")" == "$expected_final_pre_tag_evidence_sha256" ]] || {
     release_die "The durable final-pre-tag controls evidence digest does not match the manifest."
 }
 ruby "$RELEASE_SCRIPTS_DIR/remote_controls_policy.rb" \
     --policy "$remote_controls_policy" \
     --evidence "$final_pre_tag_evidence" \
+    --expected-phase final-pre-tag \
     --expected-commit "$EXPECTED_COMMIT" \
     --expected-workflow-blob "$expected_candidate_workflow_blob" \
     --expected-ci-workflow-blob "$expected_ci_workflow_blob" \
     --expected-publication-workflow-blob "$expected_publication_workflow_blob" \
+    --expected-legacy-workflow-blob "$expected_legacy_workflow_blob" \
+    --expected-predecessor-commit "$RELEASE_PREDECESSOR_COMMIT" \
+    --expected-predecessor-tag-object "$predecessor_tag_object" \
+    --expected-predecessor-pre-tag-evidence-sha256 \
+    "$expected_predecessor_pre_tag_evidence_sha256" \
     >/dev/null 2>"$parse_error" || {
     release_die "The durable final-pre-tag controls evidence cannot be replayed."
 }
@@ -1274,8 +1416,17 @@ verify_local_publication_evidence_now() {
     local beta_report_01_sha256 beta_report_02_sha256 beta_report_03_sha256
     beta_verification_result="$(ruby "$RELEASE_SCRIPTS_DIR/external_beta_policy.rb" verify-set \
         --release-manifest "$candidate_snapshot/release-manifest.json" \
+        --final-dmg "$candidate_snapshot/$dmg_name" \
         --provenance-bundle \
         "$candidate_snapshot/$provenance_name" \
+        --predecessor-release-manifest "$predecessor_snapshot/release-manifest.json" \
+        --predecessor-provenance-bundle \
+        "$predecessor_snapshot/$predecessor_provenance_name" \
+        --predecessor-dmg "$predecessor_snapshot/$predecessor_dmg_name" \
+        --predecessor-release-boundary "$final_pre_tag_evidence" \
+        --predecessor-tag-object "$predecessor_tag_object" \
+        --predecessor-pre-tag-evidence-sha256 \
+        "$expected_predecessor_pre_tag_evidence_sha256" \
         --candidate-inventory "$candidate_inventory_evidence" \
         --predecessor-lineage "$predecessor_lineage_evidence" \
         --set-manifest "$external_beta_set_evidence" \
@@ -1298,21 +1449,32 @@ verify_local_publication_evidence_now() {
       expected = %w[
         schemaVersion releaseManifestSHA256 finalDMGProvenanceSHA256
         candidateInventorySHA256 predecessorLineageSHA256 externalBetaSetSHA256
+        predecessorReleaseManifestSHA256 predecessorFinalDMGSHA256
+        predecessorFinalDMGProvenanceSHA256 predecessorReleaseBoundarySHA256
         externalBetaReportSHA256 sonomaGateReportCode sonomaGateReportSHA256
         externalBetaSetCreatedAt buildNumber
       ]
       raise unless value.is_a?(Hash) && value.keys.sort == expected.sort
       raise unless value.fetch("schemaVersion") ==
-        "desk-setup-switcher.external-beta-verification/v2"
+        "desk-setup-switcher.external-beta-verification/v3"
       sha = /\A[0-9a-f]{64}\z/
-      scalar_digests = %w[
+      publication_digests = %w[
         releaseManifestSHA256 finalDMGProvenanceSHA256
         candidateInventorySHA256 predecessorLineageSHA256 externalBetaSetSHA256
+      ].map { |name| value.fetch(name) }
+      predecessor_digests = %w[
+        predecessorReleaseManifestSHA256 predecessorFinalDMGSHA256
+        predecessorFinalDMGProvenanceSHA256 predecessorReleaseBoundarySHA256
+      ].map { |name| value.fetch(name) }
+      result_digests = %w[
         sonomaGateReportSHA256
       ].map { |name| value.fetch(name) }
       reports = value.fetch("externalBetaReportSHA256")
       raise unless reports.is_a?(Array) && reports.length == 3 && reports.uniq.length == 3
-      raise unless (scalar_digests + reports).all? { |digest| digest.is_a?(String) && sha.match?(digest) }
+      raise unless (publication_digests + predecessor_digests + result_digests + reports).all? do |digest|
+        digest.is_a?(String) && sha.match?(digest)
+      end
+      raise unless value.fetch("predecessorFinalDMGSHA256") == ARGV.fetch(1)
       code = value.fetch("sonomaGateReportCode")
       index = %w[beta-01 beta-02 beta-03].index(code)
       raise unless index && value.fetch("sonomaGateReportSHA256") == reports.fetch(index)
@@ -1323,13 +1485,16 @@ verify_local_publication_evidence_now() {
       expected_build = Integer(ARGV.fetch(0), 10)
       raise unless build_number.is_a?(Integer) && build_number.positive? &&
         build_number == expected_build
-      STDOUT.write((scalar_digests.first(5) + reports + [code,
+      STDOUT.write((publication_digests + predecessor_digests + reports + [code,
         value.fetch("sonomaGateReportSHA256"), created_at_text]).join(" "))
-    ' "$BUILD_NUMBER" <<<"$beta_verification_result" 2>"$parse_error")" || {
+    ' "$BUILD_NUMBER" "$RELEASE_PREDECESSOR_FINAL_DMG_SHA256" \
+        <<<"$beta_verification_result" 2>"$parse_error")" || {
         release_die "The external-beta verification result is invalid."
     }
     IFS=' ' read -r release_manifest_sha256 final_dmg_provenance_sha256 \
         candidate_inventory_sha256 predecessor_lineage_sha256 external_beta_set_sha256 \
+        predecessor_release_manifest_sha256 predecessor_final_dmg_sha256 \
+        predecessor_final_dmg_provenance_sha256 predecessor_release_boundary_sha256 \
         beta_report_01_sha256 beta_report_02_sha256 beta_report_03_sha256 \
         sonoma_beta_report_code sonoma_beta_report_sha256 \
         external_beta_set_created_at <<<"$beta_verification_fields"
@@ -1381,7 +1546,7 @@ verify_approval_now() {
     verify_manual_controls_now
 }
 verify_approval_now
-require_remote_tag
+require_remote_tags
 read_immutable_setting
 cp -- "$immutable_fingerprint" "$pre_immutable_fingerprint"
 read_release_state any
@@ -1396,7 +1561,7 @@ download_exact_assets "$pre_download"
 # Re-observe every mutable boundary immediately before the only mutation.
 read_remote_master
 [[ "$observed_remote_master" == "$initial_master" ]] || release_die "The default branch changed during publication review."
-require_remote_tag
+require_remote_tags
 read_immutable_setting
 cmp -s "$pre_immutable_fingerprint" "$immutable_fingerprint" || {
     release_die "The immutable-release setting changed during publication review."
@@ -1429,7 +1594,7 @@ if [[ "$state_before" == draft ]]; then
     [[ "$observed_remote_master" == "$initial_master" ]] || {
         release_die "The default branch changed immediately before publication."
     }
-    require_remote_tag
+    require_remote_tags
     read_immutable_setting
     cmp -s "$pre_immutable_fingerprint" "$immutable_fingerprint" || {
         release_die "The immutable-release setting changed immediately before publication."
@@ -1489,7 +1654,7 @@ if [[ "$state_before" == draft ]]; then
     if [[ "$response_valid" != true ]]; then
         # The server may have committed the exact PATCH even if the response was
         # interrupted. Resolve that ambiguity only by an exact-ID public read.
-        require_remote_tag
+        require_remote_tags
         read_immutable_setting
         read_release_state published
         cmp -s "$pre_asset_fingerprint" "$asset_fingerprint" || {
@@ -1504,7 +1669,7 @@ fi
 # ambiguous PATCH response, but a later workflow run never adopts public state.
 read_remote_master
 [[ "$observed_remote_master" == "$initial_master" ]] || release_die "The default branch changed during publication."
-require_remote_tag
+require_remote_tags
 read_immutable_setting
 cmp -s "$pre_immutable_fingerprint" "$immutable_fingerprint" || {
     release_die "The immutable-release setting changed during publication."
@@ -1527,7 +1692,7 @@ cmp -s "$pre_asset_fingerprint" "$asset_fingerprint" || {
 }
 read_remote_master
 [[ "$observed_remote_master" == "$initial_master" ]] || release_die "The default branch changed during final verification."
-require_remote_tag
+require_remote_tags
 
 mv -- "$post_download_staging" "$download_directory"
 post_download_staging=""

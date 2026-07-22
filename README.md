@@ -50,6 +50,8 @@ Its DMG is an ad-hoc-signed development artifact, not a supported download, and 
 
 The proposed protected-remote gate treats both CI jobs—**Verify macOS app** and **Verify public site and release assets**—as mandatory and binds their check runs and jobs to the same successful `master` push. That policy remains local and unconfigured until the documented GitHub controls are approved and read back.
 
+The proposed release sequence is deliberately not a one-tag shortcut. It first creates and retains one protected, non-public `v0.0.9` build-1 predecessor candidate, then creates the `v0.1.0` build-2 public-beta candidate and verifies an upgrade from those exact predecessor bytes. Both tag pushes, both candidate builds, the final draft, and publication remain separately approved operations; none has occurred.
+
 The historical remote **Release** workflow is still active and unsafe for any `v*` tag. A local fail-closed containment helper separates a GET-only two-observation plan receipt from a separately approved apply step that can send one exact disable request and never re-enable, dispatch, tag, or publish. A private GET-only receipt is planning evidence, not containment; no remote setting has changed.
 
 ## Privacy and safety

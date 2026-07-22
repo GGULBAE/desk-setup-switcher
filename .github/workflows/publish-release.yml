@@ -31,6 +31,26 @@ on:
         description: "Exact final stapled DMG SHA-256"
         required: true
         type: string
+      predecessor_commit:
+        description: "Exact protected v0.0.9 predecessor commit"
+        required: true
+        type: string
+      predecessor_origin_run_id:
+        description: "Exact successful v0.0.9 build-candidate origin run ID"
+        required: true
+        type: string
+      predecessor_artifact_id:
+        description: "Exact retained v0.0.9 candidate artifact ID"
+        required: true
+        type: string
+      predecessor_artifact_sha256:
+        description: "Exact retained v0.0.9 candidate archive SHA-256"
+        required: true
+        type: string
+      predecessor_final_dmg_sha256:
+        description: "Exact final stapled v0.0.9 DMG SHA-256"
+        required: true
+        type: string
       approval_record_commit:
         description: "Exact master commit containing the final approval record"
         required: true
@@ -74,6 +94,11 @@ jobs:
       RELEASE_CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
       RELEASE_CANDIDATE_ARTIFACT_SHA256: ${{ inputs.candidate_artifact_sha256 }}
       RELEASE_FINAL_DMG_SHA256: ${{ inputs.final_dmg_sha256 }}
+      RELEASE_PREDECESSOR_COMMIT: ${{ inputs.predecessor_commit }}
+      RELEASE_PREDECESSOR_RUN_ID: ${{ inputs.predecessor_origin_run_id }}
+      RELEASE_PREDECESSOR_ARTIFACT_ID: ${{ inputs.predecessor_artifact_id }}
+      RELEASE_PREDECESSOR_ARTIFACT_SHA256: ${{ inputs.predecessor_artifact_sha256 }}
+      RELEASE_PREDECESSOR_FINAL_DMG_SHA256: ${{ inputs.predecessor_final_dmg_sha256 }}
       RELEASE_APPROVAL_RECORD_COMMIT: ${{ inputs.approval_record_commit }}
       RELEASE_APPROVAL_RECORD_SHA256: ${{ inputs.approval_record_sha256 }}
       RELEASE_APPROVER_LOGIN: ${{ inputs.approver_login }}
@@ -93,6 +118,13 @@ jobs:
             || [[ ! "$RELEASE_CANDIDATE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] \
             || [[ ! "$RELEASE_CANDIDATE_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] \
             || [[ ! "$RELEASE_FINAL_DMG_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+            || [[ ! "$RELEASE_PREDECESSOR_COMMIT" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ ! "$RELEASE_PREDECESSOR_RUN_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$RELEASE_PREDECESSOR_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$RELEASE_PREDECESSOR_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+            || [[ ! "$RELEASE_PREDECESSOR_FINAL_DMG_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+            || [[ "$RELEASE_PREDECESSOR_COMMIT" == "$EXPECTED_COMMIT" ]] \
+            || [[ "$RELEASE_PREDECESSOR_RUN_ID" == "$RELEASE_CANDIDATE_RUN_ID" ]] \
             || [[ ! "$RELEASE_APPROVAL_RECORD_COMMIT" =~ ^[0-9a-f]{40}$ ]] \
             || [[ ! "$RELEASE_APPROVAL_RECORD_SHA256" =~ ^[0-9a-f]{64}$ ]] \
             || [[ ! "$RELEASE_APPROVER_LOGIN" =~ $login_pattern ]] \
@@ -105,7 +137,8 @@ jobs:
             || [[ "$GITHUB_REF_NAME" != "$RELEASE_TAG" ]] \
             || [[ ! "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]] \
             || [[ "$GITHUB_RUN_ATTEMPT" != 1 ]] \
-            || [[ "$GITHUB_RUN_ID" == "$RELEASE_CANDIDATE_RUN_ID" ]]; then
+            || [[ "$GITHUB_RUN_ID" == "$RELEASE_CANDIDATE_RUN_ID" ]] \
+            || [[ "$GITHUB_RUN_ID" == "$RELEASE_PREDECESSOR_RUN_ID" ]]; then
             echo "::error::The publication dispatch does not identify one approved v0.1.0 Release and actor." >&2
             exit 1
           fi
@@ -128,6 +161,11 @@ jobs:
       RELEASE_CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
       RELEASE_CANDIDATE_ARTIFACT_SHA256: ${{ inputs.candidate_artifact_sha256 }}
       RELEASE_FINAL_DMG_SHA256: ${{ inputs.final_dmg_sha256 }}
+      RELEASE_PREDECESSOR_COMMIT: ${{ inputs.predecessor_commit }}
+      RELEASE_PREDECESSOR_RUN_ID: ${{ inputs.predecessor_origin_run_id }}
+      RELEASE_PREDECESSOR_ARTIFACT_ID: ${{ inputs.predecessor_artifact_id }}
+      RELEASE_PREDECESSOR_ARTIFACT_SHA256: ${{ inputs.predecessor_artifact_sha256 }}
+      RELEASE_PREDECESSOR_FINAL_DMG_SHA256: ${{ inputs.predecessor_final_dmg_sha256 }}
       RELEASE_APPROVAL_RECORD_COMMIT: ${{ inputs.approval_record_commit }}
       RELEASE_APPROVAL_RECORD_SHA256: ${{ inputs.approval_record_sha256 }}
       RELEASE_APPROVER_LOGIN: ${{ inputs.approver_login }}
@@ -138,6 +176,7 @@ jobs:
       RELEASE_APPROVAL_RECORD_PATH: docs/evidence/releases/v0.1.0/publication-approval.json
       RELEASE_NOTES_PATH: docs/releases/v0.1.0.md
       RELEASE_SOURCE_DIR: artifacts/release
+      RELEASE_PREDECESSOR_SOURCE_DIR: artifacts/predecessor
       RELEASE_DOWNLOAD_DIR: .build/release-download
 
     steps:
@@ -194,11 +233,14 @@ jobs:
             mkdir -m 0700 -- "$path"
           done
 
-      - name: Restore the exact candidate from its origin artifact
+      - name: Restore the exact current and predecessor candidates
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
-        run: exec /bin/bash scripts/release/restore-candidate-artifact.sh
+        run: |
+          set -euo pipefail
+          RELEASE_RESTORE_KIND=candidate /bin/bash scripts/release/restore-candidate-artifact.sh
+          RELEASE_RESTORE_KIND=predecessor /bin/bash scripts/release/restore-candidate-artifact.sh
 
       - name: Verify origin candidate and all attestations before publication
         shell: bash
@@ -208,6 +250,72 @@ jobs:
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           RELEASE_DOWNLOAD_DIR: artifacts/release
         run: make verify-downloaded-release
+
+      - name: Verify protected predecessor and all attestations before publication
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+          DEVELOPER_ID_APPLICATION: ${{ vars.DEVELOPER_ID_APPLICATION }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          set +x
+          set +a
+          umask 077
+          predecessor_read_token="${GH_TOKEN:-}"
+          unset GH_TOKEN GITHUB_TOKEN GH_HOST GH_DEBUG DEBUG GH_ENTERPRISE_TOKEN \
+            GITHUB_ENTERPRISE_TOKEN GH_CONFIG_DIR
+          export -n predecessor_read_token 2>/dev/null || true
+          if [[ -z "$predecessor_read_token" || "$predecessor_read_token" == *$'\n'* \
+            || "$predecessor_read_token" == *$'\r'* ]]; then
+            echo "::error::The predecessor verification credential is missing or malformed." >&2
+            exit 1
+          fi
+          predecessor_ref=refs/tags/v0.0.9
+          git show-ref --verify --quiet "$predecessor_ref"
+          predecessor_tag_object="$(git rev-parse "$predecessor_ref")"
+          predecessor_tag_commit="$(git rev-parse "$predecessor_ref^{commit}")"
+          if [[ ! "$predecessor_tag_object" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ "$(git cat-file -t "$predecessor_tag_object")" != tag ]] \
+            || [[ "$predecessor_tag_commit" != "$RELEASE_PREDECESSOR_COMMIT" ]]; then
+            echo "::error::The protected predecessor tag does not match the pinned commit." >&2
+            exit 1
+          fi
+          predecessor_source="$(cd "$RELEASE_PREDECESSOR_SOURCE_DIR" && pwd -P)"
+          worktree_root="$(mktemp -d "$RUNNER_TEMP/desk-setup-predecessor-verify.XXXXXX")"
+          worktree="$worktree_root/checkout"
+          worktree_added=false
+          cleanup() {
+            status=$?
+            trap - EXIT HUP INT TERM
+            if [[ "$worktree_added" == true ]]; then
+              git worktree remove --force "$worktree" >/dev/null 2>&1 || true
+            fi
+            git worktree prune >/dev/null 2>&1 || true
+            rm -rf -- "$worktree_root"
+            return "$status"
+          }
+          trap cleanup EXIT
+          trap 'exit 129' HUP
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          if [[ "$(stat -f %Lp "$worktree_root")" != 700 ]]; then
+            echo "::error::The predecessor verification worktree root is not private." >&2
+            exit 1
+          fi
+          git worktree add --detach "$worktree" "$RELEASE_PREDECESSOR_COMMIT" >/dev/null
+          worktree_added=true
+          (
+            cd "$worktree"
+            RELEASE_TAG=v0.0.9 \
+            EXPECTED_COMMIT="$RELEASE_PREDECESSOR_COMMIT" \
+            RELEASE_CANDIDATE_RUN_ID="$RELEASE_PREDECESSOR_RUN_ID" \
+            RELEASE_CANDIDATE_RUN_ATTEMPT=1 \
+            RELEASE_SOURCE_DIR="$predecessor_source" \
+            RELEASE_DOWNLOAD_DIR="$predecessor_source" \
+            GH_TOKEN="$predecessor_read_token" \
+              /bin/bash scripts/release/verify-downloaded-candidate.sh
+          )
 
       - name: Publish only the exact approved Release ID
         shell: bash

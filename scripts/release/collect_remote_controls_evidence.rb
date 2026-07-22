@@ -19,11 +19,16 @@ module RemoteControlsCollector
   INPUT_SCHEMA = "desk-setup-switcher.remote-release-controls-input/v1"
   EVIDENCE_SCHEMA_V2 = "desk-setup-switcher.remote-release-controls-evidence/v2"
   INPUT_SCHEMA_V2 = "desk-setup-switcher.remote-release-controls-input/v2"
+  EVIDENCE_SCHEMA_V3 = "desk-setup-switcher.remote-release-controls-evidence/v3"
+  INPUT_SCHEMA_V3 = "desk-setup-switcher.remote-release-controls-input/v3"
+  PREDECESSOR_PRE_TAG_PHASE = "predecessor-pre-tag"
   PHASE = "final-pre-tag"
   PRE_PUBLICATION_PHASE = "pre-publication"
   MASTER_REF = "refs/heads/master"
+  PREDECESSOR_TAG_REF = "refs/tags/v0.0.9"
   RELEASE_TAG_REF = "refs/tags/v0.1.0"
-  RELEASE_WORKFLOW_PATH = ".github/workflows/release.yml"
+  RELEASE_WORKFLOW_PATH = ".github/workflows/signed-release-candidate.yml"
+  LEGACY_WORKFLOW_PATH = ".github/workflows/release.yml"
   CI_WORKFLOW_PATH = ".github/workflows/ci.yml"
   PUBLICATION_WORKFLOW_PATH = ".github/workflows/publish-release.yml"
   PRIMARY_CI_JOB_NAME = "Verify macOS app"
@@ -92,6 +97,10 @@ module RemoteControlsCollector
   ].sort.freeze
   LIFECYCLE_EXTRA_INPUT_FILES = %w[
     active-workflows.json
+    legacy-workflow-content-1.json
+    legacy-workflow-content-2.json
+    legacy-workflow-metadata-1.json
+    legacy-workflow-metadata-2.json
     publication-deployment-policies.json
     publication-environment-secrets.json
     publication-environment-variable-names.json
@@ -503,11 +512,11 @@ module RemoteControlsCollector
     unavailable! unless MANUAL_CONTROLS.fetch(permission_profile) == expected_control
     positive_integer(actor_id)
     exact_string(actor_login, max_bytes: 39, pattern: /\A(?!-)[A-Za-z0-9-]+(?<!-)\z/)
-    unavailable! unless [PHASE, PRE_PUBLICATION_PHASE].include?(phase)
+    unavailable! unless [PREDECESSOR_PRE_TAG_PHASE, PHASE, PRE_PUBLICATION_PHASE].include?(phase)
     unavailable! unless %w[current historical].include?(freshness_mode)
     unavailable! if freshness_mode == "historical" && phase != PHASE
 
-    expected_subject = if phase == PHASE
+    expected_subject = if [PREDECESSOR_PRE_TAG_PHASE, PHASE].include?(phase)
       unavailable! if release_commit || release_id || release_tag_object
       { "tag" => "v0.1.0" }
     else
@@ -601,7 +610,7 @@ module RemoteControlsCollector
   def normalize_manifest_v2(value)
     raw = exact_object(
       value,
-      %w[collectedAt expectedCIWorkflowBlob expectedCommit expectedPublicationWorkflowBlob expectedRelease expectedWorkflowBlob files finalPreTagEvidenceSHA256 localCandidateWorkflow localCIWorkflow localPublicationWorkflow manualEvidence phase schemaVersion]
+      %w[collectedAt expectedCIWorkflowBlob expectedCommit expectedLegacyWorkflowBlob expectedPublicationWorkflowBlob expectedRelease expectedWorkflowBlob files finalPreTagEvidenceSHA256 localCandidateWorkflow localCIWorkflow localLegacyWorkflow localPublicationWorkflow manualEvidence phase schemaVersion]
     )
     unavailable! unless raw.fetch("schemaVersion") == INPUT_SCHEMA_V2
     phase = exact_string(raw.fetch("phase"), max_bytes: 32)
@@ -613,6 +622,7 @@ module RemoteControlsCollector
     expected_blob = exact_sha(raw.fetch("expectedWorkflowBlob"))
     expected_ci_blob = exact_sha(raw.fetch("expectedCIWorkflowBlob"))
     expected_publication_blob = exact_sha(raw.fetch("expectedPublicationWorkflowBlob"))
+    expected_legacy_blob = exact_sha(raw.fetch("expectedLegacyWorkflowBlob"))
     final_pre_tag_evidence_sha256 = raw.fetch("finalPreTagEvidenceSHA256")
     expected_release = raw.fetch("expectedRelease")
     if phase == PHASE
@@ -635,6 +645,7 @@ module RemoteControlsCollector
       "expectedWorkflowBlob" => expected_blob,
       "expectedCIWorkflowBlob" => expected_ci_blob,
       "expectedPublicationWorkflowBlob" => expected_publication_blob,
+      "expectedLegacyWorkflowBlob" => expected_legacy_blob,
       "expectedRelease" => expected_release,
       "finalPreTagEvidenceSHA256" => final_pre_tag_evidence_sha256,
       "localCandidateWorkflow" => normalize_local_workflow_projection(
@@ -652,11 +663,119 @@ module RemoteControlsCollector
         expected_path: PUBLICATION_WORKFLOW_PATH,
         expected_blob: expected_publication_blob
       ),
+      "localLegacyWorkflow" => normalize_local_workflow_projection(
+        raw.fetch("localLegacyWorkflow"),
+        expected_path: LEGACY_WORKFLOW_PATH,
+        expected_blob: expected_legacy_blob
+      ),
       "manualEvidence" => normalize_manual_evidence_input(raw.fetch("manualEvidence")),
       "files" => canonical_strings(raw.fetch("files"), allow_empty: false, pattern: BASENAME)
     }
   rescue KeyError
     unavailable!
+  end
+
+  def normalize_manifest_v3(value)
+    raw = exact_object(
+      value,
+      %w[collectedAt expectedCIWorkflowBlob expectedCommit expectedLegacyWorkflowBlob expectedPredecessor expectedPublicationWorkflowBlob expectedRelease expectedWorkflowBlob files finalPreTagEvidenceSHA256 localCandidateWorkflow localCIWorkflow localLegacyWorkflow localPublicationWorkflow manualEvidence phase predecessorPreTagEvidenceSHA256 schemaVersion]
+    )
+    unavailable! unless raw.fetch("schemaVersion") == INPUT_SCHEMA_V3
+    phase = exact_string(raw.fetch("phase"), max_bytes: 32)
+    phases = [PREDECESSOR_PRE_TAG_PHASE, PHASE, PRE_PUBLICATION_PHASE]
+    unavailable! unless phases.include?(phase)
+    collected_at = exact_string(raw.fetch("collectedAt"), max_bytes: 32)
+    collected_time = Time.iso8601(collected_at)
+    unavailable! unless collected_at == collected_time.utc.iso8601
+    expected_commit = exact_sha(raw.fetch("expectedCommit"))
+    expected_blob = exact_sha(raw.fetch("expectedWorkflowBlob"))
+    expected_ci_blob = exact_sha(raw.fetch("expectedCIWorkflowBlob"))
+    expected_publication_blob = exact_sha(raw.fetch("expectedPublicationWorkflowBlob"))
+    expected_legacy_blob = exact_sha(raw.fetch("expectedLegacyWorkflowBlob"))
+    predecessor_digest = raw.fetch("predecessorPreTagEvidenceSHA256")
+    final_digest = raw.fetch("finalPreTagEvidenceSHA256")
+    expected_predecessor = raw.fetch("expectedPredecessor")
+    expected_release = raw.fetch("expectedRelease")
+    case phase
+    when PREDECESSOR_PRE_TAG_PHASE
+      unavailable! unless expected_predecessor.nil? && expected_release.nil? &&
+                          predecessor_digest.nil? && final_digest.nil?
+    when PHASE
+      predecessor = exact_object(expected_predecessor, %w[commitSha tagObjectSha])
+      expected_predecessor = {
+        "commitSha" => exact_sha(predecessor.fetch("commitSha")),
+        "tagObjectSha" => exact_sha(predecessor.fetch("tagObjectSha"))
+      }
+      predecessor_digest = exact_string(predecessor_digest, pattern: /\A[0-9a-f]{64}\z/)
+      unavailable! unless expected_release.nil? && final_digest.nil?
+    when PRE_PUBLICATION_PHASE
+      predecessor = exact_object(expected_predecessor, %w[commitSha tagObjectSha])
+      expected_predecessor = {
+        "commitSha" => exact_sha(predecessor.fetch("commitSha")),
+        "tagObjectSha" => exact_sha(predecessor.fetch("tagObjectSha"))
+      }
+      release = exact_object(expected_release, %w[commitSha id tagObjectSha])
+      expected_release = {
+        "commitSha" => exact_sha(release.fetch("commitSha")),
+        "id" => positive_integer(release.fetch("id")),
+        "tagObjectSha" => exact_sha(release.fetch("tagObjectSha"))
+      }
+      predecessor_digest = exact_string(predecessor_digest, pattern: /\A[0-9a-f]{64}\z/)
+      final_digest = exact_string(final_digest, pattern: /\A[0-9a-f]{64}\z/)
+    end
+    {
+      "schemaVersion" => INPUT_SCHEMA_V3,
+      "evidenceSchemaVersion" => EVIDENCE_SCHEMA_V3,
+      "phase" => phase,
+      "collectedAt" => collected_at,
+      "expectedCommit" => expected_commit,
+      "expectedWorkflowBlob" => expected_blob,
+      "expectedCIWorkflowBlob" => expected_ci_blob,
+      "expectedPublicationWorkflowBlob" => expected_publication_blob,
+      "expectedLegacyWorkflowBlob" => expected_legacy_blob,
+      "expectedPredecessor" => expected_predecessor,
+      "expectedRelease" => expected_release,
+      "predecessorPreTagEvidenceSHA256" => predecessor_digest,
+      "finalPreTagEvidenceSHA256" => final_digest,
+      "localCandidateWorkflow" => normalize_local_workflow_projection(
+        raw.fetch("localCandidateWorkflow"),
+        expected_path: RELEASE_WORKFLOW_PATH,
+        expected_blob: expected_blob
+      ),
+      "localCIWorkflow" => normalize_local_workflow_projection(
+        raw.fetch("localCIWorkflow"),
+        expected_path: CI_WORKFLOW_PATH,
+        expected_blob: expected_ci_blob
+      ),
+      "localPublicationWorkflow" => normalize_local_workflow_projection(
+        raw.fetch("localPublicationWorkflow"),
+        expected_path: PUBLICATION_WORKFLOW_PATH,
+        expected_blob: expected_publication_blob
+      ),
+      "localLegacyWorkflow" => normalize_local_workflow_projection(
+        raw.fetch("localLegacyWorkflow"),
+        expected_path: LEGACY_WORKFLOW_PATH,
+        expected_blob: expected_legacy_blob
+      ),
+      "manualEvidence" => normalize_manual_evidence_input(raw.fetch("manualEvidence")),
+      "files" => canonical_strings(raw.fetch("files"), allow_empty: false, pattern: BASENAME)
+    }
+  rescue KeyError
+    unavailable!
+  end
+
+  def normalize_lifecycle_manifest(value)
+    case value.is_a?(Hash) && value["schemaVersion"]
+    when INPUT_SCHEMA_V3
+      normalize_manifest_v3(value)
+    when INPUT_SCHEMA_V2
+      normalize_manifest_v2(value).merge(
+        "schemaVersion" => INPUT_SCHEMA_V2,
+        "evidenceSchemaVersion" => EVIDENCE_SCHEMA_V2
+      )
+    else
+      unavailable!
+    end
   end
 
   def normalize_manifest(value)
@@ -975,9 +1094,8 @@ module RemoteControlsCollector
     end
     unavailable! unless workflows.map { |workflow| workflow["id"] }.uniq.length == workflows.length
     unavailable! unless workflows.map { |workflow| workflow["path"] }.uniq.length == workflows.length
-    active = workflows.select { |workflow| workflow["state"] == "active" }
-    active.sort_by! { |workflow| workflow["path"] }
-    { "complete" => true, "items" => active }
+    workflows.sort_by! { |workflow| workflow["path"] }
+    { "complete" => true, "items" => workflows }
   rescue KeyError
     unavailable!
   end
@@ -1465,7 +1583,7 @@ module RemoteControlsCollector
 
   def collect_lifecycle(input_directory:, output_path: nil)
     input_directory = require_secure_directory(input_directory)
-    manifest = normalize_manifest_v2(
+    manifest = normalize_lifecycle_manifest(
       read_json(input_directory, "manifest.json", max_bytes: MAX_MANIFEST_BYTES)
     )
 
@@ -1496,6 +1614,13 @@ module RemoteControlsCollector
         metadata: "publication-workflow-metadata",
         blob: manifest.fetch("expectedPublicationWorkflowBlob"),
         local: manifest.fetch("localPublicationWorkflow")
+      },
+      "legacyWorkflow" => {
+        path: LEGACY_WORKFLOW_PATH,
+        content: "legacy-workflow-content",
+        metadata: "legacy-workflow-metadata",
+        blob: manifest.fetch("expectedLegacyWorkflowBlob"),
+        local: manifest.fetch("localLegacyWorkflow")
       }
     }.freeze
 
@@ -1570,7 +1695,16 @@ module RemoteControlsCollector
       repository.fetch("fullName")
     )
     private_label = exact_object(read_json(input_directory, "label.json"), %w[name present])
-    if manifest.fetch("phase") == PHASE
+    if manifest.fetch("schemaVersion") == INPUT_SCHEMA_V3
+      boundary = {
+        "vRefs" => normalize_pre_publication_refs(
+          read_json_lines(input_directory, "v-refs.json", allow_empty: true)
+        ),
+        "releases" => normalize_pre_publication_releases(
+          read_json_lines(input_directory, "releases.json", allow_empty: true)
+        )
+      }
+    elsif manifest.fetch("phase") == PHASE
       boundary = {
         "vRefs" => {
           "complete" => true,
@@ -1595,7 +1729,7 @@ module RemoteControlsCollector
     end
 
     evidence = {
-      "schemaVersion" => EVIDENCE_SCHEMA_V2,
+      "schemaVersion" => manifest.fetch("evidenceSchemaVersion"),
       "phase" => manifest.fetch("phase"),
       "collectedAt" => manifest.fetch("collectedAt"),
       "repository" => repository,
@@ -1604,6 +1738,7 @@ module RemoteControlsCollector
       "candidateWorkflow" => full_workflows.fetch("candidateWorkflow"),
       "ciWorkflow" => full_workflows.fetch("ciWorkflow"),
       "publicationWorkflow" => full_workflows.fetch("publicationWorkflow"),
+      "legacyWorkflow" => full_workflows.fetch("legacyWorkflow"),
       "workflowInventory" => workflow_inventory,
       "rulesets" => {
         "complete" => true,
@@ -1628,7 +1763,6 @@ module RemoteControlsCollector
         }
       },
       "manualEvidence" => manifest.fetch("manualEvidence"),
-      "finalPreTagEvidenceSHA256" => manifest.fetch("finalPreTagEvidenceSHA256"),
       "security" => normalize_security(input_directory),
       "actions" => normalize_actions(input_directory),
       "labels" => {
@@ -1645,6 +1779,13 @@ module RemoteControlsCollector
         "checkRuns" => { "complete" => true, "items" => checks }
       }
     }
+    if manifest.fetch("schemaVersion") == INPUT_SCHEMA_V3
+      evidence["predecessorPreTagEvidenceSHA256"] =
+        manifest.fetch("predecessorPreTagEvidenceSHA256")
+      evidence["finalPreTagEvidenceSHA256"] = manifest.fetch("finalPreTagEvidenceSHA256")
+    else
+      evidence["finalPreTagEvidenceSHA256"] = manifest.fetch("finalPreTagEvidenceSHA256")
+    end
 
     if output_path && output_path != "-"
       expanded_output = File.expand_path(output_path)
