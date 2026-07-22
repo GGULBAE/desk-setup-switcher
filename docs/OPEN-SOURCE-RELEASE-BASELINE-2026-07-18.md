@@ -65,7 +65,7 @@ Accepted P2 boundaries are intentionally recorded rather than hidden:
 - Export uses an exclusive final-file write and a crash could leave a partial new export; a staged non-overwriting rename is a future hardening pass.
 - Parent-directory sync is best effort, so perfect sudden-power-loss durability is not claimed.
 
-These bullets preserve the 2026-07-18 implementation boundary. The current writer described in the completion ledger later moved managed staging, commit, rollback, cleanup, and sync onto one verified parent-directory descriptor and added deterministic parent-path, regular/symlink leaf replacement, and both post-commit rollback tests. Current residuals include the lack of public inode-conditional rename/unlink and possible private old-leaf staging residue after abrupt interruption between swap and unlink; there is no production path-based mutation fallback.
+These bullets preserve the 2026-07-18 implementation boundary. The direct-export limitation on line 65 is historical and has been superseded: the current writer described in the completion ledger later moved managed and export staging, commit, rollback, cleanup, and sync onto verified parent-directory descriptors, added exclusive staged export plus explicit parent trust policy, and added deterministic parent-path, destination/staging leaf replacement, and post-commit rollback tests. Current residuals include the lack of public inode-conditional rename/unlink, possible staging residue after abrupt interruption or detected replacement, and best-effort parent-directory durability; there is no production path-based mutation fallback or partial final export path.
 
 ### Repository and release controls
 

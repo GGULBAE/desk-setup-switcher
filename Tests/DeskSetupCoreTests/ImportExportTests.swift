@@ -82,11 +82,17 @@ final class ImportExportTests: XCTestCase {
     }
   }
 
-  func testImportAllowsMacOSRootOwnedTemporaryDirectoryCompatibilityLink() throws {
+  func testImportAndExportAllowMacOSRootOwnedTemporaryDirectoryCompatibilityLink() throws {
     let source = URL(
       fileURLWithPath: "/tmp/DeskSetupCoreTests-\(UUID().uuidString).json"
     )
-    defer { try? FileManager.default.removeItem(at: source) }
+    let destination = URL(
+      fileURLWithPath: "/tmp/DeskSetupCoreTests-export-\(UUID().uuidString).json"
+    )
+    defer {
+      try? FileManager.default.removeItem(at: source)
+      try? FileManager.default.removeItem(at: destination)
+    }
     let document = ProfileDocument(
       updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
     )
@@ -102,6 +108,12 @@ final class ImportExportTests: XCTestCase {
     let imported = try ProfileImportExport().importDocument(from: source)
 
     XCTAssertEqual(imported.document, document)
+    try ProfileImportExport().export(document, to: destination)
+    XCTAssertEqual(
+      try ProfileImportExport().importDocument(from: destination).document,
+      document
+    )
+    XCTAssertEqual(try filePermissions(at: destination), mode_t(0o600))
   }
 
   func testImportRejectsNonDirectoryAncestorAndSymlinkLoopAsUnsafe() throws {
@@ -235,6 +247,286 @@ final class ImportExportTests: XCTestCase {
     XCTAssertEqual(imported.document, document)
     XCTAssertEqual(imported.sourceURL, destination.standardizedFileURL)
     XCTAssertEqual(imported.originalSchemaVersion, ProfileDocument.currentSchemaVersion)
+    XCTAssertEqual(try filePermissions(at: destination), mode_t(0o600))
+    XCTAssertTrue(try exportStagingNames(in: directory).isEmpty)
+  }
+
+  func testExportFailureBeforeAndAfterCommitLeavesNoFinalOrStagingFile() throws {
+    enum CheckpointFailure: Error {
+      case injected
+    }
+
+    let directory = try makeTemporaryDirectory()
+    let checkpoints: [PrivateAtomicFileWriter.TestHooks] = [
+      .init(afterPrecommitValidation: { _ in throw CheckpointFailure.injected }),
+      .init(afterCommit: { _ in throw CheckpointFailure.injected }),
+    ]
+
+    for (index, hooks) in checkpoints.enumerated() {
+      let destination = directory.appendingPathComponent("failed-export-\(index).json")
+      let service = ProfileImportExport(exportWriter: { data, url in
+        try PrivateAtomicFileWriter(testHooks: hooks).writeNew(data, to: url)
+      })
+
+      XCTAssertThrowsError(try service.export(ProfileDocument(), to: destination)) { error in
+        XCTAssertEqual(error as? ProfileStorageError, .io)
+      }
+      XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+      XCTAssertTrue(try exportStagingNames(in: directory).isEmpty)
+    }
+  }
+
+  func testExportMapsDestinationInsertedAtCommitBoundaryToDestinationExists() throws {
+    let directory = try makeTemporaryDirectory()
+    let destination = directory.appendingPathComponent("raced-export.json")
+    let sentinel = Data("race-winner".utf8)
+    let service = ProfileImportExport(exportWriter: { data, url in
+      try PrivateAtomicFileWriter(
+        testHooks: .init(
+          afterPrecommitValidation: { _ in
+            try sentinel.write(to: destination)
+          }
+        )
+      ).writeNew(data, to: url)
+    })
+
+    XCTAssertThrowsError(try service.export(ProfileDocument(), to: destination)) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .destinationExists(destination))
+    }
+    XCTAssertEqual(try Data(contentsOf: destination), sentinel)
+    XCTAssertTrue(try exportStagingNames(in: directory).isEmpty)
+  }
+
+  func testExportRejectsExistingSymlinkPipeAndDirectoryWithoutFollowingThem() throws {
+    let directory = try makeTemporaryDirectory()
+    let sentinelURL = directory.appendingPathComponent("sentinel.json")
+    let sentinel = Data("outside-sentinel".utf8)
+    try sentinel.write(to: sentinelURL)
+
+    let symlink = directory.appendingPathComponent("existing-symlink.json")
+    try FileManager.default.createSymbolicLink(at: symlink, withDestinationURL: sentinelURL)
+    let pipe = directory.appendingPathComponent("existing-pipe.json")
+    let pipeResult = pipe.withUnsafeFileSystemRepresentation { path -> Int32 in
+      guard let path else { return -1 }
+      return Darwin.mkfifo(path, mode_t(0o600))
+    }
+    XCTAssertEqual(pipeResult, 0)
+    let nestedDirectory = directory.appendingPathComponent(
+      "existing-directory.json",
+      isDirectory: true
+    )
+    try FileManager.default.createDirectory(
+      at: nestedDirectory,
+      withIntermediateDirectories: false
+    )
+
+    for destination in [symlink, pipe, nestedDirectory] {
+      XCTAssertThrowsError(
+        try ProfileImportExport().export(ProfileDocument(), to: destination)
+      ) { error in
+        XCTAssertEqual(error as? ProfileStorageError, .destinationExists(destination))
+      }
+    }
+    XCTAssertEqual(try Data(contentsOf: sentinelURL), sentinel)
+    XCTAssertTrue(try exportStagingNames(in: directory).isEmpty)
+  }
+
+  func testExportRejectsSharedWritableNonStickyParent() throws {
+    let syntheticUserID: uid_t = 501
+    XCTAssertTrue(
+      SecureFileAccess.isTrustedExportDirectory(
+        ownerID: syntheticUserID,
+        mode: mode_t(0o700),
+        expectedOwnerID: syntheticUserID
+      )
+    )
+    XCTAssertFalse(
+      SecureFileAccess.isTrustedExportDirectory(
+        ownerID: syntheticUserID,
+        mode: mode_t(0o777),
+        expectedOwnerID: syntheticUserID
+      )
+    )
+    XCTAssertTrue(
+      SecureFileAccess.isTrustedExportDirectory(
+        ownerID: 0,
+        mode: mode_t(0o1777),
+        expectedOwnerID: syntheticUserID
+      )
+    )
+    XCTAssertFalse(
+      SecureFileAccess.isTrustedExportDirectory(
+        ownerID: 0,
+        mode: mode_t(0o777),
+        expectedOwnerID: syntheticUserID
+      )
+    )
+    XCTAssertFalse(
+      SecureFileAccess.isTrustedExportDirectory(
+        ownerID: syntheticUserID + 1,
+        mode: mode_t(0o1777),
+        expectedOwnerID: syntheticUserID
+      )
+    )
+
+    let container = try makeTemporaryDirectory()
+    let sharedParent = container.appendingPathComponent("shared", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: sharedParent,
+      withIntermediateDirectories: false
+    )
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o777],
+      ofItemAtPath: sharedParent.path
+    )
+    let destination = sharedParent.appendingPathComponent("export.json")
+
+    XCTAssertThrowsError(
+      try ProfileImportExport().export(ProfileDocument(), to: destination)
+    ) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .unsafeFilesystemObject)
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    XCTAssertTrue(try exportStagingNames(in: sharedParent).isEmpty)
+  }
+
+  func testExportRejectsAllowACLAndStripsInheritedDenyACL() throws {
+    let container = try makeTemporaryDirectory()
+    let allowParent = container.appendingPathComponent("allow-acl", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: allowParent,
+      withIntermediateDirectories: false
+    )
+    try SecureACLTestSupport.set(
+      SecureACLTestSupport.everyoneAllowDirectoryMutation,
+      at: allowParent
+    )
+    XCTAssertEqual(
+      try SecureACLTestSupport.state(at: allowParent),
+      .containsAllow
+    )
+    let rejectedDestination = allowParent.appendingPathComponent("rejected.json")
+
+    XCTAssertThrowsError(
+      try ProfileImportExport().export(ProfileDocument(), to: rejectedDestination)
+    ) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .unsafeFilesystemObject)
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: rejectedDestination.path))
+    XCTAssertTrue(try exportStagingNames(in: allowParent).isEmpty)
+
+    let denyParent = container.appendingPathComponent("deny-acl", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: denyParent,
+      withIntermediateDirectories: false
+    )
+    try SecureACLTestSupport.set(
+      SecureACLTestSupport.everyoneInheritedReadDeny,
+      at: denyParent
+    )
+    XCTAssertEqual(try SecureACLTestSupport.state(at: denyParent), .denyOnly)
+    let destination = denyParent.appendingPathComponent("export.json")
+
+    try ProfileImportExport().export(ProfileDocument(), to: destination)
+
+    XCTAssertEqual(try filePermissions(at: destination), mode_t(0o600))
+    XCTAssertEqual(try SecureACLTestSupport.state(at: destination), .absent)
+    XCTAssertTrue(try exportStagingNames(in: denyParent).isEmpty)
+  }
+
+  func testExportRejectsParentPathReplacementAndRollsBackAnchoredCommit() throws {
+    let container = try makeTemporaryDirectory()
+    let selectedParent = container.appendingPathComponent("Selected", isDirectory: true)
+    let displacedParent = container.appendingPathComponent("OpenedSelected", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: selectedParent,
+      withIntermediateDirectories: false
+    )
+    let destination = selectedParent.appendingPathComponent("export.json")
+    let service = ProfileImportExport(exportWriter: { data, url in
+      try PrivateAtomicFileWriter(
+        testHooks: .init(
+          afterPrecommitValidation: { _ in
+            try FileManager.default.moveItem(at: selectedParent, to: displacedParent)
+            try FileManager.default.createDirectory(
+              at: selectedParent,
+              withIntermediateDirectories: false
+            )
+          }
+        )
+      ).writeNew(data, to: url)
+    })
+
+    XCTAssertThrowsError(try service.export(ProfileDocument(), to: destination)) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .fileChangedDuringRead)
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: displacedParent.appendingPathComponent("export.json").path
+      )
+    )
+    XCTAssertTrue(try exportStagingNames(in: selectedParent).isEmpty)
+    XCTAssertTrue(try exportStagingNames(in: displacedParent).isEmpty)
+  }
+
+  func testExportDetectsStagingLeafReplacementBeforeRename() throws {
+    let directory = try makeTemporaryDirectory()
+    let destination = directory.appendingPathComponent("export.json")
+    let outside = directory.appendingPathComponent("outside.json")
+    let sentinel = Data("outside-sentinel".utf8)
+    try sentinel.write(to: outside)
+    let service = ProfileImportExport(exportWriter: { data, url in
+      try PrivateAtomicFileWriter(
+        testHooks: .init(
+          afterPrecommitValidation: { checkpoint in
+            let unlinkResult = checkpoint.stagingName.withCString { stagingName in
+              Darwin.unlinkat(checkpoint.parentDirectoryDescriptor, stagingName, 0)
+            }
+            guard unlinkResult == 0 else {
+              throw ProfileStorageError.io(String(cString: strerror(errno)))
+            }
+            let linkResult = outside.path.withCString { target in
+              checkpoint.stagingName.withCString { stagingName in
+                Darwin.symlinkat(
+                  target,
+                  checkpoint.parentDirectoryDescriptor,
+                  stagingName
+                )
+              }
+            }
+            guard linkResult == 0 else {
+              throw ProfileStorageError.io(String(cString: strerror(errno)))
+            }
+          }
+        )
+      ).writeNew(data, to: url)
+    })
+
+    XCTAssertThrowsError(try service.export(ProfileDocument(), to: destination)) { error in
+      XCTAssertEqual(error as? ProfileStorageError, .unsafeFilesystemObject)
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    XCTAssertEqual(try Data(contentsOf: outside), sentinel)
+    let stagingNames = try exportStagingNames(in: directory)
+    XCTAssertEqual(stagingNames.count, 1)
+    let stagingURL = directory.appendingPathComponent(try XCTUnwrap(stagingNames.first))
+    XCTAssertEqual(
+      try stagingURL.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink,
+      true
+    )
+  }
+
+  func testExportSupportsMaximumLengthDestinationWithoutLengtheningStagingName() throws {
+    let directory = try makeTemporaryDirectory()
+    let destinationName = String(repeating: "a", count: 250) + ".json"
+    XCTAssertEqual(destinationName.utf8.count, 255)
+    let destination = directory.appendingPathComponent(destinationName)
+
+    try ProfileImportExport().export(ProfileDocument(), to: destination)
+
+    XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+    XCTAssertTrue(try exportStagingNames(in: directory).isEmpty)
   }
 
   func testLegacyImportNormalizesUnsupportedLeavesWithoutLosingValues() throws {
@@ -329,6 +621,7 @@ final class ImportExportTests: XCTestCase {
       XCTAssertEqual(error as? ProfileStorageError, .destinationExists(destination))
     }
     XCTAssertEqual(try Data(contentsOf: destination), sentinel)
+    XCTAssertTrue(try exportStagingNames(in: directory).isEmpty)
   }
 
   func testImportRejectsInvalidSelection() throws {
@@ -357,6 +650,23 @@ final class ImportExportTests: XCTestCase {
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     addTeardownBlock { try? FileManager.default.removeItem(at: url) }
     return url
+  }
+
+  private func filePermissions(at url: URL) throws -> mode_t {
+    var status = stat()
+    let result = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+      guard let path else { return -1 }
+      return Darwin.lstat(path, &status)
+    }
+    guard result == 0 else {
+      throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+    }
+    return status.st_mode & mode_t(0o777)
+  }
+
+  private func exportStagingNames(in directory: URL) throws -> [String] {
+    return try FileManager.default.contentsOfDirectory(atPath: directory.path)
+      .filter { $0.hasPrefix(".dss-staging-") && $0.hasSuffix(".tmp") }
   }
 
   private func unsupportedNetworkDocument() -> ProfileDocument {
@@ -469,5 +779,49 @@ private func overwriteInPlacePreservingModificationTime(_ data: Data, at url: UR
   var times = [before.st_atimespec, before.st_mtimespec]
   guard Darwin.futimens(descriptor, &times) == 0 else {
     throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+  }
+}
+
+enum SecureACLTestSupport {
+  static let everyoneAllowDirectoryMutation = """
+    !#acl 1
+    group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF0000000C:everyone:12:allow:write,delete_child
+    """
+
+  static let everyoneAllowRead = """
+    !#acl 1
+    group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF0000000C:everyone:12:allow:read
+    """
+
+  static let everyoneInheritedReadDeny = """
+    !#acl 1
+    group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF0000000C:everyone:12:deny,file_inherit,only_inherit:read
+    """
+
+  static func set(_ text: String, at url: URL) throws {
+    errno = 0
+    guard let acl = text.withCString({ Darwin.acl_from_text($0) }) else {
+      throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EINVAL)
+    }
+    defer { _ = Darwin.acl_free(UnsafeMutableRawPointer(acl)) }
+    let result = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+      guard let path else { return -1 }
+      return Darwin.acl_set_file(path, ACL_TYPE_EXTENDED, acl)
+    }
+    guard result == 0 else {
+      throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+    }
+  }
+
+  static func state(at url: URL) throws -> SecureExtendedACLState {
+    let descriptor = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+      guard let path else { return -1 }
+      return Darwin.open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+    }
+    guard descriptor >= 0 else {
+      throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+    }
+    defer { _ = Darwin.close(descriptor) }
+    return try SecureFileAccess.extendedACLState(descriptor: descriptor)
   }
 }

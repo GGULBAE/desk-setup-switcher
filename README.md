@@ -57,7 +57,8 @@ The historical remote **Release** workflow is still active and unsafe for any `v
 ## Privacy and safety
 
 - Profiles, backups, and diagnostics stay on the Mac. The app has no account, cloud sync, app-owned server, telemetry, analytics, ads, or automatic profile switching.
-- App-managed profile and backup files are owner-private. Updates are staged and committed relative to one verified directory handle, and corrupt data is quarantined or recovered from the last-known-good backup when that can be proven safe.
+- App-managed profile and backup files are owner-private: extended ACLs are removed and verified absent in addition to `0700`/`0600` POSIX modes. Updates are staged and committed relative to one verified directory handle, and corrupt data is quarantined or recovered from the last-known-good backup when that can be proven safe.
+- Profile export writes a complete ACL-free owner-private staging file, synchronizes it, and publishes it with an exclusive atomic rename. The cooperative writer does not overwrite an existing destination or publish its own partially written JSON; the documented same-account syscall race and sudden-stop staging residue remain.
 - Capture is read-only. Applying a profile always requires an explicit review and confirmation.
 - Apply Preview uses one review-to-decision scroll flow. A visible, non-color **Beta** status says Apply and rollback are not hardware-verified and asks you to check System Settings afterward; decision actions follow the review content, and Escape remains the cancel shortcut.
 - The app reads current state again before execution. If the profile, device state, capability, or rollback evidence changed, it applies nothing and returns to a refreshed review.

@@ -2,6 +2,11 @@ import Darwin
 import Foundation
 
 struct PrivateAtomicFileWriter: Sendable {
+  private enum ExistingDestinationPolicy: Equatable, Sendable {
+    case replaceVerified
+    case requireMissing
+  }
+
   struct Checkpoint: Sendable {
     let parentDirectoryDescriptor: Int32
     let destinationName: String
@@ -41,6 +46,21 @@ struct PrivateAtomicFileWriter: Sendable {
   /// Prepares and commits a private file relative to one verified parent FD.
   /// No production mutation after the parent open resolves the parent path.
   func write(_ data: Data, to destination: URL) throws {
+    try write(data, to: destination, existingDestinationPolicy: .replaceVerified)
+  }
+
+  /// Publishes a fully synchronized private staging file only when the final
+  /// leaf is still absent. This is the export path: it never replaces an
+  /// existing destination and never writes partial bytes to the final name.
+  func writeNew(_ data: Data, to destination: URL) throws {
+    try write(data, to: destination, existingDestinationPolicy: .requireMissing)
+  }
+
+  private func write(
+    _ data: Data,
+    to destination: URL,
+    existingDestinationPolicy: ExistingDestinationPolicy
+  ) throws {
     guard destination.isFileURL else {
       throw ProfileStorageError.unsafeFilesystemObject
     }
@@ -48,10 +68,19 @@ struct PrivateAtomicFileWriter: Sendable {
     let parentURL = normalizedDestination.deletingLastPathComponent()
     let destinationName = try SecureFileAccess.validatedLeafName(normalizedDestination)
     let expectedOwnerID = Darwin.geteuid()
-    let parentDescriptor = try SecureFileAccess.openOwnedDirectory(
-      parentURL,
-      expectedOwnerID: expectedOwnerID
-    )
+    let parentDescriptor: Int32
+    switch existingDestinationPolicy {
+    case .replaceVerified:
+      parentDescriptor = try SecureFileAccess.openOwnedDirectory(
+        parentURL,
+        expectedOwnerID: expectedOwnerID
+      )
+    case .requireMissing:
+      parentDescriptor = try SecureFileAccess.openExportDirectory(
+        parentURL,
+        expectedOwnerID: expectedOwnerID
+      )
+    }
     defer {
       // Directory durability is best effort because a failure after visibility
       // cannot always be rolled back without risking a concurrently changed leaf.
@@ -60,17 +89,32 @@ struct PrivateAtomicFileWriter: Sendable {
     }
     let parentIdentity = try SecureFileAccess.directoryIdentity(
       descriptor: parentDescriptor,
-      expectedOwnerID: expectedOwnerID
+      expectedOwnerID: nil
     )
-    let initialDestination = try SecureFileAccess.managedRegularFileState(
-      in: parentDescriptor,
-      named: destinationName,
-      expectedOwnerID: expectedOwnerID
-    )
+    let expectedParentOwnerID = parentIdentity.owner
+    let initialDestination: SecureManagedLeafState
+    switch existingDestinationPolicy {
+    case .replaceVerified:
+      initialDestination = try SecureFileAccess.managedRegularFileState(
+        in: parentDescriptor,
+        named: destinationName,
+        expectedOwnerID: expectedOwnerID
+      )
+    case .requireMissing:
+      switch try SecureFileAccess.directoryEntryState(
+        in: parentDescriptor,
+        named: destinationName,
+        expectedOwnerID: nil
+      ) {
+      case .missing:
+        initialDestination = .missing
+      case .present:
+        throw ProfileStorageError.destinationExists(normalizedDestination)
+      }
+    }
 
     let staging = try Self.createPrivateStagingFile(
       data,
-      destinationName: destinationName,
       parentDescriptor: parentDescriptor,
       expectedOwnerID: expectedOwnerID
     )
@@ -94,18 +138,26 @@ struct PrivateAtomicFileWriter: Sendable {
       parentURL,
       descriptor: parentDescriptor,
       expectedIdentity: parentIdentity,
-      expectedOwnerID: expectedOwnerID
+      expectedOwnerID: expectedParentOwnerID
     )
     try Self.verifyDestination(
       initialDestination,
       parentDescriptor: parentDescriptor,
       destinationName: destinationName,
+      destinationURL: normalizedDestination,
+      existingDestinationPolicy: existingDestinationPolicy,
       expectedOwnerID: expectedOwnerID
     )
 
     // This hook intentionally sits in the otherwise syscall-adjacent test
     // window. Production callers cannot replace any FD-relative mutation.
     try testHooks.afterPrecommitValidation(checkpoint)
+    try Self.verifyRegularLeaf(
+      named: checkpoint.stagingName,
+      equals: staging.identity,
+      parentDescriptor: parentDescriptor,
+      expectedOwnerID: expectedOwnerID
+    )
 
     switch initialDestination {
     case .missing:
@@ -114,6 +166,9 @@ struct PrivateAtomicFileWriter: Sendable {
         parentURL: parentURL,
         parentIdentity: parentIdentity,
         stagingIdentity: staging.identity,
+        destinationURL: normalizedDestination,
+        existingDestinationPolicy: existingDestinationPolicy,
+        expectedParentOwnerID: expectedParentOwnerID,
         expectedOwnerID: expectedOwnerID
       )
     case .regularFile(let originalIdentity):
@@ -123,6 +178,7 @@ struct PrivateAtomicFileWriter: Sendable {
         parentIdentity: parentIdentity,
         stagingIdentity: staging.identity,
         originalIdentity: originalIdentity,
+        expectedParentOwnerID: expectedParentOwnerID,
         expectedOwnerID: expectedOwnerID
       )
     }
@@ -133,6 +189,9 @@ struct PrivateAtomicFileWriter: Sendable {
     parentURL: URL,
     parentIdentity: SecureFileIdentity,
     stagingIdentity: SecureFileIdentity,
+    destinationURL: URL,
+    existingDestinationPolicy: ExistingDestinationPolicy,
+    expectedParentOwnerID: uid_t,
     expectedOwnerID: uid_t
   ) throws {
     let renameResult = checkpoint.stagingName.withCString { stagingName in
@@ -148,6 +207,9 @@ struct PrivateAtomicFileWriter: Sendable {
     }
     guard renameResult == 0 else {
       let code = errno
+      if code == EEXIST, existingDestinationPolicy == .requireMissing {
+        throw ProfileStorageError.destinationExists(destinationURL)
+      }
       if code == EEXIST || code == ENOENT {
         throw ProfileStorageError.fileChangedDuringRead
       }
@@ -160,7 +222,7 @@ struct PrivateAtomicFileWriter: Sendable {
         parentURL,
         descriptor: checkpoint.parentDirectoryDescriptor,
         expectedIdentity: parentIdentity,
-        expectedOwnerID: expectedOwnerID
+        expectedOwnerID: expectedParentOwnerID
       )
       try Self.verifyRegularLeaf(
         named: checkpoint.destinationName,
@@ -197,6 +259,7 @@ struct PrivateAtomicFileWriter: Sendable {
     parentIdentity: SecureFileIdentity,
     stagingIdentity: SecureFileIdentity,
     originalIdentity: SecureFileIdentity,
+    expectedParentOwnerID: uid_t,
     expectedOwnerID: uid_t
   ) throws {
     let swapResult = Self.swapLeaves(
@@ -220,7 +283,7 @@ struct PrivateAtomicFileWriter: Sendable {
         parentURL,
         descriptor: checkpoint.parentDirectoryDescriptor,
         expectedIdentity: parentIdentity,
-        expectedOwnerID: expectedOwnerID
+        expectedOwnerID: expectedParentOwnerID
       )
       try Self.verifyRegularLeaf(
         named: checkpoint.destinationName,
@@ -256,14 +319,13 @@ struct PrivateAtomicFileWriter: Sendable {
 
   private static func createPrivateStagingFile(
     _ data: Data,
-    destinationName: String,
     parentDescriptor: Int32,
     expectedOwnerID: uid_t
   ) throws -> StagingFile {
     var stagingName = ""
     var descriptor: Int32 = -1
     for _ in 0..<16 {
-      stagingName = ".\(destinationName).\(UUID().uuidString).tmp"
+      stagingName = ".dss-staging-\(UUID().uuidString).tmp"
       descriptor = stagingName.withCString { name in
         Darwin.openat(
           parentDescriptor,
@@ -305,9 +367,10 @@ struct PrivateAtomicFileWriter: Sendable {
     )
     ownedIdentity = createdIdentity
 
-    guard Darwin.fchmod(descriptor, mode_t(0o600)) == 0 else {
-      throw posixError(errno)
-    }
+    try SecureFileAccess.enforcePrivatePermissions(
+      descriptor: descriptor,
+      mode: mode_t(0o600)
+    )
 
     try data.withUnsafeBytes { bytes in
       guard !bytes.isEmpty else { return }
@@ -381,16 +444,34 @@ struct PrivateAtomicFileWriter: Sendable {
     _ expectedState: SecureManagedLeafState,
     parentDescriptor: Int32,
     destinationName: String,
+    destinationURL: URL,
+    existingDestinationPolicy: ExistingDestinationPolicy,
     expectedOwnerID: uid_t
   ) throws {
-    guard
-      try SecureFileAccess.managedRegularFileState(
-        in: parentDescriptor,
-        named: destinationName,
-        expectedOwnerID: expectedOwnerID
-      ) == expectedState
-    else {
-      throw ProfileStorageError.fileChangedDuringRead
+    switch existingDestinationPolicy {
+    case .replaceVerified:
+      guard
+        try SecureFileAccess.managedRegularFileState(
+          in: parentDescriptor,
+          named: destinationName,
+          expectedOwnerID: expectedOwnerID
+        ) == expectedState
+      else {
+        throw ProfileStorageError.fileChangedDuringRead
+      }
+    case .requireMissing:
+      guard expectedState == .missing else {
+        throw ProfileStorageError.fileChangedDuringRead
+      }
+      guard
+        try SecureFileAccess.directoryEntryState(
+          in: parentDescriptor,
+          named: destinationName,
+          expectedOwnerID: nil
+        ) == .missing
+      else {
+        throw ProfileStorageError.destinationExists(destinationURL)
+      }
     }
   }
 

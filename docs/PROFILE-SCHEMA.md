@@ -238,11 +238,14 @@ The app exports the authoritative persisted document; unsaved editor drafts are 
 
 - normalizes and validates before encoding;
 - accepts only a local file URL;
-- creates a new owner-readable/writable file with exclusive-create semantics;
+- opens and identity-binds the user-selected parent under an explicit trust policy: current-user-owned without shared POSIX writes, sticky current-user-owned, or sticky root-owned compatibility directories such as macOS `/tmp`;
+- rejects other-owner parents, group/other-writable parents that lack sticky-bit deletion protection, and any extended-ACL ALLOW entry; deny-only ACLs remain compatible;
+- removes and absence-verifies inherited extended ACLs before enforcing `0600`, then writes and synchronizes the complete JSON to the short randomized sibling staging file;
+- publishes the staging bytes to the final name with exclusive atomic rename semantics;
 - refuses to overwrite any existing destination; and
 - when exporting an `ImportedProfileDocument`, refuses a destination that resolves to the import source.
 
-The current export writer writes directly to the new final path. It synchronizes and removes the file when a reported write fails, but it is not a crash-atomic export: sudden termination or power loss could leave a partial newly created file. If an export is interrupted, delete the incomplete file after inspection and export again to a new destination. This limitation does not change the managed `ProfileStore`, which separately anchors mutations to one verified parent-directory descriptor, commits a private staging file with exclusive rename or atomic swap, verifies and conditionally rolls back the resulting identities, retains a last-known-good backup, and quarantines corrupt files.
+In the cooperative writer path, the final export name receives only the complete synchronized staging inode: interruption before rename can leave only a private randomized staging file, while interruption after rename leaves the complete JSON bytes visible. Parent-directory sync remains best effort, so sudden power loss can still affect whether the new name itself is durable. A noncooperative process under the same UID can still race the final adjacent identity check and rename because Darwin has no public inode-conditional rename; that residual prevents an absolute claim against same-account interference. Deterministic tests cover ALLOW-ACL rejection and inherited-ACL removal, destination insertion at the commit boundary, existing regular and special entries, parent-path and staging-leaf replacement, maximum-length final leaves, and injected failures immediately before and after commit. Owned staging is cleaned when its identity is intact; an actual killed process cannot run cleanup, and a replaced staging name is deliberately not deleted, so either case may leave private or untrusted residue for manual inspection. The managed `ProfileStore` separately supports verified replacement through atomic swap, retains a last-known-good backup, and quarantines corrupt files.
 
 ## Privacy and safe sharing
 

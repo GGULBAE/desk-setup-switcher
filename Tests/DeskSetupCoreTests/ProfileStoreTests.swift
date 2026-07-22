@@ -548,7 +548,7 @@ final class ProfileStoreTests: XCTestCase {
     XCTAssertEqual(try Data(contentsOf: destination), original)
     XCTAssertFalse(
       try FileManager.default.contentsOfDirectory(atPath: directory.path).contains {
-        $0.hasPrefix(".profiles.json.") && $0.hasSuffix(".tmp")
+        $0.hasPrefix(".dss-staging-") && $0.hasSuffix(".tmp")
       }
     )
   }
@@ -837,7 +837,7 @@ final class ProfileStoreTests: XCTestCase {
     XCTAssertEqual(try Data(contentsOf: destination), original)
     XCTAssertFalse(
       try FileManager.default.contentsOfDirectory(atPath: directory.path).contains {
-        $0.hasPrefix(".profiles.json.") && $0.hasSuffix(".tmp")
+        $0.hasPrefix(".dss-staging-") && $0.hasSuffix(".tmp")
       }
     )
   }
@@ -1119,6 +1119,30 @@ final class ProfileStoreTests: XCTestCase {
     XCTAssertEqual(try permissions(at: store.locations.backupURL), 0o600)
   }
 
+  func testPrivatePermissionRepairRemovesExtendedAllowACLs() throws {
+    let directory = try makeTemporaryDirectory()
+    try SecureACLTestSupport.set(
+      SecureACLTestSupport.everyoneAllowDirectoryMutation,
+      at: directory
+    )
+    XCTAssertEqual(try SecureACLTestSupport.state(at: directory), .containsAllow)
+
+    try SecureFileAccess.preparePrivateDirectory(directory)
+
+    XCTAssertEqual(try permissions(at: directory), 0o700)
+    XCTAssertEqual(try SecureACLTestSupport.state(at: directory), .absent)
+
+    let file = directory.appendingPathComponent("private.json")
+    try Data("private".utf8).write(to: file)
+    try SecureACLTestSupport.set(SecureACLTestSupport.everyoneAllowRead, at: file)
+    XCTAssertEqual(try SecureACLTestSupport.state(at: file), .containsAllow)
+
+    try SecureFileAccess.setPrivateFilePermissions(file)
+
+    XCTAssertEqual(try permissions(at: file), 0o600)
+    XCTAssertEqual(try SecureACLTestSupport.state(at: file), .absent)
+  }
+
   private func permissions(at url: URL) throws -> Int {
     let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
     return (attributes[.posixPermissions] as? NSNumber)?.intValue ?? -1
@@ -1126,7 +1150,7 @@ final class ProfileStoreTests: XCTestCase {
 
   private func stagingNames(in directory: URL) throws -> [String] {
     try FileManager.default.contentsOfDirectory(atPath: directory.path).filter {
-      $0.hasPrefix(".profiles.json.") && $0.hasSuffix(".tmp")
+      $0.hasPrefix(".dss-staging-") && $0.hasSuffix(".tmp")
     }
   }
 

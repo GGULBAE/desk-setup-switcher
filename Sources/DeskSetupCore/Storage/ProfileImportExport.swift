@@ -1,4 +1,3 @@
-import Darwin
 import Foundation
 
 public struct ImportedProfileDocument: Equatable, Sendable {
@@ -21,8 +20,11 @@ public struct ImportedProfileDocument: Equatable, Sendable {
 }
 
 public struct ProfileImportExport: Sendable {
+  typealias ExportWriter = @Sendable (Data, URL) throws -> Void
+
   private let codec: ProfileJSONCodec
   private let normalizer: ProfileApplicabilityNormalizer
+  private let exportWriter: ExportWriter
 
   public init(
     codec: ProfileJSONCodec = .init(),
@@ -30,6 +32,19 @@ public struct ProfileImportExport: Sendable {
   ) {
     self.codec = codec
     self.normalizer = normalizer
+    self.exportWriter = { data, destination in
+      try PrivateAtomicFileWriter().writeNew(data, to: destination)
+    }
+  }
+
+  init(
+    codec: ProfileJSONCodec = .init(),
+    normalizer: ProfileApplicabilityNormalizer = .init(),
+    exportWriter: @escaping ExportWriter
+  ) {
+    self.codec = codec
+    self.normalizer = normalizer
+    self.exportWriter = exportWriter
   }
 
   public func importDocument(from sourceURL: URL) throws -> ImportedProfileDocument {
@@ -61,25 +76,11 @@ public struct ProfileImportExport: Sendable {
       throw ProfileStorageError.unsafeFilesystemObject
     }
     let normalizedDestinationURL = destinationURL.standardizedFileURL
-    let descriptor = normalizedDestinationURL.withUnsafeFileSystemRepresentation { path -> Int32 in
-      guard let path else { return -1 }
-      return Darwin.open(path, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)
-    }
-    guard descriptor >= 0 else {
-      if errno == EEXIST {
-        throw ProfileStorageError.destinationExists(destinationURL)
-      }
-      throw ProfileStorageError.io(String(cString: strerror(errno)))
-    }
-
-    let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
     do {
-      try handle.write(contentsOf: data)
-      try handle.synchronize()
-      try handle.close()
+      try exportWriter(data, normalizedDestinationURL)
+    } catch let error as ProfileStorageError {
+      throw error
     } catch {
-      try? handle.close()
-      try? FileManager.default.removeItem(at: normalizedDestinationURL)
       throw ProfileStorageError.io(String(describing: error))
     }
   }

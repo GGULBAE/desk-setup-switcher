@@ -155,6 +155,12 @@ enum SecureDirectoryEntryState: Equatable, Sendable {
   case present(SecureDirectoryEntryIdentity)
 }
 
+enum SecureExtendedACLState: Equatable, Sendable {
+  case absent
+  case denyOnly
+  case containsAllow
+}
+
 struct SecureDirectoryEntryIdentity: Equatable, Sendable {
   let device: dev_t
   let inode: ino_t
@@ -289,9 +295,7 @@ enum SecureFileAccess {
       expectedOwnerID: expectedOwnerID
     )
     defer { _ = Darwin.close(descriptor) }
-    guard Darwin.fchmod(descriptor, mode_t(0o700)) == 0 else {
-      throw ProfileStorageError.io(String(cString: strerror(errno)))
-    }
+    try enforcePrivatePermissions(descriptor: descriptor, mode: mode_t(0o700))
   }
 
   static func setPrivateFilePermissions(
@@ -312,9 +316,7 @@ enum SecureFileAccess {
     if let expectedIdentity, openedIdentity != expectedIdentity {
       throw ProfileStorageError.fileChangedDuringRead
     }
-    guard Darwin.fchmod(descriptor, mode_t(0o600)) == 0 else {
-      throw ProfileStorageError.io(String(cString: strerror(errno)))
-    }
+    try enforcePrivatePermissions(descriptor: descriptor, mode: mode_t(0o600))
   }
 
   static func regularFileIdentity(
@@ -455,9 +457,146 @@ enum SecureFileAccess {
     try openVerifiedDirectory(url, expectedOwnerID: expectedOwnerID)
   }
 
+  /// Opens a stable export directory whose ownership and sticky-bit policy
+  /// prevents another non-root UID from removing a private staging leaf.
+  ///
+  /// User-owned directories must either deny shared POSIX writes or be sticky.
+  /// A root-owned compatibility directory such as `/private/tmp` must be sticky.
+  static func openExportDirectory(
+    _ url: URL,
+    expectedOwnerID: uid_t
+  ) throws -> Int32 {
+    let descriptor = try openVerifiedDirectory(url, expectedOwnerID: nil)
+    do {
+      var status = stat()
+      guard Darwin.fstat(descriptor, &status) == 0 else {
+        throw ProfileStorageError.io(String(cString: strerror(errno)))
+      }
+      guard (status.st_mode & S_IFMT) == S_IFDIR else {
+        throw ProfileStorageError.unsafeFilesystemObject
+      }
+      guard status.st_uid == expectedOwnerID || status.st_uid == 0 else {
+        throw ProfileStorageError.unexpectedFileOwner
+      }
+      guard
+        isTrustedExportDirectory(
+          ownerID: status.st_uid,
+          mode: status.st_mode,
+          expectedOwnerID: expectedOwnerID
+        )
+      else {
+        throw ProfileStorageError.unsafeFilesystemObject
+      }
+      guard try extendedACLState(descriptor: descriptor) != .containsAllow else {
+        throw ProfileStorageError.unsafeFilesystemObject
+      }
+      return descriptor
+    } catch {
+      _ = Darwin.close(descriptor)
+      throw error
+    }
+  }
+
+  static func isTrustedExportDirectory(
+    ownerID: uid_t,
+    mode: mode_t,
+    expectedOwnerID: uid_t
+  ) -> Bool {
+    let isSticky = mode & mode_t(S_ISVTX) != 0
+    let isSharedWritable = mode & (mode_t(S_IWGRP) | mode_t(S_IWOTH)) != 0
+
+    if ownerID == expectedOwnerID {
+      return !isSharedWritable || isSticky
+    }
+    return ownerID == 0 && isSticky
+  }
+
+  static func enforcePrivatePermissions(
+    descriptor: Int32,
+    mode: mode_t
+  ) throws {
+    guard mode == mode_t(0o600) || mode == mode_t(0o700) else {
+      throw ProfileStorageError.unsafeFilesystemObject
+    }
+    try removeExtendedACL(descriptor: descriptor)
+    guard Darwin.fchmod(descriptor, mode) == 0 else {
+      throw ProfileStorageError.io(String(cString: strerror(errno)))
+    }
+
+    var status = stat()
+    guard Darwin.fstat(descriptor, &status) == 0 else {
+      throw ProfileStorageError.io(String(cString: strerror(errno)))
+    }
+    guard status.st_mode & mode_t(0o777) == mode,
+      try extendedACLState(descriptor: descriptor) == .absent
+    else {
+      throw ProfileStorageError.unsafeFilesystemObject
+    }
+  }
+
+  static func extendedACLState(descriptor: Int32) throws -> SecureExtendedACLState {
+    errno = 0
+    guard let acl = Darwin.acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) else {
+      let code = errno
+      if code == ENOENT {
+        return .absent
+      }
+      throw ProfileStorageError.io(String(cString: strerror(code)))
+    }
+    defer { _ = Darwin.acl_free(UnsafeMutableRawPointer(acl)) }
+
+    var entry: acl_entry_t?
+    var selector = Int32(ACL_FIRST_ENTRY.rawValue)
+    var foundDeny = false
+    while true {
+      errno = 0
+      let result = Darwin.acl_get_entry(acl, selector, &entry)
+      guard result == 0 else {
+        let code = errno
+        if code == EINVAL {
+          return foundDeny ? .denyOnly : .absent
+        }
+        throw ProfileStorageError.io(String(cString: strerror(code)))
+      }
+      guard let entry else {
+        throw ProfileStorageError.unsafeFilesystemObject
+      }
+
+      var tag = ACL_UNDEFINED_TAG
+      guard Darwin.acl_get_tag_type(entry, &tag) == 0 else {
+        throw ProfileStorageError.io(String(cString: strerror(errno)))
+      }
+      switch tag {
+      case ACL_EXTENDED_ALLOW:
+        return .containsAllow
+      case ACL_EXTENDED_DENY:
+        foundDeny = true
+      default:
+        throw ProfileStorageError.unsafeFilesystemObject
+      }
+      selector = Int32(ACL_NEXT_ENTRY.rawValue)
+    }
+  }
+
+  private static func removeExtendedACL(descriptor: Int32) throws {
+    guard try extendedACLState(descriptor: descriptor) != .absent else {
+      return
+    }
+    guard let emptyACL = Darwin.acl_init(0) else {
+      throw ProfileStorageError.io(String(cString: strerror(errno)))
+    }
+    defer { _ = Darwin.acl_free(UnsafeMutableRawPointer(emptyACL)) }
+    guard Darwin.acl_set_fd_np(descriptor, emptyACL, ACL_TYPE_EXTENDED) == 0 else {
+      throw ProfileStorageError.io(String(cString: strerror(errno)))
+    }
+    guard try extendedACLState(descriptor: descriptor) == .absent else {
+      throw ProfileStorageError.unsafeFilesystemObject
+    }
+  }
+
   static func directoryIdentity(
     descriptor: Int32,
-    expectedOwnerID: uid_t
+    expectedOwnerID: uid_t?
   ) throws -> SecureFileIdentity {
     var status = stat()
     guard Darwin.fstat(descriptor, &status) == 0 else {
@@ -466,7 +605,7 @@ enum SecureFileAccess {
     guard (status.st_mode & S_IFMT) == S_IFDIR else {
       throw ProfileStorageError.unsafeFilesystemObject
     }
-    guard status.st_uid == expectedOwnerID else {
+    if let expectedOwnerID, status.st_uid != expectedOwnerID {
       throw ProfileStorageError.unexpectedFileOwner
     }
     return SecureFileIdentity(
@@ -479,7 +618,7 @@ enum SecureFileAccess {
   static func verifyDirectoryPathIdentity(
     _ url: URL,
     equals expectedIdentity: SecureFileIdentity,
-    expectedOwnerID: uid_t
+    expectedOwnerID: uid_t?
   ) throws {
     let descriptor = try openVerifiedDirectory(url, expectedOwnerID: expectedOwnerID)
     defer { _ = Darwin.close(descriptor) }
@@ -522,7 +661,7 @@ enum SecureFileAccess {
   static func directoryEntryState(
     in directoryDescriptor: Int32,
     named name: String,
-    expectedOwnerID: uid_t
+    expectedOwnerID: uid_t?
   ) throws -> SecureDirectoryEntryState {
     guard isValidLeafName(name) else {
       throw ProfileStorageError.unsafeFilesystemObject
@@ -541,7 +680,7 @@ enum SecureFileAccess {
       }
       throw ProfileStorageError.io(String(cString: strerror(errno)))
     }
-    guard status.st_uid == expectedOwnerID else {
+    if let expectedOwnerID, status.st_uid != expectedOwnerID {
       throw ProfileStorageError.unexpectedFileOwner
     }
     return .present(
