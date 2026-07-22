@@ -59,6 +59,7 @@ struct TrayPopoverControllerTests {
     )
     #expect(noFreshMatch.state == .noMatch)
     #expect(noFreshMatch.symbolName == TrayStatusItemPresentation.fallbackSymbolName)
+    #expect(noFreshMatch.preferredLength == NSStatusItem.squareLength)
 
     let freshMatch = builder.presentation(
       for: TrayStatusItemSnapshot(
@@ -73,6 +74,7 @@ struct TrayPopoverControllerTests {
     #expect(freshMatch.symbolName == TrayStatusItemPresentation.fallbackSymbolName)
     #expect(freshMatch.title.count == TrayStatusItemPresentationBuilder.maximumDisplayedNameLength)
     #expect(freshMatch.title.hasSuffix("…"))
+    #expect(freshMatch.preferredLength == NSStatusItem.variableLength)
 
     let applying = builder.presentation(
       for: TrayStatusItemSnapshot(

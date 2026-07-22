@@ -28,6 +28,10 @@ struct TrayStatusItemPresentation: Equatable, Sendable {
   var title: String
   var toolTip: String
   var accessibilityValue: String
+
+  var preferredLength: CGFloat {
+    title.isEmpty ? NSStatusItem.squareLength : NSStatusItem.variableLength
+  }
 }
 
 enum TrayPopoverPresentationStage: String, Equatable, Sendable {
@@ -217,6 +221,8 @@ private final class AppKitTrayStatusItemSurface: TrayStatusItemSurface {
   init() {
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     if let button = statusItem.button {
+      button.cell?.wraps = false
+      button.cell?.lineBreakMode = .byTruncatingTail
       button.setAccessibilityLabel(appLocalized("Desk Setup Switcher"))
       button.setAccessibilityHelp(
         appLocalized("Opens or closes the Desk Setup Switcher tray."))
@@ -250,10 +256,7 @@ private final class AppKitTrayStatusItemSurface: TrayStatusItemSurface {
     button.imagePosition = presentation.title.isEmpty ? .imageOnly : .imageLeading
     button.toolTip = presentation.toolTip
     button.setAccessibilityValue(presentation.accessibilityValue)
-    statusItem.length =
-      presentation.title.isEmpty
-      ? NSStatusItem.squareLength
-      : min(172, max(48, button.fittingSize.width + 8))
+    statusItem.length = presentation.preferredLength
   }
 }
 

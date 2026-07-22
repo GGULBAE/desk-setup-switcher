@@ -31,6 +31,8 @@ Inspect every proposed change and omission. Nothing changes until you explicitly
 
 The screenshots contain synthetic data from a non-mutating demo state. They show the intended product flow, not live hardware-mutation evidence. See the [asset provenance record](docs/RELEASE-ASSET-PROVENANCE.md) and [static demo-site source](site/README.md).
 
+When a saved profile matches the current Mac, the menu-bar indicator shows its profile name on one horizontal line.
+
 ## Install
 
 Supported binaries will be provided only through versioned GitHub Releases. When this README identifies a release as supported:
