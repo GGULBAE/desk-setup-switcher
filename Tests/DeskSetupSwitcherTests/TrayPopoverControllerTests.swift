@@ -389,12 +389,17 @@ struct TrayPopoverControllerTests {
   }
 }
 
-/// Swift Testing's command-line helper crashes while presenting NSPopover on
-/// macOS 15. Keep this native AppKit contract in XCTest, whose macOS runner
-/// provides the application test host required by the popover presentation.
+/// Keep the native AppKit contract isolated from the parallel offscreen suite.
+/// GitHub-hosted CI cannot safely present NSPopover, so it records a skip while
+/// contributor-hosted `make verify` continues to execute the genuine surface.
 @MainActor
 final class NativePopoverRegressionTests: XCTestCase {
   func testNativePopoverPreservesAttachedWrapperFrame() throws {
+    try XCTSkipIf(
+      ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true",
+      "GitHub-hosted macOS runners crash inside NSPopover.show before assertions"
+    )
+
     let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 2))
     let factory = NativePopoverFactory()
     let controller = TrayPopoverController(

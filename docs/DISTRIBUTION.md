@@ -1,6 +1,6 @@
 # Distribution
 
-Last updated: 2026-07-22
+Last updated: 2026-07-26
 
 Desk Setup Switcher has no public release. The repository is intentionally staged at `0.0.9`/build 1 so it can build and inspect the protected predecessor as an ad-hoc-signed development DMG; that artifact is not an end-user distribution. The official `v0.1.0`/build-2 public beta is produced only after the predecessor is retained and requires Developer ID signing, hardened runtime, secure timestamps, notarization, stapling, Gatekeeper verification, protected approval, and clean-download evidence before publication.
 
@@ -19,6 +19,15 @@ An ad-hoc signature is never promoted by changing its description. A public arti
 ## Current development baseline
 
 The current `v0.0.9`/build-1 source's 2026-07-22 no-Developer-ID path passed 5,298 deterministic checks/assertions: 516 app checks (192 XCTest cases, 323 default Swift Testing cases across 39 suites, and one isolated native `NSPopover` case in a 40th Swift Testing suite) plus 4,782 release-tooling assertions (374 base release-policy, 8 Mach-O compatibility-verifier, 659 remote-controls v1 policy/normalizer, 210 remote-controls v2 lifecycle-policy, 86 remote-controls v3 lifecycle-policy, 71 remote-controls v2 collector, 17 remote-controls v3 collector, 407 publication-approval policy, 1,386 external-beta/inventory/lineage/template policy, 132 collector-wrapper mock, 19 release-evidence history, 57 draft-reconciler mock, 261 artifact-restoration mock, 557 approved-publication mock, 306 legacy-workflow-containment mock, and 232 shell/workflow guard assertions). Universal Debug/Release, Analyze, project-generation verification, DMG creation, SHA-256 validation, mounted metadata/resources, exact `arm64 x86_64` slices, per-slice macOS 14.0 `LC_BUILD_VERSION`, and ad-hoc signature classification passed. The 39-assertion public-release audit fixture suite and complete-history/current-asset production scan also passed on 2026-07-22 after the current source and regenerated-media commits. The release-tooling evidence is simulated and structural, not a candidate-history review, external beta result, credentialed signing, notarization, protected-remote, or publication result. The package was not installed, launched, uploaded, or published.
+
+GitHub-hosted macOS CI records the isolated native `NSPopover.show(...)`
+regression as skipped because the hosted test process exits with `SIGSEGV`
+before the first assertion under both Swift Testing and XCTest. Contributor-
+hosted `make verify` still executes that genuine AppKit contract, while CI
+continues to run its deterministic geometry/ownership coverage and every other
+app test. A passing CI job therefore is not native-popover runtime evidence for
+macOS 15; the required exact-candidate Sonoma lifecycle remains the support
+gate.
 
 - Current development-only DMG: `artifacts/Desk-Setup-Switcher-0.0.9-unsigned.dmg`, SHA-256 `2a743a6df6c14ad4b2ae3b1fc4ecc5bdeb7527089165d3ed7e6db32c1d5cf0c4`
 - Authoritative current record: [Completion criteria and evidence ledger](COMPLETION-CRITERIA.md)
