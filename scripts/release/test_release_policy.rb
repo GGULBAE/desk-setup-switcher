@@ -859,9 +859,11 @@ class ReleasePolicyTestSuite
         assert_failure(*release_manifest_arguments(duplicate_context, output: File.join(directory, "duplicate.json")))
 
         nested_context = create_release_context(File.join(directory, "nested"))
-        nested_source = File.binread(nested_context.fetch(:notary_log)).sub(
-          '"issues": []',
-          '"issues": [{"metadata":{"key":1,"\u006bey":2}}]'
+        nested_data = JSON.parse(File.binread(nested_context.fetch(:notary_log)))
+        nested_data["issues"] = [{ "metadata" => { "key" => 1, "duplicateKeyPlaceholder" => 2 } }]
+        nested_source = JSON.generate(nested_data).sub(
+          '"duplicateKeyPlaceholder"',
+          %q("\u006bey")
         )
         write(nested_context.fetch(:notary_log), nested_source)
         assert_failure(*release_manifest_arguments(nested_context, output: File.join(directory, "nested.json")))
