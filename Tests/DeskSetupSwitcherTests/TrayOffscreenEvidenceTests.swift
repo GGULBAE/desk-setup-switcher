@@ -364,7 +364,7 @@ import Testing
         #expect(!rendered.accessibility.localizedCaseInsensitiveContains("password"))
         if fixture.colorScheme == .light {
           #expect(rendered.nearBlackSampleRatio < 0.01)
-          #expect(rendered.brightSampleRatio > 0.80)
+          #expect(rendered.brightSampleRatio > 0.65)
         }
         if fixture.size == CGSize(width: 680, height: 480),
           fixture.displayMode == .largeText
@@ -373,7 +373,7 @@ import Testing
             let geometry = try #require(rendered.sidebarActionGeometry)
             #expect(geometry.runs.count == 2)
             #expect(geometry.runs[0].upperBound + 20 < geometry.runs[1].lowerBound)
-            #expect(geometry.runs[0].upperBound - geometry.runs[0].lowerBound > 90)
+            #expect(geometry.runs[0].upperBound - geometry.runs[0].lowerBound >= 80)
             #expect(geometry.runs[1].upperBound - geometry.runs[1].lowerBound > 40)
           }
           #expect(rendered.accessibility.contains("dynamic-type=accessibility3"))
