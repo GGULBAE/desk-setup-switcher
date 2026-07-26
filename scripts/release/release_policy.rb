@@ -6,7 +6,6 @@ require "fileutils"
 require "find"
 require "json"
 require "optparse"
-require "psych"
 require "rexml/document"
 require "tempfile"
 require "time"
@@ -33,7 +32,7 @@ module ReleasePolicy
     mountedAppCompatibility
     signedAppCompatibility
   ].freeze
-  JSON_STRING_TOKEN = /"(?:[^"\\\x00-\x1f]|\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4}))*"/.freeze
+  JSON_WHITESPACE_BYTES = [0x09, 0x0A, 0x0D, 0x20].freeze
 
   class PolicyError < StandardError; end
   class DuplicateJSONKeyError < StandardError; end
@@ -103,22 +102,51 @@ module ReleasePolicy
     { "sha256" => digest.hexdigest, "size" => size }
   end
 
-  def reject_duplicate_json_keys!(node, label)
-    case node
-    when Psych::Nodes::Mapping
-      seen = {}
-      node.children.each_slice(2) do |key_node, value_node|
-        unless key_node.is_a?(Psych::Nodes::Scalar)
-          raise PolicyError, "#{label} is not valid JSON"
-        end
-        key = key_node.value
-        raise DuplicateJSONKeyError if seen.key?(key)
+  def json_string_token_end(source, start_index, label)
+    index = start_index + 1
+    while index < source.bytesize
+      byte = source.getbyte(index)
+      return index + 1 if byte == 0x22
 
-        seen[key] = true
-        reject_duplicate_json_keys!(value_node, label)
+      index += byte == 0x5C ? 2 : 1
+    end
+
+    raise PolicyError, "#{label} is not valid JSON"
+  end
+
+  def reject_duplicate_json_keys!(source, label)
+    containers = []
+    index = 0
+    while index < source.bytesize
+      case source.getbyte(index)
+      when 0x7B
+        containers << {}
+        index += 1
+      when 0x5B
+        containers << nil
+        index += 1
+      when 0x7D, 0x5D
+        containers.pop
+        index += 1
+      when 0x22
+        token_end = json_string_token_end(source, index, label)
+        following = token_end
+        following += 1 while JSON_WHITESPACE_BYTES.include?(source.getbyte(following))
+
+        if source.getbyte(following) == 0x3A
+          keys = containers.last
+          raise PolicyError, "#{label} is not valid JSON" unless keys.is_a?(Hash)
+
+          token = source.byteslice(index, token_end - index)
+          key = JSON.parse(token, create_additions: false)
+          raise DuplicateJSONKeyError if keys.key?(key)
+
+          keys[key] = true
+        end
+        index = token_end
+      else
+        index += 1
       end
-    when Psych::Nodes::Sequence
-      node.children.each { |child| reject_duplicate_json_keys!(child, label) }
     end
   end
 
@@ -129,17 +157,11 @@ module ReleasePolicy
       create_additions: false,
       max_nesting: max_nesting
     )
-    normalized_source = source.gsub(JSON_STRING_TOKEN) do |token|
-      JSON.generate(JSON.parse(token, create_additions: false))
-    end
-    document = Psych.parse(normalized_source)
-    raise PolicyError, "#{label} is not valid JSON" unless document&.root
-
-    reject_duplicate_json_keys!(document.root, label)
+    reject_duplicate_json_keys!(source, label)
     value
   rescue DuplicateJSONKeyError
     raise PolicyError, "#{label} contains duplicate JSON keys"
-  rescue JSON::ParserError, Psych::SyntaxError
+  rescue JSON::ParserError
     raise PolicyError, "#{label} is not valid JSON"
   end
 

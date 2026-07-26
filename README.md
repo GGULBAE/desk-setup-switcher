@@ -76,7 +76,7 @@ cd desk-setup-switcher
 make verify
 ```
 
-`make verify` is the canonical local gate. Its packaged DMG is ad-hoc signed development evidence, not a supported release. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow. Release engineering and remaining evidence are tracked in the [distribution guide](docs/DISTRIBUTION.md) and [completion ledger](docs/COMPLETION-CRITERIA.md).
+`make verify` is the canonical local gate. Release JSON evidence rejects decoded-equivalent duplicate keys with parser-independent scanning so local and CI Ruby versions enforce the same rule. Its packaged DMG is ad-hoc signed development evidence, not a supported release. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow. Release engineering and remaining evidence are tracked in the [distribution guide](docs/DISTRIBUTION.md) and [completion ledger](docs/COMPLETION-CRITERIA.md).
 
 ## Documentation
 
