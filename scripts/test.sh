@@ -6,10 +6,10 @@ source "$(dirname "$0")/lib/common.sh"
 cd "$ROOT_DIR"
 
 # NSPopover owns process-global AppKit presentation state. Running its native
-# shell regression alongside the offscreen NSWindow render suites can crash the
-# Swift Testing helper after the assertions pass, so keep the pure/mock suite
-# parallel and execute the one native presentation contract in isolation.
-NATIVE_POPOVER_TEST='DeskSetupSwitcherTests.TrayPopoverControllerTests/nativePopoverPreservesAttachedWrapperFrame\(\)'
+# shell regression through the Swift Testing helper crashes on macOS 15, and
+# sharing it with the offscreen NSWindow render suites is unsafe. Keep the
+# pure/mock suite parallel and execute the native XCTest contract in isolation.
+NATIVE_POPOVER_TEST='DeskSetupSwitcherTests.NativePopoverRegressionTests/testNativePopoverPreservesAttachedWrapperFrame'
 
 swift test \
   --parallel \

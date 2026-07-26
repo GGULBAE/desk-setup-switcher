@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Testing
+import XCTest
 
 @testable import DeskSetupCore
 @testable import DeskSetupSwitcher
@@ -152,55 +153,6 @@ struct TrayPopoverControllerTests {
     #expect(state.openEvents.map(\.generation) == Array(UInt64(1)...20))
     #expect(state.attachGenerations == Array(UInt64(1)...20))
     #expect(state.closeGenerations == Array(UInt64(1)...20))
-  }
-
-  @Test("offscreen native NSPopover preserves its attached wrapper frame across reopens")
-  func nativePopoverPreservesAttachedWrapperFrame() throws {
-    let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 2))
-    let factory = NativePopoverFactory()
-    let controller = TrayPopoverController(
-      rootView: Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity),
-      sessionState: state,
-      factory: factory
-    )
-    defer {
-      if let generation = controller.activeSessionGeneration {
-        controller.requestClose(sessionGeneration: generation)
-      }
-      factory.tearDown()
-    }
-
-    for expectedGeneration in UInt64(1)...3 {
-      controller.show()
-
-      let before = try #require(factory.popover.wrapperFramesBeforeFirstLayout.last)
-      let after = try #require(factory.popover.wrapperFramesAfterFirstLayout.last)
-      let wrapper = try #require(factory.popover.contentViewController?.view)
-      let shellContentRoot = try #require(wrapper.superview)
-      let hostedView = try #require(
-        (factory.popover.contentViewController as? TrayPopoverContentController)?
-          .hostedController.view
-      )
-      let hostedFrameInShell = hostedView.convert(hostedView.bounds, to: shellContentRoot)
-
-      // The native popover shell gives the attached content wrapper a nonzero
-      // chrome inset (13 pt on current macOS). The exact value is AppKit's;
-      // preserving it is the regression contract.
-      #expect(before.origin.x > 0)
-      #expect(before.origin.y > 0)
-      #expect(after == before)
-      #expect(wrapper.frame == before)
-      #expect(controller.hostingViewFrame == wrapper.bounds)
-      #expect(controller.hostingViewBounds == CGRect(origin: .zero, size: wrapper.bounds.size))
-      #expect(shellContentRoot.bounds.midX == wrapper.frame.midX)
-      #expect(shellContentRoot.bounds.midX == hostedFrameInShell.midX)
-      #expect(controller.activeSessionGeneration == expectedGeneration)
-
-      controller.requestClose(sessionGeneration: expectedGeneration)
-    }
-
-    #expect(factory.popover.wrapperFramesBeforeFirstLayout.count == 3)
-    #expect(factory.popover.wrapperFramesAfterFirstLayout.count == 3)
   }
 
   @Test("late first-layout completion restores the viewport exactly once")
@@ -434,6 +386,63 @@ struct TrayPopoverControllerTests {
     #expect(controller.activeSessionGeneration == nil)
     #expect(state.closeGenerations == [generation!])
     #expect(factory.monitor.stopCount == 1)
+  }
+}
+
+/// Swift Testing's command-line helper crashes while presenting NSPopover on
+/// macOS 15. Keep this native AppKit contract in XCTest, whose macOS runner
+/// provides the application test host required by the popover presentation.
+@MainActor
+final class NativePopoverRegressionTests: XCTestCase {
+  func testNativePopoverPreservesAttachedWrapperFrame() throws {
+    let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 2))
+    let factory = NativePopoverFactory()
+    let controller = TrayPopoverController(
+      rootView: Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity),
+      sessionState: state,
+      factory: factory
+    )
+    defer {
+      if let generation = controller.activeSessionGeneration {
+        controller.requestClose(sessionGeneration: generation)
+      }
+      factory.tearDown()
+    }
+
+    for expectedGeneration in UInt64(1)...3 {
+      controller.show()
+
+      let before = try XCTUnwrap(factory.popover.wrapperFramesBeforeFirstLayout.last)
+      let after = try XCTUnwrap(factory.popover.wrapperFramesAfterFirstLayout.last)
+      let wrapper = try XCTUnwrap(factory.popover.contentViewController?.view)
+      let shellContentRoot = try XCTUnwrap(wrapper.superview)
+      let hostedView = try XCTUnwrap(
+        (factory.popover.contentViewController as? TrayPopoverContentController)?
+          .hostedController.view
+      )
+      let hostedFrameInShell = hostedView.convert(hostedView.bounds, to: shellContentRoot)
+
+      // The native popover shell gives the attached content wrapper a nonzero
+      // chrome inset (13 pt on current macOS). The exact value is AppKit's;
+      // preserving it is the regression contract.
+      XCTAssertGreaterThan(before.origin.x, 0)
+      XCTAssertGreaterThan(before.origin.y, 0)
+      XCTAssertEqual(after, before)
+      XCTAssertEqual(wrapper.frame, before)
+      XCTAssertEqual(controller.hostingViewFrame, wrapper.bounds)
+      XCTAssertEqual(
+        controller.hostingViewBounds,
+        CGRect(origin: .zero, size: wrapper.bounds.size)
+      )
+      XCTAssertEqual(shellContentRoot.bounds.midX, wrapper.frame.midX)
+      XCTAssertEqual(shellContentRoot.bounds.midX, hostedFrameInShell.midX)
+      XCTAssertEqual(controller.activeSessionGeneration, expectedGeneration)
+
+      controller.requestClose(sessionGeneration: expectedGeneration)
+    }
+
+    XCTAssertEqual(factory.popover.wrapperFramesBeforeFirstLayout.count, 3)
+    XCTAssertEqual(factory.popover.wrapperFramesAfterFirstLayout.count, 3)
   }
 }
 
