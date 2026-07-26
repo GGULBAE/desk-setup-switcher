@@ -617,10 +617,12 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
     ["987c19ec4be9e7910fbec2a1a5b626864a08dae9", "Sources/DeskSetupSwitcher/ConditionEditorView.swift", "coordinates"],
     # UI audit host: one reviewed synthetic manual-network fixture (IP host).
     ["6035be8b7e48e168cb9817da2e73470931ba621d", "Sources/DeskSetupSwitcher/UIAuditFixtures.swift", "ip-host"],
-    # Applicability normalization fixtures: three historical synthetic host sets.
+    ["acb7182145e9671b7b5dd20f40a4eaf8aab9cb2c", "Sources/DeskSetupSwitcher/UIAuditFixtures.swift", "ip-host"],
+    # Applicability normalization fixtures: reviewed synthetic host sets.
     ["0744ebd07210d65e95ac32d9ea32963ed96d6dcd", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
     ["1fcbd3d948886a7986a5d6eb4c4553e26049cd26", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
     ["d54d17d20981ffc6b8ff9b99436b562d835c9fe0", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
+    ["5cc589545dbbaac2871fbee74aa0143f97591a8c", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
     # Profile validation fixtures: three historical coordinate + host sets.
     ["233327bf3e07ca38febdda8d7136ecc703b1c5a6", "Tests/DeskSetupCoreTests/ProfileValidationTests.swift", "coordinates"],
     ["233327bf3e07ca38febdda8d7136ecc703b1c5a6", "Tests/DeskSetupCoreTests/ProfileValidationTests.swift", "ip-host"],
@@ -638,6 +640,7 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
     ["0cb67cbfea98c600d91d7896a50e566b2ef193b7", "Tests/DeskSetupPresentationTests/ConditionPresentationTests.swift", "coordinates"],
     ["1aded4130b17b954dac079b25ca75be136f94647", "Tests/DeskSetupPresentationTests/ProfileDraftValidationTests.swift", "ip-host"],
     ["fb47abea94598d6e5700a02542c0d7fcfa2ad883", "Tests/DeskSetupPresentationTests/ProfileDraftValidationTests.swift", "ip-host"],
+    ["a4ba83646ed74b044a308ed5b9a9328af70fc1ba", "Tests/DeskSetupPresentationTests/ProfileDraftValidationTests.swift", "ip-host"],
     # Apply handoff uses an arbitrary synthetic region and never reads live location.
     ["54465288cb2c9e6ba70b801b59f25a258cc329b5", "Tests/DeskSetupSwitcherTests/ApplicationModelApplyTests.swift", "coordinates"],
     # UI-audit catalog fixtures use named fake audio roles, never runtime identifiers.
@@ -646,6 +649,7 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
     ["80fe384aa5e192ebd8c7ed2e63da373e1dce0c55", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
     ["a002e5046957710e9e066d9deda17eb6bd1b70f6", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
     ["a45b31f1fe6f3b4744b50b8ee5324411cba44688", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    ["d38d386f48d7618a81aafbe09acc44547f7ce458", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
     # Runtime-context fixtures: reviewed synthetic host, region, and network-name sets.
     ["744af5fcef5933ba3c038e076d867957b218d2e3", "Tests/DeskSetupSystemTests/ConditionContextProviderTests.swift", "ip-host"],
     ["744af5fcef5933ba3c038e076d867957b218d2e3", "Tests/DeskSetupSystemTests/ConditionContextProviderTests.swift", "coordinates"],
@@ -662,8 +666,9 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
     ["74e6109e290f841ba36140f17f9c34a902f0fc16", "Tests/DeskSetupSystemTests/NetworkAdapterTests.swift", "ip-host"],
     ["9d24038a4b80b9de1a17106c2666e54706e5e583", "Tests/DeskSetupSystemTests/NetworkAdapterTests.swift", "ip-host"],
     ["d1515acfcff87a30f1df2e35f1faab895ee08eb3", "Tests/DeskSetupSystemTests/NetworkAdapterTests.swift", "ip-host"],
-    # End-to-end invariant fixture: one historical synthetic host set.
+    # End-to-end invariant fixtures: reviewed synthetic host sets.
     ["23214b39846087c8ae5c274a060236dcf668a7bb", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
+    ["763fdb635f9d4b8815a93e8a2f874d11e0b67345", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
     # The audit regression script deliberately generates private-looking probe
     # values. Exempt only these exact reviewed blobs; any edit at the same path
     # receives a new object ID and is scanned normally.
