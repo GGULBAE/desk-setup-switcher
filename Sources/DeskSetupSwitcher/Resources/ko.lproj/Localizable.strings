@@ -219,7 +219,7 @@
 "Default output device" = "기본 출력 기기";
 "System output device" = "시스템 출력 기기";
 "Output volume" = "출력 음량";
-"Output mute" = "출력 음소거";
+"Output mute" = "소리 끔";
 "Network options" = "네트워크 옵션";
 "Wi-Fi power" = "Wi-Fi 전원";
 "Wi-Fi network" = "Wi-Fi 네트워크";
@@ -1122,6 +1122,7 @@
 "Enter a contiguous IPv4 subnet mask" = "연속된 IPv4 서브넷 마스크를 입력하세요";
 "Enter the optional IPv4 router address" = "선택 사항인 IPv4 라우터 주소를 입력하세요";
 "This included volume setting is unavailable for the selected device. Turn off Include to apply other available settings normally." = "선택한 장치에서 이 포함된 음량 설정을 사용할 수 없습니다. 다른 사용 가능한 설정을 정상 적용하려면 포함을 끄세요.";
+"This included mute setting is unavailable for the selected output device. Turn off Include to apply other available settings normally." = "선택한 출력 장치에서 이 포함된 소리 끔 설정을 사용할 수 없습니다. 다른 사용 가능한 설정을 정상 적용하려면 포함을 끄세요.";
 "This included ColorSync profile setting is unavailable for the saved display. Turn off Include to apply other available settings normally." = "저장된 디스플레이에서 이 포함된 ColorSync 프로필 설정을 사용할 수 없습니다. 다른 사용 가능한 설정을 정상 적용하려면 포함을 끄세요.";
 "The included IPv4 setting for %@ is unavailable in the current network configuration. Turn off Include to apply other available settings normally." = "현재 네트워크 구성에서 %@의 포함된 IPv4 설정을 사용할 수 없습니다. 다른 사용 가능한 설정을 정상 적용하려면 포함을 끄세요.";
 "High-risk display and network changes remain temporary. Desk Setup Switcher will attempt to restore the previous configuration if the safety window closes, the app exits, or you do not confirm within 15 seconds." = "고위험 디스플레이 및 네트워크 변경은 임시 상태로 유지됩니다. 안전 창을 닫거나 앱을 종료하거나 15초 안에 확인하지 않으면 앱이 이전 구성 복원을 시도합니다.";
@@ -1169,6 +1170,8 @@
 "editor.audio.inputVolume.accessibility" = "입력 음량 설정";
 "editor.audio.outputVolume" = "출력 음량";
 "editor.audio.outputVolume.accessibility" = "출력 음량 설정";
+"editor.audio.outputMute" = "소리 끔";
+"editor.audio.outputMute.accessibility" = "출력 소리를 끄거나 켜기";
 "editor.network.serviceIPv4" = "서비스 IPv4";
 "editor.network.serviceIPv4.accessibility" = "네트워크 서비스의 DHCP 또는 수동 IPv4 구성";
 "Choose the display that should anchor the desktop" = "데스크탑 기준이 될 디스플레이를 선택하세요";
@@ -1176,6 +1179,7 @@
 "Choose the default input device" = "기본 입력 장치를 선택하세요";
 "Choose the default output device" = "기본 출력 장치를 선택하세요";
 "Set volume from 0 to 100 percent" = "음량을 0~100퍼센트로 설정하세요";
+"Turn sound off or on for the selected output device" = "선택한 출력 장치의 소리를 끄거나 켜세요";
 
 /* 반응형 워크플로 화면 */
 "No system setting changes occur until you choose the next step." = "다음 단계를 선택하기 전에는 시스템 설정이 변경되지 않습니다.";

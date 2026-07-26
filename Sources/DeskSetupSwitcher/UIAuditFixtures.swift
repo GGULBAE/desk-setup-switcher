@@ -359,7 +359,7 @@ extension View {
             systemOutputUID: .init(isIncluded: false, value: "synthetic-output"),
             inputVolume: .init(value: 0.44),
             outputVolume: .init(value: 0.72),
-            outputMuted: .init(isIncluded: false, value: false)
+            outputMuted: .init(value: false)
           )
         ),
         network: .init(
@@ -465,6 +465,12 @@ extension View {
           state: .storable,
           detail: "Readable and writable"
         ),
+        SnapshotItem(
+          key: "outputMute",
+          label: "Output mute",
+          state: .storable,
+          detail: "Readable and writable"
+        ),
       ]
       let audioSnapshot = AdapterSnapshot(
         group: .audio,
@@ -498,6 +504,13 @@ extension View {
             currentValue: audioSettings.outputVolume.value,
             canApply: supportsAudioVolume
           ),
+        ],
+        audioMuteControlCatalog: [
+          .init(
+            deviceUID: "synthetic-output",
+            currentValue: audioSettings.outputMuted.value,
+            canApply: supportsAudioVolume
+          )
         ]
       )
       let networkRollbackCatalog = settings.network.value.serviceIPv4.map { service in

@@ -146,7 +146,7 @@ These fields remain in schema 1 for decode and round-trip compatibility. They ar
 | Group | Inclusion may remain actionable | Preserved but forced dormant |
 | --- | --- | --- |
 | Display | primary display, mirroring, mode, ColorSync profile | origin, rotation, active state |
-| Audio | default input, default output, input volume, output volume | system output, output mute |
+| Audio | default input, default output, input volume, output volume, output mute | system output |
 | Network | per-service IPv4 | Wi-Fi power/SSID, legacy global IPv4, DNS, web proxy, secure web proxy |
 | Input | none | every input leaf |
 

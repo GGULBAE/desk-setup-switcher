@@ -12,7 +12,8 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     let displayValue = DisplayProfileSettings()
     let audioValue = AudioProfileSettings(
       defaultInputUID: .init(isIncluded: true, value: "input-uid"),
-      outputVolume: .init(isIncluded: false, value: 0.8)
+      outputVolume: .init(isIncluded: false, value: 0.8),
+      outputMuted: .init(value: true)
     )
     let networkValue = NetworkProfileSettings(
       wifiPower: .init(isIncluded: true, value: true),
@@ -75,6 +76,8 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     XCTAssertFalse(result.settings.input.value.pointerSpeed.isIncluded)
     XCTAssertFalse(result.settings.audio.value.outputVolume.isIncluded)
     XCTAssertEqual(result.settings.audio.value.outputVolume.value, 0.8)
+    XCTAssertTrue(result.settings.audio.value.outputMuted.isIncluded)
+    XCTAssertEqual(result.settings.audio.value.outputMuted.value, true)
     XCTAssertFalse(result.settings.network.value.wifiSSID.isIncluded)
     XCTAssertEqual(result.settings.network.value.wifiSSID.value, "Office")
     XCTAssertFalse(result.settings.input.value.naturalScrolling.isIncluded)

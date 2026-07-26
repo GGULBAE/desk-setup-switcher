@@ -1122,6 +1122,7 @@
 "Enter a contiguous IPv4 subnet mask" = "Enter a contiguous IPv4 subnet mask";
 "Enter the optional IPv4 router address" = "Enter the optional IPv4 router address";
 "This included volume setting is unavailable for the selected device. Turn off Include to apply other available settings normally." = "This included volume setting is unavailable for the selected device. Turn off Include to apply other available settings normally.";
+"This included mute setting is unavailable for the selected output device. Turn off Include to apply other available settings normally." = "This included mute setting is unavailable for the selected output device. Turn off Include to apply other available settings normally.";
 "This included ColorSync profile setting is unavailable for the saved display. Turn off Include to apply other available settings normally." = "This included ColorSync profile setting is unavailable for the saved display. Turn off Include to apply other available settings normally.";
 "The included IPv4 setting for %@ is unavailable in the current network configuration. Turn off Include to apply other available settings normally." = "The included IPv4 setting for %@ is unavailable in the current network configuration. Turn off Include to apply other available settings normally.";
 "High-risk display and network changes remain temporary. Desk Setup Switcher will attempt to restore the previous configuration if the safety window closes, the app exits, or you do not confirm within 15 seconds." = "High-risk display and network changes remain temporary. Desk Setup Switcher will attempt to restore the previous configuration if the safety window closes, the app exits, or you do not confirm within 15 seconds.";
@@ -1169,6 +1170,8 @@
 "editor.audio.inputVolume.accessibility" = "Set input volume";
 "editor.audio.outputVolume" = "Output volume";
 "editor.audio.outputVolume.accessibility" = "Set output volume";
+"editor.audio.outputMute" = "Output mute";
+"editor.audio.outputMute.accessibility" = "Turn output sound off or on";
 "editor.network.serviceIPv4" = "Service IPv4";
 "editor.network.serviceIPv4.accessibility" = "Configure DHCP or manual IPv4 for a network service";
 "Choose the display that should anchor the desktop" = "Choose the display that should anchor the desktop";
@@ -1176,6 +1179,7 @@
 "Choose the default input device" = "Choose the default input device";
 "Choose the default output device" = "Choose the default output device";
 "Set volume from 0 to 100 percent" = "Set volume from 0 to 100 percent";
+"Turn sound off or on for the selected output device" = "Turn sound off or on for the selected output device";
 
 /* Responsive workflow surfaces */
 "No system setting changes occur until you choose the next step." = "No system setting changes occur until you choose the next step.";

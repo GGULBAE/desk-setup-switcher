@@ -288,6 +288,37 @@ import Testing
       )
     }
 
+    @Test("audio mute capability follows the output device the profile will target")
+    func audioMuteCapabilityUsesTargetDevice() {
+      let catalog = [
+        AudioMuteControlCatalogEntry(
+          deviceUID: "writable-output",
+          currentValue: false,
+          canApply: true
+        ),
+        AudioMuteControlCatalogEntry(
+          deviceUID: "read-only-output",
+          currentValue: true,
+          canApply: false
+        ),
+      ]
+
+      #expect(
+        ProfileEditorAudioMuteCapabilityResolver.resolve(
+          selectedDevice: SettingOption(isIncluded: false, value: nil),
+          currentDeviceUID: "writable-output",
+          catalog: catalog
+        ) == ProfileEditorAudioMuteCapability(isWritable: true, suggestedValue: false)
+      )
+      #expect(
+        ProfileEditorAudioMuteCapabilityResolver.resolve(
+          selectedDevice: SettingOption(isIncluded: true, value: "read-only-output"),
+          currentDeviceUID: "writable-output",
+          catalog: catalog
+        ) == ProfileEditorAudioMuteCapability(isWritable: false, suggestedValue: true)
+      )
+    }
+
     @Test("only included unavailable settings receive an editor repair control")
     func unavailableIncludedSettingsRemainRepairable() {
       let savedColorProfile = ColorSyncProfileTarget(

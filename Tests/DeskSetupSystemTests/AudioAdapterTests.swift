@@ -52,6 +52,13 @@ final class AudioAdapterTests: XCTestCase {
           && $0.canApply
       }
     )
+    let muteCatalog = try XCTUnwrap(snapshot.audioMuteControlCatalog)
+    XCTAssertEqual(muteCatalog.count, 2)
+    XCTAssertTrue(
+      muteCatalog.contains {
+        $0.deviceUID == "output-B" && $0.currentValue == false && $0.canApply
+      }
+    )
 
     let capability = await adapter.capability()
     XCTAssertEqual(capability.state, .supported)

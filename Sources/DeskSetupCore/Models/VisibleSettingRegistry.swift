@@ -9,6 +9,7 @@ public enum VisibleSettingKind: String, CaseIterable, Codable, Hashable, Sendabl
   case audioDefaultOutput
   case audioInputVolume
   case audioOutputVolume
+  case audioOutputMute
   case networkServiceIPv4
 }
 
@@ -26,6 +27,7 @@ public enum VisibleSettingEditorKind: String, Codable, Hashable, Sendable {
   case segmentedPicker
   case picker
   case sliderAndField
+  case toggle
   case ipv4Form
 }
 
@@ -170,6 +172,17 @@ public struct VisibleSettingRegistry: Sendable {
       accessibilityLabelKey: "editor.audio.outputVolume.accessibility"
     ),
     .init(
+      kind: .audioOutputMute,
+      group: .audio,
+      snapshotKey: "outputMute",
+      runtimeCatalogSource: "audio.outputMute.settable",
+      validationKey: "outputMute",
+      operationKeyPrefix: "outputMute",
+      editorKind: .toggle,
+      localizationKey: "editor.audio.outputMute",
+      accessibilityLabelKey: "editor.audio.outputMute.accessibility"
+    ),
+    .init(
       kind: .networkServiceIPv4,
       group: .network,
       snapshotKey: "network.serviceIPv4",
@@ -233,6 +246,11 @@ public struct VisibleSettingRegistry: Sendable {
         if let contract = contractByKind[kind] {
           fields.append(.init(id: contract.kind.rawValue, contract: contract))
         }
+      }
+      if (audio.audioMuteControlCatalog ?? []).contains(where: {
+        $0.canApply && $0.currentValue != nil && $0.deviceUID != nil
+      }), let contract = contractByKind[.audioOutputMute] {
+        fields.append(.init(id: contract.kind.rawValue, contract: contract))
       }
     }
 

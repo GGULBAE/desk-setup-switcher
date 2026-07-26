@@ -36,7 +36,6 @@ public struct ProfileApplicabilityNormalizer: Sendable {
     }
 
     normalized.audio.value.systemOutputUID.isIncluded = false
-    normalized.audio.value.outputMuted.isIncluded = false
 
     normalized.network.value.wifiPower.isIncluded = false
     normalized.network.value.wifiSSID.isIncluded = false

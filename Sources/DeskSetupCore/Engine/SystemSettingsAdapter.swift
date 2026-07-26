@@ -156,6 +156,22 @@ public struct AudioVolumeControlCatalogEntry: Codable, Hashable, Sendable {
   }
 }
 
+public struct AudioMuteControlCatalogEntry: Codable, Hashable, Sendable {
+  public var deviceUID: String?
+  public var currentValue: Bool?
+  public var canApply: Bool
+
+  public init(
+    deviceUID: String?,
+    currentValue: Bool?,
+    canApply: Bool
+  ) {
+    self.deviceUID = deviceUID
+    self.currentValue = currentValue
+    self.canApply = canApply
+  }
+}
+
 public struct AdapterSnapshot: Codable, Hashable, Sendable {
   public var group: SettingGroup
   public var capturedAt: Date
@@ -173,6 +189,8 @@ public struct AdapterSnapshot: Codable, Hashable, Sendable {
   public var audioDeviceCatalog: [AudioDeviceCatalogEntry]?
   /// Typed writable-volume projection; unsupported controls remain non-visible.
   public var audioVolumeControlCatalog: [AudioVolumeControlCatalogEntry]?
+  /// Typed writable-output-mute projection; unsupported controls remain non-visible.
+  public var audioMuteControlCatalog: [AudioMuteControlCatalogEntry]?
   /// Optional read-only saved-network choices; contains no credential material.
   public var savedWiFiNetworkNames: [String]?
 
@@ -187,6 +205,7 @@ public struct AdapterSnapshot: Codable, Hashable, Sendable {
     networkIPv4RollbackCatalog: [NetworkIPv4RollbackCatalogEntry]? = nil,
     audioDeviceCatalog: [AudioDeviceCatalogEntry]? = nil,
     audioVolumeControlCatalog: [AudioVolumeControlCatalogEntry]? = nil,
+    audioMuteControlCatalog: [AudioMuteControlCatalogEntry]? = nil,
     savedWiFiNetworkNames: [String]? = nil
   ) {
     self.group = group
@@ -199,6 +218,7 @@ public struct AdapterSnapshot: Codable, Hashable, Sendable {
     self.networkIPv4RollbackCatalog = networkIPv4RollbackCatalog
     self.audioDeviceCatalog = audioDeviceCatalog
     self.audioVolumeControlCatalog = audioVolumeControlCatalog
+    self.audioMuteControlCatalog = audioMuteControlCatalog
     self.savedWiFiNetworkNames = savedWiFiNetworkNames
   }
 }

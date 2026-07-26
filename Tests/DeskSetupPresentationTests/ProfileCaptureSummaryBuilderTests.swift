@@ -69,6 +69,27 @@ struct ProfileCaptureSummaryBuilderTests {
     #expect(!summary.canCreateProfile)
   }
 
+  @Test("captured output mute is reported as an applicable audio setting")
+  func capturedOutputMuteIsApplicable() {
+    let settings = ProfileSettings(
+      audio: .init(
+        value: .init(outputMuted: .init(value: true))
+      )
+    )
+
+    let summary = ProfileCaptureSummaryBuilder().summary(
+      settings: settings,
+      evidence: []
+    )
+
+    #expect(summary.status == .complete)
+    #expect(
+      summary.items == [
+        .init(group: .audio, key: "outputMute", disposition: .savedApplicable)
+      ]
+    )
+  }
+
   @Test("unreadable and unsupported evidence is omitted from the user-facing result")
   func nonActionableEvidenceIsOmitted() {
     let duplicate = CaptureSnapshotEvidence(

@@ -43,6 +43,7 @@ struct VisibleSettingEndToEndInvariantTests {
     #expect(audioAPI.defaultUID(for: .output) == "output-A")
     #expect(audioAPI.inputVolume(for: "input-B")?.value == 0.45)
     #expect(audioAPI.volume(for: "output-B")?.value == 0.4)
+    #expect(audioAPI.mute(for: "output-B")?.value == false)
     #expect(await networkAPI.ipv4(for: ethernetIdentity) == .dhcp)
     #expect(
       await networkAPI.ipv4(for: wifiIdentity)
@@ -166,7 +167,8 @@ struct VisibleSettingEndToEndInvariantTests {
       defaultInputUID: .init(value: "input-B"),
       defaultOutputUID: .init(value: "output-B"),
       inputVolume: .init(value: 0.7),
-      outputVolume: .init(value: 0.8)
+      outputVolume: .init(value: 0.8),
+      outputMuted: .init(value: true)
     )
     let payload = SettingsPayload.audio(desired)
     let issues = await adapter.validate(payload, against: snapshot)

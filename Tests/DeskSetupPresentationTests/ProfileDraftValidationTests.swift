@@ -42,6 +42,7 @@ struct ProfileDraftValidationTests {
         issue(.audio(.defaultInputDevice), .audio, .required),
         issue(.audio(.defaultOutputDevice), .audio, .cannotBeBlank),
         issue(.audio(.outputVolume), .audio, .required),
+        issue(.audio(.outputMute), .audio, .required),
       ]
     )
   }

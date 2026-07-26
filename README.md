@@ -20,6 +20,7 @@ Choose **Capture Current Settings** from the menu-bar app. Capture reads the cur
 ### 2. Edit
 
 Name the profile and keep only the display, audio, and network values that should change. Unsupported or unavailable values are not presented as safe, runnable choices.
+For supported output devices, Audio captures volume and the separate output-mute state (`소리 끔`) so either value can be included or excluded independently.
 
 ![Synthetic profile editor showing display settings and saved profiles](site/public/screenshots/edit.png)
 

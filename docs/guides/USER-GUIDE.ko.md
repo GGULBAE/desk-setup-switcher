@@ -16,7 +16,7 @@ Desk Setup Switcher는 선택한 디스플레이·오디오·네트워크 설정
 
 DMG에 Intel slice가 들어 있더라도 Intel 지원을 의미하지 않습니다. 실제 Intel Mac 설치·실행 검증은 아직 통과하지 않았습니다. App Store 릴리스, 앱 내 업데이트, 지원되는 Homebrew 설치도 아직 없습니다.
 
-2026-07-20 현재 소스에서 opt-in 읽기 전용 테스트의 Display, Audio, Network, Input, ConditionContext, ApplyLivePreparation 그룹/기본 경로가 Apple Silicon/macOS 26.5.2에서 통과했습니다. 다만 이 테스트는 해당 호스트의 ColorSync 프로필·입력 볼륨·서비스 IPv4 개별 필드 존재/읽기를 항목별로 확인하지 않았습니다. 따라서 그 개별 실기 읽기 주장과 모든 Display, Audio, Network 적용·rollback 경로는 mock 검증 전용으로 남으며, 실제 설정 변경은 검증되지 않았습니다. 기능에 의존하기 전에 [지원표](../SUPPORT-MATRIX.md)를 확인하세요. 이 가이드는 하드웨어 인증을 의미하지 않습니다.
+2026-07-20 현재 소스에서 opt-in 읽기 전용 테스트의 Display, Audio, Network, Input, ConditionContext, ApplyLivePreparation 그룹/기본 경로가 Apple Silicon/macOS 26.5.2에서 통과했습니다. 다만 이 테스트는 해당 호스트의 ColorSync 프로필·입력 볼륨·출력 소리 끔·서비스 IPv4 개별 필드 존재/읽기를 항목별로 확인하지 않았습니다. 따라서 그 개별 실기 읽기 주장과 모든 Display, Audio, Network 적용·rollback 경로는 mock 검증 전용으로 남으며, 실제 설정 변경은 검증되지 않았습니다. 기능에 의존하기 전에 [지원표](../SUPPORT-MATRIX.md)를 확인하세요. 이 가이드는 하드웨어 인증을 의미하지 않습니다.
 
 키보드 동작, 접근성 이름·값, 비색상 상태 단서는 유지합니다. 포괄적인 보조 기술 인증은 초기 베타 범위에 포함하지 않습니다.
 
@@ -58,7 +58,7 @@ macOS에서는 현재 Wi-Fi 네트워크 이름을 확인할 때 위치 접근�
 
 - 알아보기 쉬운 프로필 이름과 아이콘을 지정합니다.
 - 각 설정의 **프로필 적용에 포함**을 사용해 프로필 포함 여부를 정합니다. **포함됨**과 **포함되지 않음**은 색상뿐 아니라 텍스트와 기호로 표시됩니다.
-- 실제로 바꾸려는 값만 설정합니다. 현재 편집기는 Mac이 제공하는 capability에 따라 지원되는 디스플레이 모드·주 디스플레이·ColorSync, 오디오 기본 장치와 조절 가능한 볼륨, 정확한 Ethernet 또는 Wi-Fi 서비스의 DHCP/수동 IPv4를 보여줍니다.
+- 실제로 바꾸려는 값만 설정합니다. 현재 편집기는 Mac이 제공하는 capability에 따라 지원되는 디스플레이 모드·주 디스플레이·ColorSync, 오디오 기본 장치와 조절 가능한 볼륨, 독립적으로 포함할 수 있는 **소리 끔**, 정확한 Ethernet 또는 Wi-Fi 서비스의 DHCP/수동 IPv4를 보여줍니다.
 - 프로필을 저장합니다. 유효한 변경 초안은 `⌘S`로 저장할 수 있습니다.
 
 저장된 대상 장치가 사라진 경우 가능한 범위에서 경고와 함께 계속 표시됩니다. 장치를 다시 연결하거나 해당 행의 **프로필 적용에 포함**을 끈 뒤 저장하세요. 선택지가 보이지 않는다고 지원된다고 추정하면 안 됩니다. 앱은 현재 snapshot에서 capture/apply/verify/rollback 계약을 끝까지 수행할 수 없는 새 선택지를 숨깁니다.

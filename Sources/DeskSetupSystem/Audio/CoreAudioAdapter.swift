@@ -122,7 +122,8 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
           supportsOutput: $0.supportsOutput
         )
       },
-      audioVolumeControlCatalog: volumeControlCatalog(for: devices)
+      audioVolumeControlCatalog: volumeControlCatalog(for: devices),
+      audioMuteControlCatalog: muteControlCatalog(for: devices)
     )
   }
 
@@ -659,6 +660,20 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
         )
       }
       return entries
+    }
+  }
+
+  private func muteControlCatalog(
+    for devices: [AudioDeviceDescriptor]
+  ) -> [AudioMuteControlCatalogEntry] {
+    devices.compactMap { device in
+      guard device.supportsOutput else { return nil }
+      let state = try? api.outputMute(forDeviceUID: device.uid)
+      return AudioMuteControlCatalogEntry(
+        deviceUID: device.uid,
+        currentValue: state?.value,
+        canApply: state?.isSettable == true
+      )
     }
   }
 

@@ -199,6 +199,7 @@ No live display/audio/network mutation, UI automation, TCC action, Keychain writ
 - Prove editor load/edit/save/fresh-reload/apply/read-back as one deterministic injected lifecycle with no live adapter.
 - Reject zero-operation plans in every mode and collapse semantically duplicate adapter issues before presentation.
 - Make Audio capability target-device scoped and turn changed-but-unavailable Audio, ColorSync, and service-IPv4 values into explicit omissions. Preserve already-satisfied values as omission-free no-ops and keep color-only planning independent from unused topology rollback.
+- Promote Core Audio output mute from dormant compatibility data to a visible, independently includable capture/editor value. Project only writable per-device controls and retain mock-only apply/read-back/rollback evidence until an explicit hardware procedure is run.
 - Keep previously included unavailable targets repairable with a warning and Include-off control without exposing never-included unsupported controls.
 - Stage profile bytes and private permissions before atomic replacement; cover pre-commit failure and backup recovery ordering with temporary-directory tests.
 - Record the source/test/evidence boundary in [SETTINGS-LIFECYCLE-REFACTOR-2026-07-16.md](SETTINGS-LIFECYCLE-REFACTOR-2026-07-16.md).

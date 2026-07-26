@@ -438,6 +438,16 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
           }
         ))
     }
+    if settings.outputMuted.isIncluded {
+      items.append(
+        .init(
+          kind: .outputMute,
+          label: "Output mute",
+          value: optionalValue(settings.outputMuted.value) {
+            .init(primaryText: $0 ? "On" : "Off")
+          }
+        ))
+    }
 
     return ProfileGroupSummary(group: .audio, items: items)
   }

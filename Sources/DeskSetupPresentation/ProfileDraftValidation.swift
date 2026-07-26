@@ -381,6 +381,7 @@ public struct ProfileDraftValidator: Equatable, Sendable {
         || group.value.defaultOutputUID.isIncluded
         || group.value.inputVolume.isIncluded
         || group.value.outputVolume.isIncluded
+        || group.value.outputMuted.isIncluded
     else { return }
 
     validateIncludedString(
@@ -409,6 +410,14 @@ public struct ProfileDraftValidator: Equatable, Sendable {
       group: .audio,
       issues: &issues
     )
+    if group.value.outputMuted.isIncluded, group.value.outputMuted.value == nil {
+      append(
+        .required,
+        field: .audio(.outputMute),
+        group: .audio,
+        to: &issues
+      )
+    }
   }
 
   private func validateNetwork(

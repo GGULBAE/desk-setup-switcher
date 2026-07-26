@@ -76,6 +76,7 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     )
     applicable(audio.inputVolume.isIncluded, .audio, "inputVolume")
     applicable(audio.outputVolume.isIncluded, .audio, "outputVolume")
+    applicable(audio.outputMuted.isIncluded, .audio, "outputMute")
 
     let network = settings.network.value
     for (index, service) in network.serviceIPv4.enumerated() {

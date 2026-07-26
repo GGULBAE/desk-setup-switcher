@@ -16,7 +16,7 @@ After `v0.1.0` is approved and published, the canonical download will be the pro
 
 The included Intel slice is not an Intel support claim. Physical Intel installation and runtime testing have not passed. There is also no App Store release, in-app updater, or supported Homebrew installation yet.
 
-On 2026-07-20, opt-in read-only tests passed the then-current Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. That dated run did not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on the host, so those item-level live-read claims and every Display, Audio, and Network apply/rollback path remain mock-only. No live setting mutation is verified. Read the [support matrix](../SUPPORT-MATRIX.md) before relying on a capability. This guide must not be read as hardware certification.
+On 2026-07-20, opt-in read-only tests passed the then-current Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. That dated run did not itemize actual ColorSync-profile, input-volume, output-mute, or service-IPv4 field presence/read on the host, so those item-level live-read claims and every Display, Audio, and Network apply/rollback path remain mock-only. No live setting mutation is verified. Read the [support matrix](../SUPPORT-MATRIX.md) before relying on a capability. This guide must not be read as hardware certification.
 
 Keyboard behavior, accessibility names and values, and non-color state cues are maintained. Comprehensive assistive-technology certification is outside the initial beta scope.
 
@@ -58,7 +58,7 @@ Choose **Edit Profile** on a profile to open **Settings → Profiles**.
 
 - Give the profile a recognizable name and icon.
 - For each visible setting, use **Apply with profile** to choose whether it belongs to this profile. **Included** and **Not included** are shown with text and a symbol, not color alone.
-- Configure only the values you intend to change. The current editor exposes supported display mode/primary-display/ColorSync choices, audio defaults and settable volumes, and exact Ethernet or Wi-Fi service DHCP/manual IPv4 where the current capability catalog allows them.
+- Configure only the values you intend to change. The current editor exposes supported display mode/primary-display/ColorSync choices, audio defaults, settable volumes, independently includable output mute, and exact Ethernet or Wi-Fi service DHCP/manual IPv4 where the current capability catalog allows them.
 - Save the profile. `⌘S` saves a valid dirty draft.
 
 An unavailable saved target remains visible with a warning when possible. Reconnect the device or turn **Apply with profile** off for that row before saving. Do not infer support from a value that is absent: the app hides choices that cannot complete its capture/apply/verify/rollback contract on the current snapshot.

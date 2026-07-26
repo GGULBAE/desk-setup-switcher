@@ -91,6 +91,10 @@ public struct SystemSnapshotResult: Equatable, Sendable {
     groups.flatMap { $0.snapshot?.audioVolumeControlCatalog ?? [] }
   }
 
+  public var audioMuteControlCatalog: [AudioMuteControlCatalogEntry] {
+    groups.flatMap { $0.snapshot?.audioMuteControlCatalog ?? [] }
+  }
+
   public var savedWiFiNetworkNames: [String] {
     groups.flatMap { $0.snapshot?.savedWiFiNetworkNames ?? [] }
   }

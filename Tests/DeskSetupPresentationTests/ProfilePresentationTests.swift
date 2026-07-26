@@ -99,12 +99,13 @@ struct ProfilePresentationTests {
 
     #expect(
       summary?.items.map(\.kind) == [
-        .defaultInput, .defaultOutput, .outputVolume,
+        .defaultInput, .defaultOutput, .outputVolume, .outputMute,
       ]
     )
     #expect(summary?.summaryText.contains("Synthetic Speakers") == true)
     #expect(summary?.summaryText.contains("Selected input device") == true)
     #expect(summary?.summaryText.contains("70%") == true)
+    #expect(summary?.summaryText.contains("Off") == true)
     #expect(summary?.summaryText.contains("synthetic-output-uid") == false)
     #expect(summary?.summaryText.contains("synthetic-input-uid") == false)
     #expect(
@@ -146,7 +147,8 @@ struct ProfilePresentationTests {
       audio: .init(
         value: .init(
           defaultOutputUID: .init(value: nil),
-          outputVolume: .init(value: nil)
+          outputVolume: .init(value: nil),
+          outputMuted: .init(value: nil)
         )
       ),
       network: .init(
@@ -169,7 +171,11 @@ struct ProfilePresentationTests {
     let audio = builder.summary(for: .audio, in: settings)
     let network = builder.summary(for: .network, in: settings)
 
-    #expect(audio?.items.map(\.value.primaryText) == ["No device saved", "Value unavailable"])
+    #expect(
+      audio?.items.map(\.value.primaryText) == [
+        "No device saved", "Value unavailable", "Value unavailable",
+      ]
+    )
     #expect(network?.items.map(\.value.primaryText) == ["Value unavailable"])
   }
 

@@ -34,6 +34,7 @@ struct VisibleSettingRegistryTests {
     #expect(counts[.audioDefaultOutput] == 1)
     #expect(counts[.audioInputVolume] == 1)
     #expect(counts[.audioOutputVolume] == 1)
+    #expect(counts[.audioOutputMute] == 1)
     #expect(counts[.networkServiceIPv4] == 2)
     #expect(fields.allSatisfy { $0.contract.stages.contains(.rollback) })
   }
@@ -50,6 +51,13 @@ struct VisibleSettingRegistryTests {
         canApply: false
       )
     }
+    snapshots[1].audioMuteControlCatalog = snapshots[1].audioMuteControlCatalog?.map {
+      .init(
+        deviceUID: $0.deviceUID,
+        currentValue: $0.currentValue,
+        canApply: false
+      )
+    }
     snapshots[2].networkIPv4RollbackCatalog = []
 
     let kinds = VisibleSettingRegistry().fields(snapshots: snapshots).map(\.contract.kind)
@@ -57,6 +65,7 @@ struct VisibleSettingRegistryTests {
     #expect(!kinds.contains(.displayColorProfile))
     #expect(!kinds.contains(.audioInputVolume))
     #expect(!kinds.contains(.audioOutputVolume))
+    #expect(!kinds.contains(.audioOutputMute))
     #expect(!kinds.contains(.networkServiceIPv4))
     #expect(kinds.contains(.audioDefaultInput))
     #expect(kinds.contains(.audioDefaultOutput))
@@ -130,6 +139,9 @@ struct VisibleSettingRegistryTests {
         audioVolumeControlCatalog: [
           .init(role: .input, deviceUID: "synthetic-input", currentValue: 0.4, canApply: true),
           .init(role: .output, deviceUID: "synthetic-output", currentValue: 0.5, canApply: true),
+        ],
+        audioMuteControlCatalog: [
+          .init(deviceUID: "synthetic-output", currentValue: false, canApply: true)
         ]
       ),
       AdapterSnapshot(

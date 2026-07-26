@@ -301,6 +301,34 @@ enum ProfileEditorAudioVolumeCapabilityResolver {
   }
 }
 
+struct ProfileEditorAudioMuteCapability: Equatable, Sendable {
+  let isWritable: Bool
+  let suggestedValue: Bool?
+}
+
+enum ProfileEditorAudioMuteCapabilityResolver {
+  static func resolve(
+    selectedDevice: SettingOption<String?>,
+    currentDeviceUID: String?,
+    catalog: [AudioMuteControlCatalogEntry]
+  ) -> ProfileEditorAudioMuteCapability {
+    let targetDeviceUID =
+      selectedDevice.isIncluded
+      ? selectedDevice.value
+      : currentDeviceUID
+    guard
+      let targetDeviceUID,
+      let entry = catalog.first(where: { $0.deviceUID == targetDeviceUID })
+    else {
+      return ProfileEditorAudioMuteCapability(isWritable: false, suggestedValue: nil)
+    }
+    return ProfileEditorAudioMuteCapability(
+      isWritable: entry.canApply && entry.currentValue != nil,
+      suggestedValue: entry.currentValue
+    )
+  }
+}
+
 enum ProfileEditorUnavailableIncludedSettingPolicy {
   static func isSelectedColorProfileAvailable(
     _ selectedProfile: ColorSyncProfileTarget?,
@@ -1567,6 +1595,10 @@ private struct ProfileEditorForm: View {
       option: $profile.settings.audio.value.outputVolume,
       fieldID: .audio(.outputVolume)
     )
+    audioMuteOption(
+      option: $profile.settings.audio.value.outputMuted,
+      fieldID: .audio(.outputMute)
+    )
   }
 
   @ViewBuilder
@@ -2093,6 +2125,74 @@ private struct ProfileEditorForm: View {
     )
   }
 
+  @ViewBuilder
+  private func audioMuteOption(
+    option: Binding<SettingOption<Bool?>>,
+    fieldID: DraftFieldIdentifier
+  ) -> some View {
+    let capability = audioMuteCapability
+    if capability.isWritable {
+      optionEditor(
+        "Output mute",
+        isOn: option.isIncluded,
+        validationFields: [fieldID],
+        onIncludeChange: IncludeChangeAction { isIncluded in
+          if isIncluded, option.wrappedValue.value == nil {
+            option.wrappedValue.value = capability.suggestedValue ?? false
+          }
+        }
+      ) {
+        if option.wrappedValue.value == nil {
+          chooseSuggestedValueButton(fieldID: fieldID) {
+            option.wrappedValue.value = capability.suggestedValue ?? false
+          }
+        } else {
+          Toggle(
+            appLocalized(option.wrappedValue.value == true ? "Muted" : "Not muted"),
+            isOn: optionalBoolBinding(
+              option.value,
+              defaultValue: capability.suggestedValue ?? false
+            )
+          )
+          .toggleStyle(.switch)
+          .focused($focusedField, equals: fieldID)
+          .accessibilityLabel(appLocalized("Output mute"))
+          .accessibilityValue(
+            appLocalized(option.wrappedValue.value == true ? "Muted" : "Not muted")
+          )
+          .accessibilityHint(
+            validationAccessibilityHint(
+              for: fieldID,
+              fallback: "Turn sound off or on for the selected output device"
+            )
+          )
+          .accessibilityInvalid(validation.issue(for: fieldID) != nil)
+        }
+      }
+    } else if ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
+      isIncluded: option.wrappedValue.isIncluded,
+      isRuntimeAvailable: capability.isWritable,
+      hasRuntimeEvidence: systemSnapshot != nil
+    ) {
+      unavailableIncludedOption(
+        appLocalized("Output mute"),
+        isOn: option.isIncluded,
+        validationFields: [fieldID],
+        warning: appLocalized(
+          "This included mute setting is unavailable for the selected output device. Turn off Include to apply other available settings normally."
+        )
+      )
+    }
+  }
+
+  private var audioMuteCapability: ProfileEditorAudioMuteCapability {
+    ProfileEditorAudioMuteCapabilityResolver.resolve(
+      selectedDevice: profile.settings.audio.value.defaultOutputUID,
+      currentDeviceUID: systemSnapshot?.profileSettings.audio.value.defaultOutputUID.value,
+      catalog: systemSnapshot?.audioMuteControlCatalog ?? []
+    )
+  }
+
   private func chooseSuggestedValueButton(
     fieldID: DraftFieldIdentifier,
     action: @escaping () -> Void
@@ -2377,6 +2477,11 @@ private struct ProfileEditorForm: View {
       || ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
         isIncluded: audio.outputVolume.isIncluded,
         isRuntimeAvailable: audioVolumeCapability(role: .output).isWritable,
+        hasRuntimeEvidence: systemSnapshot != nil
+      )
+      || ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
+        isIncluded: audio.outputMuted.isIncluded,
+        isRuntimeAvailable: audioMuteCapability.isWritable,
         hasRuntimeEvidence: systemSnapshot != nil
       )
   }
@@ -2681,6 +2786,16 @@ private struct ProfileEditorForm: View {
         )
       },
       set: { value.wrappedValue = AudioVolumePresentation.scalar(fromPercent: $0) }
+    )
+  }
+
+  private func optionalBoolBinding(
+    _ value: Binding<Bool?>,
+    defaultValue: Bool
+  ) -> Binding<Bool> {
+    Binding(
+      get: { value.wrappedValue ?? defaultValue },
+      set: { value.wrappedValue = $0 }
     )
   }
 

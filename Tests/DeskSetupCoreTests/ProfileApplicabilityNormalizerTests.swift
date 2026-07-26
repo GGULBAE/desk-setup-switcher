@@ -102,7 +102,7 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(normalized.settings.audio.isIncluded)
     #expect(normalized.settings.audio.value.defaultInputUID.isIncluded)
     #expect(!normalized.settings.audio.value.systemOutputUID.isIncluded)
-    #expect(!normalized.settings.audio.value.outputMuted.isIncluded)
+    #expect(normalized.settings.audio.value.outputMuted.isIncluded)
     #expect(normalized.settings.network.value.serviceIPv4[0].configuration.value == ipv4)
     #expect(normalized.settings.network.value.serviceIPv4[0].configuration.isIncluded)
     #expect(normalized.settings.network.value.ipv4.value == ipv4)
@@ -117,6 +117,19 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(!normalized.settings.input.isIncluded)
     #expect(normalized.settings.input.value.pointerSpeed.value == 4.5)
     #expect(!normalized.settings.input.value.pointerSpeed.isIncluded)
+  }
+
+  @Test("output mute remains applicable and keeps the audio group included")
+  func outputMuteRemainsApplicable() {
+    var settings = ProfileSettings()
+    settings.audio.value.outputMuted = .init(value: true)
+
+    let normalized = normalizer.normalize(settings)
+
+    #expect(normalized.audio.isIncluded)
+    #expect(normalized.audio.value.outputMuted.isIncluded)
+    #expect(normalized.audio.value.outputMuted.value == true)
+    #expect(normalized.payload(for: .audio) == .audio(normalized.audio.value))
   }
 
   @Test("groups with no applicable leaves are disabled without deleting values")
