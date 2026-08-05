@@ -5,6 +5,20 @@ source "$(dirname "$0")/lib/common.sh"
 
 site_directory="$ROOT_DIR/site"
 release_notes="$ROOT_DIR/docs/releases/v0.1.0.md"
+sites_plugin_path="site/build/sites-vite-plugin.ts"
+
+[[ -f "$ROOT_DIR/$sites_plugin_path" ]] || {
+    echo "Public-surface verification requires $sites_plugin_path." >&2
+    exit 1
+}
+git -C "$ROOT_DIR" ls-files --error-unmatch -- "$sites_plugin_path" >/dev/null 2>&1 || {
+    echo "Public-surface verification requires $sites_plugin_path to be tracked." >&2
+    exit 1
+}
+if git -C "$ROOT_DIR" check-ignore -q -- "$sites_plugin_path"; then
+    echo "Public-surface verification requires $sites_plugin_path not to be ignored." >&2
+    exit 1
+fi
 
 ruby - "$release_notes" <<'RUBY'
 EXPECTED_RELEASE_LINKS = {

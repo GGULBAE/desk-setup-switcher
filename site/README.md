@@ -16,6 +16,9 @@ npm run verify
 
 From the repository root, `make verify-public-surface` runs the site build,
 lint, rendered-output/privacy tests, and the complete public/source asset gate.
+The Sites packaging plugin at `build/sites-vite-plugin.ts` is source despite its
+directory name, so it is deliberately tracked; the gate rejects a missing,
+untracked, or ignored copy to keep clean checkouts equivalent to local builds.
 The media gate also requires `ffmpeg`/`ffprobe`; CI installs the Homebrew
 `ffmpeg@7` developer tool, then installs only the lockfile-pinned site dependency
 graph with lifecycle scripts disabled, checks the registry advisory feed, and
