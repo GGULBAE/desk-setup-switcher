@@ -78,7 +78,7 @@ cd desk-setup-switcher
 make verify
 ```
 
-`make verify` is the canonical local gate. Release JSON evidence rejects decoded-equivalent duplicate keys with parser-independent scanning so local and CI Ruby versions enforce the same rule. Its packaged DMG uses the same no-Developer-ID packaging class planned for the public beta, but a local build is not supported unless its exact bytes and checksum are attached to the approved versioned GitHub Release. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow. Release engineering and remaining evidence are tracked in the [distribution guide](docs/DISTRIBUTION.md) and [completion ledger](docs/COMPLETION-CRITERIA.md).
+`make verify` is the canonical local gate. Release JSON evidence rejects decoded-equivalent duplicate keys with parser-independent scanning so local and CI Ruby versions enforce the same rule. Pull-request CI runs the app gate against GitHub's merge preview, then audits public Git history from a separate full-history checkout of the exact PR head so GitHub's temporary merge-commit identity is not mistaken for publishable repository history. Its packaged DMG uses the same no-Developer-ID packaging class planned for the public beta, but a local build is not supported unless its exact bytes and checksum are attached to the approved versioned GitHub Release. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow. Release engineering and remaining evidence are tracked in the [distribution guide](docs/DISTRIBUTION.md) and [completion ledger](docs/COMPLETION-CRITERIA.md).
 
 ## Documentation
 

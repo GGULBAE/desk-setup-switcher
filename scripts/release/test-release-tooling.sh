@@ -610,6 +610,7 @@ assert_fails "$RELEASE_SCRIPTS_DIR/compare-bundle-manifest.sh" "$first_manifest"
 workflow=.github/workflows/signed-release-candidate.yml
 publication_workflow=.github/workflows/publish-release.yml
 unsigned_workflow=.github/workflows/unsigned-release.yml
+ci_workflow=.github/workflows/ci.yml
 prepare_draft="$RELEASE_SCRIPTS_DIR/prepare-draft-release.sh"
 restore_candidate="$RELEASE_SCRIPTS_DIR/restore-candidate-artifact.sh"
 verify_candidate="$RELEASE_SCRIPTS_DIR/verify-candidate.sh"
@@ -727,6 +728,53 @@ ruby -ryaml -rjson -e '
   mutation = steps.find { |step| step.fetch("name") == "Create one draft prerelease without publishing" }
   abort "unsigned release mutation token differs" unless mutation.fetch("env") == { "GH_TOKEN" => "${{ github.token }}" }
 ' "$unsigned_workflow"
+pass
+
+assert_contains "$ci_workflow" "timeout-minutes: 60"
+assert_contains "$ci_workflow" "Check out exact pull request head for public-history audit"
+assert_contains "$ci_workflow" "ref: \${{ github.event.pull_request.head.sha }}"
+assert_contains "$ci_workflow" "path: public-history-audit"
+assert_contains "$ci_workflow" "Audit public history from the exact pull request head"
+assert_contains "$ci_workflow" "Audit public history from the checked-out commit"
+
+ruby -ryaml -e '
+  workflow = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: true)
+  verify = workflow.fetch("jobs").fetch("verify")
+  abort "CI app timeout differs" unless verify.fetch("timeout-minutes") == 60
+  steps = verify.fetch("steps")
+  pr_condition = "github.event_name == #{39.chr}pull_request#{39.chr}"
+  non_pr_condition = "github.event_name != #{39.chr}pull_request#{39.chr}"
+  audit_checkout = steps.find do |step|
+    step["name"] == "Check out exact pull request head for public-history audit"
+  end
+  abort "CI PR-head audit checkout is missing" unless audit_checkout
+  abort "CI PR-head audit checkout condition differs" unless
+    audit_checkout.fetch("if") == pr_condition
+  abort "CI PR-head audit checkout action differs" unless
+    audit_checkout.fetch("uses") ==
+      "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"
+  abort "CI PR-head audit checkout boundary differs" unless
+    audit_checkout.fetch("with") == {
+      "ref" => "${{ github.event.pull_request.head.sha }}",
+      "path" => "public-history-audit",
+      "fetch-depth" => 0,
+      "persist-credentials" => false
+    }
+  pr_audit = steps.find do |step|
+    step["name"] == "Audit public history from the exact pull request head"
+  end
+  abort "CI PR-head audit step differs" unless pr_audit &&
+    pr_audit.fetch("if") == pr_condition &&
+    pr_audit.fetch("working-directory") == "public-history-audit" &&
+    pr_audit.fetch("run") == "make audit-public-release"
+  branch_audit = steps.find do |step|
+    step["name"] == "Audit public history from the checked-out commit"
+  end
+  abort "CI branch audit step differs" unless branch_audit &&
+    branch_audit.fetch("if") == non_pr_condition &&
+    !branch_audit.key?("working-directory") &&
+    branch_audit.fetch("run") == "make audit-public-release"
+' "$ci_workflow"
 pass
 
 assert_contains "$publication_workflow" "workflow_dispatch:"

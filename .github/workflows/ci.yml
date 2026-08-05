@@ -17,7 +17,7 @@ jobs:
   verify:
     name: Verify macOS app
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -34,7 +34,22 @@ jobs:
       - name: Run complete verification
         run: make verify
 
-      - name: Audit public release history and assets
+      - name: Check out exact pull request head for public-history audit
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: public-history-audit
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Audit public history from the exact pull request head
+        if: github.event_name == 'pull_request'
+        working-directory: public-history-audit
+        run: make audit-public-release
+
+      - name: Audit public history from the checked-out commit
+        if: github.event_name != 'pull_request'
         run: make audit-public-release
 
       - name: Upload unsigned package

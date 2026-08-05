@@ -71,8 +71,10 @@ get/set/remove calls, and rejects other browser-storage or tracking APIs in the
 built client.
 
 `npm run audit:dependencies` is the networked dependency advisory gate. It is
-kept separate from the deterministic local build and test command; the
-2026-07-18 lockfile audit reports zero known vulnerabilities.
+kept separate from the deterministic local build and test command. The
+2026-08-05 lockfile refresh pins Next/React security patches, the compatible
+Cloudflare/Wrangler pair, fixed PostCSS, and the first fixed Undici 7.x release;
+`npm ci --ignore-scripts && npm audit` reports zero known vulnerabilities.
 
 ## Content boundaries
 
