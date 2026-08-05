@@ -6,13 +6,13 @@ Desk Setup Switcher saves selected display, audio, and network settings as local
 
 ## Before you install
 
-There is no supported public download yet. Repository and CI-generated DMGs are ad-hoc-signed development evidence; they are not signed, notarized end-user releases. Do not bypass Gatekeeper to install them as an ordinary user.
+There is no supported public download yet. Repository and ordinary CI-generated DMGs are development evidence, not approved end-user releases. The planned public beta will deliberately use the same free, Developer ID-unsigned packaging class, but only the exact DMG and checksum attached to the approved versioned GitHub Release will be supported.
 
 After `v0.1.0` is approved and published, the canonical download will be the project's [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases). The planned initial public-beta target is:
 
 - Apple Silicon;
 - a macOS 14 Sonoma deployment target, after the exact candidate passes the Sonoma lifecycle gate; and
-- the signed and notarized DMG attached to the published GitHub Release.
+- the Developer ID-unsigned, ad-hoc integrity-signed DMG attached to the published GitHub Release.
 
 The included Intel slice is not an Intel support claim. Physical Intel installation and runtime testing have not passed. There is also no App Store release, in-app updater, or supported Homebrew installation yet.
 
@@ -22,11 +22,12 @@ Keyboard behavior, accessibility names and values, and non-color state cues are 
 
 ## Install after the official release
 
-1. Open the published GitHub Release and confirm that its notes identify it as the approved public beta, not an unsigned candidate, discontinued release, or affected release. A public beta may still carry GitHub's **Pre-release** badge.
+1. Open the published GitHub Release and confirm that its notes identify it as the approved unsigned public beta, not an Actions artifact, third-party mirror, discontinued release, or affected release. A public beta may still carry GitHub's **Pre-release** badge.
 2. Download the DMG and its published checksum from that same release. Confirm the SHA-256 matches the release record.
 3. Open the DMG, drag **Desk Setup Switcher** to **Applications**, and eject the DMG.
-4. Open the app from **Applications**. A normal first-open confirmation for an Internet download is expected. If macOS says the developer cannot be verified, the app cannot be checked, or the artifact is damaged, stop. Do not use **Open Anyway** for an official release; verify the download and report the problem.
-5. Look for the Desk Setup Switcher icon in the menu bar. The app is menu-bar-only, so it does not normally show a Dock icon or a main window at launch.
+4. Open the app from **Applications** once. Because the free release is not Developer ID signed or notarized, macOS is expected to block the unidentified developer.
+5. Recheck the release URL and SHA-256. Then open **System Settings → Privacy & Security**, choose **Open Anyway**, and confirm. Do not disable Gatekeeper globally, run a quarantine-removal command, or continue when the checksum differs.
+6. Look for the Desk Setup Switcher icon in the menu bar. The app is menu-bar-only, so it does not normally show a Dock icon or a main window at launch.
 
 **Launch at login is off by default.** Enable it only if wanted in **Settings → System → Login**. The app shows the requested setting and macOS registration status separately because macOS may require approval.
 
@@ -151,12 +152,13 @@ Use [SUPPORT.md](../../SUPPORT.md) for public support and bug-report routes. For
 | Review refreshes instead of applying | The profile, capability, current value, or rollback evidence changed after the first review. This is a safety stop; inspect the new plan. |
 | Profile storage shows an error | Use **Retry Loading** for a load failure or **Dismiss Error** after an ordinary failed operation. Do not edit managed files while the app is running. Restore through a reviewed export/import if needed. |
 | A protected change is unusable | Choose **Revert Now** before the 15-second timer ends. Then confirm the original state in macOS System Settings and inspect the result. |
-| The official DMG fails Gatekeeper | Stop; do not disable Gatekeeper or use **Open Anyway**. Confirm the release URL and checksum, then report the exact message without private data. |
+| The unsigned official DMG is blocked on first launch | This is expected. Confirm the canonical Release URL and SHA-256, then use **System Settings → Privacy & Security → Open Anyway** once. Never disable Gatekeeper globally or remove quarantine from the command line. |
+| macOS reports that the app is damaged or the checksum differs | Stop. Delete the download and report the exact message without private data; do not create a security exception. |
 | Launch at login was requested but is not enabled | Open **Settings → System**, compare the requested setting with **macOS registration**, approve it in macOS Login Items if prompted, then choose **Refresh Status** or **Retry Registration**. |
 
 ## Update
 
-The app does not check the network for updates. After a public release exists, obtain updates manually from the canonical GitHub Releases page. Never replace an existing app with an ad-hoc CI artifact. Export saved profiles first when a release note calls out profile migration or recovery risk.
+The app does not check the network for updates. After a public release exists, obtain updates manually from the canonical GitHub Releases page. Never replace an existing app with an ordinary CI artifact or third-party mirror. Each new unsigned version may require the same one-time macOS trust decision. Export saved profiles first when a release note calls out profile migration or recovery risk.
 
 ## Uninstall and delete local data
 

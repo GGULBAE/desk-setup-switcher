@@ -4,12 +4,12 @@ const copy = {
     publishedEyebrow: "Open-source macOS public beta",
     holdingStatus: "v0.1.0 download opens only after the complete release gate passes",
     download: "Download v0.1.0",
-    holdingInstallTitle: "A trusted download, once the gate passes.",
+    holdingInstallTitle: "A checksum-verified download, once the gate passes.",
     holdingInstallBody:
-      "There is no supported public download today. The canonical GitHub Release will open only after the complete release gate—including Developer ID signing, notarization, stapling, Gatekeeper checks, and clean external beta installs—passes.",
-    publishedInstallTitle: "Download the signed public beta.",
+      "There is no supported public download today. The canonical GitHub Release will open only after the unsigned release gate—including exact artifact verification, a published SHA-256, and clean external beta installs—passes.",
+    publishedInstallTitle: "Download the unsigned public beta.",
     publishedInstallBody:
-      "Desk Setup Switcher v0.1.0 is available only from the canonical GitHub Release. Download its immutable signed DMG and verify the published SHA-256 before opening it.",
+      "Desk Setup Switcher v0.1.0 is available only from the canonical GitHub Release. It is not Developer ID signed or notarized: verify the published SHA-256, then make the documented one-time Open Anyway decision without disabling Gatekeeper.",
     holdingSupportNote:
       "Planned v0.1.0 platform: Apple Silicon with a macOS 14 deployment target. Exact-candidate lifecycle testing on Sonoma remains a release gate. The packaged Intel slice is not a physical Intel support claim.",
     publishedSupportNote:
@@ -24,12 +24,12 @@ const copy = {
     publishedEyebrow: "오픈소스 macOS 공개 베타",
     holdingStatus: "v0.1.0은 전체 릴리스 관문을 통과한 뒤에만 다운로드할 수 있습니다",
     download: "v0.1.0 다운로드",
-    holdingInstallTitle: "검증 관문을 통과한 다운로드만 제공합니다.",
+    holdingInstallTitle: "checksum 검증 관문을 통과한 다운로드만 제공합니다.",
     holdingInstallBody:
-      "현재 지원되는 공개 다운로드는 없습니다. Developer ID 서명, 공증, stapling, Gatekeeper, 외부 clean-install 베타를 포함한 전체 릴리스 관문을 통과한 뒤 GitHub Release를 공식 다운로드로 엽니다.",
-    publishedInstallTitle: "서명된 public beta를 다운로드하세요.",
+      "현재 지원되는 공개 다운로드는 없습니다. 정확한 artifact 검증, 공개 SHA-256, 외부 clean-install 베타를 포함한 unsigned 릴리스 관문을 통과한 뒤 GitHub Release를 공식 다운로드로 엽니다.",
+    publishedInstallTitle: "unsigned public beta를 다운로드하세요.",
     publishedInstallBody:
-      "Desk Setup Switcher v0.1.0은 공식 GitHub Release에서만 제공합니다. 변경할 수 없는 서명 DMG를 다운로드하고 공개된 SHA-256을 확인한 뒤 여세요.",
+      "Desk Setup Switcher v0.1.0은 공식 GitHub Release에서만 제공합니다. Developer ID 미서명·미공증 릴리스이므로 공개 SHA-256을 확인한 뒤 Gatekeeper를 끄지 않고 문서화된 그래도 열기 절차를 한 번 수행하세요.",
     holdingSupportNote:
       "v0.1.0 예정 환경: macOS 14 deployment target의 Apple Silicon. Sonoma에서 exact candidate 수명주기 검증을 통과해야 출시할 수 있습니다. 패키지의 Intel slice는 실제 Intel 지원을 뜻하지 않습니다.",
     publishedSupportNote:

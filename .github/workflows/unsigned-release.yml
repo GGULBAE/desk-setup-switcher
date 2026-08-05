@@ -1,0 +1,210 @@
+name: Prepare unsigned GitHub release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing annotated release tag, for example v0.1.0"
+        required: true
+        type: string
+      expected_commit:
+        description: "Exact lowercase 40-character commit SHA referenced by the tag"
+        required: true
+        type: string
+      confirmation:
+        description: "Type exactly: prepare unsigned release TAG"
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: unsigned-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  validate-dispatch:
+    name: Validate unsigned release request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Reject ambiguous release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || [[ ! "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ "$RELEASE_CONFIRMATION" != "prepare unsigned release $RELEASE_TAG" ]]; then
+            echo "::error::Tag, commit, or typed confirmation is invalid." >&2
+            exit 1
+          fi
+
+  prepare-draft:
+    name: Build and prepare unsigned draft
+    needs: validate-dispatch
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Check out the existing release tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind tag, checkout, version, and notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE_CONFIRMATION" != "prepare unsigned release $RELEASE_TAG" ]]; then
+            echo "::error::Typed confirmation changed after validation." >&2
+            exit 1
+          fi
+          git check-ref-format --allow-onelevel "$RELEASE_TAG" >/dev/null
+          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
+          tag_object="$(git rev-parse "refs/tags/$RELEASE_TAG")"
+          tag_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          if [[ ! "$tag_object" =~ ^[0-9a-f]{40}$ ]] \
+            || [[ "$(git cat-file -t "$tag_object")" != tag ]] \
+            || [[ "$tag_commit" != "$EXPECTED_COMMIT" ]] \
+            || [[ "$(git rev-parse HEAD)" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::The annotated tag, checkout, and expected commit do not match." >&2
+            exit 1
+          fi
+
+          version="${RELEASE_TAG#v}"
+          bundle_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Config/Info.plist)"
+          bundle_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Config/Info.plist)"
+          if [[ "$bundle_version" != "$version" ]] \
+            || [[ ! "$bundle_build" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! -f "docs/releases/$version.md" ]] \
+            || [[ -L "docs/releases/$version.md" ]]; then
+            echo "::error::Tag, bundle metadata, or checked-in release notes differ." >&2
+            exit 1
+          fi
+          if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+            echo "::error::The release checkout is not clean." >&2
+            exit 1
+          fi
+          git diff --check
+
+      - name: Set up Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install public-asset inspection tools
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          brew install ffmpeg@7
+          echo "$(brew --prefix ffmpeg@7)/bin" >> "$GITHUB_PATH"
+
+      - name: Install locked site dependencies
+        working-directory: site
+        run: npm ci --ignore-scripts
+
+      - name: Audit site dependency advisories
+        working-directory: site
+        run: npm run audit:dependencies
+
+      - name: Run complete app verification
+        run: make verify
+
+      - name: Audit public history and assets
+        run: make audit-public-release
+
+      - name: Verify public site and release copy
+        run: make verify-public-surface
+
+      - name: Require the exact unsigned package pair
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          dmg="artifacts/Desk-Setup-Switcher-$version-unsigned.dmg"
+          checksum="$dmg.sha256"
+          if [[ ! -f "$dmg" || -L "$dmg" || ! -f "$checksum" || -L "$checksum" ]]; then
+            echo "::error::The exact unsigned DMG and checksum are required." >&2
+            exit 1
+          fi
+          file_count="$(find artifacts -mindepth 1 -maxdepth 1 -type f | wc -l | tr -d '[:space:]')"
+          unexpected="$(find artifacts -mindepth 1 -maxdepth 1 ! -type f -print)"
+          if [[ "$file_count" != 2 || -n "$unexpected" ]]; then
+            echo "::error::The release artifact directory must contain exactly two regular files." >&2
+            exit 1
+          fi
+          (
+            cd artifacts
+            shasum -a 256 -c "$(basename "$checksum")"
+          )
+          if codesign --display --verbose=4 ".build/xcode-package/Build/Products/Release/Desk Setup Switcher.app" 2>&1 | grep -q '^Authority='; then
+            echo "::error::The free release path must not contain a Developer ID identity." >&2
+            exit 1
+          fi
+          git diff --check
+          if [[ -n "$(git status --porcelain=v1 --untracked-files=all -- ':!artifacts' ':!.build')" ]]; then
+            echo "::error::Verification changed tracked release source." >&2
+            exit 1
+          fi
+
+      - name: Retain the exact unsigned package pair
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unsigned-release-${{ inputs.tag }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            artifacts/Desk-Setup-Switcher-*-unsigned.dmg
+            artifacts/Desk-Setup-Switcher-*-unsigned.dmg.sha256
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 30
+
+      - name: Create one draft prerelease without publishing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          dmg="artifacts/Desk-Setup-Switcher-$version-unsigned.dmg"
+          checksum="$dmg.sha256"
+          notes="docs/releases/$version.md"
+          if gh release view "$RELEASE_TAG" --json id >/dev/null 2>&1; then
+            echo "::error::A GitHub Release already exists for $RELEASE_TAG; no overwrite or repair is allowed." >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" \
+            --verify-tag \
+            --draft \
+            --prerelease \
+            --title "Desk Setup Switcher $RELEASE_TAG public beta" \
+            --notes-file "$notes" \
+            "$dmg" \
+            "$checksum"
+
+          release_json="$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,tagName,assets)"
+          RELEASE_JSON="$release_json" ruby -rjson -e '
+            release = JSON.parse(ENV.fetch("RELEASE_JSON"))
+            expected = [
+              "Desk-Setup-Switcher-#{ENV.fetch("RELEASE_TAG").delete_prefix("v")}-unsigned.dmg",
+              "Desk-Setup-Switcher-#{ENV.fetch("RELEASE_TAG").delete_prefix("v")}-unsigned.dmg.sha256"
+            ].sort
+            actual = release.fetch("assets").map { |asset| asset.fetch("name") }.sort
+            abort "draft state differs" unless release.fetch("isDraft") == true
+            abort "prerelease state differs" unless release.fetch("isPrerelease") == true
+            abort "tag differs" unless release.fetch("tagName") == ENV.fetch("RELEASE_TAG")
+            abort "asset inventory differs" unless actual == expected
+          '

@@ -103,9 +103,9 @@ const content = {
       "This project code sets no cookies and contains no project analytics or client-side tracking. Its hosting provider still processes requests and may retain aggregate operational metrics.",
     installEyebrow: "Install",
     installSteps: [
-      "Download the signed DMG and checksum from the canonical GitHub Release.",
+      "Download the unsigned DMG and checksum from the canonical GitHub Release.",
       "Verify SHA-256, open the DMG, and drag Desk Setup Switcher to Applications.",
-      "Launch the menu-bar app. Launch at login stays off until you opt in.",
+      "After the first blocked launch, use Privacy & Security → Open Anyway once. Never disable Gatekeeper.",
     ],
     demoTitle: "37-second silent walkthrough",
     demoBody: "Synthetic screens, captions on, no live system changes.",
@@ -226,9 +226,9 @@ const content = {
       "이 프로젝트 코드는 쿠키, 프로젝트 분석, 클라이언트 추적을 넣지 않습니다. 다만 호스팅 제공자는 요청을 처리하고 집계된 운영 지표를 보관할 수 있습니다.",
     installEyebrow: "설치",
     installSteps: [
-      "공식 GitHub Release에서 서명된 DMG와 checksum을 다운로드합니다.",
+      "공식 GitHub Release에서 unsigned DMG와 checksum을 다운로드합니다.",
       "SHA-256을 확인하고 DMG를 연 뒤 앱을 Applications로 옮깁니다.",
-      "메뉴 막대 앱을 실행합니다. 로그인 시 실행은 직접 켜기 전까지 꺼져 있습니다.",
+      "최초 실행 차단 뒤 개인정보 보호 및 보안 → 그래도 열기를 한 번 사용합니다. Gatekeeper는 끄지 마세요.",
     ],
     demoTitle: "37초 무음 둘러보기",
     demoBody: "합성 화면과 자막만 사용하며 실제 시스템 설정은 바꾸지 않습니다.",

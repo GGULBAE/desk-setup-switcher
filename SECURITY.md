@@ -7,8 +7,8 @@ There is no public release yet. The table describes the current pre-release boun
 | Version | Security status |
 | --- | --- |
 | Default development branch | Reports are accepted and fixes land here before the first public beta. Development snapshots are not supported end-user releases. |
-| `v0.1.0` public beta | Not published yet. It becomes supported only after the complete distribution gate passes and the maintainer-approved canonical GitHub Release is published. |
-| Older builds and untagged artifacts | Unsupported. Do not redistribute the current ad-hoc-signed test DMG as a release. |
+| `v0.1.0` public beta | Not published yet. It becomes supported only after the unsigned distribution gate passes and the maintainer-approved canonical GitHub Release is published. |
+| Older builds, untagged artifacts, and third-party mirrors | Unsupported. Do not redistribute a local or ordinary CI DMG as a release. |
 
 During the `0.x` public-beta period, the latest published beta receives security fixes. The immediately preceding beta may receive critical fixes for up to 30 days when a safe backport is practical. After a stable release exists, the latest and immediately preceding stable minor lines are the intended support window. See [Compatibility and versioning](docs/COMPATIBILITY.md) for the application, platform, schema, and Swift-package policies.
 
@@ -32,5 +32,6 @@ We aim to acknowledge a complete report within 7 days and provide a status updat
 - Diagnostics remain local, rotate, and pass through redaction.
 - The app has no telemetry or application-owned outbound network communication.
 - Mutating adapters require validation, typed operations, backup, itemized results, and rollback semantics.
+- The initial public beta is intentionally not Developer ID signed or notarized. Users must authenticate it by the canonical GitHub Release URL and SHA-256 before making the documented one-time macOS trust exception; instructions must never disable Gatekeeper globally or remove quarantine.
 
 General feature requests and non-sensitive bugs belong in the issue tracker.

@@ -609,6 +609,7 @@ assert_fails "$RELEASE_SCRIPTS_DIR/compare-bundle-manifest.sh" "$first_manifest"
 
 workflow=.github/workflows/signed-release-candidate.yml
 publication_workflow=.github/workflows/publish-release.yml
+unsigned_workflow=.github/workflows/unsigned-release.yml
 prepare_draft="$RELEASE_SCRIPTS_DIR/prepare-draft-release.sh"
 restore_candidate="$RELEASE_SCRIPTS_DIR/restore-candidate-artifact.sh"
 verify_candidate="$RELEASE_SCRIPTS_DIR/verify-candidate.sh"
@@ -659,6 +660,74 @@ assert_not_contains "$workflow" "RELEASE_SIGNING_KEYCHAIN:"
 assert_contains "$workflow" "run: exec /bin/bash scripts/release/import-signing-certificate.sh"
 assert_contains "$workflow" "run: exec /bin/bash scripts/release/build-candidate.sh"
 assert_not_contains "$workflow" "run: make release-candidate"
+
+assert_contains "$unsigned_workflow" "workflow_dispatch:"
+assert_contains "$unsigned_workflow" "group: unsigned-release-\${{ inputs.tag }}"
+assert_contains "$unsigned_workflow" "needs: validate-dispatch"
+assert_contains "$unsigned_workflow" "contents: write"
+assert_contains "$unsigned_workflow" "make verify"
+assert_contains "$unsigned_workflow" "make audit-public-release"
+assert_contains "$unsigned_workflow" "make verify-public-surface"
+assert_contains "$unsigned_workflow" "npm run audit:dependencies"
+assert_contains "$unsigned_workflow" "overwrite: false"
+assert_contains "$unsigned_workflow" "gh release create"
+assert_contains "$unsigned_workflow" "--verify-tag"
+assert_contains "$unsigned_workflow" "--draft"
+assert_contains "$unsigned_workflow" "--prerelease"
+assert_contains "$unsigned_workflow" "A GitHub Release already exists"
+assert_contains "$unsigned_workflow" "one draft prerelease without publishing"
+assert_before "$unsigned_workflow" "Run complete app verification" "Require the exact unsigned package pair"
+assert_before "$unsigned_workflow" "Require the exact unsigned package pair" "Retain the exact unsigned package pair"
+assert_before "$unsigned_workflow" "Retain the exact unsigned package pair" "Create one draft prerelease without publishing"
+assert_not_contains "$unsigned_workflow" "push:"
+assert_not_contains "$unsigned_workflow" "schedule:"
+assert_not_contains "$unsigned_workflow" "--draft=false"
+assert_not_contains "$unsigned_workflow" "gh release edit"
+assert_not_contains "$unsigned_workflow" "gh release delete"
+assert_not_contains "$unsigned_workflow" "--clobber"
+assert_not_contains "$unsigned_workflow" "git tag"
+assert_not_contains "$unsigned_workflow" "git push"
+assert_not_contains "$unsigned_workflow" "DEVELOPER_ID_CERTIFICATE_BASE64"
+assert_not_contains "$unsigned_workflow" "APPLE_NOTARY_API_KEY_BASE64"
+assert_not_contains "$unsigned_workflow" "xattr"
+assert_not_contains "$unsigned_workflow" "spctl --master-disable"
+
+ruby -ryaml -rjson -e '
+  workflow = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: true)
+  triggers = workflow.fetch(true)
+  abort "unsigned release must be manual-only" unless triggers.keys == ["workflow_dispatch"]
+  inputs = triggers.fetch("workflow_dispatch").fetch("inputs")
+  abort "unsigned release input schema differs" unless inputs.keys.sort == %w[confirmation expected_commit tag]
+  abort "unsigned release input is optional or non-string" unless
+    inputs.values.all? { |input| input.fetch("required") == true && input.fetch("type") == "string" }
+  abort "unsigned release global permissions differ" unless workflow.fetch("permissions") == {}
+  abort "unsigned release concurrency may cancel" unless
+    workflow.fetch("concurrency") == {
+      "group" => "unsigned-release-${{ inputs.tag }}", "cancel-in-progress" => false
+    }
+  jobs = workflow.fetch("jobs")
+  abort "unsigned release jobs differ" unless jobs.keys.sort == %w[prepare-draft validate-dispatch]
+  guard = jobs.fetch("validate-dispatch")
+  draft = jobs.fetch("prepare-draft")
+  abort "unsigned guard permissions differ" unless guard.fetch("permissions") == {}
+  abort "unsigned draft dependency differs" unless draft.fetch("needs") == "validate-dispatch"
+  abort "unsigned draft permissions differ" unless draft.fetch("permissions") == { "contents" => "write" }
+  steps = draft.fetch("steps")
+  action_uses = steps.filter_map { |step| step["uses"] }
+  expected_actions = [
+    "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+    "actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f",
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+  ]
+  abort "unsigned release action inventory differs" unless action_uses == expected_actions
+  checkout = steps.fetch(0)
+  abort "unsigned checkout is not exact-tag and credential-free" unless checkout.fetch("with") == {
+    "ref" => "${{ inputs.tag }}", "fetch-depth" => 0, "persist-credentials" => false
+  }
+  mutation = steps.find { |step| step.fetch("name") == "Create one draft prerelease without publishing" }
+  abort "unsigned release mutation token differs" unless mutation.fetch("env") == { "GH_TOKEN" => "${{ github.token }}" }
+' "$unsigned_workflow"
+pass
 
 assert_contains "$publication_workflow" "workflow_dispatch:"
 assert_contains "$publication_workflow" "environment: release-publication"

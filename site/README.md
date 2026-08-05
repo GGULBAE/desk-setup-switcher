@@ -2,7 +2,7 @@
 
 This directory contains the account-free, bilingual, single-page public site for Desk Setup Switcher. It has no account, database, object storage, project-set cookies, project analytics, telemetry, advertising, or remotely loaded third-party runtime content.
 
-The site is release-preparation source. Do not deploy it publicly until the protected `v0.1.0` release candidate, canonical download URL, clean-install evidence, and maintainer publication approval are complete.
+The site is release-preparation source. Do not deploy it publicly until the exact unsigned `v0.1.0` release candidate, canonical download URL and SHA-256, clean-install/Open-Anyway evidence, and maintainer publication approval are complete.
 
 ## Local development
 
@@ -78,7 +78,7 @@ kept separate from the deterministic local build and test command; the
 
 - The three product screens use synthetic fixture data and sanitized public derivatives.
 - The silent demo stops at the Apply Preview. It does not simulate an Apply result or claim live hardware mutation.
-- Download remains unavailable until the complete distribution gate passes and the maintainer-approved canonical GitHub Release exists.
+- Download remains unavailable until the unsigned distribution gate passes and the maintainer-approved canonical GitHub Release exists. Published copy identifies the DMG as Developer ID-unsigned and not notarized, requires SHA-256 verification, and permits only the one-time macOS **Open Anyway** path without disabling Gatekeeper or removing quarantine.
 - Apple Silicon with a macOS 14 deployment target is the planned `v0.1.0` platform. At least one external exact-candidate lifecycle report must pass on Sonoma before that minimum-OS support claim is used; the `x86_64` slice is not advertised as physically verified.
 - On 2026-07-20, current-source opt-in read-only tests passed Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. They did not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on this host, so those item-level claims and every apply/rollback path remain mock-only.
 - Comprehensive assistive-technology certification is outside the initial beta gate. Keyboard behavior, accessibility names and values, and non-color state cues remain required.

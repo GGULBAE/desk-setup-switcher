@@ -5,7 +5,7 @@ A simple, local-only macOS menu-bar app for moving between desk setups without c
 Save selected display, audio, and network settings as a profile. When you want to use it, review the exact plan and decide what to apply.
 
 > [!IMPORTANT]
-> **Unreleased public beta:** there is no supported public download yet. Current local and CI artifacts are development-only; they are not Developer ID signed or notarized. The first supported build will be a signed, notarized DMG on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after the [public-beta completion gates](docs/COMPLETION-CRITERIA.md) pass. Do not redistribute a development DMG or create or push a `v*` tag.
+> **Unreleased public beta:** there is no supported public download yet. The first supported build will be a free, Developer ID-unsigned DMG on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after the [public-beta completion gates](docs/COMPLETION-CRITERIA.md) pass. Its app carries an ad-hoc integrity signature but is not notarized, so macOS will require a one-time **Open Anyway** decision. Local and ordinary CI artifacts remain unsupported; do not redistribute them or create or push a `v*` tag.
 
 [English user guide](docs/guides/USER-GUIDE.md) · [한국어 사용자 가이드](docs/guides/USER-GUIDE.ko.md) · [Support matrix](docs/SUPPORT-MATRIX.md)
 
@@ -37,13 +37,14 @@ The App Information page keeps its four project links centered as one compact gr
 
 ## Install
 
-Supported binaries will be provided only through versioned GitHub Releases. When this README identifies a release as supported:
+Supported binaries will be provided only through versioned GitHub Releases. There is no App Store release and the initial public beta does not require a paid Apple Developer Program membership. When this README identifies a release as supported:
 
-1. Get its signed, notarized DMG and checksum from the project’s [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases).
-2. Verify the checksum, drag **Desk Setup Switcher** to **Applications**, and launch it. The app appears in the menu bar rather than the Dock.
-3. Start with a small profile and inspect both the preview and the itemized result.
+1. Get the versioned `-unsigned.dmg` and checksum from the project’s [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases). Do not substitute an Actions artifact or third-party mirror.
+2. Verify the SHA-256 checksum, open the DMG, and drag **Desk Setup Switcher** to **Applications**.
+3. Try to open the app once. When macOS blocks the unidentified developer, open **System Settings → Privacy & Security**, choose **Open Anyway**, and confirm only after checking the release URL and checksum. The app appears in the menu bar rather than the Dock.
+4. Start with a small profile and inspect both the preview and the itemized result.
 
-If macOS cannot verify an official release, stop and report it. Do not bypass Gatekeeper for an end-user installation.
+Do not disable Gatekeeper globally, remove quarantine with `xattr`, or use an artifact whose checksum differs. The manual exception is expected only because this project currently uses the free unsigned distribution path.
 
 ## Privacy and safety
 
@@ -65,7 +66,7 @@ Exports can contain device labels, SSIDs, network ranges, stable identifiers, an
 
 Selecting an audio input device does not record audio and does not require microphone access.
 
-The planned initial public beta targets Apple Silicon and macOS 14 Sonoma, but exact-candidate Sonoma lifecycle evidence is still required before that becomes a support claim. The project builds an `x86_64` slice, but physical Intel installation and runtime testing have not passed, so Intel is not supported. Current user-facing profile work is limited to Display, Audio, and Network; no live setting mutation or hardware rollback is claimed as verified. See the [support matrix](docs/SUPPORT-MATRIX.md) for capability-level evidence.
+The planned initial public beta targets Apple Silicon and macOS 14 Sonoma, but exact-candidate Sonoma lifecycle evidence is still required before that becomes a support claim. The project builds an `x86_64` slice, but physical Intel installation and runtime testing have not passed, so Intel is not supported. The public DMG will be Developer ID-unsigned and not notarized; that packaging status is a deliberate cost-free distribution choice, not an Apple trust claim. Current user-facing profile work is limited to Display, Audio, and Network; no live setting mutation or hardware rollback is claimed as verified. See the [support matrix](docs/SUPPORT-MATRIX.md) for capability-level evidence.
 
 ## Build from source
 
@@ -77,7 +78,7 @@ cd desk-setup-switcher
 make verify
 ```
 
-`make verify` is the canonical local gate. Release JSON evidence rejects decoded-equivalent duplicate keys with parser-independent scanning so local and CI Ruby versions enforce the same rule. Its packaged DMG is ad-hoc signed development evidence, not a supported release. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow. Release engineering and remaining evidence are tracked in the [distribution guide](docs/DISTRIBUTION.md) and [completion ledger](docs/COMPLETION-CRITERIA.md).
+`make verify` is the canonical local gate. Release JSON evidence rejects decoded-equivalent duplicate keys with parser-independent scanning so local and CI Ruby versions enforce the same rule. Its packaged DMG uses the same no-Developer-ID packaging class planned for the public beta, but a local build is not supported unless its exact bytes and checksum are attached to the approved versioned GitHub Release. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow. Release engineering and remaining evidence are tracked in the [distribution guide](docs/DISTRIBUTION.md) and [completion ledger](docs/COMPLETION-CRITERIA.md).
 
 ## Documentation
 

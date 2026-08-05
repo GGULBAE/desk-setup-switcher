@@ -6,13 +6,13 @@ Desk Setup Switcher는 선택한 디스플레이·오디오·네트워크 설정
 
 ## 설치 전 확인
 
-아직 지원되는 공개 다운로드가 없습니다. 저장소와 CI에서 만든 DMG는 ad-hoc 서명된 개발 검증 자료이며, 서명·공증된 일반 사용자용 릴리스가 아닙니다. 일반 사용자는 Gatekeeper를 우회해 설치하지 마세요.
+아직 지원되는 공개 다운로드가 없습니다. 저장소와 일반 CI에서 만든 DMG는 개발 검증 자료이며 승인된 일반 사용자용 릴리스가 아닙니다. 예정된 public beta도 비용이 들지 않는 Developer ID 미서명 패키징을 사용하지만, 승인된 버전 GitHub Release에 첨부된 정확한 DMG와 checksum만 지원합니다.
 
 `v0.1.0`이 승인되어 공개된 뒤에는 프로젝트의 [GitHub Releases 페이지](https://github.com/GGULBAE/desk-setup-switcher/releases)가 유일한 공식 다운로드 경로가 됩니다. 초기 public beta 예정 환경은 다음과 같습니다.
 
 - Apple Silicon
 - exact candidate가 Sonoma 수명주기 검증을 통과한 뒤의 macOS 14 Sonoma deployment target
-- 공개된 GitHub Release에 첨부된 서명·공증 DMG
+- 공개된 GitHub Release에 첨부된 Developer ID 미서명·ad-hoc 무결성 서명 DMG
 
 DMG에 Intel slice가 들어 있더라도 Intel 지원을 의미하지 않습니다. 실제 Intel Mac 설치·실행 검증은 아직 통과하지 않았습니다. App Store 릴리스, 앱 내 업데이트, 지원되는 Homebrew 설치도 아직 없습니다.
 
@@ -22,11 +22,12 @@ DMG에 Intel slice가 들어 있더라도 Intel 지원을 의미하지 않습니
 
 ## 정식 공개 후 설치
 
-1. 공개된 GitHub Release의 노트가 unsigned candidate, 중단 또는 문제 있는 릴리스가 아닌 승인된 public beta라고 명시하는지 확인합니다. public beta에는 GitHub의 **Pre-release** 배지가 표시될 수 있습니다.
+1. 공개된 GitHub Release의 노트가 Actions artifact, 제3자 mirror, 중단 또는 문제 있는 릴리스가 아닌 승인된 unsigned public beta라고 명시하는지 확인합니다. public beta에는 GitHub의 **Pre-release** 배지가 표시될 수 있습니다.
 2. 같은 Release에서 DMG와 공개된 checksum을 내려받고 SHA-256이 릴리스 기록과 일치하는지 확인합니다.
 3. DMG를 열고 **Desk Setup Switcher**를 **응용 프로그램**으로 드래그한 뒤 DMG를 추출합니다.
-4. **응용 프로그램**에서 앱을 엽니다. 인터넷에서 받은 앱에 대한 일반적인 최초 실행 확인은 정상입니다. 개발자를 확인할 수 없거나, 앱을 검사할 수 없거나, 파일이 손상됐다는 메시지가 나오면 중단하세요. 공식 릴리스에 **확인 없이 열기(Open Anyway)**를 사용하지 말고 다운로드와 checksum을 확인한 뒤 신고하세요.
-5. 메뉴 막대에서 Desk Setup Switcher 아이콘을 찾습니다. 메뉴 막대 전용 앱이므로 실행할 때 Dock 아이콘이나 메인 창이 보이지 않는 것이 정상입니다.
+4. **응용 프로그램**에서 앱을 한 번 엽니다. 무료 릴리스는 Developer ID 서명·공증되지 않으므로 macOS가 확인되지 않은 개발자 앱을 차단하는 것이 정상입니다.
+5. Release URL과 SHA-256을 다시 확인한 뒤 **시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기(Open Anyway)**를 선택하고 확인합니다. Gatekeeper를 전역으로 끄거나 명령어로 quarantine을 제거하지 말고, checksum이 다르면 진행하지 마세요.
+6. 메뉴 막대에서 Desk Setup Switcher 아이콘을 찾습니다. 메뉴 막대 전용 앱이므로 실행할 때 Dock 아이콘이나 메인 창이 보이지 않는 것이 정상입니다.
 
 **로그인 시 실행은 기본으로 꺼져 있습니다.** 필요할 때만 **설정 → 시스템 → 로그인**에서 켜세요. macOS 승인이 필요할 수 있으므로 앱은 사용자가 요청한 값과 macOS 등록 상태를 따로 보여줍니다.
 
@@ -151,12 +152,13 @@ Capture, 준비 상태, 저장소 또는 Apply 문제가 생기면 다음을 수
 | 적용 대신 검토 화면이 갱신됨 | 첫 검토 후 프로필, capability, 현재 값 또는 rollback 근거가 바뀌었습니다. 안전을 위한 중단이므로 새 계획을 확인하세요. |
 | 프로필 저장소 오류가 표시됨 | 로드 실패에는 **다시 불러오기**, 일반 작업 실패 뒤에는 **오류 닫기**를 사용하세요. 앱 실행 중 관리 파일을 직접 수정하지 마세요. 필요하면 검토한 내보내기·가져오기로 복구하세요. |
 | 보호 변경 후 Mac을 사용할 수 없음 | 15초가 끝나기 전에 **지금 되돌리기**를 선택하세요. 이후 macOS 시스템 설정에서 원래 상태와 항목별 결과를 확인하세요. |
-| 공식 DMG가 Gatekeeper를 통과하지 못함 | 중단하고 Gatekeeper를 끄거나 **확인 없이 열기**를 사용하지 마세요. Release URL과 checksum을 확인한 뒤 민감 정보 없이 정확한 메시지를 신고하세요. |
+| unsigned 공식 DMG가 최초 실행에서 차단됨 | 정상입니다. 공식 Release URL과 SHA-256을 확인한 뒤 **시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기**를 한 번 사용하세요. Gatekeeper를 전역으로 끄거나 명령어로 quarantine을 제거하지 마세요. |
+| 앱이 손상됐다는 메시지가 나오거나 checksum이 다름 | 중단하고 다운로드를 삭제한 뒤 민감 정보 없이 정확한 메시지를 신고하세요. 보안 예외를 만들지 마세요. |
 | 로그인 시 실행을 켰지만 등록되지 않음 | **설정 → 시스템**에서 요청 값과 **macOS 등록**을 비교하고, 필요하면 macOS 로그인 항목에서 승인한 뒤 **상태 새로 고침** 또는 **등록 다시 시도**를 선택하세요. |
 
 ## 업데이트
 
-앱은 네트워크에서 업데이트를 확인하지 않습니다. 공개 릴리스가 생긴 뒤에는 공식 GitHub Releases 페이지에서 새 버전을 직접 받으세요. 기존 앱을 ad-hoc CI artifact로 교체하지 마세요. 릴리스 노트가 profile migration 또는 복구 위험을 알리면 먼저 저장된 프로필을 내보내세요.
+앱은 네트워크에서 업데이트를 확인하지 않습니다. 공개 릴리스가 생긴 뒤에는 공식 GitHub Releases 페이지에서 새 버전을 직접 받으세요. 기존 앱을 일반 CI artifact나 제3자 mirror의 파일로 교체하지 마세요. unsigned 새 버전마다 macOS의 일회성 신뢰 확인이 다시 필요할 수 있습니다. 릴리스 노트가 profile migration 또는 복구 위험을 알리면 먼저 저장된 프로필을 내보내세요.
 
 ## 앱 제거와 로컬 데이터 삭제
 

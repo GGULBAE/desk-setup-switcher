@@ -118,7 +118,7 @@ Remaining at that milestone: user-driven installed status-item/popover interacti
 - Local post-fix DMG SHA-256 is `246af7c21ac9f1ffd4c6f7523f857737f148e4354a948b0e4d9a2123bb5d827f`
 - CI artifact ID `8249295840` verified CI-generated DMG SHA-256 `d3894d8e7efdd775c5983c63051ec4181d33e039a40b83163a39a24c898be6b5`; the DMGs are not byte-for-byte reproducible
 - The artifact is correctly classified as no Developer ID and not notarized
-- CI passed for repair commit `4e45328`. The effective remote tag workflow remains an unsafe historical unsigned-publication path; the safer local signed-candidate draft/prerelease proposal is unpushed and neither path has produced public-beta distribution evidence
+- CI passed for repair commit `4e45328`. The repository now plans one manual-only unsigned release-preparation workflow that creates a draft prerelease from an existing annotated tag after verification; no workflow publishes automatically and no path has produced public-beta distribution evidence
 - The historical header/editor follow-up `make verify` produced and verified a universal local DMG with SHA-256 `45772d20e6d7655c41ed4ff5d0261257b98f1361f4cf8cc38ebf837720d5820b`
 - UI-hardening commit `5f0cabc` passed [Actions run `29181900967`](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/29181900967); unsigned artifact ID `8256718472` verified CI DMG SHA-256 `f3d82b033e8e375c9063a9b72cbd174d94a03f0cdd4414961895db3b3dcfc3f4`
 - The 2026-07-14 apply-reliability `make verify` produced and mounted its then-current universal package with SHA-256 `417ffbb20b6a77b9037f42d5acb998574460374675e746715474e17f9f772615`; this is historical package evidence
@@ -130,7 +130,7 @@ Remaining at that milestone: user-driven installed status-item/popover interacti
 
 Remaining:
 
-- Perform an exact downloaded/quarantined Gatekeeper install on a clean user account or Mac; an official candidate must open without **Open Anyway**
+- Perform an exact downloaded/quarantined install on a clean user account or Mac; the expected unsigned flow must verify SHA-256, observe the first-launch block, and succeed through one documented **Open Anyway** decision without disabling Gatekeeper
 - Complete remaining non-mutating manual workflows, accessibility audit, and login approval/retry/reboot cases
 - Publish a tag only after green CI and a current evidence ledger
 
@@ -236,9 +236,17 @@ The P2 pass does not include profile-store path hardening, Apply/Capture executi
 
 Release publication, push, Gatekeeper, physical Intel, required TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md). Full VoiceOver certification is excluded and unclaimed, not a deferred release task.
 
-## M6 — Open-source public beta release (v3 predecessor/final contract and tooling locally verified; protected execution/publication pending)
+## M6 — Free open-source public beta release (unsigned GitHub path selected; execution/publication pending)
 
 The first public beta remains bounded to the simple **Capture → Edit → Review & Apply** product flow. It does not add accounts, cloud services, telemetry, automatic profile switching, arbitrary shell execution, UI automation, private APIs, or a new plugin/SDK surface.
+
+Current distribution decision: `v0.1.0` will use a Developer ID-unsigned,
+non-notarized DMG on GitHub Releases. App Store and paid Apple Developer Program
+membership are not release gates. The app retains its free ad-hoc integrity
+signature; users verify the canonical URL and SHA-256 before making one explicit
+**Open Anyway** decision. The previously implemented Developer ID/notarization
+policies remain historical, non-gating tooling unless a later decision explicitly
+reactivates them.
 
 Baseline completed locally:
 
@@ -246,7 +254,7 @@ Baseline completed locally:
 - Make launch at login explicitly opt-in. Reset the unverifiable pre-release automatic-registration state, remove stale registration, and preserve subsequent user choices with a versioned consent marker.
 - Add a full-history public-release audit for credential patterns, concrete personal home paths, current-tree placeholders, historical PNG/JPEG/ICNS metadata, and commit/tag author, committer, and tagger email metadata; configure the unpushed local CI definition to run it from a full-history checkout. Already-public legacy identity metadata remains in immutable history without exposing its values in audit output or the exact-SHA exception file, while new published commits and annotated tags require GitHub noreply identities.
 - Freeze the public-beta compatibility boundary in policy documentation: bundle and Keychain identities, SemVer/build/schema behavior, macOS 14.0 deployment target, planned initial Apple Silicon target, minimum-OS runtime evidence gate, and internal/unstable Swift library products.
-- Add support, governance, compatibility, security, privacy, contribution, and distribution guidance. The local proposed manual signed-candidate workflow builds and retains protected `v0.0.9`/build-1 and `v0.1.0`/build-2 attempt-1 origins, but creates a Developer ID/notarized/stapled **draft prerelease** only for the final candidate. It is unpushed and unproven with credentials. The legacy workflow is an inert tombstone locally but remains effective and unsafe remotely until the reviewed change is merged, so no release tag may be pushed first.
+- Add support, governance, compatibility, security, privacy, contribution, and distribution guidance. The current manual unsigned workflow accepts one existing annotated tag and exact commit, runs the complete app/history/public-surface gates, retains the exact DMG/checksum pair, and creates a **draft prerelease** only. It has no Apple credentials or publication command. The older signed-candidate workflows and scripts remain non-gating historical engineering evidence.
 - Fail closed on missing/non-integral profile schema versions, nil included ColorSync values, and snapshot capability-group mismatches without blocking unrelated snapshot groups. Preserve only the explicit schema 0→1 migration.
 - Remove runtime coordinate collection/cache and its Settings refresh surface. Location authorization now exists only to read the current Wi-Fi SSID during an explicit Capture; imported location conditions remain dormant schema data.
 - Keep the final Apply decision honest without complicating the flow: Apply Preview uses one review-to-decision scroll sequence with a localized text-and-shield Beta status stating that Apply and rollback are not hardware-verified and that users must check System Settings afterward. Decision actions follow the review content, Escape remains the cancel shortcut, and Apply is not a default Return-key action.
@@ -268,12 +276,12 @@ Baseline completed locally:
 
 Mandatory gates before public v0.1.0:
 
-- Produce both exact protected candidates with Developer ID/hardened runtime/timestamping, unchanged per-origin signed-app identity through packaging, signed DMGs, accepted notarization logs, stapled artifacts, app-and-DMG Gatekeeper validation, checksums, SBOMs, and attestations/provenance; then complete final-only draft/public redownload verification for `v0.1.0`/build 2.
-- Replace the effective remote unsigned-publication workflow, protect the release environment/default branch, split `v*` creation authority from no-bypass update/deletion protection, enable immutable releases and private vulnerability reporting, and verify that no workflow can bypass human publication approval or move/delete an existing release tag.
+- Merge the manual-only unsigned release-preparation workflow and prove that it binds one existing annotated `v0.1.0` tag, exact commit, bundle version, exact DMG/checksum pair, and bilingual notes while creating only a draft prerelease. No workflow may publish automatically, create/move/delete a tag, overwrite assets, deploy the site, or consume Apple credentials.
+- Protect the default branch and `v*` tag update/deletion boundary, enable immutable releases and private vulnerability reporting, and retain explicit human publication approval.
 - Merge the locally reviewed guides, support/security routes, and provenance-reviewed media before deploying the bilingual site; set approved canonical HTTPS/release URLs, complete a bounded manual browser and final bilingual-copy pass, then verify every public link from a clean session.
-- Complete separate exact-candidate evidence for browser download and real extracted-DMG quarantine, Gatekeeper without Open Anyway, manifest-bound Finder installation of both origins to exact `/Applications/Desk Setup Switcher.app`, DMG eject-before-launch, first launch/login default-off, the mandatory protected `v0.0.9`/build-1 to `v0.1.0`/build-2 upgrade, schema 0→1 migration, backup recovery, import/export, diagnostics, uninstall, and optional app-owned data removal.
-- Complete the protected candidate-history review plus three external Apple Silicon beta reports downloaded from the two retained protected workflow artifacts, their protected independence-review set and predecessor lineage, all bound to both exact candidate identities and the identical final DMG SHA-256/final-DMG provenance attestation, with at least one full exact-candidate lifecycle on macOS 14 Sonoma, zero public P0/P1 issues, and a confidential security-responder zero-blocker sign-off. Intel remains unclaimed until physical verification exists.
+- Complete exact-candidate evidence for browser download and real quarantine, checksum verification, the expected first-launch unidentified-developer block, one **Open Anyway** decision without disabling Gatekeeper, Finder installation at exact `/Applications/Desk Setup Switcher.app`, DMG eject-before-launch, first launch/login default-off, schema 0→1 migration, backup recovery, import/export, diagnostics, uninstall, and optional app-owned data removal.
+- Complete at least one Apple Silicon external lifecycle report bound to the exact final DMG/checksum on macOS 14 Sonoma, with zero public P0/P1 issues and a confidential security-responder zero-blocker sign-off. Intel remains unclaimed until physical verification exists.
 - Obtain the user's explicit approval for the final artifact, tag, release notes, site publication, and promotional posts. Until then, this milestone is **not a public release**.
-- After the canonical GitHub Release exists, pass project-owned Homebrew tap `install`, `upgrade`, `uninstall`, and `zap` against its exact final SHA-256. Official Homebrew Cask submission remains a later milestone.
+- Homebrew remains a later optional milestone; it is not used to hide or bypass the unsigned Gatekeeper boundary.
 
 Full VoiceOver certification is intentionally excluded from this release goal and is not claimed. The bounded accessibility contract remains localized keyboard behavior, accessible names/values/help where implemented, and non-color state cues; full VoiceOver/rotor evidence may be pursued independently without blocking v0.1.0.
