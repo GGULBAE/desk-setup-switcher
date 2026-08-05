@@ -1105,34 +1105,8 @@ struct AboutSettingsView: View {
         Divider()
           .frame(maxWidth: 360)
 
-        LazyVGrid(columns: linkColumns, alignment: .leading, spacing: 12) {
-          aboutLink(
-            title: appLocalized("Source Code"),
-            systemImage: "chevron.left.forwardslash.chevron.right",
-            destination: repositoryURL,
-            identifier: "about.source-code"
-          )
-          aboutLink(
-            title: appLocalized("Report an Issue"),
-            systemImage: "exclamationmark.bubble",
-            destination: issuesURL,
-            identifier: "about.report-issue"
-          )
-          aboutLink(
-            title: appLocalized("MIT License"),
-            systemImage: "doc.text",
-            destination: licenseURL,
-            identifier: "about.license"
-          )
-          aboutLink(
-            title: appLocalized("Privacy Principles"),
-            systemImage: "hand.raised",
-            destination: privacyURL,
-            identifier: "about.privacy"
-          )
-        }
-        .frame(maxWidth: 480)
-        .focusSection()
+        aboutLinks
+          .focusSection()
 
         Text(appLocalized("Links open only when you choose them and use your default browser."))
           .font(.caption)
@@ -1149,14 +1123,63 @@ struct AboutSettingsView: View {
     }
   }
 
-  private var linkColumns: [GridItem] {
+  @ViewBuilder
+  private var aboutLinks: some View {
     if dynamicTypeSize.isAccessibilitySize {
-      return [GridItem(.flexible(), alignment: .leading)]
+      VStack(alignment: .leading, spacing: 12) {
+        sourceCodeLink
+        reportIssueLink
+        licenseLink
+        privacyLink
+      }
+    } else {
+      Grid(alignment: .leading, horizontalSpacing: 48, verticalSpacing: 12) {
+        GridRow {
+          sourceCodeLink
+          reportIssueLink
+        }
+        GridRow {
+          licenseLink
+          privacyLink
+        }
+      }
     }
-    return [
-      GridItem(.flexible(), alignment: .leading),
-      GridItem(.flexible(), alignment: .leading),
-    ]
+  }
+
+  private var sourceCodeLink: some View {
+    aboutLink(
+      title: appLocalized("Source Code"),
+      systemImage: "chevron.left.forwardslash.chevron.right",
+      destination: repositoryURL,
+      identifier: "about.source-code"
+    )
+  }
+
+  private var reportIssueLink: some View {
+    aboutLink(
+      title: appLocalized("Report an Issue"),
+      systemImage: "exclamationmark.bubble",
+      destination: issuesURL,
+      identifier: "about.report-issue"
+    )
+  }
+
+  private var licenseLink: some View {
+    aboutLink(
+      title: appLocalized("MIT License"),
+      systemImage: "doc.text",
+      destination: licenseURL,
+      identifier: "about.license"
+    )
+  }
+
+  private var privacyLink: some View {
+    aboutLink(
+      title: appLocalized("Privacy Principles"),
+      systemImage: "hand.raised",
+      destination: privacyURL,
+      identifier: "about.privacy"
+    )
   }
 
   private func aboutLink(
@@ -1166,9 +1189,13 @@ struct AboutSettingsView: View {
     identifier: String
   ) -> some View {
     Link(destination: destination) {
-      Label(title, systemImage: systemImage)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      HStack(spacing: 8) {
+        Image(systemName: systemImage)
+          .frame(width: 22)
+        Text(title)
+      }
     }
+    .gridCellAnchor(.leading)
     .accessibilityLabel(title)
     .accessibilityIdentifier(identifier)
   }

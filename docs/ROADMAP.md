@@ -183,6 +183,7 @@ Evidence: [installed empty/apply follow-up](INSTALLED-EMPTY-APPLY-FOLLOWUP-2026-
 ## M4.8 — tray, Settings, and workflow UI stability follow-up
 
 - Freeze the variable-width status-item anchor for each open popover generation: cached readiness remains usable during refresh, duplicate presentations are ignored, and the latest title/width is applied after close. Nonempty localized titles use AppKit's native variable width with wrapping disabled so they remain horizontal.
+- Center App Information's four external links by their intrinsic two-column content width, align every symbol/text start, and retain the single-column accessibility-text order. A default-text 900×568 attached/offscreen raster regression checks the visible link bounds against the canvas center.
 - Keep empty idle tray content outside scrolling, make Capture icon-only with explicit accessibility copy, keep the header on one line, give every open generation a new top-anchored scroll identity, and remove animated focus scrolling.
 - Use one horizontal Settings workspace from the 680-point minimum upward instead of flipping the whole sidebar/editor anatomy at 760 points. Keep footer and save/revert action bars at stable heights.
 - Keep the runtime editor catalog stable while refresh is in flight, adopt at most the first completed read-only refresh in each presentation, suppress identical editor publications, replace lazy editor layout with deterministic layout, make invalid-save validation feedback reachable, and reset scroll only on profile identity or a hidden-window reopen.

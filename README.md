@@ -33,6 +33,7 @@ Inspect every proposed change and omission. Nothing changes until you explicitly
 The screenshots contain synthetic data from a non-mutating demo state. They show the intended product flow, not live hardware-mutation evidence. See the [asset provenance record](docs/RELEASE-ASSET-PROVENANCE.md) and [static demo-site source](site/README.md).
 
 When a saved profile matches the current Mac, the menu-bar indicator shows its profile name on one horizontal line.
+The App Information page keeps its four project links centered as one compact group, with aligned icon and text columns.
 
 ## Install
 

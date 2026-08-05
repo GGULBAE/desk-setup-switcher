@@ -35,6 +35,26 @@ import Testing
       let size: CGSize
       let colorScheme: ColorScheme
       let expectedKeyboardFocus: String
+      let dynamicTypeSize: DynamicTypeSize
+      let dynamicTypeName: String
+
+      init(
+        name: String,
+        state: AuxiliaryFixtureState,
+        size: CGSize,
+        colorScheme: ColorScheme,
+        expectedKeyboardFocus: String,
+        dynamicTypeSize: DynamicTypeSize = .accessibility3,
+        dynamicTypeName: String = "accessibility3"
+      ) {
+        self.name = name
+        self.state = state
+        self.size = size
+        self.colorScheme = colorScheme
+        self.expectedKeyboardFocus = expectedKeyboardFocus
+        self.dynamicTypeSize = dynamicTypeSize
+        self.dynamicTypeName = dynamicTypeName
+      }
     }
 
     private struct RGBSample {
@@ -186,9 +206,7 @@ import Testing
       }
     }
 
-    @Test(
-      "About, safety, result, error, and diagnostics render at their minimum viewport in Korean accessibility text"
-    )
+    @Test("Auxiliary surfaces render in Korean at their supported viewport and text sizes")
     func rendersP2AuxiliarySurfaces() throws {
       let allFixtures = [
         AuxiliaryFixture(
@@ -233,6 +251,15 @@ import Testing
           colorScheme: .light,
           expectedKeyboardFocus: "about links in source-issue-license-privacy order"
         ),
+        AuxiliaryFixture(
+          name: "34-settings-about-ko-900x568-default-light",
+          state: .settingsAbout,
+          size: CGSize(width: 900, height: 568),
+          colorScheme: .light,
+          expectedKeyboardFocus: "about links in source-issue-license-privacy order",
+          dynamicTypeSize: .large,
+          dynamicTypeName: "large"
+        ),
       ]
       let selectedFixture = ProcessInfo.processInfo.environment[
         "DESK_SETUP_P2_AUXILIARY_FIXTURE"
@@ -256,7 +283,7 @@ import Testing
         let rendered = try renderAuxiliary(fixture)
         #expect(rendered.image.count > 10_000)
         #expect(rendered.notes.contains("synthetic-p2-auxiliary=true"))
-        #expect(rendered.notes.contains("dynamic-type=accessibility3"))
+        #expect(rendered.notes.contains("dynamic-type=\(fixture.dynamicTypeName)"))
         #expect(rendered.notes.contains("language=ko"))
         #expect(rendered.notes.contains("live-display-audio-network-mutations=false"))
         #expect(!rendered.notes.contains("/Users/"))
@@ -265,6 +292,13 @@ import Testing
         #expect(!decodedImage.hasAlpha)
         #expect(decodedImage.pixelsWide >= Int(fixture.size.width))
         #expect(decodedImage.pixelsHigh >= Int(fixture.size.height))
+        if fixture.name == "34-settings-about-ko-900x568-default-light" {
+          let blueBounds = try blueContentBounds(for: decodedImage)
+          let canvasMidX = CGFloat(decodedImage.pixelsWide) / 2
+          let centeringTolerance = CGFloat(decodedImage.pixelsWide) * 0.015
+          #expect(abs(blueBounds.midX - canvasMidX) <= centeringTolerance)
+          #expect(blueBounds.width < CGFloat(decodedImage.pixelsWide) * 0.4)
+        }
 
         if let outputDirectory {
           try rendered.image.write(
@@ -322,7 +356,7 @@ import Testing
       }
       .environment(\.locale, Locale(identifier: "ko"))
       .environment(\.colorScheme, fixture.colorScheme)
-      .dynamicTypeSize(.accessibility3)
+      .dynamicTypeSize(fixture.dynamicTypeSize)
       .preferredColorScheme(fixture.colorScheme)
       .uiAuditEnvironment(configuration)
       .frame(width: fixture.size.width, height: fixture.size.height)
@@ -366,7 +400,7 @@ import Testing
         "state=\(fixture.state.rawValue)",
         "language=ko",
         "viewport=\(Int(fixture.size.width))x\(Int(fixture.size.height))",
-        "dynamic-type=accessibility3",
+        "dynamic-type=\(fixture.dynamicTypeName)",
         "color-scheme=\(fixture.colorScheme == .dark ? "dark" : "light")",
         "expected-accessibility-focus=heading",
         "expected-keyboard-focus=\(fixture.expectedKeyboardFocus)",
@@ -701,6 +735,39 @@ import Testing
         brightSampleRatio: Double(brightSampleCount) / Double(sampledPixelCount),
         darkSampleRatio: Double(darkSampleCount) / Double(sampledPixelCount),
         backgroundSamples: backgroundSamples
+      )
+    }
+
+    private func blueContentBounds(for image: NSBitmapImageRep) throws -> CGRect {
+      var minimumX = image.pixelsWide
+      var minimumY = image.pixelsHigh
+      var maximumX = -1
+      var maximumY = -1
+
+      for y in 0..<image.pixelsHigh {
+        for x in 0..<image.pixelsWide {
+          guard let color = image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else {
+            continue
+          }
+          let isLinkBlue =
+            color.blueComponent > 0.65
+            && color.blueComponent - color.redComponent > 0.25
+            && color.blueComponent - color.greenComponent > 0.12
+          guard isLinkBlue else { continue }
+          minimumX = min(minimumX, x)
+          minimumY = min(minimumY, y)
+          maximumX = max(maximumX, x)
+          maximumY = max(maximumY, y)
+        }
+      }
+
+      #expect(maximumX >= minimumX)
+      #expect(maximumY >= minimumY)
+      return CGRect(
+        x: minimumX,
+        y: minimumY,
+        width: maximumX - minimumX + 1,
+        height: maximumY - minimumY + 1
       )
     }
 
