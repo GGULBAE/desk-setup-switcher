@@ -587,9 +587,9 @@ private struct SystemSettingsView: View {
 
   var body: some View {
     Form {
-      Section("Login") {
+      Section(appLocalized("Login")) {
         Toggle(
-          "Launch Desk Setup Switcher at login",
+          appLocalized("Launch Desk Setup Switcher at login"),
           isOn: Binding(
             get: { model.launchAtLoginDesired },
             set: { model.setLaunchAtLogin($0) }
@@ -597,7 +597,7 @@ private struct SystemSettingsView: View {
         )
 
         LabeledContent(
-          "macOS registration",
+          appLocalized("macOS registration"),
           value: model.loginItemEnabled ? appLocalized("Enabled") : appLocalized("Not enabled")
         )
 
@@ -625,18 +625,22 @@ private struct SystemSettingsView: View {
           isExpanded: $isLoginExplanationExpanded
         ) {
           Text(
-            "macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration."
+            appLocalized(
+              "macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration."
+            )
           )
           .font(.caption)
           .foregroundStyle(.secondary)
         }
       }
 
-      Section("System permissions") {
+      Section(appLocalized("System permissions")) {
         Text(
-          "macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates."
+          appLocalized(
+            "macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates."
+          )
         )
-        LabeledContent("Location", value: locationPermission.statusText)
+        LabeledContent(appLocalized("Location"), value: locationPermission.statusText)
         if let locationPermissionActionTitle {
           Button(locationPermissionActionTitle) {
             performLocationPermissionAction()
@@ -644,22 +648,30 @@ private struct SystemSettingsView: View {
           .accessibilityHint(locationPermissionActionHint)
         }
         if !locationPermission.isAuthorized {
-          Text("After changing Location access, return to the menu bar and capture again.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+          Text(
+            appLocalized(
+              "After changing Location access, return to the menu bar and capture again."
+            )
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
         }
       }
 
-      Section("Troubleshooting") {
+      Section(appLocalized("Troubleshooting")) {
         Text(
-          "Diagnostics are only needed when a capture or apply does not behave as expected. They contain redacted local status and no telemetry."
+          appLocalized(
+            "Diagnostics are only needed when a capture or apply does not behave as expected. They contain redacted local status and no telemetry."
+          )
         )
         .font(.caption)
         .foregroundStyle(.secondary)
         Button(appLocalized("Open Advanced Diagnostics…")) {
           showsAdvancedDiagnostics = true
         }
-        .accessibilityHint("Shows redacted local status, snapshot details, and recent events")
+        .accessibilityHint(
+          appLocalized("Shows redacted local status, snapshot details, and recent events")
+        )
       }
     }
     .formStyle(.grouped)

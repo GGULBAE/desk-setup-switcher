@@ -124,6 +124,30 @@ The DEBUG-only host used synthetic fixtures, a temporary store, empty system/app
 | English/Korean and long strings | Catalog lint and exact runtime-bundle tests cover both languages; P2 adds 520×360 and 680×480 Korean accessibility-text fixtures for the changed auxiliary surfaces | The final 39-fixture/79-artifact review passed; interactive linguistic-quality audit remains pending |
 | Keyboard and accessibility structure | Localized AX policies cover labels, values, descriptions, validation metadata, de-duplicated profile rows, and explicit disclosure state/hint | Installed Return expands and Space collapses with AX value/hint/child presence updated. Full keyboard-only order and focused-control AX observation remain nonblocking follow-ups. VoiceOver was not run; full VoiceOver certification is excluded and unclaimed |
 
+## M4.12 UI polish evidence recorded on 2026-08-13
+
+This is a current working-tree implementation and verification record. The
+final integrated non-live `make verify` and current `git diff --check` pass.
+The local unsigned development package passed mounted universal-DMG
+verification; its SHA-256 is
+`1b1b2d5c0bf0b3dcfe7155ecae94648ffde693f8fffa7c1f427cd2e83b02f96e`.
+The behavior-focused commit remains pending, while install, CI, upload, tag,
+and publication evidence remain separate. Historical M4.8/M4.11 results are
+not reused.
+
+| Surface | Current implementation and deterministic evidence | Remaining boundary |
+| --- | --- | --- |
+| Fixed-width tray at accessibility text sizes | The 368-point tray moves header actions below the title and stacks profile-card actions at every accessibility Dynamic Type size. A recoverable destination, deletion, or operation failure is the first scroll card with a context-correct heading; its top anchor and Dismiss focus target keep the complete action visible, and deletion Cancel focus returns after dismissal. Focused tray/profile selections pass as part of the recorded 19 tests. | Current synthetic captures and viewport-bounds raster checks pass; installed native text-size behavior, full keyboard order, and focused-control AX remain manual. |
+| Profile option hierarchy and contrast | Option rows use reduced inset/radius, quieter normal surfaces, and stronger background/border/warning boundaries under the app's Increase Contrast environment. Inclusion is one localized **When applying · Included/Not included** label with a non-color symbol and switch; accessibility-sized summaries have unlimited lines and no fixed minimum/maximum control width. Profile/Icon/Revert/Save and related field copy use the explicit localization boundary. | Policy and offscreen evidence pass. Real macOS Increase Contrast, multiple physical displays, and a complete bilingual linguistic walkthrough remain unverified. |
+| Workflow spacing | Apply Preview, result, safety, error, permission, and dirty-draft roots share one 20-point inset token. Nineteen workflow action and five responsive-layout tests pass; the established Apply Preview scroll/action contract remains unchanged. | This is deterministic/offscreen evidence only; Apply was not invoked and no result or rollback was observed on hardware. |
+| Nested-source localization | The validator recursively scans app Swift sources and the five formerly missed nested-surface keys have exact English/Korean catalog values. Nine runtime localization tests and the final integrated lint/`make verify` pass. | Installed native linguistic quality remains manual. |
+| Synthetic render matrix | Four current attached/offscreen matrix tests pass across the expanded matrix, including `12c-partial-ko-accessibility3` and `25-audio-ko-accessibility5`, followed by selected focused captures. Raster checks bound the handoff card inside the tray viewport and require opaque tray and Apply Preview PNGs. | No tracked public media, installed screenshot, or release asset is added by this pass; the verified local package is development evidence only. |
+
+The detailed boundary is recorded in
+[UI-POLISH-AUDIT-2026-08-13.md](UI-POLISH-AUDIT-2026-08-13.md). These results
+must not be described as installed accessibility, VoiceOver, live mutation, or
+hardware rollback evidence.
+
 ## System capabilities
 
 | Group | Capability | API/mechanism | Status and evidence |

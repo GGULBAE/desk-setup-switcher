@@ -8,29 +8,27 @@ import Foundation
   import DeskSetupPresentation
 #endif
 
+private var appLocalizationResourceBundle: Bundle {
+  #if SWIFT_PACKAGE
+    Bundle.module
+  #else
+    Bundle.main
+  #endif
+}
+
 private var appRuntimeLocalizationBundle: Bundle {
   #if DEBUG
-    if let languageCode = ProcessInfo.processInfo.environment["DESK_SETUP_UI_AUDIT_LANGUAGE"] {
-      #if SWIFT_PACKAGE
-        if let path = Bundle.module.path(forResource: languageCode, ofType: "lproj"),
-          let bundle = Bundle(path: path)
-        {
-          return bundle
-        }
-      #else
-        if let path = Bundle.main.path(forResource: languageCode, ofType: "lproj"),
-          let bundle = Bundle(path: path)
-        {
-          return bundle
-        }
-      #endif
+    if let languageCode = ProcessInfo.processInfo.environment["DESK_SETUP_UI_AUDIT_LANGUAGE"],
+      let path = appLocalizationResourceBundle.path(
+        forResource: languageCode,
+        ofType: "lproj"
+      ),
+      let bundle = Bundle(path: path)
+    {
+      return bundle
     }
   #endif
-  #if SWIFT_PACKAGE
-    return Bundle.module
-  #else
-    return Bundle.main
-  #endif
+  return appLocalizationResourceBundle
 }
 
 func appResolvedProfileSymbolName(_ symbolName: String) -> String {
@@ -54,7 +52,7 @@ func appLocalizedRuntime(_ value: String) -> String {
 /// the host process language or global user defaults.
 func appLocalizedRuntime(_ value: String, languageCode: String) -> String {
   guard
-    let path = appRuntimeLocalizationBundle.path(
+    let path = appLocalizationResourceBundle.path(
       forResource: languageCode,
       ofType: "lproj"
     ),

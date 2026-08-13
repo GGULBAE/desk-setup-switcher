@@ -24,7 +24,7 @@ final class UserFacingLocalizationTests: XCTestCase {
     XCTAssertEqual(appLocalizedRuntime(key, languageCode: "en"), key)
     XCTAssertEqual(
       appLocalizedRuntime(key, languageCode: "ko"),
-      "macOS에서는 Capture 중 현재 Wi-Fi 네트워크 이름을 확인할 때 위치 서비스 권한이 필요할 수 있습니다. 책상 설정 전환기는 사용자의 좌표를 요청하거나 저장하지 않습니다."
+      "macOS에서는 캡처 중 현재 Wi-Fi 네트워크 이름을 확인할 때 위치 서비스 권한이 필요할 수 있습니다. 책상 설정 전환기는 사용자의 좌표를 요청하거나 저장하지 않습니다."
     )
   }
 
@@ -103,6 +103,40 @@ final class UserFacingLocalizationTests: XCTestCase {
     XCTAssertEqual(
       appLocalizedRuntime("Meeting · Applying…", languageCode: "ko"),
       "Meeting · 적용 중…"
+    )
+  }
+
+  func testNestedSurfaceCopyResolvesExactlyInEnglishAndKorean() {
+    let expectedTranslations = [
+      (
+        "Desk Setup Switcher — no profile is confirmed to match",
+        "책상 설정 전환기 — 일치하는 프로필이 확인되지 않음"
+      ),
+      ("When applying", "프로필 적용 시"),
+      ("Dismiss", "닫기"),
+      ("Could Not Delete Profile", "프로필을 삭제할 수 없음"),
+      ("Could Not Complete Action", "작업을 완료할 수 없음"),
+      ("The Settings window is unavailable.", "설정 창을 사용할 수 없습니다."),
+      ("The destination window could not be shown.", "대상 창을 표시할 수 없습니다."),
+      ("The destination window is unavailable.", "대상 창을 사용할 수 없습니다."),
+    ]
+
+    for (english, korean) in expectedTranslations {
+      XCTAssertEqual(appLocalizedRuntime(english, languageCode: "en"), english)
+      XCTAssertEqual(appLocalizedRuntime(english, languageCode: "ko"), korean)
+    }
+  }
+
+  func testExplicitLanguageResolutionDoesNotDependOnAuditEnvironment() {
+    setenv("DESK_SETUP_UI_AUDIT_LANGUAGE", "en", 1)
+    defer { unsetenv("DESK_SETUP_UI_AUDIT_LANGUAGE") }
+
+    XCTAssertEqual(
+      appLocalizedRuntime(
+        "The destination window could not be shown.",
+        languageCode: "ko"
+      ),
+      "대상 창을 표시할 수 없습니다."
     )
   }
 }

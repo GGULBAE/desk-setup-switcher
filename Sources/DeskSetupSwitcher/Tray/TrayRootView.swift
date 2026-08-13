@@ -26,6 +26,19 @@ enum TrayHeaderIconPolicy {
   static let quitSystemImage = "power"
 }
 
+enum TrayAdaptiveLayoutPolicy {
+  /// The tray has a deliberately fixed width. At accessibility sizes, moving
+  /// actions below the title prevents the trailing controls from being
+  /// compressed outside that viewport.
+  static func usesStackedHeader(for dynamicTypeSize: DynamicTypeSize) -> Bool {
+    dynamicTypeSize.isAccessibilitySize
+  }
+
+  static func usesStackedProfileCard(for dynamicTypeSize: DynamicTypeSize) -> Bool {
+    dynamicTypeSize.isAccessibilitySize
+  }
+}
+
 enum TrayCaptureAffordancePlacement: String, Equatable, Sendable {
   case compactHeader = "compact-header"
   case emptyStatePrimary = "empty-state-primary"
@@ -135,54 +148,76 @@ struct TrayRootView: View {
     }
   }
 
+  @ViewBuilder
   private var header: some View {
-    HStack(spacing: 8) {
-      Label(appLocalized("Desk Setup Switcher"), systemImage: "switch.2")
-        .font(.headline)
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .layoutPriority(1)
-        .accessibilityAddTraits(.isHeader)
-
-      Spacer(minLength: 8)
-
-      if captureAffordancePlacement.showsCompactHeader {
-        Button {
-          route(presentation.captureAction)
-        } label: {
-          Label(appLocalized("Capture"), systemImage: "camera.metering.center.weighted")
-            .labelStyle(.iconOnly)
-            .frame(width: 20, height: 20)
+    if TrayAdaptiveLayoutPolicy.usesStackedHeader(for: dynamicTypeSize) {
+      VStack(alignment: .leading, spacing: 8) {
+        headerTitle
+        HStack(spacing: 8) {
+          Spacer(minLength: 0)
+          headerActions
         }
-        .buttonStyle(.bordered)
-        .controlSize(.regular)
-        .frame(minWidth: 32, minHeight: 32)
-        .disabled(isCaptureDisabled)
-        .focused($focusedControl, equals: captureAffordancePlacement.focusTarget)
-        .accessibilityLabel(appLocalizedRuntime(TrayAccessibilityCopy.captureLabel))
-        .help(appLocalizedRuntime(TrayAccessibilityCopy.captureHelp))
       }
-
-      iconButton(
-        action: .openSettings,
-        title: TrayAccessibilityCopy.settingsLabel,
-        help: TrayAccessibilityCopy.settingsHelp,
-        systemImage: "gearshape"
-      )
-      .keyboardShortcut(",")
-
-      iconButton(
-        action: .quit,
-        title: TrayAccessibilityCopy.quitLabel,
-        help: model.isProfileMutationLocked
-          ? "Quit becomes available after the current apply transaction is safely recorded."
-          : TrayAccessibilityCopy.quitHelp,
-        systemImage: TrayHeaderIconPolicy.quitSystemImage,
-        isDisabled: model.isProfileMutationLocked
-      )
-      .keyboardShortcut("q")
+      .frame(minHeight: TrayGeometry.headerHeight)
+    } else {
+      HStack(spacing: 8) {
+        headerTitle
+        Spacer(minLength: 8)
+        headerActions
+      }
+      .frame(minHeight: TrayGeometry.headerHeight)
     }
-    .frame(minHeight: TrayGeometry.headerHeight)
+  }
+
+  private var headerTitle: some View {
+    Label(appLocalized("Desk Setup Switcher"), systemImage: "switch.2")
+      .font(.headline)
+      .lineLimit(
+        TrayAdaptiveLayoutPolicy.usesStackedHeader(for: dynamicTypeSize) ? 2 : 1
+      )
+      .truncationMode(.tail)
+      .fixedSize(horizontal: false, vertical: true)
+      .layoutPriority(1)
+      .accessibilityAddTraits(.isHeader)
+  }
+
+  @ViewBuilder
+  private var headerActions: some View {
+    if captureAffordancePlacement.showsCompactHeader {
+      Button {
+        route(presentation.captureAction)
+      } label: {
+        Label(appLocalized("Capture"), systemImage: "camera.metering.center.weighted")
+          .labelStyle(.iconOnly)
+          .frame(width: 20, height: 20)
+      }
+      .buttonStyle(.bordered)
+      .controlSize(.regular)
+      .frame(minWidth: 32, minHeight: 32)
+      .disabled(isCaptureDisabled)
+      .focused($focusedControl, equals: captureAffordancePlacement.focusTarget)
+      .accessibilityLabel(appLocalizedRuntime(TrayAccessibilityCopy.captureLabel))
+      .help(appLocalizedRuntime(TrayAccessibilityCopy.captureHelp))
+    }
+
+    iconButton(
+      action: .openSettings,
+      title: TrayAccessibilityCopy.settingsLabel,
+      help: TrayAccessibilityCopy.settingsHelp,
+      systemImage: "gearshape"
+    )
+    .keyboardShortcut(",")
+
+    iconButton(
+      action: .quit,
+      title: TrayAccessibilityCopy.quitLabel,
+      help: model.isProfileMutationLocked
+        ? "Quit becomes available after the current apply transaction is safely recorded."
+        : TrayAccessibilityCopy.quitHelp,
+      systemImage: TrayHeaderIconPolicy.quitSystemImage,
+      isDisabled: model.isProfileMutationLocked
+    )
+    .keyboardShortcut("q")
   }
 
   private var captureAffordancePlacement: TrayCaptureAffordancePlacement {
@@ -215,12 +250,12 @@ struct TrayRootView: View {
     ScrollViewReader { proxy in
       ScrollView {
         VStack(alignment: .leading, spacing: TrayGeometry.sectionGap) {
+          handoffError
           profileContent
             .id(TrayScrollAnchor.top)
           captureStatus
           captureSummary
           applySummary
-          handoffError
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .padding(.bottom, 2)
@@ -230,11 +265,19 @@ struct TrayRootView: View {
       .scrollBounceBehavior(.basedOnSize)
       .scrollIndicators(.automatic)
       .contentMargins(.vertical, 0, for: .scrollContent)
-      .onChange(of: presentation.scrollResetRequest) { _, request in
-        guard request?.anchor == .top else { return }
-        proxy.scrollTo(TrayScrollAnchor.top, anchor: .top)
+      .task(id: presentation.scrollResetRequest) {
+        guard let request = presentation.scrollResetRequest else { return }
+        await Task.yield()
+        switch request.anchor {
+        case .top:
+          proxy.scrollTo(TrayScrollAnchor.top, anchor: .top)
+        case .handoffError:
+          proxy.scrollTo(TrayScrollAnchor.handoffError, anchor: .top)
+        }
       }
-      .onChange(of: presentation.focusTarget) { _, target in
+      .task(id: presentation.focusRequest) {
+        await Task.yield()
+        let target = presentation.focusRequest.target
         focusedControl = target
         guard let profileID = target?.scrollProfileID else { return }
         proxy.scrollTo(profileID, anchor: .center)
@@ -418,7 +461,7 @@ struct TrayRootView: View {
   private var handoffError: some View {
     if let message = presentation.handoffError {
       VStack(alignment: .leading, spacing: 7) {
-        Label(appLocalized("Could Not Open Destination"), systemImage: "exclamationmark.triangle")
+        Label(presentation.handoffErrorTitle, systemImage: "exclamationmark.triangle")
           .font(.caption.bold())
         Text(message)
           .font(.caption)
@@ -426,11 +469,13 @@ struct TrayRootView: View {
           presentation.dismissHandoffError()
         }
         .controlSize(.small)
+        .focused($focusedControl, equals: .handoffError)
       }
       .padding(TrayGeometry.cardPadding)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
       .accessibilityElement(children: .contain)
+      .id(TrayScrollAnchor.handoffError)
     }
   }
 
@@ -504,6 +549,8 @@ extension TrayFocusTarget {
     case .delete(let profileID), .cancelDelete(let profileID), .profile(let profileID):
       profileID
     case .capture, .emptyState:
+      nil
+    case .handoffError:
       nil
     }
   }

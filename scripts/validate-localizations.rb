@@ -87,7 +87,8 @@ end
 
 catalog_path = File.join(RESOURCE_ROOT, "en.lproj", "Localizable.strings")
 catalog = load_dictionary(catalog_path)
-swift_source = Dir[File.join(ROOT, "Sources", "DeskSetupSwitcher", "*.swift")]
+swift_source = Dir[File.join(ROOT, "Sources", "DeskSetupSwitcher", "**", "*.swift")]
+  .reject { |path| File.basename(path) == "resource_bundle_accessor.swift" }
   .sort
   .map { |path| File.read(path) }
   .join("\n")

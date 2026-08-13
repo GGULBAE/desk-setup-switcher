@@ -89,7 +89,7 @@
 "Refresh Status" = "상태 새로 고침";
 "macOS accepts login-item registration only for an eligible installed and code-signed app. The requested preference does not guarantee registration." = "macOS는 적합한 위치에 설치되고 코드 서명된 앱의 로그인 항목 등록만 허용합니다. 사용자가 요청한 설정이 실제 등록을 보장하지는 않습니다.";
 "System permissions" = "시스템 권한";
-"macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates." = "macOS에서는 Capture 중 현재 Wi-Fi 네트워크 이름을 확인할 때 위치 서비스 권한이 필요할 수 있습니다. 책상 설정 전환기는 사용자의 좌표를 요청하거나 저장하지 않습니다.";
+"macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates." = "macOS에서는 캡처 중 현재 Wi-Fi 네트워크 이름을 확인할 때 위치 서비스 권한이 필요할 수 있습니다. 책상 설정 전환기는 사용자의 좌표를 요청하거나 저장하지 않습니다.";
 "Location" = "위치";
 "Request Location Access" = "위치 접근 요청";
 "Shows the macOS permission prompt only after this explanation" = "이 설명을 표시한 후에만 macOS 권한 요청을 표시합니다";
@@ -1054,7 +1054,7 @@
 /* 캡처 권한 및 조치 가능한 결과 */
 "Capture Without Wi-Fi" = "Wi-Fi 없이 캡처";
 "Allow Location and Capture" = "위치 접근 허용 후 캡처";
-"Location access lets macOS reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates." = "위치 접근을 허용하면 macOS가 Capture 중 현재 Wi-Fi 네트워크 이름을 제공할 수 있습니다. 책상 설정 전환기는 사용자의 좌표를 요청하거나 저장하지 않습니다.";
+"Location access lets macOS reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates." = "위치 접근을 허용하면 macOS가 캡처 중 현재 Wi-Fi 네트워크 이름을 제공할 수 있습니다. 책상 설정 전환기는 사용자의 좌표를 요청하거나 저장하지 않습니다.";
 "Location Access Is Off" = "위치 접근이 꺼져 있습니다";
 "Location Access Is Ready" = "위치 접근을 사용할 수 있습니다";
 "Location access is enabled. Capture the current settings to include the current Wi-Fi network." = "위치 접근이 허용되었습니다. 현재 Wi-Fi 네트워크를 포함하려면 현재 설정을 캡처하세요.";
@@ -1071,8 +1071,12 @@
 "%lld applicable settings saved." = "적용 가능한 설정 %lld개를 저장했습니다.";
 "%lld applicable settings saved; %lld permission required." = "적용 가능한 설정 %lld개를 저장했으며 권한 %lld개가 필요합니다.";
 "Could Not Open Destination" = "대상 화면을 열 수 없음";
+"Could Not Delete Profile" = "프로필을 삭제할 수 없음";
+"Could Not Complete Action" = "작업을 완료할 수 없음";
 "Current Mac matches this profile" = "현재 Mac이 이 프로필과 일치함";
+"Desk Setup Switcher — no profile is confirmed to match" = "책상 설정 전환기 — 일치하는 프로필이 확인되지 않음";
 "Desk Setup Switcher Workflow" = "책상 설정 전환기 작업";
+"Dismiss" = "닫기";
 "Location access was not granted." = "위치 접근이 허용되지 않았습니다.";
 "No apply result is available." = "사용 가능한 적용 결과가 없습니다.";
 "Opening the destination was cancelled." = "대상 화면 열기가 취소되었습니다.";
@@ -1080,10 +1084,13 @@
 "Opens persistent Desk Setup Switcher settings." = "닫히지 않는 책상 설정 전환기 설정 창을 엽니다.";
 "Review Permission" = "권한 검토";
 "Settings…" = "설정…";
+"The Settings window is unavailable." = "설정 창을 사용할 수 없습니다.";
 "The apply workflow window is unavailable." = "적용 작업 창을 사용할 수 없습니다.";
 "The capture service is unavailable." = "캡처 서비스를 사용할 수 없습니다.";
 "The destination could not be opened." = "대상 화면을 열 수 없습니다.";
+"The destination window could not be shown." = "대상 창을 표시할 수 없습니다.";
 "The destination window did not become visible and active." = "대상 창이 표시되고 활성화되지 않았습니다.";
+"The destination window is unavailable." = "대상 창을 사용할 수 없습니다.";
 "The permission workflow window is unavailable." = "권한 작업 창을 사용할 수 없습니다.";
 "The result window is unavailable." = "결과 창을 사용할 수 없습니다.";
 "The workflow window is unavailable." = "작업 창을 사용할 수 없습니다.";
@@ -1196,6 +1203,7 @@
 "Export uses saved profiles only. Unsaved changes are not included." = "내보내기에는 저장된 프로필만 사용됩니다. 저장하지 않은 변경사항은 포함되지 않습니다.";
 "Exports all saved profiles to a local JSON file; the unsaved draft is not included" = "저장된 모든 프로필을 로컬 JSON 파일로 내보냅니다. 저장하지 않은 초안은 포함하지 않습니다";
 "Apply with profile" = "프로필 적용에 포함";
+"When applying" = "프로필 적용 시";
 "%@: Apply with profile" = "%@: 프로필 적용에 포함";
 "Not included" = "포함되지 않음";
 "Included in profile application" = "프로필 적용에 포함됨";

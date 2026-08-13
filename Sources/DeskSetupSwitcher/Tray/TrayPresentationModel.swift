@@ -42,15 +42,50 @@ enum TrayFocusTarget: Hashable, Sendable {
   case cancelDelete(UUID)
   case profile(UUID)
   case emptyState
+  case handoffError
 }
 
 enum TrayScrollAnchor: Hashable, Sendable {
   case top
+  case handoffError
+}
+
+enum TrayPresentedErrorKind: Equatable, Sendable {
+  case destinationHandoff
+  case profileDeletion
+  case operation
+
+  var titleKey: String {
+    switch self {
+    case .destinationHandoff:
+      "Could Not Open Destination"
+    case .profileDeletion:
+      "Could Not Delete Profile"
+    case .operation:
+      "Could Not Complete Action"
+    }
+  }
+}
+
+struct TrayFocusRequest: Equatable, Sendable {
+  let target: TrayFocusTarget?
+  let revision: UInt64
 }
 
 struct TrayScrollResetRequest: Equatable, Sendable {
   let sessionGeneration: UInt64
   let anchor: TrayScrollAnchor
+  let revision: UInt64
+
+  init(
+    sessionGeneration: UInt64,
+    anchor: TrayScrollAnchor,
+    revision: UInt64 = 0
+  ) {
+    self.sessionGeneration = sessionGeneration
+    self.anchor = anchor
+    self.revision = revision
+  }
 }
 
 enum TrayCapturePhase: Equatable, Sendable {
@@ -128,11 +163,13 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   @Published private(set) var deletion = MenuProfileDeletionState()
   @Published private(set) var deletionInFlightProfileID: UUID?
   @Published private(set) var focusTarget: TrayFocusTarget?
+  @Published private var focusRequestRevision: UInt64 = 0
   @Published private(set) var capturePhase: TrayCapturePhase = .idle
   @Published private(set) var permissionWorkflowNotice: String?
   @Published private(set) var permissionWorkflowError: String?
   @Published private(set) var isWorkflowTaskInFlight = false
   @Published private(set) var handoffError: String?
+  @Published private(set) var handoffErrorKind: TrayPresentedErrorKind?
   @Published private(set) var activeSessionGeneration: UInt64?
   @Published private(set) var scrollResetRequest: TrayScrollResetRequest?
   @Published private(set) var viewport: CGSize = .zero
@@ -156,9 +193,20 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   private var permissionTaskID: UUID?
   private var workflowTask: Task<Void, Never>?
   private var workflowTaskGeneration: UInt64 = 0
+  private var scrollRequestRevision: UInt64 = 0
   private var inFlightApplyDraftPrompt: TrayApplyDraftPrompt?
   private var applyDraftRetryAfterError: TrayApplyDraftPrompt?
   private var surfaceDismissRequest: (@MainActor (UInt64) -> Void)?
+
+  var focusRequest: TrayFocusRequest {
+    TrayFocusRequest(target: focusTarget, revision: focusRequestRevision)
+  }
+
+  var handoffErrorTitle: String {
+    appLocalizedRuntime(
+      handoffErrorKind?.titleKey ?? TrayPresentedErrorKind.operation.titleKey
+    )
+  }
   private var statusItemPresentationHandler: (@MainActor (TrayStatusItemPresentation) -> Void)?
   private var modelStatusObservation: AnyCancellable?
   private var locationAuthorizationObservation: AnyCancellable?
@@ -211,7 +259,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
         guard status == .authorized || status == .authorizedAlways else { return }
         self?.permissionWorkflowNotice = nil
         self?.permissionWorkflowError = nil
-        self?.handoffError = nil
+        self?.clearHandoffError()
       }
   }
 
@@ -327,6 +375,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   #endif
 
   func trayDidOpen(sessionGeneration: UInt64, viewport: CGSize) {
+    scrollRequestRevision = 0
     activeSessionGeneration = sessionGeneration
     self.viewport = viewport
     isTrayVisible = true
@@ -337,8 +386,14 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     guard activeSessionGeneration == sessionGeneration else { return }
     scrollResetRequest = TrayScrollResetRequest(
       sessionGeneration: sessionGeneration,
-      anchor: .top
+      anchor: handoffError == nil ? .top : .handoffError,
+      revision: scrollRequestRevision
     )
+    if handoffError != nil {
+      focusTarget = .handoffError
+    } else if let pendingProfileID = deletion.pendingProfileID {
+      focusTarget = .cancelDelete(pendingProfileID)
+    }
   }
 
   func trayDidClose(sessionGeneration: UInt64) {
@@ -404,12 +459,27 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   }
 
   func reportHandoffFailure(_ message: String) {
+    reportPresentedError(message, kind: .destinationHandoff)
+  }
+
+  private func reportPresentedError(_ message: String, kind: TrayPresentedErrorKind) {
     handoffError = message
+    handoffErrorKind = kind
+    focusTarget = .handoffError
+    focusRequestRevision &+= 1
+    if let activeSessionGeneration {
+      scrollRequestRevision &+= 1
+      scrollResetRequest = TrayScrollResetRequest(
+        sessionGeneration: activeSessionGeneration,
+        anchor: .handoffError,
+        revision: scrollRequestRevision
+      )
+    }
     AccessibilityNotification.Announcement(message).post()
   }
 
   func dismissHandoffError() {
-    handoffError = nil
+    clearHandoffError()
   }
 
   func setWorkflowDestination(_ destination: TrayDestination?) {
@@ -430,7 +500,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     consumeTerminalCapturePhase()
     permissionWorkflowNotice = nil
     permissionWorkflowError = nil
-    handoffError = nil
+    clearHandoffError()
     setWorkflowDestination(.permission(workflow))
   }
 
@@ -623,7 +693,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   func saveDraftThenCapture() {
     guard workflowTask == nil else { return }
     permissionWorkflowError = nil
-    handoffError = nil
+    clearHandoffError()
     let generation = beginWorkflowTaskGeneration()
     workflowTask = Task { @MainActor [weak self] in
       guard let self else { return }
@@ -669,7 +739,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     guard permissionTask == nil else { return }
     permissionWorkflowNotice = nil
     permissionWorkflowError = nil
-    handoffError = nil
+    clearHandoffError()
     let taskID = UUID()
     permissionTaskID = taskID
     permissionTask = Task { @MainActor [weak self] in
@@ -718,7 +788,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
 
   func openLocationSystemSettings() {
     permissionWorkflowError = nil
-    handoffError = nil
+    clearHandoffError()
     locationPermission.openSystemSettings()
     if let error = locationPermission.lastError {
       reportPermissionWorkflowError(error)
@@ -735,7 +805,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     guard captureTask == nil else { return }
     permissionWorkflowNotice = nil
     permissionWorkflowError = nil
-    handoffError = nil
+    clearHandoffError()
     transientMessageTask?.cancel()
     transientMessageTask = nil
     capturePhase = .running
@@ -799,10 +869,10 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
       } else {
         focusTarget = .profile(remaining[min(index, remaining.count - 1)].id)
       }
-      handoffError = nil
+      clearHandoffError()
 
     case .rejected(let message):
-      reportHandoffFailure(message)
+      reportPresentedError(message, kind: .profileDeletion)
     }
   }
 
@@ -872,7 +942,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     let message = appLocalized(
       "Location access was not granted. Choose Capture Without Wi-Fi or open System Settings."
     )
-    handoffError = nil
+    clearHandoffError()
     permissionWorkflowNotice = message
     permissionWorkflowError = nil
     setWorkflowDestination(.permission(.captureDenied))
@@ -882,7 +952,18 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   private func reportPermissionWorkflowError(_ message: String) {
     permissionWorkflowNotice = nil
     permissionWorkflowError = message
-    reportHandoffFailure(message)
+    reportPresentedError(message, kind: .operation)
+  }
+
+  /// Removes an error-owned focus request along with its card. If an inline
+  /// deletion decision is still pending, its safe Cancel action becomes the
+  /// next focus target only after the user has dismissed the error.
+  private func clearHandoffError() {
+    handoffError = nil
+    handoffErrorKind = nil
+    guard focusTarget == .handoffError else { return }
+    focusTarget = deletion.pendingProfileID.map(TrayFocusTarget.cancelDelete)
+    focusRequestRevision &+= 1
   }
 
   private func ownsPermissionTask(_ taskID: UUID) -> Bool {

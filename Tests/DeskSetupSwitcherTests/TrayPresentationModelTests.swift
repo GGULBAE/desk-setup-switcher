@@ -107,6 +107,86 @@ import Testing
       }
     }
 
+    @Test("handoff failures move focus and scrolling to the recoverable error")
+    func handoffFailureVisibilityPolicy() async {
+      let model = UIAuditFixtures.makeModel(configuration: .disabled)
+      let presentation = makePresentation(model: model)
+      let viewport = CGSize(width: 368, height: 260)
+
+      presentation.trayDidOpen(sessionGeneration: 31, viewport: viewport)
+      presentation.trayContentDidAttach(sessionGeneration: 31)
+      #expect(
+        presentation.scrollResetRequest
+          == TrayScrollResetRequest(sessionGeneration: 31, anchor: .top)
+      )
+
+      presentation.reportHandoffFailure("Synthetic destination failure")
+
+      #expect(presentation.focusTarget == .handoffError)
+      #expect(presentation.handoffErrorKind == .destinationHandoff)
+      #expect(presentation.handoffErrorTitle == "Could Not Open Destination")
+      #expect(
+        presentation.scrollResetRequest
+          == TrayScrollResetRequest(
+            sessionGeneration: 31,
+            anchor: .handoffError,
+            revision: 1
+          )
+      )
+
+      presentation.dismissHandoffError()
+      #expect(presentation.handoffError == nil)
+      #expect(presentation.focusTarget == nil)
+
+      let profileID = model.profiles[0].id
+      await presentation.executeStayOpen(.requestDelete(profileID))
+      let focusRequestBeforeFailure = presentation.focusRequest
+      presentation.reportHandoffFailure("Synthetic persistence failure")
+
+      #expect(presentation.focusTarget == .handoffError)
+      #expect(presentation.focusRequest.target == .handoffError)
+      #expect(presentation.focusRequest != focusRequestBeforeFailure)
+      #expect(
+        presentation.scrollResetRequest
+          == TrayScrollResetRequest(
+            sessionGeneration: 31,
+            anchor: .handoffError,
+            revision: 2
+          )
+      )
+
+      presentation.trayDidClose(sessionGeneration: 31)
+      presentation.trayDidOpen(sessionGeneration: 32, viewport: viewport)
+      presentation.trayContentDidAttach(sessionGeneration: 32)
+      #expect(presentation.focusTarget == .handoffError)
+      #expect(
+        presentation.scrollResetRequest
+          == TrayScrollResetRequest(sessionGeneration: 32, anchor: .handoffError)
+      )
+
+      presentation.dismissHandoffError()
+      #expect(presentation.handoffError == nil)
+      #expect(presentation.focusTarget == .cancelDelete(profileID))
+      #expect(presentation.focusRequest.target == .cancelDelete(profileID))
+    }
+
+    @Test("starting a new workflow clears an error-owned focus request")
+    func handoffFocusDoesNotOutliveItsError() {
+      let model = UIAuditFixtures.makeModel(configuration: .disabled)
+      let presentation = makePresentation(model: model)
+
+      presentation.reportHandoffFailure("Synthetic destination failure")
+      let errorFocusRequest = presentation.focusRequest
+      #expect(errorFocusRequest.target == .handoffError)
+
+      presentation.beginPermissionWorkflow(.systemSettings)
+
+      #expect(presentation.handoffError == nil)
+      #expect(presentation.focusTarget == nil)
+      #expect(presentation.focusRequest.target == nil)
+      #expect(presentation.focusRequest != errorFocusRequest)
+    }
+
     @Test("delete confirmation focuses cancel, then delete, then the next profile")
     func deletionFocusPolicy() async {
       let fixture = UIAuditFixtures.fixture(.overview)

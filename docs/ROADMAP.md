@@ -236,6 +236,18 @@ The P2 pass does not include profile-store path hardening, Apply/Capture executi
 
 Release publication, push, Gatekeeper, physical Intel, required TCC testing, signing/notarization, and any live mutation-and-rollback procedure remain separate and require their own authorization boundaries in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md). Full VoiceOver certification is excluded and unclaimed, not a deferred release task.
 
+## M4.12 — fixed-width accessibility and visual polish (implemented; local verification passed)
+
+- Reflow the 368-point tray header into a title row plus a dedicated action row at accessibility text sizes, and stack profile-card actions at every accessibility Dynamic Type size.
+- Put recoverable destination, deletion, and operation failures first in the tray scroll with context-correct headings, then use one top anchor and Dismiss focus path so the complete error card stays visible. A pending deletion regains safe Cancel focus only after the error is dismissed.
+- Flatten profile option rows with smaller inset/radius and quieter normal boundaries, then strengthen their background, border, and warning boundary under Increase Contrast.
+- Replace the split inclusion caption/state with one localized, non-color **When applying · Included/Not included** label beside the existing symbol and switch. Accessibility-sized summaries have unlimited lines and no fixed control width. Route Profile, Name, Icon, imported-symbol, Revert, and Save copy explicitly through the app localization boundary.
+- Give Apply Preview, result, protected safety, error, permission, and dirty-draft workflow roots one 20-point content-inset token without changing the established Apply Preview scroll order, action reachability, Escape behavior, or non-default Apply action.
+- Make static localization-key validation recursive across nested Settings, Tray, and Workflow sources and add exact English/Korean translations for the five previously uncovered nested-surface messages.
+- Record the working-tree decisions and evidence boundary in [UI-POLISH-AUDIT-2026-08-13.md](UI-POLISH-AUDIT-2026-08-13.md). Focused selections pass: 19 tray/profile policy tests, nine runtime-localization tests, 19 workflow action tests, five responsive-layout tests, and four current attached/offscreen matrix tests. The expanded matrix includes `12c-partial-ko-accessibility3` and `25-audio-ko-accessibility5`; raster checks keep the handoff card inside the tray viewport and require opaque tray and Apply Preview PNGs, with follow-up selected captures for focused review.
+
+The final integrated non-live `make verify` and current `git diff --check` pass: 194 XCTest cases, 331 Swift Testing cases across 39 suites, one isolated native popover regression, release tooling, builds, Analyze, package, and mounted universal-DMG verification completed successfully. The local unsigned development DMG SHA-256 is `1b1b2d5c0bf0b3dcfe7155ecae94648ffde693f8fffa7c1f427cd2e83b02f96e`; it was not installed, uploaded, or published. The behavior-focused commit remains the final local ledger gate, and no installed-app, real accessibility-setting, Capture/Apply, TCC/login, Keychain, CI, or hardware-mutation evidence is claimed by M4.12.
+
 ## M6 — Free open-source public beta release (unsigned GitHub path selected; execution/publication pending)
 
 The first public beta remains bounded to the simple **Capture → Edit → Review & Apply** product flow. It does not add accounts, cloud services, telemetry, automatic profile switching, arbitrary shell execution, UI automation, private APIs, or a new plugin/SDK surface.

@@ -1071,8 +1071,12 @@
 "%lld applicable settings saved." = "%lld applicable settings saved.";
 "%lld applicable settings saved; %lld permission required." = "%lld applicable settings saved; %lld permission required.";
 "Could Not Open Destination" = "Could Not Open Destination";
+"Could Not Delete Profile" = "Could Not Delete Profile";
+"Could Not Complete Action" = "Could Not Complete Action";
 "Current Mac matches this profile" = "Current Mac matches this profile";
+"Desk Setup Switcher — no profile is confirmed to match" = "Desk Setup Switcher — no profile is confirmed to match";
 "Desk Setup Switcher Workflow" = "Desk Setup Switcher Workflow";
+"Dismiss" = "Dismiss";
 "Location access was not granted." = "Location access was not granted.";
 "No apply result is available." = "No apply result is available.";
 "Opening the destination was cancelled." = "Opening the destination was cancelled.";
@@ -1080,10 +1084,13 @@
 "Opens persistent Desk Setup Switcher settings." = "Opens persistent Desk Setup Switcher settings.";
 "Review Permission" = "Review Permission";
 "Settings…" = "Settings…";
+"The Settings window is unavailable." = "The Settings window is unavailable.";
 "The apply workflow window is unavailable." = "The apply workflow window is unavailable.";
 "The capture service is unavailable." = "The capture service is unavailable.";
 "The destination could not be opened." = "The destination could not be opened.";
+"The destination window could not be shown." = "The destination window could not be shown.";
 "The destination window did not become visible and active." = "The destination window did not become visible and active.";
+"The destination window is unavailable." = "The destination window is unavailable.";
 "The permission workflow window is unavailable." = "The permission workflow window is unavailable.";
 "The result window is unavailable." = "The result window is unavailable.";
 "The workflow window is unavailable." = "The workflow window is unavailable.";
@@ -1196,6 +1203,7 @@
 "Export uses saved profiles only. Unsaved changes are not included." = "Export uses saved profiles only. Unsaved changes are not included.";
 "Exports all saved profiles to a local JSON file; the unsaved draft is not included" = "Exports all saved profiles to a local JSON file; the unsaved draft is not included";
 "Apply with profile" = "Apply with profile";
+"When applying" = "When applying";
 "%@: Apply with profile" = "%@: Apply with profile";
 "Not included" = "Not included";
 "Included in profile application" = "Included in profile application";

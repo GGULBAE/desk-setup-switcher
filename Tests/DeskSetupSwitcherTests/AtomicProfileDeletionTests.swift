@@ -259,8 +259,10 @@ struct AtomicProfileDeletionTests {
 
     let expectedError = appLocalized("A local profile storage operation failed.")
     #expect(presentation.deletion.pendingProfileID == profile.id)
-    #expect(presentation.focusTarget == .cancelDelete(profile.id))
+    #expect(presentation.focusTarget == .handoffError)
     #expect(presentation.handoffError == expectedError)
+    #expect(presentation.handoffErrorKind == .profileDeletion)
+    #expect(presentation.handoffErrorTitle == "Could Not Delete Profile")
     #expect(presentation.isTrayVisible)
     #expect(editor.draft == draftBefore)
     #expect(editor.isDirty)
@@ -272,6 +274,11 @@ struct AtomicProfileDeletionTests {
     #expect(await failingStore.currentDocument() == documentBefore)
     #expect(try Data(contentsOf: locations.primaryURL) == primaryBefore)
     #expect(!loginItem.mutatedRegistration)
+
+    presentation.dismissHandoffError()
+    #expect(presentation.handoffError == nil)
+    #expect(presentation.deletion.pendingProfileID == profile.id)
+    #expect(presentation.focusTarget == .cancelDelete(profile.id))
   }
 
   @Test("dirty deletion confirmation explicitly names unsaved-change loss in both languages")

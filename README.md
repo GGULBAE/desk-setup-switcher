@@ -35,6 +35,8 @@ The screenshots contain synthetic data from a non-mutating demo state. They show
 When a saved profile matches the current Mac, the menu-bar indicator shows its profile name on one horizontal line.
 The App Information page keeps its four project links centered as one compact group, with aligned icon and text columns.
 
+The current M4.12 polish keeps the fixed 368-point tray usable by moving header actions to their own row and stacking profile-card actions at every accessibility Dynamic Type size. A destination-handoff failure is the first card in the tray scroll, with a top anchor and focus target that keep its Dismiss action fully visible. Profile options use a flatter, Increase Contrast-aware treatment and one **When applying · Included/Not included** cue; at accessibility sizes that summary has no line limit or fixed width. Every app-owned workflow also uses the same 20-point content inset without changing Apply Preview's review-to-decision contract. Focused deterministic, synthetic offscreen/raster, and the final integrated non-live `make verify` checks pass. See the [2026-08-13 UI polish audit](docs/UI-POLISH-AUDIT-2026-08-13.md).
+
 ## Install
 
 Supported binaries will be provided only through versioned GitHub Releases. There is no App Store release and the initial public beta does not require a paid Apple Developer Program membership. When this README identifies a release as supported:

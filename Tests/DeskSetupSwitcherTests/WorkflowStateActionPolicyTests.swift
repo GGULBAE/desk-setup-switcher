@@ -110,6 +110,58 @@ import Testing
       #expect(WorkflowErrorActionPolicy.actions == [.close])
     }
 
+    @Test("app-owned workflow roots share one 20-point content inset")
+    func workflowRootsShareContentInset() throws {
+      #expect(WorkflowSurfaceMetrics.contentInset == 20)
+
+      let testFile = URL(fileURLWithPath: #filePath)
+      let repositoryRoot =
+        testFile
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+      let sourceURL = repositoryRoot.appendingPathComponent(
+        "Sources/DeskSetupSwitcher/Workflow/TrayWorkflowWindowController.swift"
+      )
+      let source = try String(contentsOf: sourceURL, encoding: .utf8)
+      let rootPadding = ".padding(WorkflowSurfaceMetrics.contentInset)"
+      let rootSurfaceMarkers = [
+        (
+          "struct ApplyPreviewView: View {",
+          "\n  private var applyActionBar: some View {"
+        ),
+        (
+          "struct ApplyResultDetailsView: View {",
+          "\n  @ViewBuilder\n  private var resultFooter: some View {"
+        ),
+        (
+          "struct SafetyConfirmationView: View {",
+          "\n@MainActor\nprotocol TrayWorkflowWindowPresenting"
+        ),
+        (
+          "struct WorkflowErrorView: View {",
+          "\nprivate enum WorkflowRootAccessibilityFocusTarget"
+        ),
+        (
+          "  private func permissionWorkflow(_ workflow: TrayPermissionWorkflow) -> some View {",
+          "\n  private func permissionAction(_ kind: PermissionWorkflowActionKind)"
+        ),
+        (
+          "  private func dirtyApplyPrompt(_ prompt: TrayApplyDraftPrompt) -> some View {",
+          "\n  private func dirtyApplyActions(_ prompt: TrayApplyDraftPrompt)"
+        ),
+      ]
+
+      for (start, end) in rootSurfaceMarkers {
+        let surface = try #require(sourceSlice(source, after: start, before: end))
+        #expect(surface.contains(rootPadding))
+        #expect(!surface.contains(".padding(24)"))
+      }
+
+      #expect(source.components(separatedBy: rootPadding).count - 1 == rootSurfaceMarkers.count)
+      #expect(!source.contains(".padding(24)"))
+    }
+
     @Test("permission and apply CTA copy stays exact in English and Korean")
     func localizedActionCopyMatchesVisibleOutcomes() {
       #expect(

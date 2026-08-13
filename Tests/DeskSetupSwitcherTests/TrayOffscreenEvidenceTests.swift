@@ -18,6 +18,43 @@ import Testing
       let largeText: Bool
       let reduceTransparency: Bool
       let increasedContrast: Bool
+      let handoffErrorKey: String?
+      let dynamicTypeSizeOverride: DynamicTypeSize?
+      let usesPartialProfileOnly: Bool
+
+      var dynamicTypeSize: DynamicTypeSize {
+        dynamicTypeSizeOverride ?? (largeText ? .accessibility3 : .large)
+      }
+
+      var dynamicTypeName: String {
+        dynamicTypeSizeOverride == .accessibility5
+          ? "accessibility5"
+          : (largeText ? "accessibility3" : "large")
+      }
+
+      init(
+        name: String,
+        variant: UIAuditVariant,
+        languageCode: String,
+        colorScheme: ColorScheme,
+        largeText: Bool,
+        reduceTransparency: Bool,
+        increasedContrast: Bool,
+        handoffErrorKey: String? = nil,
+        dynamicTypeSizeOverride: DynamicTypeSize? = nil,
+        usesPartialProfileOnly: Bool = false
+      ) {
+        self.name = name
+        self.variant = variant
+        self.languageCode = languageCode
+        self.colorScheme = colorScheme
+        self.largeText = largeText
+        self.reduceTransparency = reduceTransparency
+        self.increasedContrast = increasedContrast
+        self.handoffErrorKey = handoffErrorKey
+        self.dynamicTypeSizeOverride = dynamicTypeSizeOverride
+        self.usesPartialProfileOnly = usesPartialProfileOnly
+      }
     }
 
     struct TrayActionCopy {
@@ -41,6 +78,28 @@ import Testing
       let displayMode: UIAuditDisplayMode
       let size: CGSize
       let state: State
+      let dynamicTypeSizeOverride: DynamicTypeSize?
+
+      var dynamicTypeSize: DynamicTypeSize {
+        dynamicTypeSizeOverride ?? (displayMode == .largeText ? .accessibility3 : .large)
+      }
+
+      var dynamicTypeName: String {
+        dynamicTypeSizeOverride == .accessibility5
+          ? "accessibility5"
+          : (displayMode == .largeText ? "accessibility3" : "large")
+      }
+
+      var selectedTab: SettingsTab {
+        switch variant {
+        case .permissions, .diagnostics:
+          .system
+        default:
+          .profiles
+        }
+      }
+
+      var isProfileSurface: Bool { selectedTab == .profiles }
 
       init(
         name: String,
@@ -49,7 +108,8 @@ import Testing
         colorScheme: ColorScheme,
         displayMode: UIAuditDisplayMode,
         size: CGSize,
-        state: State = .standard
+        state: State = .standard,
+        dynamicTypeSizeOverride: DynamicTypeSize? = nil
       ) {
         self.name = name
         self.variant = variant
@@ -58,6 +118,7 @@ import Testing
         self.displayMode = displayMode
         self.size = size
         self.state = state
+        self.dynamicTypeSizeOverride = dynamicTypeSizeOverride
       }
     }
 
@@ -127,6 +188,12 @@ import Testing
           name: "08-capture-failure-en-light", variant: .trayCaptureFailure, languageCode: "en",
           colorScheme: .light, largeText: false, reduceTransparency: false, increasedContrast: true),
         Fixture(
+          name: "08b-handoff-error-ko-light", variant: .traySingle, languageCode: "ko",
+          colorScheme: .light, largeText: false, reduceTransparency: false,
+          increasedContrast: true,
+          handoffErrorKey: "The destination window could not be shown."
+        ),
+        Fixture(
           name: "09-apply-result-en-dark", variant: .trayApplyResult, languageCode: "en",
           colorScheme: .dark, largeText: false, reduceTransparency: true, increasedContrast: false),
         Fixture(
@@ -139,6 +206,18 @@ import Testing
         Fixture(
           name: "12-overflow-ko-large-text", variant: .trayOverflow, languageCode: "ko",
           colorScheme: .light, largeText: true, reduceTransparency: true, increasedContrast: false),
+        Fixture(
+          name: "12b-overflow-ko-accessibility5", variant: .trayOverflow, languageCode: "ko",
+          colorScheme: .light, largeText: true, reduceTransparency: true,
+          increasedContrast: false,
+          dynamicTypeSizeOverride: .accessibility5
+        ),
+        Fixture(
+          name: "12c-partial-ko-accessibility3", variant: .overview, languageCode: "ko",
+          colorScheme: .light, largeText: true, reduceTransparency: false,
+          increasedContrast: false,
+          usesPartialProfileOnly: true
+        ),
       ]
       let selectedFixture = ProcessInfo.processInfo.environment[
         "DESK_SETUP_TRAY_EVIDENCE_FIXTURE"
@@ -201,6 +280,55 @@ import Testing
         #expect(!rendered.accessibility.contains("/Users/"))
         #expect(!rendered.accessibility.localizedCaseInsensitiveContains("password"))
 
+        let representation = try #require(NSBitmapImageRep(data: rendered.png))
+        if fixture.largeText, fixture.variant != .trayEmpty {
+          let headerActionInkCount = pixelCount(
+            in: representation,
+            viewport: rendered.viewport,
+            logicalRegion: CGRect(x: 190, y: 20, width: 166, height: 130)
+          ) { perceivedBrightness($0) < 0.45 }
+          #expect(headerActionInkCount > 200)
+        }
+        if fixture.usesPartialProfileOnly {
+          #expect(rendered.accessibility.contains("profile-action-layout=stacked"))
+          #expect(rendered.accessibility.contains("declared-partial-profile-actions="))
+          #expect(
+            rendered.accessibility.contains(
+              appLocalizedRuntime("Review Available…", languageCode: fixture.languageCode)
+            )
+          )
+        }
+        if let handoffErrorKey = fixture.handoffErrorKey {
+          let localizedError = appLocalizedRuntime(
+            handoffErrorKey,
+            languageCode: fixture.languageCode
+          )
+          #expect(rendered.accessibility.contains("handoff-error-visible=true"))
+          #expect(rendered.accessibility.contains("declared-handoff-error=\(localizedError)"))
+          let errorAccentPixelCount = pixelCount(
+            in: representation,
+            viewport: rendered.viewport,
+            logicalRegion: CGRect(origin: .zero, size: rendered.viewport)
+          ) { color in
+            color.redComponent - color.greenComponent > 0.02
+              && color.redComponent - color.blueComponent > 0.02
+          }
+          #expect(errorAccentPixelCount > 500)
+          let errorAccentBounds = try #require(
+            logicalVerticalBounds(
+              in: representation,
+              viewport: rendered.viewport,
+              logicalRegion: CGRect(origin: .zero, size: rendered.viewport)
+            ) { color in
+              color.redComponent - color.greenComponent > 0.02
+                && color.redComponent - color.blueComponent > 0.02
+            }
+          )
+          #expect(errorAccentBounds.upperBound < rendered.viewport.height - 40)
+          #expect(rendered.accessibility.contains("handoff-scroll-anchor=top"))
+          #expect(rendered.accessibility.contains("handoff-focus-target=dismiss"))
+        }
+
         if let outputDirectory {
           try rendered.png.write(
             to: outputDirectory.appendingPathComponent("\(fixture.name).png"),
@@ -216,7 +344,7 @@ import Testing
       }
     }
 
-    @Test("simplified profile sections render offscreen in English and Korean")
+    @Test("profile and System settings render offscreen in English and Korean")
     func rendersSimplifiedProfileSections() throws {
       let allFixtures = [
         SettingsFixture(
@@ -325,6 +453,31 @@ import Testing
           displayMode: .standard,
           size: CGSize(width: 900, height: 568)
         ),
+        SettingsFixture(
+          name: "23-system-en-dark",
+          variant: .permissions,
+          languageCode: "en",
+          colorScheme: .dark,
+          displayMode: .standard,
+          size: CGSize(width: 900, height: 568)
+        ),
+        SettingsFixture(
+          name: "24-system-ko-minimum-large-text",
+          variant: .permissions,
+          languageCode: "ko",
+          colorScheme: .light,
+          displayMode: .largeText,
+          size: CGSize(width: 680, height: 480)
+        ),
+        SettingsFixture(
+          name: "25-audio-ko-accessibility5",
+          variant: .editorAudio,
+          languageCode: "ko",
+          colorScheme: .light,
+          displayMode: .largeText,
+          size: CGSize(width: 900, height: 568),
+          dynamicTypeSizeOverride: .accessibility5
+        ),
       ]
       let selectedFixture = ProcessInfo.processInfo.environment[
         "DESK_SETUP_REFINEMENT_EVIDENCE_FIXTURE"
@@ -366,7 +519,8 @@ import Testing
           #expect(rendered.nearBlackSampleRatio < 0.01)
           #expect(rendered.brightSampleRatio > 0.65)
         }
-        if fixture.size == CGSize(width: 680, height: 480),
+        if fixture.isProfileSurface,
+          fixture.size == CGSize(width: 680, height: 480),
           fixture.displayMode == .largeText
         {
           if fixture.state != .storageError {
@@ -376,11 +530,21 @@ import Testing
             #expect(geometry.runs[0].upperBound - geometry.runs[0].lowerBound >= 80)
             #expect(geometry.runs[1].upperBound - geometry.runs[1].lowerBound > 40)
           }
-          #expect(rendered.accessibility.contains("dynamic-type=accessibility3"))
+          #expect(rendered.accessibility.contains("dynamic-type=\(fixture.dynamicTypeName)"))
           #expect(rendered.accessibility.contains("inclusion-header-layout=stacked"))
           #expect(rendered.accessibility.contains("inclusion-state-cues=text,symbol,switch"))
           #expect(rendered.accessibility.contains("sidebar-primary-action="))
           #expect(rendered.accessibility.contains("sidebar-secondary-menu="))
+        }
+        if fixture.dynamicTypeSizeOverride == .accessibility5 {
+          #expect(rendered.accessibility.contains("dynamic-type=accessibility5"))
+          #expect(rendered.accessibility.contains("inclusion-summary-line-limit=unlimited"))
+          #expect(rendered.accessibility.contains("inclusion-header-layout=stacked"))
+        }
+        if !fixture.isProfileSurface {
+          #expect(rendered.accessibility.contains("settings-tab=system"))
+          #expect(rendered.accessibility.contains("inclusion-header-layout=not-applicable"))
+          #expect(rendered.accessibility.contains("sidebar-primary-action=not-applicable"))
         }
         switch fixture.state {
         case .standard:
@@ -858,9 +1022,21 @@ import Testing
       host.layoutSubtreeIfNeeded()
       host.displayIfNeeded()
 
-      let representation = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
-      host.cacheDisplay(in: host.bounds, to: representation)
-      let png = try #require(representation.representation(using: .png, properties: [:]))
+      let sourceRepresentation = try #require(
+        host.bitmapImageRepForCachingDisplay(in: host.bounds)
+      )
+      host.cacheDisplay(in: host.bounds, to: sourceRepresentation)
+      let representation = try opaqueRepresentation(
+        from: sourceRepresentation,
+        background: .white
+      )
+      #expect(!representation.hasAlpha)
+      let png = try #require(
+        representation.representation(
+          using: NSBitmapImageRep.FileType.png,
+          properties: [:]
+        )
+      )
       let hardwareStatus = ApplyPreviewHardwareVerificationStatus.localized()
       var lines = [
         "source=ApplyPreviewView in attached offscreen NSWindow",
@@ -918,7 +1094,7 @@ import Testing
         model.configureProfileStorageFailureForUIAudit()
       }
       let size = fixture.size
-      let navigation = SettingsNavigationModel(selectedTab: .profiles)
+      let navigation = SettingsNavigationModel(selectedTab: fixture.selectedTab)
       navigation.beginPresentation()
       let root = ZStack {
         (fixture.colorScheme == .dark ? Color.black : Color.white)
@@ -932,7 +1108,8 @@ import Testing
         .environmentObject(editor)
       }
       .environment(\.locale, Locale(identifier: fixture.languageCode))
-      .uiAuditEnvironment(configuration)
+      .environment(\.uiAuditConfiguration, configuration)
+      .dynamicTypeSize(fixture.dynamicTypeSize)
       .preferredColorScheme(fixture.colorScheme)
       .frame(width: size.width, height: size.height)
 
@@ -1004,7 +1181,21 @@ import Testing
           && color.redComponent - color.blueComponent > 0.08
       }
       let inclusionLayout =
-        fixture.displayMode == .largeText ? "stacked" : "inline"
+        if fixture.isProfileSurface {
+          ProfileSettingInclusionLayoutPolicy.usesStackedHeader(
+            for: fixture.dynamicTypeSize
+          ) ? "stacked" : "inline"
+        } else {
+          "not-applicable"
+        }
+      let inclusionSummaryLineLimit =
+        if fixture.isProfileSurface {
+          ProfileSettingInclusionLayoutPolicy.visibleSummaryLineLimit(
+            for: fixture.dynamicTypeSize
+          ).map(String.init) ?? "unlimited"
+        } else {
+          "not-applicable"
+        }
       let sidebarRuns =
         sidebarActionGeometry?.runs.map {
           String(format: "%.1f...%.1f", $0.lowerBound, $0.upperBound)
@@ -1016,20 +1207,22 @@ import Testing
         "language=\(fixture.languageCode)",
         "viewport=\(Int(size.width))x\(Int(size.height))",
         "variant=\(fixture.variant.rawValue)",
+        "settings-tab=\(fixture.selectedTab == .profiles ? "profiles" : "system")",
         "display-mode=\(fixture.displayMode.rawValue)",
         "state=\(fixture.state.rawValue)",
         "image-format=png",
         "image-has-alpha=false",
         "near-black-sample-ratio=\(imageStatistics.nearBlackRatio)",
         "bright-sample-ratio=\(imageStatistics.brightRatio)",
-        "dynamic-type=\(fixture.displayMode == .largeText ? "accessibility3" : "system")",
-        "sidebar-primary-action=\(appLocalizedRuntime("New Profile"))",
-        "sidebar-secondary-menu=\(appLocalizedRuntime("More Profile Actions"))",
+        "dynamic-type=\(fixture.dynamicTypeName)",
+        "sidebar-primary-action=\(fixture.isProfileSurface ? appLocalizedRuntime("New Profile") : "not-applicable")",
+        "sidebar-secondary-menu=\(fixture.isProfileSurface ? appLocalizedRuntime("More Profile Actions") : "not-applicable")",
         "sidebar-action-background-runs=\(sidebarRuns)",
         "inclusion-header-layout=\(inclusionLayout)",
-        "inclusion-minimum-available-width=\(Int(ProfileSettingInclusionLayoutPolicy.minimumAvailableHeaderWidth))",
-        "inclusion-expected-control-width-limit=\(Int(ProfileSettingInclusionLayoutPolicy.maximumExpectedControlWidth))",
-        "inclusion-state-cues=text,symbol,switch",
+        "inclusion-summary-line-limit=\(inclusionSummaryLineLimit)",
+        "inclusion-minimum-available-width=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.minimumAvailableHeaderWidth)) : "not-applicable")",
+        "inclusion-expected-control-width-limit=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.maximumExpectedControlWidth)) : "not-applicable")",
+        "inclusion-state-cues=\(fixture.isProfileSurface ? "text,symbol,switch" : "not-applicable")",
         "declared-dirty-export-notice=\(fixture.state == .dirtyDraft ? appLocalizedRuntime(ProfileExportScopePolicy.unsavedDraftNotice) : "none")",
         "export-source=persisted-document-only",
         "storage-error-card-visible=\(fixture.state == .storageError)",
@@ -1189,7 +1382,7 @@ import Testing
     private func render(
       _ fixture: Fixture,
       actionCopy: TrayActionCopy
-    ) throws -> (png: Data, accessibility: String) {
+    ) throws -> (png: Data, accessibility: String, viewport: CGSize) {
       let configuration = UIAuditConfiguration(
         isEnabled: true,
         variant: fixture.variant,
@@ -1197,6 +1390,24 @@ import Testing
         showsStatusPopover: false
       )
       let model = UIAuditFixtures.makeModel(configuration: configuration)
+      if fixture.usesPartialProfileOnly {
+        let state = UIAuditFixtures.fixture(.overview)
+        let partialProfile = try #require(
+          state.profiles.first { state.readinessByProfile[$0.id] == .partial }
+        )
+        model.configureForUIAudit(
+          UIAuditFixtureState(
+            profiles: [partialProfile],
+            selectedProfileID: partialProfile.id,
+            snapshot: state.snapshot,
+            readinessByProfile: [partialProfile.id: .partial],
+            operationCountByProfile: [partialProfile.id: 7],
+            availableOperationCountByProfile: [partialProfile.id: 3],
+            captureSummary: nil,
+            applySummary: nil
+          )
+        )
+      }
       if fixture.variant == .trayCaptureFailure {
         let state = UIAuditFixtures.fixture(.trayCaptureFailure)
         model.configureForUIAudit(
@@ -1241,6 +1452,11 @@ import Testing
       default:
         break
       }
+      if let handoffErrorKey = fixture.handoffErrorKey {
+        presentation.reportHandoffFailure(
+          appLocalizedRuntime(handoffErrorKey, languageCode: fixture.languageCode)
+        )
+      }
 
       let destinationPresenter = OffscreenDestinationPresenter()
       let router = TrayActionRouter(
@@ -1263,7 +1479,7 @@ import Testing
         .environmentObject(locationPermission)
         .environmentObject(profileEditor)
         .environment(\.locale, Locale(identifier: fixture.languageCode))
-        .dynamicTypeSize(fixture.largeText ? .accessibility3 : .large)
+        .dynamicTypeSize(fixture.dynamicTypeSize)
         .preferredColorScheme(fixture.colorScheme)
         .frame(width: viewport.width, height: viewport.height)
         .background(fixture.colorScheme == .dark ? Color.black : Color.white)
@@ -1296,8 +1512,15 @@ import Testing
       host.layoutSubtreeIfNeeded()
       host.displayIfNeeded()
 
-      let representation = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
-      host.cacheDisplay(in: host.bounds, to: representation)
+      let sourceRepresentation = try #require(
+        host.bitmapImageRepForCachingDisplay(in: host.bounds)
+      )
+      host.cacheDisplay(in: host.bounds, to: sourceRepresentation)
+      let representation = try opaqueRepresentation(
+        from: sourceRepresentation,
+        background: fixture.colorScheme == .dark ? .black : .white
+      )
+      #expect(!representation.hasAlpha)
       let png = try #require(
         representation.representation(
           using: NSBitmapImageRep.FileType.png,
@@ -1318,7 +1541,7 @@ import Testing
           hasHandoffError: presentation.handoffError != nil
         )
       )
-      return (png, accessibility)
+      return (png, accessibility, viewport)
     }
 
     private func accessibilitySnapshot(
@@ -1336,10 +1559,23 @@ import Testing
         actionCopy.settingsLabel,
         actionCopy.quitLabel,
       ].compactMap { $0 }.joined(separator: " | ")
+      let profileActionLayout =
+        TrayAdaptiveLayoutPolicy.usesStackedProfileCard(
+          for: fixture.dynamicTypeSize
+        ) ? "stacked" : "inline"
+      let partialProfileActions =
+        fixture.usesPartialProfileOnly
+        ? [
+          appLocalizedRuntime("Review Available…", languageCode: fixture.languageCode),
+          appLocalizedRuntime("Edit Profile", languageCode: fixture.languageCode),
+          appLocalizedRuntime("Delete", languageCode: fixture.languageCode),
+        ].joined(separator: " | ")
+        : "not-applicable"
       var lines = [
         "source=TrayRootView in attached offscreen NSWindow read-only accessibility attributes",
         "fixture=\(fixture.name)",
         "language=\(fixture.languageCode)",
+        "dynamic-type=\(fixture.dynamicTypeName)",
         "viewport=\(Int(viewport.width))x\(Int(viewport.height))",
         "profile-count=\(profileCount)",
         "requested-reduce-transparency=\(fixture.reduceTransparency)",
@@ -1354,6 +1590,12 @@ import Testing
         "declared-capture-help=\(actionCopy.captureHelp)",
         "declared-primary-action=\(primaryAction)",
         "declared-icon-labels=\(iconLabels)",
+        "profile-action-layout=\(profileActionLayout)",
+        "declared-partial-profile-actions=\(partialProfileActions)",
+        "handoff-error-visible=\(fixture.handoffErrorKey != nil)",
+        "declared-handoff-error=\(fixture.handoffErrorKey.map { appLocalizedRuntime($0, languageCode: fixture.languageCode) } ?? "none")",
+        "handoff-scroll-anchor=\(fixture.handoffErrorKey == nil ? "none" : "top")",
+        "handoff-focus-target=\(fixture.handoffErrorKey == nil ? "none" : "dismiss")",
         "offscreen-ax-limit=virtual SwiftUI children may remain pending without ordering the window front",
       ]
       var visited: Set<ObjectIdentifier> = []
@@ -1488,6 +1730,40 @@ import Testing
         }
       }
       return count
+    }
+
+    private func logicalVerticalBounds(
+      in representation: NSBitmapImageRep,
+      viewport: CGSize,
+      logicalRegion: CGRect,
+      matching predicate: (NSColor) -> Bool
+    ) -> ClosedRange<CGFloat>? {
+      let scaleX = CGFloat(representation.pixelsWide) / viewport.width
+      let scaleY = CGFloat(representation.pixelsHigh) / viewport.height
+      let lowerX = max(0, Int((logicalRegion.minX * scaleX).rounded(.down)))
+      let upperX = min(
+        representation.pixelsWide,
+        Int((logicalRegion.maxX * scaleX).rounded(.up))
+      )
+      let lowerY = max(0, Int((logicalRegion.minY * scaleY).rounded(.down)))
+      let upperY = min(
+        representation.pixelsHigh,
+        Int((logicalRegion.maxY * scaleY).rounded(.up))
+      )
+      var minimumY = representation.pixelsHigh
+      var maximumY = -1
+      for y in lowerY..<upperY {
+        for x in lowerX..<upperX {
+          guard
+            let color = representation.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+            predicate(color)
+          else { continue }
+          minimumY = min(minimumY, y)
+          maximumY = max(maximumY, y)
+        }
+      }
+      guard maximumY >= minimumY else { return nil }
+      return (CGFloat(minimumY) / scaleY)...(CGFloat(maximumY + 1) / scaleY)
     }
 
     private func perceivedBrightness(_ color: NSColor) -> CGFloat {

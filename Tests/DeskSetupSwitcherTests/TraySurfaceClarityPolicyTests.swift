@@ -174,6 +174,18 @@ struct TraySurfaceClarityPolicyTests {
     #expect(!accessibility)
   }
 
+  @Test("fixed-width tray stacks header and profile actions at accessibility sizes")
+  func accessibilityLayoutProtectsActions() {
+    #expect(!TrayAdaptiveLayoutPolicy.usesStackedHeader(for: .large))
+    #expect(!TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: .large))
+    #expect(TrayAdaptiveLayoutPolicy.usesStackedHeader(for: .accessibility1))
+    #expect(TrayAdaptiveLayoutPolicy.usesStackedHeader(for: .accessibility3))
+    #expect(TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: .accessibility1))
+    #expect(TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: .accessibility3))
+    #expect(TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: .accessibility4))
+    #expect(TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: .accessibility5))
+  }
+
   @Test("profile empty-state copy names only visible actions")
   func profileEmptyStateCopyUsesReachablePaths() {
     let noProfiles = ProfileEditorEmptyStateCopy.noProfilesDescription.lowercased()

@@ -14,6 +14,7 @@ enum TrayDeletionProgressCopy {
 }
 
 struct TrayProfileListView: View {
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var profileEditor: ProfileEditorModel
 
@@ -37,16 +38,7 @@ struct TrayProfileListView: View {
     let action = primaryApplyActionState(profile, readiness: readiness)
 
     return VStack(alignment: .leading, spacing: 9) {
-      HStack(alignment: .firstTextBaseline) {
-        Label(profile.name, systemImage: appResolvedProfileSymbolName(profile.symbolName))
-          .lineLimit(3)
-        Spacer(minLength: 8)
-        Label(appReadinessTitle(readiness), systemImage: readinessSymbol(readiness))
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .accessibilityLabel(
-            appLocalized("Profile status: \(appReadinessTitle(readiness))"))
-      }
+      profileHeader(profile, readiness: readiness)
 
       if presentation.deletion.isPending(profileID: profile.id) {
         deletionConfirmation(profile)
@@ -57,6 +49,39 @@ struct TrayProfileListView: View {
     .padding(TrayGeometry.cardPadding)
     .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 9))
     .accessibilityElement(children: .contain)
+  }
+
+  @ViewBuilder
+  private func profileHeader(_ profile: DeskProfile, readiness: ProfileReadiness) -> some View {
+    if TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: dynamicTypeSize) {
+      VStack(alignment: .leading, spacing: 5) {
+        profileTitle(profile)
+        readinessLabel(readiness)
+      }
+    } else {
+      HStack(alignment: .firstTextBaseline) {
+        profileTitle(profile)
+        Spacer(minLength: 8)
+        readinessLabel(readiness)
+      }
+    }
+  }
+
+  private func profileTitle(_ profile: DeskProfile) -> some View {
+    Label(profile.name, systemImage: appResolvedProfileSymbolName(profile.symbolName))
+      .lineLimit(3)
+      .fixedSize(horizontal: false, vertical: true)
+      .layoutPriority(1)
+  }
+
+  private func readinessLabel(_ readiness: ProfileReadiness) -> some View {
+    Label(appReadinessTitle(readiness), systemImage: readinessSymbol(readiness))
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      .lineLimit(2)
+      .fixedSize(horizontal: false, vertical: true)
+      .accessibilityLabel(
+        appLocalized("Profile status: \(appReadinessTitle(readiness))"))
   }
 
   @ViewBuilder
@@ -72,46 +97,70 @@ struct TrayProfileListView: View {
         .foregroundStyle(.secondary)
     }
 
-    HStack(spacing: 8) {
+    if TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: dynamicTypeSize) {
       if action.disabledReason != .alreadyMatches {
-        if action.isEnabled {
-          applyButton(profile, action: action)
-            .buttonStyle(.borderedProminent)
-        } else {
-          applyButton(profile, action: action)
-            .buttonStyle(.bordered)
+        styledApplyButton(profile, action: action)
+      }
+      HStack(spacing: 8) {
+        editButton(profile)
+        Spacer(minLength: 8)
+        deleteButton(profile)
+      }
+    } else {
+      HStack(spacing: 8) {
+        if action.disabledReason != .alreadyMatches {
+          styledApplyButton(profile, action: action)
         }
+        Spacer(minLength: 8)
+        editButton(profile)
+        deleteButton(profile)
       }
-
-      Spacer(minLength: 8)
-
-      Button {
-        route(.editProfile(profile.id))
-      } label: {
-        Label(appLocalized("Edit Profile"), systemImage: "pencil")
-      }
-      .buttonStyle(.bordered)
-      .disabled(model.isProfileMutationLocked || profileEditor.activity.isBusy)
-      .accessibilityLabel(appLocalized("Edit \(profile.name)"))
-      .help(appLocalized("Edit Profile"))
-
-      Button {
-        route(.requestDelete(profile.id))
-      } label: {
-        Label(appLocalized("Delete Profile"), systemImage: "trash")
-          .labelStyle(.iconOnly)
-      }
-      .buttonStyle(.plain)
-      .frame(minWidth: 28, minHeight: 28)
-      .disabled(
-        model.isProfileMutationLocked || profileEditor.activity.isBusy
-          || profileEditor.session.pendingSelection != nil
-          || presentation.deletionInFlightProfileID != nil
-      )
-      .focused(focusedControl, equals: .delete(profile.id))
-      .accessibilityLabel(appLocalized("Delete \(profile.name)"))
-      .help(appLocalized("Delete \(profile.name)"))
     }
+  }
+
+  @ViewBuilder
+  private func styledApplyButton(
+    _ profile: DeskProfile,
+    action: PrimaryApplyActionState
+  ) -> some View {
+    if action.isEnabled {
+      applyButton(profile, action: action)
+        .buttonStyle(.borderedProminent)
+    } else {
+      applyButton(profile, action: action)
+        .buttonStyle(.bordered)
+    }
+  }
+
+  private func editButton(_ profile: DeskProfile) -> some View {
+    Button {
+      route(.editProfile(profile.id))
+    } label: {
+      Label(appLocalized("Edit Profile"), systemImage: "pencil")
+    }
+    .buttonStyle(.bordered)
+    .disabled(model.isProfileMutationLocked || profileEditor.activity.isBusy)
+    .accessibilityLabel(appLocalized("Edit \(profile.name)"))
+    .help(appLocalized("Edit Profile"))
+  }
+
+  private func deleteButton(_ profile: DeskProfile) -> some View {
+    Button {
+      route(.requestDelete(profile.id))
+    } label: {
+      Label(appLocalized("Delete Profile"), systemImage: "trash")
+        .labelStyle(.iconOnly)
+    }
+    .buttonStyle(.plain)
+    .frame(minWidth: 28, minHeight: 28)
+    .disabled(
+      model.isProfileMutationLocked || profileEditor.activity.isBusy
+        || profileEditor.session.pendingSelection != nil
+        || presentation.deletionInFlightProfileID != nil
+    )
+    .focused(focusedControl, equals: .delete(profile.id))
+    .accessibilityLabel(appLocalized("Delete \(profile.name)"))
+    .help(appLocalized("Delete \(profile.name)"))
   }
 
   private func deletionConfirmation(_ profile: DeskProfile) -> some View {

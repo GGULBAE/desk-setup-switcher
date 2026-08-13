@@ -85,6 +85,10 @@ enum WorkflowFooterShortcut: Equatable, Sendable {
   case defaultAction
 }
 
+enum WorkflowSurfaceMetrics {
+  static let contentInset: CGFloat = 20
+}
+
 private struct WorkflowFooterAction: Identifiable {
   let id: String
   let title: String
@@ -702,7 +706,7 @@ struct ApplyPreviewView: View {
     .id(request.id)
     .defaultScrollAnchor(initialScrollAnchor)
     .scrollBounceBehavior(.basedOnSize)
-    .padding(20)
+    .padding(WorkflowSurfaceMetrics.contentInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .task(id: request.id) {
       await Task.yield()
@@ -1213,7 +1217,7 @@ struct ApplyResultDetailsView: View {
       Divider()
       resultFooter
     }
-    .padding(20)
+    .padding(WorkflowSurfaceMetrics.contentInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .task(id: summary.appliedAt) {
       await Task.yield()
@@ -1523,7 +1527,7 @@ struct SafetyConfirmationView: View {
         focusRequestID: state.id.uuidString
       )
     }
-    .padding(20)
+    .padding(WorkflowSurfaceMetrics.contentInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .task(id: state.id) {
       await Task.yield()
@@ -1779,7 +1783,7 @@ struct WorkflowErrorView: View {
         focusRequestID: message
       )
     }
-    .padding(24)
+    .padding(WorkflowSurfaceMetrics.contentInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .task(id: message) {
       await Task.yield()
@@ -1870,7 +1874,7 @@ struct TrayWorkflowRootView: View {
           "permission-\(String(describing: workflow))-\(actionSet.leading.rawValue)"
       )
     }
-    .padding(24)
+    .padding(WorkflowSurfaceMetrics.contentInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .id(workflow)
   }
@@ -2157,7 +2161,7 @@ struct TrayWorkflowRootView: View {
         focusRequestID: "dirty-apply-\(prompt.id.uuidString)"
       )
     }
-    .padding(24)
+    .padding(WorkflowSurfaceMetrics.contentInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 

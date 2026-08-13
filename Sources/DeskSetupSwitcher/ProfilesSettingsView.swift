@@ -200,13 +200,14 @@ private struct ProfileStorageFailureOwnershipModifier: ViewModifier {
 struct ProfileSettingInclusionPresentation: Equatable, Sendable {
   let visibleTitle: String
   let visibleState: String
+  let visibleSummary: String
   let systemImage: String
   let accessibilityLabel: String
   let accessibilityValue: String
   let accessibilityHint: String
 
   static func make(settingTitle: String, isIncluded: Bool) -> Self {
-    let visibleTitle = appLocalized("Apply with profile")
+    let visibleTitle = appLocalized("When applying")
     let labelFormat = appLocalized("%@: Apply with profile")
     let visibleState = isIncluded ? appLocalized("Included") : appLocalized("Not included")
     let accessibilityValue =
@@ -216,6 +217,7 @@ struct ProfileSettingInclusionPresentation: Equatable, Sendable {
     return Self(
       visibleTitle: visibleTitle,
       visibleState: visibleState,
+      visibleSummary: "\(visibleTitle) · \(visibleState)",
       systemImage: isIncluded ? "checkmark.circle.fill" : "minus.circle",
       accessibilityLabel: String.localizedStringWithFormat(labelFormat, settingTitle),
       accessibilityValue: accessibilityValue,
@@ -229,7 +231,8 @@ struct ProfileSettingInclusionPresentation: Equatable, Sendable {
 enum ProfileSettingInclusionLayoutPolicy {
   static let formHorizontalInset: CGFloat = 18
   static let groupContentInset: CGFloat = 8
-  static let optionContentInset: CGFloat = 12
+  static let optionContentInset: CGFloat = 10
+  static let minimumExpectedControlWidth: CGFloat = 180
   static let maximumExpectedControlWidth: CGFloat = 220
 
   static var minimumAvailableHeaderWidth: CGFloat {
@@ -239,6 +242,39 @@ enum ProfileSettingInclusionLayoutPolicy {
 
   static func usesStackedHeader(for dynamicTypeSize: DynamicTypeSize) -> Bool {
     dynamicTypeSize.isAccessibilitySize
+  }
+
+  static func visibleSummaryLineLimit(for dynamicTypeSize: DynamicTypeSize) -> Int? {
+    dynamicTypeSize.isAccessibilitySize ? nil : 2
+  }
+
+  static func minimumControlWidth(for dynamicTypeSize: DynamicTypeSize) -> CGFloat? {
+    dynamicTypeSize.isAccessibilitySize ? nil : minimumExpectedControlWidth
+  }
+
+  static func maximumControlWidth(for dynamicTypeSize: DynamicTypeSize) -> CGFloat? {
+    dynamicTypeSize.isAccessibilitySize ? .infinity : maximumExpectedControlWidth
+  }
+}
+
+enum ProfileSettingRowStylePolicy {
+  static let contentLeadingInset: CGFloat = 8
+  static let cornerRadius: CGFloat = 8
+
+  static func backgroundOpacity(increasedContrast: Bool) -> Double {
+    increasedContrast ? 0.56 : 0.34
+  }
+
+  static func borderOpacity(increasedContrast: Bool) -> Double {
+    increasedContrast ? 0.34 : 0.08
+  }
+
+  static func borderWidth(increasedContrast: Bool) -> CGFloat {
+    increasedContrast ? 1.5 : 1
+  }
+
+  static func warningBorderOpacity(increasedContrast: Bool) -> Double {
+    increasedContrast ? 0.7 : 0.35
   }
 }
 
@@ -911,14 +947,14 @@ struct ProfilesSettingsView: View {
   }
 
   private var revertDraftButton: some View {
-    Button("Revert Changes") {
+    Button(appLocalized("Revert Changes")) {
       profileEditor.revertDraft()
     }
     .disabled(!profileEditor.isDirty || profileEditor.activity.isBusy)
   }
 
   private var saveDraftButton: some View {
-    Button("Save Profile") {
+    Button(appLocalized("Save Profile")) {
       Task { await saveCurrentDraft() }
     }
     .keyboardShortcut("s")
@@ -1161,6 +1197,7 @@ private enum DeferredProfileAction: Identifiable {
 private struct ProfileEditorForm: View {
   @Environment(\.uiAuditConfiguration) private var uiAuditConfiguration
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
   @Binding var profile: DeskProfile
   let systemSnapshot: SystemSnapshotResult?
   let validation: ProfileDraftValidation
@@ -1172,7 +1209,7 @@ private struct ProfileEditorForm: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
+      VStack(alignment: .leading, spacing: 16) {
         profileDetailsCard
 
         if showsValidationSummary, !validation.isValid {
@@ -1246,7 +1283,7 @@ private struct ProfileEditorForm: View {
             accessibilityIdentifier: "profile-imported-icon-technical-information",
             isExpanded: $showsImportedIconTechnicalInformation
           ) {
-            LabeledContent("Imported symbol name") {
+            LabeledContent(appLocalized("Imported symbol name")) {
               Text(profile.symbolName)
                 .font(.caption.monospaced())
                 .textSelection(.enabled)
@@ -1256,15 +1293,15 @@ private struct ProfileEditorForm: View {
       }
       .padding(ProfileSettingInclusionLayoutPolicy.groupContentInset)
     } label: {
-      Label("Profile", systemImage: "person.crop.rectangle")
+      Label(appLocalized("Profile"), systemImage: "person.crop.rectangle")
         .font(.headline)
         .accessibilityAddTraits(.isHeader)
     }
   }
 
   private var profileNameField: some View {
-    TextField("Name", text: $profile.name)
-      .accessibilityLabel("Profile name")
+    TextField(appLocalized("Name"), text: $profile.name)
+      .accessibilityLabel(appLocalized("Profile name"))
       .accessibilityIdentifier("profile-name-field")
       .focused($focusedField, equals: .profileName)
       .accessibilityHint(validationAccessibilityHint(for: .profileName))
@@ -1273,7 +1310,7 @@ private struct ProfileEditorForm: View {
   }
 
   private var profileIconPicker: some View {
-    Picker("Icon", selection: $profile.symbolName) {
+    Picker(appLocalized("Icon"), selection: $profile.symbolName) {
       ForEach(iconChoices, id: \.symbolName) { choice in
         Label(appLocalizedRuntime(choice.title), systemImage: choice.symbolName)
           .tag(choice.symbolName)
@@ -1286,7 +1323,7 @@ private struct ProfileEditorForm: View {
         .tag(profile.symbolName)
       }
     }
-    .accessibilityLabel("Profile icon")
+    .accessibilityLabel(appLocalized("Profile icon"))
     .frame(width: 190)
   }
 
@@ -1783,7 +1820,7 @@ private struct ProfileEditorForm: View {
     let localizedTitle = appLocalized(title)
 
     GroupBox {
-      VStack(alignment: .leading, spacing: 14) {
+      VStack(alignment: .leading, spacing: 12) {
         Label(localizedTitle, systemImage: systemImage)
           .font(.headline)
           .lineLimit(2)
@@ -1801,7 +1838,7 @@ private struct ProfileEditorForm: View {
         }
 
         Divider()
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
           content()
         }
       }
@@ -1830,7 +1867,7 @@ private struct ProfileEditorForm: View {
       VStack(alignment: .leading, spacing: 8) {
         content()
       }
-      .padding(.leading, 20)
+      .padding(.leading, ProfileSettingRowStylePolicy.contentLeadingInset)
 
       ForEach(validationIssues(for: validationFields)) { issue in
         inlineValidationMessage(
@@ -1841,12 +1878,25 @@ private struct ProfileEditorForm: View {
     }
     .padding(ProfileSettingInclusionLayoutPolicy.optionContentInset)
     .background(
-      Color(nsColor: .controlBackgroundColor).opacity(0.7),
-      in: RoundedRectangle(cornerRadius: 10)
+      Color(nsColor: .controlBackgroundColor).opacity(
+        ProfileSettingRowStylePolicy.backgroundOpacity(
+          increasedContrast: colorSchemeContrast == .increased
+        )
+      ),
+      in: RoundedRectangle(cornerRadius: ProfileSettingRowStylePolicy.cornerRadius)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: 10)
-        .stroke(Color.secondary.opacity(0.12))
+      RoundedRectangle(cornerRadius: ProfileSettingRowStylePolicy.cornerRadius)
+        .stroke(
+          Color.secondary.opacity(
+            ProfileSettingRowStylePolicy.borderOpacity(
+              increasedContrast: colorSchemeContrast == .increased
+            )
+          ),
+          lineWidth: ProfileSettingRowStylePolicy.borderWidth(
+            increasedContrast: colorSchemeContrast == .increased
+          )
+        )
     }
   }
 
@@ -1866,7 +1916,7 @@ private struct ProfileEditorForm: View {
       Label(warning, systemImage: "exclamationmark.triangle.fill")
         .font(.caption)
         .foregroundStyle(.secondary)
-        .padding(.leading, 20)
+        .padding(.leading, ProfileSettingRowStylePolicy.contentLeadingInset)
         .accessibilityElement(children: .combine)
 
       ForEach(validationIssues(for: validationFields)) { issue in
@@ -1878,12 +1928,25 @@ private struct ProfileEditorForm: View {
     }
     .padding(ProfileSettingInclusionLayoutPolicy.optionContentInset)
     .background(
-      Color(nsColor: .controlBackgroundColor).opacity(0.7),
-      in: RoundedRectangle(cornerRadius: 10)
+      Color(nsColor: .controlBackgroundColor).opacity(
+        ProfileSettingRowStylePolicy.backgroundOpacity(
+          increasedContrast: colorSchemeContrast == .increased
+        )
+      ),
+      in: RoundedRectangle(cornerRadius: ProfileSettingRowStylePolicy.cornerRadius)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: 10)
-        .stroke(Color.orange.opacity(0.35))
+      RoundedRectangle(cornerRadius: ProfileSettingRowStylePolicy.cornerRadius)
+        .stroke(
+          Color.orange.opacity(
+            ProfileSettingRowStylePolicy.warningBorderOpacity(
+              increasedContrast: colorSchemeContrast == .increased
+            )
+          ),
+          lineWidth: ProfileSettingRowStylePolicy.borderWidth(
+            increasedContrast: colorSchemeContrast == .increased
+          )
+        )
     }
   }
 
@@ -1897,15 +1960,18 @@ private struct ProfileEditorForm: View {
     )
 
     return HStack(spacing: 8) {
-      VStack(alignment: .trailing, spacing: 1) {
-        Text(presentation.visibleTitle)
-          .font(.caption)
-        Label(presentation.visibleState, systemImage: presentation.systemImage)
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-      }
-      .fixedSize(horizontal: true, vertical: false)
-      .accessibilityHidden(true)
+      Label(presentation.visibleSummary, systemImage: presentation.systemImage)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(
+          ProfileSettingInclusionLayoutPolicy.visibleSummaryLineLimit(
+            for: dynamicTypeSize
+          )
+        )
+        .multilineTextAlignment(.trailing)
+        .fixedSize(horizontal: false, vertical: true)
+        .layoutPriority(1)
+        .accessibilityHidden(true)
       Toggle(isOn: isOn) {
         EmptyView()
       }
@@ -1917,7 +1983,16 @@ private struct ProfileEditorForm: View {
       .accessibilityValue(presentation.accessibilityValue)
       .accessibilityHint(presentation.accessibilityHint)
     }
-    .fixedSize(horizontal: true, vertical: false)
+    .frame(
+      minWidth: ProfileSettingInclusionLayoutPolicy.minimumControlWidth(
+        for: dynamicTypeSize
+      ),
+      maxWidth: ProfileSettingInclusionLayoutPolicy.maximumControlWidth(
+        for: dynamicTypeSize
+      ),
+      alignment: .trailing
+    )
+    .fixedSize(horizontal: false, vertical: true)
   }
 
   @ViewBuilder
