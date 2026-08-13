@@ -12,9 +12,9 @@ regression, release tooling, Swift/Xcode Debug and Release builds, Analyze, and
 mounted universal-DMG verification all completed successfully. The generated
 unsigned development DMG has SHA-256
 `1b1b2d5c0bf0b3dcfe7155ecae94648ffde693f8fffa7c1f427cd2e83b02f96e`.
-The current `git diff --check` passes. A behavior-focused commit remains the
-last local ledger gate; this record does not claim an install, CI run, upload,
-tag, or publication.
+The current `git diff --check` passes. Behavior-focused commit `015e6bb`
+records the implementation, tests, and this audit together. This record does
+not claim an install, CI run, upload, tag, or publication.
 
 The historical M4.8 and M4.11 records remain unchanged. This document is the
 separate M4.12 working-tree evidence boundary.
@@ -69,11 +69,7 @@ certification remains excluded and unclaimed; keyboard behavior, accessible
 names/values/help, localized English/Korean copy, and non-color state cues remain
 required.
 
-## Remaining completion work
-
-1. Repeat `git diff --check` and review the final scoped diff if the integrated
-   tree changes.
-2. Commit the behavior and evidence together before marking M4.12 complete.
+## Unclaimed follow-up evidence
 
 Installed native accessibility settings, full keyboard/focused-control AX,
 VoiceOver, CI, and hardware mutation/rollback remain separate evidence and are

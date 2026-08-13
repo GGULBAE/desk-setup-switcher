@@ -131,9 +131,9 @@ final integrated non-live `make verify` and current `git diff --check` pass.
 The local unsigned development package passed mounted universal-DMG
 verification; its SHA-256 is
 `1b1b2d5c0bf0b3dcfe7155ecae94648ffde693f8fffa7c1f427cd2e83b02f96e`.
-The behavior-focused commit remains pending, while install, CI, upload, tag,
-and publication evidence remain separate. Historical M4.8/M4.11 results are
-not reused.
+Behavior-focused commit `015e6bb` records the implementation and evidence,
+while install, CI, upload, tag, and publication evidence remain separate.
+Historical M4.8/M4.11 results are not reused.
 
 | Surface | Current implementation and deterministic evidence | Remaining boundary |
 | --- | --- | --- |
