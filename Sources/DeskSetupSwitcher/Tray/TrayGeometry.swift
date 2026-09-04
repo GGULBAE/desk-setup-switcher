@@ -57,6 +57,10 @@ struct TrayGeometry: Equatable, Sendable {
   // unused tail.
   static let singleProfileHeight: CGFloat = compactHeight
   static let twoProfileHeight: CGFloat = 316
+  // Three standard cards fit without consuming the maximum scroll viewport.
+  // Keep a small visual tail instead of the large empty area produced by the
+  // former 3+ bucket; four or more profiles still use the scrollable maximum.
+  static let threeProfileHeight: CGFloat = 480
   static let maximumHeight: CGFloat = 560
   static let screenMargin: CGFloat = 32
 
@@ -82,6 +86,8 @@ struct TrayGeometry: Equatable, Sendable {
       idealHeight = Self.singleProfileHeight
     case 2:
       idealHeight = Self.twoProfileHeight
+    case 3:
+      idealHeight = Self.threeProfileHeight
     default:
       idealHeight = Self.maximumHeight
     }

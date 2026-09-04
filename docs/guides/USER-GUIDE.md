@@ -75,9 +75,9 @@ Each profile exposes one state-aware review action:
 - **Review Changes…** means all included applicable settings can be prepared.
 - **Review Available Changes…** means some executable settings exist but other items will be omitted, blocked, unsupported, or unavailable.
 
-The review is read-only. Inspect the target values, operation list, omissions, and technical details before continuing.
+The review is read-only. Start with the summary counts, then scan each compact current → target row. **Review details** groups omissions, validation issues, and rejected items; open it before applying an available-items plan. A blocking plan opens those details automatically.
 
-The top of Apply Preview carries a **Beta** text-and-shield status: Apply and rollback are not hardware-verified, so check System Settings after applying. One Safety summary explains that the screen is still a review and identifies temporary display/network changes; a refreshed-plan notice remains separate because it represents a new state. Review content and decision actions form one scroll sequence; at reduced height or large text, scroll through the plan before the buttons become reachable. Escape cancels, while Return alone does not apply.
+The top of Apply Preview carries a **Beta** text-and-shield status: Apply and rollback are not hardware-verified, so check System Settings after applying. Temporary display/network guidance and a refreshed-plan warning remain visible when relevant. Review content and decision actions form one scroll sequence; at reduced height or large text, scroll through the plan before the buttons become reachable. Escape cancels, while Return alone does not apply.
 
 - **Apply Profile** starts a complete plan.
 - **Apply Available Settings** applies only the listed executable items. Use it only when every omission is expected.

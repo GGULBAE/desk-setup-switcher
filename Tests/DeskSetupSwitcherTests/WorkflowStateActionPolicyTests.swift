@@ -288,14 +288,24 @@ import Testing
       )
       #expect(ApplyPreviewDecisionPolicy.primaryActionShortcut == .none)
       #expect(!ApplyPreviewDecisionPolicy.focusesActionsOnAppear)
+      #expect(ApplyPreviewReviewOrderPolicy.primarySection == .plannedChanges)
       #expect(
-        ApplyPreviewReviewOrderPolicy.contentSections == [
-          .plannedChanges,
+        ApplyPreviewReviewOrderPolicy.detailSections == [
           .omissions,
           .validation,
           .rejections,
         ]
       )
+      #expect(
+        ApplyPreviewSummaryPolicy.counts(
+          changes: 2,
+          skipped: 2,
+          validationIssues: 2,
+          rejections: 1
+        ) == ApplyPreviewSummaryCounts(changes: 2, skipped: 2, toReview: 3)
+      )
+      #expect(!ApplyPreviewSummaryPolicy.expandsDetailsInitially(canExecute: true))
+      #expect(ApplyPreviewSummaryPolicy.expandsDetailsInitially(canExecute: false))
       #expect(
         !ApplyPreviewDecisionPolicy.isPrimaryActionDisabled(
           canExecute: true,
@@ -362,15 +372,18 @@ import Testing
       let body = try #require(
         sourceSlice(
           source,
-          after: "  var body: some View {\n    ScrollView {",
+          after: "  var body: some View {\n    GeometryReader { viewport in\n      ScrollView {",
           before: "\n  private var applyActionBar: some View {"
         )
       )
       let orderedTokens = [
         "previewHeader",
         "hardwareVerificationNotice",
+        "previewSummary",
+        "reviewSection(ApplyPreviewReviewOrderPolicy.primarySection)",
+        "secondaryReviewDetails",
         "applyNotices",
-        "ForEach(ApplyPreviewReviewOrderPolicy.contentSections",
+        "Spacer(minLength: 0)",
         "Divider()",
         "applyActionBar",
       ]
@@ -380,6 +393,7 @@ import Testing
         searchStart = range.upperBound
       }
       #expect(body.contains(".defaultScrollAnchor(initialScrollAnchor)"))
+      #expect(body.contains("minHeight: viewport.size.height"))
 
       let actionBar = try #require(
         sourceSlice(
@@ -411,8 +425,8 @@ import Testing
       #expect(
         hardwareStatus.contains("Label(status.text, systemImage: status.systemImage)")
       )
-      #expect(hardwareStatus.contains(".font(.callout.weight(.medium))"))
-      #expect(hardwareStatus.contains(".foregroundStyle(.primary)"))
+      #expect(hardwareStatus.contains(".font(.caption)"))
+      #expect(hardwareStatus.contains(".foregroundStyle(.secondary)"))
       #expect(
         hardwareStatus.contains(
           ".accessibilityIdentifier(\"apply-preview-beta-hardware-status\")"

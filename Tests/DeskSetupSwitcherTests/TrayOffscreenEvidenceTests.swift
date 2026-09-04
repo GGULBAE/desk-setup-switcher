@@ -144,6 +144,7 @@ import Testing
       let mode: ApplyMode
       let size: CGSize
       let largeText: Bool
+      var includesReviewDetails = false
     }
 
     @Test("all tray states render offscreen with readable accessibility structure")
@@ -169,6 +170,9 @@ import Testing
           largeText: false, reduceTransparency: false, increasedContrast: false),
         Fixture(
           name: "03-three-en-light", variant: .overview, languageCode: "en", colorScheme: .light,
+          largeText: false, reduceTransparency: false, increasedContrast: false),
+        Fixture(
+          name: "03b-three-ko-dark", variant: .overview, languageCode: "ko", colorScheme: .dark,
           largeText: false, reduceTransparency: false, increasedContrast: false),
         Fixture(
           name: "04-overflow-en-light", variant: .trayOverflow, languageCode: "en",
@@ -282,12 +286,22 @@ import Testing
 
         let representation = try #require(NSBitmapImageRep(data: rendered.png))
         if fixture.largeText, fixture.variant != .trayEmpty {
-          let headerActionInkCount = pixelCount(
-            in: representation,
-            viewport: rendered.viewport,
-            logicalRegion: CGRect(x: 190, y: 20, width: 166, height: 130)
-          ) { perceivedBrightness($0) < 0.45 }
-          #expect(headerActionInkCount > 200)
+          let headerActionRegions = [
+            CGRect(x: 198, y: 20, width: 52, height: 130),
+            CGRect(x: 250, y: 20, width: 52, height: 130),
+            CGRect(x: 302, y: 20, width: 54, height: 130),
+          ]
+          for region in headerActionRegions {
+            let headerActionInkCount = pixelCount(
+              in: representation,
+              viewport: rendered.viewport,
+              logicalRegion: region
+            ) { perceivedBrightness($0) < 0.45 }
+            #expect(
+              headerActionInkCount >= 20,
+              "Expected each large-text header action glyph in \(fixture.name)"
+            )
+          }
         }
         if fixture.usesPartialProfileOnly {
           #expect(rendered.accessibility.contains("profile-action-layout=stacked"))
@@ -692,7 +706,7 @@ import Testing
           languageCode: "en",
           reviewReason: .initial,
           mode: .normal,
-          size: CGSize(width: 620, height: 500),
+          size: CGSize(width: 620, height: 440),
           largeText: false
         ),
         ApplyPreviewFixture(
@@ -710,6 +724,15 @@ import Testing
           mode: .force,
           size: CGSize(width: 520, height: 360),
           largeText: true
+        ),
+        ApplyPreviewFixture(
+          name: "26-apply-preview-ko-compact-details",
+          languageCode: "ko",
+          reviewReason: .initial,
+          mode: .force,
+          size: CGSize(width: 620, height: 440),
+          largeText: false,
+          includesReviewDetails: true
         ),
       ]
       let outputDirectory = workflowEvidenceOutputDirectory
@@ -990,7 +1013,7 @@ import Testing
       )
       let model = UIAuditFixtures.makeModel(configuration: configuration)
       let profile = try #require(model.profiles.first)
-      let operations = [
+      var operations = [
         PlannedOperation(
           group: .audio,
           key: "inputVolume",
@@ -1016,6 +1039,61 @@ import Testing
           )
         ),
       ]
+      if fixture.includesReviewDetails {
+        operations = [
+          PlannedOperation(
+            group: .audio,
+            key: "outputVolume",
+            summary: "Change output volume",
+            risk: .low,
+            preview: OperationPreview(previousValue: "90%", desiredValue: "0%")
+          ),
+          PlannedOperation(
+            group: .audio,
+            key: "outputMute",
+            summary: "Change output mute",
+            risk: .low,
+            preview: OperationPreview(previousValue: "Off", desiredValue: "On")
+          ),
+        ]
+      }
+      let inactiveDisplayMessage = "The saved display is not currently active."
+      let inactiveColorProfileMessage =
+        "The saved display for this ColorSync ICC profile is not currently active."
+      let omissions =
+        fixture.includesReviewDetails
+        ? [
+          PlanOmission(
+            group: .display,
+            key: "displayConfiguration",
+            status: .skipped,
+            reason: inactiveDisplayMessage
+          ),
+          PlanOmission(
+            group: .display,
+            key: "colorProfile",
+            status: .skipped,
+            reason: inactiveColorProfileMessage
+          ),
+        ] : []
+      let validationIssues =
+        fixture.includesReviewDetails
+        ? [
+          ValidationIssue(
+            group: .display,
+            key: "displayConfiguration",
+            severity: .warning,
+            isFatal: false,
+            message: inactiveDisplayMessage
+          ),
+          ValidationIssue(
+            group: .display,
+            key: "colorProfile",
+            severity: .warning,
+            isFatal: false,
+            message: inactiveColorProfileMessage
+          ),
+        ] : []
       let preparation = ApplyPreparation(
         profileID: profile.id,
         mode: fixture.mode,
@@ -1023,9 +1101,9 @@ import Testing
         includedGroups: [.display, .audio],
         capabilities: [],
         snapshots: [],
-        validationIssues: [],
+        validationIssues: validationIssues,
         operations: operations,
-        omissions: [],
+        omissions: omissions,
         readiness: ReadinessEvaluation(
           status: .ready,
           applicableGroups: [.display, .audio],
@@ -1051,10 +1129,12 @@ import Testing
       .dynamicTypeSize(fixture.largeText ? .accessibility3 : .large)
       .uiAuditEnvironment(configuration)
       .frame(width: size.width, height: size.height)
-      .background(Color.white)
+      .preferredColorScheme(fixture.includesReviewDetails ? .dark : .light)
+      .background(fixture.includesReviewDetails ? Color.black : Color.white)
       let host = NSHostingView(rootView: root)
       host.frame = NSRect(origin: .zero, size: size)
-      host.appearance = NSAppearance(named: .aqua)
+      host.appearance = NSAppearance(
+        named: fixture.includesReviewDetails ? .darkAqua : .aqua)
       let window = NSWindow(
         contentRect: NSRect(origin: .zero, size: size),
         styleMask: .borderless,
@@ -1077,7 +1157,7 @@ import Testing
       host.cacheDisplay(in: host.bounds, to: sourceRepresentation)
       let representation = try opaqueRepresentation(
         from: sourceRepresentation,
-        background: .white
+        background: fixture.includesReviewDetails ? .black : .white
       )
       #expect(!representation.hasAlpha)
       let png = try #require(
@@ -1095,6 +1175,10 @@ import Testing
         "viewport=\(Int(size.width))x\(Int(size.height))",
         "review-reason=\(String(describing: fixture.reviewReason))",
         "mode=\(String(describing: fixture.mode))",
+        "declared-change-count=\(request.preparation.operations.count)",
+        "declared-skipped-count=\(request.preparation.omissions.count)",
+        "declared-review-count=\(request.preparation.validationIssues.count + request.preparation.rejectionReasons.count)",
+        "review-details-expanded-by-default=\(!request.preparation.canExecute)",
         "large-text=\(fixture.largeText)",
         "initial-scroll-anchor=\(initialScrollAnchor == .bottom ? "bottom" : "top")",
         "live-display-audio-network-mutations=false",
@@ -1444,6 +1528,21 @@ import Testing
         showsStatusPopover: false
       )
       let model = UIAuditFixtures.makeModel(configuration: configuration)
+      if fixture.name == "03b-three-ko-dark" {
+        let state = UIAuditFixtures.fixture(.overview)
+        model.configureForUIAudit(
+          UIAuditFixtureState(
+            profiles: state.profiles,
+            selectedProfileID: state.selectedProfileID,
+            snapshot: state.snapshot,
+            readinessByProfile: state.readinessByProfile,
+            operationCountByProfile: state.operationCountByProfile,
+            availableOperationCountByProfile: state.availableOperationCountByProfile,
+            captureSummary: nil,
+            applySummary: nil
+          )
+        )
+      }
       if fixture.usesPartialProfileOnly {
         let state = UIAuditFixtures.fixture(.overview)
         let partialProfile = try #require(

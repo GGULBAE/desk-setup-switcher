@@ -26,7 +26,7 @@ struct TrayPopoverControllerTests {
     #expect(factory.popoverCreations == 1)
     #expect(factory.monitorCreations == 1)
     #expect(controller.popoverBehavior == .applicationDefined)
-    #expect(controller.contentSize == CGSize(width: 368, height: 560))
+    #expect(controller.contentSize == CGSize(width: 368, height: 480))
     #expect(controller.hostingViewBounds.size == controller.contentSize)
     #expect(controller.hostingViewBounds.origin == .zero)
     #expect(controller.hostingViewFrame == CGRect(origin: .zero, size: controller.contentSize))

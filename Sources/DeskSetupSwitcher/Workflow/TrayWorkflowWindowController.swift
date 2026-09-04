@@ -470,12 +470,43 @@ enum ApplyPreviewReviewSection: CaseIterable, Hashable, Sendable {
 }
 
 enum ApplyPreviewReviewOrderPolicy {
-  static let contentSections: [ApplyPreviewReviewSection] = [
-    .plannedChanges,
+  static let primarySection: ApplyPreviewReviewSection = .plannedChanges
+  static let detailSections: [ApplyPreviewReviewSection] = [
     .omissions,
     .validation,
     .rejections,
   ]
+}
+
+struct ApplyPreviewSummaryCounts: Equatable, Sendable {
+  let changes: Int
+  let skipped: Int
+  let toReview: Int
+}
+
+enum ApplyPreviewSummaryPolicy {
+  static func counts(
+    changes: Int,
+    skipped: Int,
+    validationIssues: Int,
+    rejections: Int
+  ) -> ApplyPreviewSummaryCounts {
+    ApplyPreviewSummaryCounts(
+      changes: changes,
+      skipped: skipped,
+      toReview: validationIssues + rejections
+    )
+  }
+
+  static func expandsDetailsInitially(canExecute: Bool) -> Bool {
+    !canExecute
+  }
+}
+
+private struct ApplyPreviewSummaryItem: Identifiable {
+  let id: String
+  let title: String
+  let systemImage: String
 }
 
 enum ApplyPreviewDecisionPolicy {
@@ -649,6 +680,7 @@ struct ApplyPreviewView: View {
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @AccessibilityFocusState private var isHeadingAccessibilityFocused: Bool
   @State private var expandedTechnicalOperationIDs: Set<UUID> = []
+  @State private var showsReviewDetails = false
   let request: PendingApplyRequest
   let showsHardwareVerificationStatus: Bool
   let initialScrollAnchor: UnitPoint
@@ -688,29 +720,41 @@ struct ApplyPreviewView: View {
   }
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 14) {
-        previewHeader
-        hardwareVerificationNotice
-        applyNotices
+    GeometryReader { viewport in
+      ScrollView {
+        VStack(alignment: .leading, spacing: 14) {
+          previewHeader
+          hardwareVerificationNotice
+          previewSummary
 
-        ForEach(ApplyPreviewReviewOrderPolicy.contentSections, id: \.self) { section in
-          reviewSection(section)
+          reviewSection(ApplyPreviewReviewOrderPolicy.primarySection)
+          secondaryReviewDetails
+          applyNotices
+
+          Spacer(minLength: 0)
+          Divider()
+          applyActionBar
         }
-
-        Divider()
-        applyActionBar
+        .frame(
+          minHeight: viewport.size.height,
+          alignment: .topLeading
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .id(request.id)
+      .defaultScrollAnchor(initialScrollAnchor)
+      .scrollBounceBehavior(.basedOnSize)
     }
-    .id(request.id)
-    .defaultScrollAnchor(initialScrollAnchor)
-    .scrollBounceBehavior(.basedOnSize)
     .padding(WorkflowSurfaceMetrics.contentInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .task(id: request.id) {
       await Task.yield()
       isHeadingAccessibilityFocused = true
+      if ApplyPreviewSummaryPolicy.expandsDetailsInitially(
+        canExecute: request.preparation.canExecute
+      ) {
+        showsReviewDetails = true
+      }
     }
   }
 
@@ -843,8 +887,8 @@ struct ApplyPreviewView: View {
     if showsHardwareVerificationStatus {
       let status = ApplyPreviewHardwareVerificationStatus.localized()
       Label(status.text, systemImage: status.systemImage)
-        .font(.callout.weight(.medium))
-        .foregroundStyle(.primary)
+        .font(.caption)
+        .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .ignore)
         .accessibilityIdentifier("apply-preview-beta-hardware-status")
@@ -855,52 +899,14 @@ struct ApplyPreviewView: View {
 
   @ViewBuilder
   private func operationRow(_ operation: PlannedOperation) -> some View {
-    Group {
-      if dynamicTypeSize.isAccessibilitySize {
-        VStack(alignment: .leading, spacing: 5) {
-          Text(appSettingGroupTitle(operation.group))
-            .font(.caption.bold())
-          operationDetails(operation)
-        }
-      } else {
-        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
-          GridRow(alignment: .top) {
-            Text(appSettingGroupTitle(operation.group))
-              .font(.caption.bold())
-              .fixedSize(horizontal: true, vertical: false)
-              .gridColumnAlignment(.leading)
-            operationDetails(operation)
-              .gridColumnAlignment(.leading)
-          }
-        }
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.vertical, 3)
-    .accessibilityElement(children: .combine)
-    .accessibilityCustomContent(
-      Text(verbatim: appLocalized("Change risk")),
-      Text(verbatim: riskTitle(operation.risk)),
-      importance: operation.risk == .high ? .high : .default
-    )
-  }
-
-  private func operationDetails(_ operation: PlannedOperation) -> some View {
-    VStack(alignment: .leading, spacing: 5) {
-      ViewThatFits(in: .horizontal) {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-          Text(appLocalizedRuntime(operation.summary))
-          Spacer(minLength: 4)
-          if operation.risk != .low {
-            riskLabel(operation.risk)
-              .fixedSize(horizontal: true, vertical: false)
-          }
-        }
-        VStack(alignment: .leading, spacing: 3) {
-          Text(appLocalizedRuntime(operation.summary))
-          if operation.risk != .low {
-            riskLabel(operation.risk)
-          }
+    VStack(alignment: .leading, spacing: 7) {
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        Text(appLocalizedRuntime(operation.summary))
+          .font(.callout.weight(.semibold))
+        Spacer(minLength: 4)
+        if operation.risk != .low {
+          riskLabel(operation.risk)
+            .fixedSize(horizontal: true, vertical: false)
         }
       }
       if let preview = presentationBuilder.operationPreview(for: operation) {
@@ -908,6 +914,18 @@ struct ApplyPreviewView: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(10)
+    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+    .accessibilityElement(children: .contain)
+    .accessibilityCustomContent(
+      Text(verbatim: appLocalized("Setting group")),
+      Text(verbatim: appSettingGroupTitle(operation.group))
+    )
+    .accessibilityCustomContent(
+      Text(verbatim: appLocalized("Change risk")),
+      Text(verbatim: riskTitle(operation.risk)),
+      importance: operation.risk == .high ? .high : .default
+    )
   }
 
   private func riskLabel(_ risk: OperationRisk) -> some View {
@@ -931,44 +949,139 @@ struct ApplyPreviewView: View {
       .background(.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
     }
 
-    VStack(alignment: .leading, spacing: 8) {
+    if request.preparation.operations.contains(where: { $0.risk == .high }) {
       Label(
-        appLocalized("Safety summary"),
-        systemImage: "exclamationmark.shield"
-      )
-      .font(.headline)
-
-      if request.preparation.mode == .force {
-        Label(
-          appLocalized("Available settings only; skipped items are listed below."),
-          systemImage: "minus.circle"
-        )
-      }
-
-      Label(
-        ApplyPreviewActionCopy.reviewNotice(
-          for: .initial,
-          actionTitle: applyActionTitle
+        appLocalized(
+          "Display and network changes stay temporary for 15 seconds unless you keep them."
         ),
-        systemImage: "info.circle"
+        systemImage: "timer"
       )
-
-      if request.preparation.operations.contains(where: { $0.risk == .high }) {
-        Label(
-          appLocalized(
-            "Display and network changes stay temporary for 15 seconds unless you keep them."
-          ),
-          systemImage: "timer"
-        )
-      }
+      .font(.callout)
+      .fixedSize(horizontal: false, vertical: true)
+      .padding(10)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(.yellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
     }
-    .font(.callout)
+
+    Label(
+      ApplyPreviewActionCopy.reviewNotice(
+        for: .initial,
+        actionTitle: applyActionTitle
+      ),
+      systemImage: "info.circle"
+    )
+    .font(.caption)
+    .foregroundStyle(.secondary)
     .fixedSize(horizontal: false, vertical: true)
-    .padding(10)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.yellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("apply-preview-safety-summary")
+  }
+
+  private var previewSummary: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 8) {
+        ForEach(previewSummaryItems) { item in
+          previewSummaryItem(item)
+        }
+      }
+      VStack(alignment: .leading, spacing: 7) {
+        ForEach(previewSummaryItems) { item in
+          previewSummaryItem(item)
+        }
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("apply-preview-change-summary")
+  }
+
+  private var previewSummaryItems: [ApplyPreviewSummaryItem] {
+    let counts = previewSummaryCounts
+    var items = [
+      ApplyPreviewSummaryItem(
+        id: "changes",
+        title: appLocalized("\(counts.changes) changes"),
+        systemImage: "arrow.right.circle"
+      )
+    ]
+    if counts.skipped > 0 {
+      items.append(
+        ApplyPreviewSummaryItem(
+          id: "skipped",
+          title: appLocalized("\(counts.skipped) skipped"),
+          systemImage: "minus.circle"
+        ))
+    }
+    if counts.toReview > 0 {
+      items.append(
+        ApplyPreviewSummaryItem(
+          id: "review",
+          title: appLocalized("\(counts.toReview) to review"),
+          systemImage: "exclamationmark.circle"
+        ))
+    }
+    return items
+  }
+
+  private var previewSummaryCounts: ApplyPreviewSummaryCounts {
+    ApplyPreviewSummaryPolicy.counts(
+      changes: request.preparation.operations.count,
+      skipped: request.preparation.omissions.count,
+      validationIssues: request.preparation.validationIssues.count,
+      rejections: request.preparation.rejectionReasons.count
+    )
+  }
+
+  private func previewSummaryItem(_ item: ApplyPreviewSummaryItem) -> some View {
+    Label(item.title, systemImage: item.systemImage)
+      .font(.callout.weight(.semibold))
+      .padding(.horizontal, 10)
+      .padding(.vertical, 6)
+      .background(.quaternary.opacity(0.55), in: Capsule())
+      .fixedSize(horizontal: true, vertical: false)
+  }
+
+  @ViewBuilder
+  private var secondaryReviewDetails: some View {
+    if !ApplyPreviewReviewOrderPolicy.detailSections.allSatisfy(isReviewSectionEmpty) {
+      AccessibleDisclosureGroup(
+        secondaryReviewTitle,
+        accessibilityIdentifier: "apply-preview.review-details",
+        isExpanded: $showsReviewDetails
+      ) {
+        VStack(alignment: .leading, spacing: 12) {
+          ForEach(ApplyPreviewReviewOrderPolicy.detailSections, id: \.self) { section in
+            reviewSection(section)
+          }
+        }
+      }
+      .padding(10)
+      .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+    }
+  }
+
+  private var secondaryReviewTitle: String {
+    let counts = previewSummaryCounts
+    var parts: [String] = []
+    if counts.skipped > 0 {
+      parts.append(appLocalized("\(counts.skipped) skipped"))
+    }
+    if counts.toReview > 0 {
+      parts.append(appLocalized("\(counts.toReview) to review"))
+    }
+    return "\(appLocalized("Review details")) · \(parts.joined(separator: " · "))"
+  }
+
+  private func isReviewSectionEmpty(_ section: ApplyPreviewReviewSection) -> Bool {
+    switch section {
+    case .plannedChanges:
+      request.preparation.operations.isEmpty
+    case .omissions:
+      request.preparation.omissions.isEmpty
+    case .validation:
+      request.preparation.validationIssues.isEmpty
+    case .rejections:
+      request.preparation.rejectionReasons.isEmpty
+    }
   }
 
   @ViewBuilder
@@ -976,8 +1089,30 @@ struct ApplyPreviewView: View {
     _ preview: FriendlyOperationPreview,
     operation: PlannedOperation
   ) -> some View {
-    Group {
-      if dynamicTypeSize.isAccessibilitySize {
+    VStack(alignment: .leading, spacing: 7) {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 8) {
+          compactOperationValue(
+            title: appLocalized("Current"),
+            value: appOperationPreviewValue(
+              preview.previousValue.compactText,
+              operation: operation,
+              isPreviousValue: true
+            )
+          )
+          Image(systemName: "arrow.right")
+            .font(.caption.bold())
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+          compactOperationValue(
+            title: appLocalized("After apply"),
+            value: appOperationPreviewValue(
+              preview.desiredValue.compactText,
+              operation: operation,
+              isPreviousValue: false
+            )
+          )
+        }
         VStack(alignment: .leading, spacing: 5) {
           operationPreviewValue(
             title: appLocalized("Current"),
@@ -987,6 +1122,10 @@ struct ApplyPreviewView: View {
               isPreviousValue: true
             )
           )
+          Image(systemName: "arrow.down")
+            .font(.caption.bold())
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
           operationPreviewValue(
             title: appLocalized("After apply"),
             value: appOperationPreviewValue(
@@ -996,65 +1135,37 @@ struct ApplyPreviewView: View {
             )
           )
         }
-      } else {
-        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
-          GridRow {
-            Text(appLocalized("Current"))
-              .font(.caption.bold())
-            Text(
-              appOperationPreviewValue(
-                preview.previousValue.compactText,
-                operation: operation,
-                isPreviousValue: true
-              )
-            )
-          }
-          GridRow {
-            Text(appLocalized("After apply"))
-              .font(.caption.bold())
-            Text(
-              appOperationPreviewValue(
-                preview.desiredValue.compactText,
-                operation: operation,
-                isPreviousValue: false
-              )
-            )
-          }
-        }
       }
-    }
-    .font(.caption)
-    .foregroundStyle(.secondary)
-    .textSelection(.enabled)
 
-    let previousDetails = preview.previousValue.technicalDetails
-    let desiredDetails = preview.desiredValue.technicalDetails
-    if !previousDetails.isEmpty || !desiredDetails.isEmpty {
-      AccessibleDisclosureGroup(
-        appLocalized("Technical Information"),
-        accessibilityIdentifier: "apply-preview.technical-information.\(operation.id.uuidString)",
-        isExpanded: technicalInformationBinding(for: operation.id)
-      ) {
-        ForEach(Array(previousDetails.enumerated()), id: \.offset) { _, detail in
-          LabeledContent(
-            appLocalized("Current \(appLocalizedPresentationText(detail.label))")
-          ) {
-            Text(detail.value)
-              .font(.caption.monospaced())
-              .textSelection(.enabled)
+      let previousDetails = preview.previousValue.technicalDetails
+      let desiredDetails = preview.desiredValue.technicalDetails
+      if !previousDetails.isEmpty || !desiredDetails.isEmpty {
+        AccessibleDisclosureGroup(
+          appLocalized("Technical Information"),
+          accessibilityIdentifier: "apply-preview.technical-information.\(operation.id.uuidString)",
+          isExpanded: technicalInformationBinding(for: operation.id)
+        ) {
+          ForEach(Array(previousDetails.enumerated()), id: \.offset) { _, detail in
+            LabeledContent(
+              appLocalized("Current \(appLocalizedPresentationText(detail.label))")
+            ) {
+              Text(detail.value)
+                .font(.caption.monospaced())
+                .textSelection(.enabled)
+            }
+          }
+          ForEach(Array(desiredDetails.enumerated()), id: \.offset) { _, detail in
+            LabeledContent(
+              appLocalized("After apply \(appLocalizedPresentationText(detail.label))")
+            ) {
+              Text(detail.value)
+                .font(.caption.monospaced())
+                .textSelection(.enabled)
+            }
           }
         }
-        ForEach(Array(desiredDetails.enumerated()), id: \.offset) { _, detail in
-          LabeledContent(
-            appLocalized("After apply \(appLocalizedPresentationText(detail.label))")
-          ) {
-            Text(detail.value)
-              .font(.caption.monospaced())
-              .textSelection(.enabled)
-          }
-        }
+        .font(.caption)
       }
-      .font(.caption)
     }
   }
 
@@ -1077,6 +1188,16 @@ struct ApplyPreviewView: View {
         .font(.caption.bold())
       Text(value)
     }
+  }
+
+  private func compactOperationValue(title: String, value: String) -> some View {
+    Text(value)
+      .font(.callout)
+      .lineLimit(2)
+      .fixedSize(horizontal: false, vertical: true)
+      .textSelection(.enabled)
+      .accessibilityLabel(title)
+      .accessibilityValue(value)
   }
 
   private var presentationBuilder: ProfilePresentationBuilder {
@@ -1554,7 +1675,7 @@ final class TrayWorkflowWindowController: NSWindowController,
 {
   typealias AwaiterFactory = @MainActor (NSWindow) -> WindowPresentationAwaiter
 
-  private static let initialContentSize = CGSize(width: 620, height: 500)
+  private static let initialContentSize = CGSize(width: 620, height: 440)
   private static let minimumContentSize = CGSize(width: 520, height: 360)
 
   private var presentationRequest: WindowPresentationRequest?

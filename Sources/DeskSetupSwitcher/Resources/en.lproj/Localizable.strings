@@ -37,11 +37,15 @@
 "Conditions" = "Conditions";
 "No readiness conditions." = "No readiness conditions.";
 "Planned changes" = "Planned changes";
+"%lld changes" = "%lld changes";
+"%lld to review" = "%lld to review";
+"Review details" = "Review details";
 "No setting needs to change." = "No setting needs to change.";
 "High risk" = "High risk";
 "Review" = "Review";
 "Low risk" = "Low risk";
 "Change risk" = "Change risk";
+"Setting group" = "Setting group";
 "Skipped or unsupported" = "Skipped or unsupported";
 "Validation" = "Validation";
 "Cannot apply" = "Cannot apply";
@@ -553,6 +557,7 @@
 "More than one saved target resolves to the same active display." = "More than one saved target resolves to the same active display.";
 "The saved display identity matches more than one active display." = "The saved display identity matches more than one active display.";
 "The saved display is not currently active." = "The saved display is not currently active.";
+"The saved display for this ColorSync ICC profile is not currently active." = "The saved display for this ColorSync ICC profile is not currently active.";
 "A display configuration can contain only one primary display." = "A display configuration can contain only one primary display.";
 "The requested display origin is outside the public Core Graphics range." = "The requested display origin is outside the public Core Graphics range.";
 "The primary display must remain at (0, 0) unless another display becomes primary." = "The primary display must remain at (0, 0) unless another display becomes primary.";

@@ -25,7 +25,7 @@ struct TrayGeometryTests {
     #expect(sizes[1].height == TrayGeometry.singleProfileHeight)
     #expect(sizes[0] == sizes[1])
     #expect(sizes[2].height == TrayGeometry.twoProfileHeight)
-    #expect(sizes[3].height == TrayGeometry.maximumHeight)
+    #expect(sizes[3].height == TrayGeometry.threeProfileHeight)
     #expect(sizes[4].height == TrayGeometry.maximumHeight)
   }
 
@@ -40,6 +40,21 @@ struct TrayGeometryTests {
     )
 
     #expect(viewport.height - standardFixtureContentHeight <= 24)
+    #expect(viewport.height - standardFixtureContentHeight >= 0)
+  }
+
+  @Test("three standard profiles avoid a large empty tail")
+  func threeProfileBottomGap() {
+    // The installed report captured standard three-card content at roughly
+    // 442 points. The policy keeps a small closing inset without jumping to
+    // the maximum scroll viewport reserved for four or more cards.
+    let standardFixtureContentHeight: CGFloat = 442
+    let viewport = policy.viewport(
+      for: TrayGeometryContext(profileCount: 3),
+      on: primaryScreen
+    )
+
+    #expect(viewport.height - standardFixtureContentHeight <= 40)
     #expect(viewport.height - standardFixtureContentHeight >= 0)
   }
 

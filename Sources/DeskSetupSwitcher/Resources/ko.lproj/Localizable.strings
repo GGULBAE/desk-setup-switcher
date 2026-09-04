@@ -37,11 +37,15 @@
 "Conditions" = "조건";
 "No readiness conditions." = "준비 조건이 없습니다.";
 "Planned changes" = "예정된 변경 사항";
+"%lld changes" = "변경 %lld개";
+"%lld to review" = "확인 %lld개";
+"Review details" = "검토 세부 정보";
 "No setting needs to change." = "변경할 설정이 없습니다.";
 "High risk" = "고위험";
 "Review" = "확인 필요";
 "Low risk" = "저위험";
 "Change risk" = "변경 위험도";
+"Setting group" = "설정 그룹";
 "Skipped or unsupported" = "건너뛰거나 지원되지 않는 항목";
 "Validation" = "유효성 검사";
 "Cannot apply" = "적용할 수 없음";
@@ -553,6 +557,7 @@
 "More than one saved target resolves to the same active display." = "저장된 대상 둘 이상이 같은 활성 디스플레이로 확인됩니다.";
 "The saved display identity matches more than one active display." = "저장된 디스플레이 식별 정보가 활성 디스플레이 둘 이상과 일치합니다.";
 "The saved display is not currently active." = "저장된 디스플레이가 현재 활성 상태가 아닙니다.";
+"The saved display for this ColorSync ICC profile is not currently active." = "이 ColorSync ICC 프로필의 저장된 디스플레이가 현재 활성 상태가 아닙니다.";
 "A display configuration can contain only one primary display." = "디스플레이 구성에는 주 디스플레이를 하나만 지정할 수 있습니다.";
 "The requested display origin is outside the public Core Graphics range." = "요청한 디스플레이 원점이 공개 Core Graphics 범위를 벗어났습니다.";
 "The primary display must remain at (0, 0) unless another display becomes primary." = "다른 디스플레이를 주 디스플레이로 지정하지 않는 한 현재 주 디스플레이는 (0, 0)에 있어야 합니다.";

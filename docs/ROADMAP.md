@@ -260,6 +260,17 @@ The final integrated non-live `make verify` and current `git diff --check` pass:
 
 A separately authorized reinstall copied the verified mounted package to `/Applications`, confirmed the installed executable at SHA-256 `f6accf8edc908a426f0082bcba1b11807f7f1bf8f862033ecd56c7e6c8d7cdcc` with `x86_64 arm64` and a valid ad-hoc signature, and launched that installed path. Profile primary and backup hashes remained unchanged and the previous app remains recoverable from a build-local backup. This proves replacement and launch only; the profile editor was not interactively exercised and no system-setting mutation ran.
 
+## M4.14 — tray and apply-preview density refinement (implemented; local verification passed)
+
+- Give exactly three standard profile cards a 480-point tray viewport instead of the 560-point overflow maximum; retain the existing 0/1/2 and 4+ height contracts and screen clamping.
+- Put Apply Preview's change/skip/review counts and compact before → after operation cards before secondary information.
+- Group omissions, validation issues, and rejections into one localized **Review details** disclosure. Expand it automatically whenever the plan cannot execute, while keeping the Beta status, refreshed-plan warning, protected-change timer, and final decision notice visible when relevant.
+- Start the workflow window at 620×440, anchor short-state actions to the bottom, and preserve the same one-scroll ordering, 520×360 minimum, Escape cancel shortcut, and non-default Apply action for overflow and accessibility text.
+- Cover the reported Korean dark-mode state with a three-profile tray fixture and a two-change/two-skip/two-warning preview fixture. Record strict same-viewport source/implementation comparisons in a build-local QA report without tracking the user's unrelated root `design-qa.md`.
+- Finish the canonical non-live gate and a behavior-focused commit before checking the completion item. A later reinstall may prove package replacement and launch only; it must not invoke Capture, Apply, permissions, login-item changes, or system-setting mutation.
+
+The integrated non-live `make verify` passes 194 XCTest cases, 333 Swift Testing cases across 39 suites, one isolated native popover regression, and 4,820 release-tooling assertions. Lint/localization policy, Swift Debug/Release, universal Xcode Debug/Release, Analyze, package, checksum, and mounted `arm64+x86_64` verification all pass. The local unsigned development DMG SHA-256 is `6a77ad1f830f30faa620a1e6f29ab1f9fb035c43ad43b9e6426ddcc58b355cff`, and its executable SHA-256 is `6b1b6feda3b886de30b5cbd2cc78117682c4d5e14d0d0932b53bb1bd0e5da260`. A behavior-focused commit and reinstall evidence remain separate until recorded.
+
 ## M6 — Free open-source public beta release (unsigned GitHub path selected; execution/publication pending)
 
 The first public beta remains bounded to the simple **Capture → Edit → Review & Apply** product flow. It does not add accounts, cloud services, telemetry, automatic profile switching, arbitrary shell execution, UI automation, private APIs, or a new plugin/SDK surface.

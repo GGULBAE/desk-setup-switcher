@@ -730,7 +730,7 @@ import Testing
     func workflowWindowGeometry() throws {
       let controller = TrayWorkflowWindowController(rootView: Color.clear)
       let window = try #require(controller.window)
-      let expectedContentSize = CGSize(width: 620, height: 500)
+      let expectedContentSize = CGSize(width: 620, height: 440)
       let expectedFrameSize = window.frameRect(
         forContentRect: NSRect(origin: .zero, size: expectedContentSize)
       ).size
@@ -771,13 +771,13 @@ import Testing
       #expect(hostingController.sizingOptions.isEmpty)
       #expect(
         window.contentRect(forFrameRect: initialFrame).size
-          == CGSize(width: 620, height: 500)
+          == CGSize(width: 620, height: 440)
       )
 
       probe.phase = .workflow
       settleDynamicHostingLayout(window)
       #expect(window.frame == initialFrame)
-      #expect(window.contentView?.bounds.size == CGSize(width: 620, height: 500))
+      #expect(window.contentView?.bounds.size == CGSize(width: 620, height: 440))
 
       let userContentSize = CGSize(width: 570, height: 420)
       window.setContentSize(userContentSize)
