@@ -62,6 +62,6 @@ Final severity result: no open P0, P1, or P2 visual issue in the synthetic scope
 
 Focused geometry, controller, workflow policy, localization, safety-source, and offscreen evidence selections pass. The canonical non-live `make verify` also passes: 194 XCTest cases, 333 Swift Testing cases across 39 suites, one isolated native popover regression, 4,820 release-tooling assertions, lint/localization policy, Swift Debug/Release, universal Xcode Debug/Release, Analyze, package, checksum, and mounted `arm64+x86_64` verification. `git diff --check` passes. The resulting local unsigned development DMG SHA-256 is `6a77ad1f830f30faa620a1e6f29ab1f9fb035c43ad43b9e6426ddcc58b355cff`; its executable SHA-256 is `6b1b6feda3b886de30b5cbd2cc78117682c4d5e14d0d0932b53bb1bd0e5da260`.
 
-The behavior-focused implementation commit and optional reinstall evidence remain deliberately pending until they exist and can be recorded without overstating completion.
+Behavior-focused implementation commit `30b50b1` records this verified source and evidence. Optional reinstall evidence remains deliberately pending until it exists and can be recorded without overstating completion.
 
 Installed focus order, real accessibility settings, full keyboard traversal, VoiceOver, multi-display placement, and every hardware apply/rollback path remain outside this synthetic result.
