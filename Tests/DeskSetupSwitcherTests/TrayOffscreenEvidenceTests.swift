@@ -495,6 +495,14 @@ import Testing
           displayMode: .largeText,
           size: CGSize(width: 680, height: 480)
         ),
+        SettingsFixture(
+          name: "27-network-simple-en-light",
+          variant: .editorNetwork,
+          languageCode: "en",
+          colorScheme: .light,
+          displayMode: .standard,
+          size: CGSize(width: 900, height: 568)
+        ),
       ]
       let selectedFixture = ProcessInfo.processInfo.environment[
         "DESK_SETUP_REFINEMENT_EVIDENCE_FIXTURE"
@@ -549,7 +557,11 @@ import Testing
           }
           #expect(rendered.accessibility.contains("dynamic-type=\(fixture.dynamicTypeName)"))
           #expect(rendered.accessibility.contains("inclusion-header-layout=stacked"))
-          #expect(rendered.accessibility.contains("inclusion-state-cues=text,symbol,switch"))
+          #expect(
+            rendered.accessibility.contains(
+              "inclusion-state-cues=label,switch;advanced=text,symbol,switch"
+            )
+          )
           #expect(rendered.accessibility.contains("sidebar-primary-action="))
           #expect(rendered.accessibility.contains("sidebar-secondary-menu="))
         }
@@ -1259,7 +1271,9 @@ import Testing
         "inclusion-summary-line-limit=\(inclusionSummaryLineLimit)",
         "inclusion-minimum-available-width=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.minimumAvailableHeaderWidth)) : "not-applicable")",
         "inclusion-expected-control-width-limit=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.maximumExpectedControlWidth)) : "not-applicable")",
-        "inclusion-state-cues=\(fixture.isProfileSurface ? "text,symbol,switch" : "not-applicable")",
+        "step-navigation=\(fixture.isProfileSurface ? "display,sound,network" : "not-applicable")",
+        "step-state-cues=\(fixture.isProfileSurface ? "number,title,checkmark" : "not-applicable")",
+        "inclusion-state-cues=\(fixture.isProfileSurface ? "label,switch;advanced=text,symbol,switch" : "not-applicable")",
         "declared-dirty-export-notice=\(fixture.state == .dirtyDraft ? appLocalizedRuntime(ProfileExportScopePolicy.unsavedDraftNotice) : "none")",
         "export-source=persisted-document-only",
         "storage-error-card-visible=\(fixture.state == .storageError)",

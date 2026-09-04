@@ -116,6 +116,52 @@ enum ProfileEditorSurfacePolicy {
   static let showsCurrentSettingsDraftRefresh = false
 }
 
+enum ProfileEditorStepPolicy {
+  static let defaultGroup: SettingGroup = .display
+  static let orderedGroups: [SettingGroup] = [.display, .audio, .network]
+
+  static func group(for fieldID: DraftFieldIdentifier) -> SettingGroup? {
+    let rawValue = fieldID.rawValue
+    if rawValue.hasPrefix("settings.display") { return .display }
+    if rawValue.hasPrefix("settings.audio") { return .audio }
+    if rawValue.hasPrefix("settings.network") { return .network }
+    return nil
+  }
+
+  static func requiresAdvancedDisclosure(_ fieldID: DraftFieldIdentifier) -> Bool {
+    let basicFields: Set<DraftFieldIdentifier> = [
+      .displayPrimary,
+      .audio(.defaultOutputDevice),
+    ]
+    guard group(for: fieldID) != nil else { return false }
+    return !basicFields.contains(fieldID)
+  }
+}
+
+enum ProfileEditorNetworkSelectionPolicy {
+  static func updatingInclusion(
+    in targets: [NetworkServiceIPv4Settings],
+    selectedIdentity: NetworkServiceIdentity,
+    isIncluded: Bool,
+    runtimeChoices: [NetworkServiceIPv4Settings]
+  ) -> [NetworkServiceIPv4Settings] {
+    var updated = targets
+    if let index = updated.firstIndex(where: { $0.identity == selectedIdentity }) {
+      updated[index].configuration.isIncluded = isIncluded
+      if isIncluded, updated[index].configuration.value == nil {
+        updated[index].configuration.value = .dhcp
+      }
+    } else if isIncluded,
+      var runtime = runtimeChoices.first(where: { $0.identity == selectedIdentity })
+    {
+      runtime.configuration.isIncluded = true
+      runtime.configuration.value = runtime.configuration.value ?? .dhcp
+      updated.append(runtime)
+    }
+    return updated
+  }
+}
+
 enum ProfileManagementAction: Hashable, Sendable {
   case create
   case duplicate
@@ -1206,6 +1252,10 @@ private struct ProfileEditorForm: View {
   @FocusState private var focusedField: DraftFieldIdentifier?
   @State private var showsValidationSummary = false
   @State private var showsImportedIconTechnicalInformation = false
+  @State private var showsLastApplicationDetails = false
+  @State private var selectedGroup = ProfileEditorStepPolicy.defaultGroup
+  @State private var expandedAdvancedGroup: SettingGroup?
+  @State private var selectedNetworkIdentity: NetworkServiceIdentity?
 
   var body: some View {
     ScrollView {
@@ -1216,12 +1266,12 @@ private struct ProfileEditorForm: View {
           validationSummary
         }
 
-        ForEach(orderedVisibleGroups, id: \.self) { group in
-          visibleGroupEditor(group)
+        if !availableGroups.isEmpty {
+          stepWorkspace
         }
 
         if let lastApplication = profile.lastApplication {
-          lastApplicationCard(lastApplication)
+          lastApplicationDisclosure(lastApplication)
         }
       }
       .padding(.horizontal, ProfileSettingInclusionLayoutPolicy.formHorizontalInset)
@@ -1243,59 +1293,74 @@ private struct ProfileEditorForm: View {
       requestedValidationFocus = nil
       showsValidationSummary = false
       showsImportedIconTechnicalInformation = false
+      showsLastApplicationDetails = false
+      selectedGroup = initialSelectedGroup
+      expandedAdvancedGroup = nil
+      selectedNetworkIdentity = nil
     }
     .onChange(of: presentationGeneration) {
       focusedField = nil
       requestedValidationFocus = nil
       showsValidationSummary = false
       showsImportedIconTechnicalInformation = false
+      showsLastApplicationDetails = false
+      selectedGroup = initialSelectedGroup
+      expandedAdvancedGroup = nil
+      selectedNetworkIdentity = nil
     }
     .onChange(of: requestedValidationFocus) {
       guard let fieldID = requestedValidationFocus else { return }
       showsValidationSummary = true
       revealAndFocus(fieldID)
     }
-    .onAppear { configureSyntheticAuditFocus() }
+    .onChange(of: availableGroups) {
+      if !availableGroups.contains(selectedGroup) {
+        selectedGroup = availableGroups.first ?? ProfileEditorStepPolicy.defaultGroup
+      }
+    }
+    .onAppear {
+      selectedGroup = initialSelectedGroup
+      configureSyntheticAuditFocus()
+    }
   }
 
   private var profileDetailsCard: some View {
-    GroupBox {
-      VStack(alignment: .leading, spacing: 12) {
-        ViewThatFits(in: .horizontal) {
-          HStack(alignment: .firstTextBaseline, spacing: 12) {
-            profileNameField
-            profileIconPicker
-          }
-          VStack(alignment: .leading, spacing: 10) {
-            profileNameField
-            profileIconPicker
-          }
-        }
-        if let issue = validation.issue(for: .profileName) {
-          inlineValidationMessage(
-            validationMessage(for: issue),
-            fieldID: .profileName
-          )
-        }
-        if !profileIconChoices.contains(where: { $0.symbolName == profile.symbolName }) {
-          AccessibleDisclosureGroup(
-            appLocalized("Technical Information"),
-            accessibilityIdentifier: "profile-imported-icon-technical-information",
-            isExpanded: $showsImportedIconTechnicalInformation
-          ) {
-            LabeledContent(appLocalized("Imported symbol name")) {
-              Text(profile.symbolName)
-                .font(.caption.monospaced())
-                .textSelection(.enabled)
-            }
-          }
-        }
-      }
-      .padding(ProfileSettingInclusionLayoutPolicy.groupContentInset)
-    } label: {
+    VStack(alignment: .leading, spacing: 10) {
       Label(appLocalized("Profile"), systemImage: "person.crop.rectangle")
         .font(.headline)
         .accessibilityAddTraits(.isHeader)
+
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+          profileNameField
+          profileIconPicker
+        }
+        VStack(alignment: .leading, spacing: 10) {
+          profileNameField
+          profileIconPicker
+        }
+      }
+      if let issue = validation.issue(for: .profileName) {
+        inlineValidationMessage(
+          validationMessage(for: issue),
+          fieldID: .profileName
+        )
+      }
+      if !profileIconChoices.contains(where: { $0.symbolName == profile.symbolName }) {
+        AccessibleDisclosureGroup(
+          appLocalized("Technical Information"),
+          accessibilityIdentifier: "profile-imported-icon-technical-information",
+          isExpanded: $showsImportedIconTechnicalInformation
+        ) {
+          LabeledContent(appLocalized("Imported symbol name")) {
+            Text(profile.symbolName)
+              .font(.caption.monospaced())
+              .textSelection(.enabled)
+          }
+        }
+      }
+
+      Divider()
     }
   }
 
@@ -1327,8 +1392,217 @@ private struct ProfileEditorForm: View {
     .frame(width: 190)
   }
 
-  private func lastApplicationCard(_ lastApplication: ApplicationSummary) -> some View {
-    GroupBox {
+  @ViewBuilder
+  private var stepWorkspace: some View {
+    if dynamicTypeSize.isAccessibilitySize {
+      compactStepWorkspace
+    } else {
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .top, spacing: 14) {
+          stepRail
+            .frame(width: 160)
+          Divider()
+          selectedStepContent
+            .frame(minWidth: 360, maxWidth: .infinity, alignment: .topLeading)
+        }
+        compactStepWorkspace
+      }
+    }
+  }
+
+  private var compactStepWorkspace: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Picker(appLocalized("Profile section"), selection: $selectedGroup) {
+        ForEach(availableGroups, id: \.self) { group in
+          Label(stepTitle(group), systemImage: stepSystemImage(group))
+            .tag(group)
+        }
+      }
+      .pickerStyle(.segmented)
+      .accessibilityLabel(appLocalized("Profile section"))
+
+      selectedStepContent
+    }
+  }
+
+  private var stepRail: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      ForEach(Array(availableGroups.enumerated()), id: \.element) { index, group in
+        Button {
+          selectedGroup = group
+        } label: {
+          HStack(alignment: .top, spacing: 10) {
+            Text("\(index + 1)")
+              .font(.caption.bold())
+              .foregroundStyle(selectedGroup == group ? Color.white : Color.secondary)
+              .frame(width: 24, height: 24)
+              .background(
+                selectedGroup == group ? Color.accentColor : Color.secondary.opacity(0.14),
+                in: Circle()
+              )
+              .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+              Label(stepTitle(group), systemImage: stepSystemImage(group))
+                .fontWeight(.semibold)
+              Text(stepSubtitle(group))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if groupHasIncludedOptions(group) {
+              Image(systemName: "checkmark.circle")
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(appLocalized("Included in this profile"))
+            }
+          }
+          .contentShape(Rectangle())
+          .padding(.horizontal, 8)
+          .padding(.vertical, 10)
+          .background(
+            selectedGroup == group ? Color.accentColor.opacity(0.09) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 8)
+          )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(stepTitle(group))
+        .accessibilityValue(
+          selectedGroup == group ? appLocalized("Selected") : stepSubtitle(group)
+        )
+        .accessibilityHint(appLocalized("Shows this profile section"))
+        .accessibilityIdentifier("profile-step-\(group.rawValue)")
+      }
+    }
+  }
+
+  private var selectedStepContent: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      VStack(alignment: .leading, spacing: 4) {
+        Label(stepHeading(selectedGroup), systemImage: stepSystemImage(selectedGroup))
+          .font(.title3.bold())
+          .accessibilityAddTraits(.isHeader)
+          .accessibilityIdentifier("profile-group-\(selectedGroup.rawValue)")
+          .accessibilityInvalid(firstValidationIssue(in: selectedGroup) != nil)
+          .focused($focusedField, equals: .group(selectedGroup))
+        Text(stepExplanation(selectedGroup))
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      if let issue = validation.issue(for: .group(selectedGroup)) {
+        inlineValidationMessage(
+          validationMessage(for: issue),
+          fieldID: issue.fieldID
+        )
+      }
+
+      Divider()
+      selectedStepOptions
+    }
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+  }
+
+  @ViewBuilder
+  private var selectedStepOptions: some View {
+    switch selectedGroup {
+    case .display:
+      displaySimpleOptions
+    case .audio:
+      audioSimpleOptions
+    case .network:
+      networkSimpleOptions
+    case .input:
+      EmptyView()
+    }
+  }
+
+  private var availableGroups: [SettingGroup] {
+    orderedVisibleGroups.filter(groupIsAvailable)
+  }
+
+  private var initialSelectedGroup: SettingGroup {
+    availableGroups.first ?? ProfileEditorStepPolicy.defaultGroup
+  }
+
+  private func groupIsAvailable(_ group: SettingGroup) -> Bool {
+    switch group {
+    case .display:
+      ProfileEditorSurfacePolicy.visibleGroups.contains(.display)
+        && (hasVisibleDisplayFields || hasIncludedUnavailableDisplayFields)
+    case .audio:
+      ProfileEditorSurfacePolicy.visibleGroups.contains(.audio)
+        && (hasVisibleAudioFields || hasIncludedUnavailableAudioFields)
+    case .network:
+      ProfileEditorSurfacePolicy.visibleGroups.contains(.network)
+        && (hasVisibleNetworkFields || hasIncludedUnavailableNetworkFields)
+    case .input:
+      false
+    }
+  }
+
+  private func stepTitle(_ group: SettingGroup) -> String {
+    switch group {
+    case .display: appLocalized("Display")
+    case .audio: appLocalized("Sound")
+    case .network: appLocalized("Network")
+    case .input: appLocalized("Input")
+    }
+  }
+
+  private func stepSubtitle(_ group: SettingGroup) -> String {
+    switch group {
+    case .display: appLocalized("How your screens are arranged")
+    case .audio: appLocalized("Your speakers and volume")
+    case .network: appLocalized("Your internet connection")
+    case .input: appLocalized("Your keyboard and pointer")
+    }
+  }
+
+  private func stepHeading(_ group: SettingGroup) -> String {
+    switch group {
+    case .display: appLocalized("How your screens are arranged")
+    case .audio: appLocalized("Your speakers and volume")
+    case .network: appLocalized("Your network settings")
+    case .input: appLocalized("Your input settings")
+    }
+  }
+
+  private func stepExplanation(_ group: SettingGroup) -> String {
+    switch group {
+    case .display: appLocalized("Choose how your screens work together.")
+    case .audio: appLocalized("Choose the output you want to hear and its volume.")
+    case .network: appLocalized("Choose the connection this profile should configure.")
+    case .input: appLocalized("Choose the input behavior for this profile.")
+    }
+  }
+
+  private func stepSystemImage(_ group: SettingGroup) -> String {
+    switch group {
+    case .display: "display"
+    case .audio: "speaker.wave.2"
+    case .network: "network"
+    case .input: "keyboard"
+    }
+  }
+
+  private func groupHasIncludedOptions(_ group: SettingGroup) -> Bool {
+    switch group {
+    case .display: profile.settings.display.value.hasIncludedOption
+    case .audio: profile.settings.audio.value.hasIncludedOption
+    case .network: profile.settings.network.value.hasIncludedOption
+    case .input: profile.settings.input.value.hasIncludedOption
+    }
+  }
+
+  private func lastApplicationDisclosure(_ lastApplication: ApplicationSummary) -> some View {
+    AccessibleDisclosureGroup(
+      appLocalized("Last application"),
+      accessibilityIdentifier: "profile-last-application",
+      isExpanded: $showsLastApplicationDetails
+    ) {
       VStack(alignment: .leading, spacing: 10) {
         LabeledContent(
           "Status",
@@ -1367,12 +1641,9 @@ private struct ProfileEditorForm: View {
           }
         }
       }
-      .padding(ProfileSettingInclusionLayoutPolicy.groupContentInset)
-    } label: {
-      Text("Last application")
-        .font(.headline)
-        .accessibilityAddTraits(.isHeader)
+      .padding(.top, 6)
     }
+    .padding(.horizontal, 4)
   }
 
   private var validationSummary: some View {
@@ -1423,59 +1694,91 @@ private struct ProfileEditorForm: View {
     )
   }
 
+  private var displaySimpleOptions: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      if isVisible(.displayOutputMode) || isVisible(.displayPrimary) {
+        VStack(alignment: .leading, spacing: 0) {
+          if isVisible(.displayOutputMode) {
+            simpleControlRow("Use as") {
+              Picker(appLocalized("Use as"), selection: displayOutputModeBinding) {
+                Text(appLocalized("Extended")).tag(DisplayOutputMode.extended)
+                Text(appLocalized("Mirror")).tag(DisplayOutputMode.mirrored)
+              }
+              .pickerStyle(.segmented)
+              .labelsHidden()
+              .frame(maxWidth: 240)
+              .accessibilityLabel(appLocalized("Display output mode"))
+              .accessibilityValue(displayOutputMode.title)
+              .accessibilityHint(
+                appLocalized("Choose an extended desktop or mirror secondary displays")
+              )
+            }
+            Divider()
+          }
+
+          if isVisible(.displayPrimary) {
+            simpleControlRow("Main display") {
+              Picker(
+                appLocalized("Main display"),
+                selection: primaryDisplaySelectionBinding()
+              ) {
+                if primaryDisplaySelectionIsAmbiguous {
+                  Text(appLocalized("Choose a display")).tag(invalidPrimaryDisplaySelectionID)
+                }
+                ForEach(profile.settings.display.value.displays) { display in
+                  Text(displayName(display)).tag(display.id)
+                }
+              }
+              .labelsHidden()
+              .frame(maxWidth: 260)
+              .accessibilityLabel(appLocalized("Primary display"))
+              .accessibilityValue(primaryDisplaySummary)
+              .accessibilityHint(
+                validationAccessibilityHint(
+                  for: .displayPrimary,
+                  fallback: "Choose the display that should anchor the desktop"
+                )
+              )
+              .accessibilityInvalid(validation.issue(for: .displayPrimary) != nil)
+              .focused($focusedField, equals: .displayPrimary)
+            }
+            if let issue = validation.issue(for: .displayPrimary) {
+              inlineValidationMessage(
+                validationMessage(for: issue),
+                fieldID: issue.fieldID
+              )
+              .padding(.horizontal, 14)
+              .padding(.bottom, 10)
+            }
+            Divider()
+          }
+
+          Toggle(
+            appLocalized("Change screen arrangement with this profile"),
+            isOn: displayArrangementIncludedBinding
+          )
+          .toggleStyle(.switch)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 12)
+          .accessibilityHint(
+            appLocalized("Includes the screen arrangement and main display when applying")
+          )
+        }
+        .simpleSettingsSurface()
+      }
+
+      advancedSettingsDisclosure(
+        group: .display,
+        caption: "Resolution, refresh rate, and color profiles."
+      ) {
+        displayAdvancedOptions
+      }
+    }
+  }
+
   @ViewBuilder
-  private var displayOptions: some View {
+  private var displayAdvancedOptions: some View {
     if !profile.settings.display.value.displays.isEmpty {
-      if isVisible(.displayOutputMode) {
-        optionEditor(
-          "Output mode",
-          isOn: displayOutputModeIncludedBinding
-        ) {
-          Picker(appLocalized("Output mode"), selection: displayOutputModeBinding) {
-            ForEach(DisplayOutputMode.allCases, id: \.self) { mode in
-              Text(mode.title).tag(mode)
-            }
-          }
-          .labelsHidden()
-          .accessibilityLabel(appLocalized("Display output mode"))
-          .accessibilityValue(displayOutputMode.title)
-          .accessibilityHint(
-            appLocalized("Choose an extended desktop or mirror secondary displays")
-          )
-        }
-      }
-
-      if isVisible(.displayPrimary) {
-        optionEditor(
-          "Primary display",
-          isOn: primaryDisplayIncludedBinding,
-          validationFields: [.displayPrimary]
-        ) {
-          Picker(
-            appLocalized("Primary display"),
-            selection: primaryDisplaySelectionBinding()
-          ) {
-            if primaryDisplaySelectionIsAmbiguous {
-              Text(appLocalized("Choose a display")).tag(invalidPrimaryDisplaySelectionID)
-            }
-            ForEach(profile.settings.display.value.displays) { display in
-              Text(displayName(display)).tag(display.id)
-            }
-          }
-          .labelsHidden()
-          .accessibilityLabel(appLocalized("Primary display"))
-          .accessibilityValue(primaryDisplaySummary)
-          .accessibilityHint(
-            validationAccessibilityHint(
-              for: .displayPrimary,
-              fallback: "Choose the display that should anchor the desktop"
-            )
-          )
-          .accessibilityInvalid(validation.issue(for: .displayPrimary) != nil)
-          .focused($focusedField, equals: .displayPrimary)
-        }
-      }
-
       ForEach($profile.settings.display.value.displays) { $display in
         let supportedModes = supportedDisplayModes(for: display)
         let colorProfiles = supportedColorProfiles(for: display)
@@ -1609,18 +1912,124 @@ private struct ProfileEditorForm: View {
   }
 
   @ViewBuilder
-  private var audioOptions: some View {
+  private var audioSimpleOptions: some View {
+    let outputChoices = simpleAudioDeviceChoices(scope: .output)
+    let outputCapability = audioVolumeCapability(role: .output)
+
+    VStack(alignment: .leading, spacing: 14) {
+      if !outputChoices.isEmpty || outputCapability.isWritable {
+        VStack(alignment: .leading, spacing: 0) {
+          if !outputChoices.isEmpty {
+            simpleControlRow("Output") {
+              Picker(
+                appLocalized("Output"),
+                selection: simpleAudioOutputDeviceBinding
+              ) {
+                Text(appLocalized("Choose a device")).tag(Optional<String>.none)
+                ForEach(outputChoices) { choice in
+                  Text(choice.name).tag(Optional(choice.uid))
+                }
+              }
+              .labelsHidden()
+              .frame(maxWidth: 260)
+              .accessibilityLabel(appLocalized("Default output device"))
+              .accessibilityValue(
+                audioDeviceSummary(
+                  profile.settings.audio.value.defaultOutputUID.value,
+                  choices: outputChoices
+                )
+              )
+              .accessibilityHint(
+                validationAccessibilityHint(
+                  for: .audio(.defaultOutputDevice),
+                  fallback: "Choose the default output device"
+                )
+              )
+              .accessibilityInvalid(
+                validation.issue(for: .audio(.defaultOutputDevice)) != nil
+              )
+              .focused($focusedField, equals: .audio(.defaultOutputDevice))
+            }
+            if let issue = validation.issue(for: .audio(.defaultOutputDevice)) {
+              inlineValidationMessage(
+                validationMessage(for: issue),
+                fieldID: issue.fieldID
+              )
+              .padding(.horizontal, 14)
+              .padding(.bottom, 10)
+            }
+            Divider()
+          }
+
+          if outputCapability.isWritable {
+            simpleControlRow("Volume") {
+              HStack(spacing: 10) {
+                Slider(value: simpleAudioOutputVolumeBinding, in: 0...100, step: 1) {
+                  Text(appLocalized("Volume percent"))
+                }
+                Text(
+                  simpleAudioOutputVolumeBinding.wrappedValue,
+                  format: .number.precision(.fractionLength(0))
+                )
+                .monospacedDigit()
+                .frame(width: 32, alignment: .trailing)
+                .accessibilityHidden(true)
+                Text("%")
+                  .foregroundStyle(.secondary)
+                  .accessibilityHidden(true)
+              }
+              .frame(maxWidth: 280)
+              .accessibilityLabel(appLocalized("Output volume"))
+              .accessibilityHint(
+                validationAccessibilityHint(
+                  for: .audio(.outputVolume),
+                  fallback: "Set the default output volume percentage"
+                )
+              )
+              .accessibilityInvalid(validation.issue(for: .audio(.outputVolume)) != nil)
+              .focused($focusedField, equals: .audio(.outputVolume))
+            }
+            if let issue = validation.issue(for: .audio(.outputVolume)) {
+              inlineValidationMessage(
+                validationMessage(for: issue),
+                fieldID: issue.fieldID
+              )
+              .padding(.horizontal, 14)
+              .padding(.bottom, 10)
+            }
+            Divider()
+          }
+
+          Toggle(
+            appLocalized("Change sound output with this profile"),
+            isOn: audioOutputIncludedBinding
+          )
+          .toggleStyle(.switch)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 12)
+          .accessibilityHint(
+            appLocalized("Includes the selected output and volume when applying")
+          )
+        }
+        .simpleSettingsSurface()
+      }
+
+      advancedSettingsDisclosure(
+        group: .audio,
+        caption: "Input device, input volume, and mute."
+      ) {
+        audioAdvancedOptions
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var audioAdvancedOptions: some View {
     audioDeviceOption(
       "Default input device",
       option: $profile.settings.audio.value.defaultInputUID,
       scope: .input,
       fieldID: .audio(.defaultInputDevice)
-    )
-    audioDeviceOption(
-      "Default output device",
-      option: $profile.settings.audio.value.defaultOutputUID,
-      scope: .output,
-      fieldID: .audio(.defaultOutputDevice)
     )
     audioVolumeOption(
       "Input volume",
@@ -1628,16 +2037,79 @@ private struct ProfileEditorForm: View {
       option: $profile.settings.audio.value.inputVolume,
       fieldID: .audio(.inputVolume)
     )
-    audioVolumeOption(
-      "Output volume",
-      role: .output,
-      option: $profile.settings.audio.value.outputVolume,
-      fieldID: .audio(.outputVolume)
-    )
     audioMuteOption(
       option: $profile.settings.audio.value.outputMuted,
       fieldID: .audio(.outputMute)
     )
+
+    if !audioVolumeCapability(role: .output).isWritable,
+      profile.settings.audio.value.outputVolume.isIncluded
+    {
+      audioVolumeOption(
+        "Output volume",
+        role: .output,
+        option: $profile.settings.audio.value.outputVolume,
+        fieldID: .audio(.outputVolume)
+      )
+    }
+  }
+
+  @ViewBuilder
+  private var networkSimpleOptions: some View {
+    let choices = simpleNetworkServiceChoices
+    VStack(alignment: .leading, spacing: 14) {
+      if !choices.isEmpty {
+        VStack(alignment: .leading, spacing: 0) {
+          if !choices.isEmpty {
+            simpleControlRow("Connection") {
+              Picker(
+                appLocalized("Connection"),
+                selection: simpleNetworkSelectionBinding
+              ) {
+                ForEach(choices, id: \.identity) { target in
+                  Label(
+                    target.identity.serviceName,
+                    systemImage: target.identity.kind == .ethernet
+                      ? "cable.connector" : "wifi"
+                  )
+                  .tag(Optional(target.identity))
+                }
+              }
+              .labelsHidden()
+              .frame(maxWidth: 280)
+              .accessibilityLabel(appLocalized("Network connection"))
+            }
+            Divider()
+
+            simpleControlRow("Configuration") {
+              Text(simpleNetworkConfigurationSummary)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: 280, alignment: .trailing)
+            }
+            Divider()
+          }
+
+          Toggle(
+            appLocalized("Change this connection with this profile"),
+            isOn: networkIncludedBinding
+          )
+          .toggleStyle(.switch)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 12)
+          .accessibilityHint(
+            appLocalized("Includes the selected connection settings when applying")
+          )
+        }
+        .simpleSettingsSurface()
+      }
+
+      advancedSettingsDisclosure(
+        group: .network,
+        caption: "Automatic or manual IP address details."
+      ) {
+        networkOptions
+      }
+    }
   }
 
   @ViewBuilder
@@ -1777,88 +2249,225 @@ private struct ProfileEditorForm: View {
     return .manual
   }
 
-  private var orderedVisibleGroups: [SettingGroup] {
-    guard uiAuditConfiguration.isEnabled else { return [.display, .audio, .network] }
-    switch uiAuditConfiguration.variant {
-    case .editorAudio, .editorAudioUnsupported:
-      return [.audio, .display, .network]
-    case .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
-      .editorNetworkWiFiDHCP, .editorNetworkWiFiManual:
-      return [.network, .display, .audio]
-    case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
-      .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
-      .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .validation, .permissions,
-      .diagnostics:
-      return [.display, .audio, .network]
-    }
-  }
-
   @ViewBuilder
-  private func visibleGroupEditor(_ group: SettingGroup) -> some View {
-    switch group {
-    case .display:
-      if ProfileEditorSurfacePolicy.visibleGroups.contains(.display),
-        hasVisibleDisplayFields || hasIncludedUnavailableDisplayFields
-      {
-        settingGroupEditor("Displays", group: .display, systemImage: "display.2") {
-          displayOptions
-        }
-      }
-    case .audio:
-      if ProfileEditorSurfacePolicy.visibleGroups.contains(.audio),
-        hasVisibleAudioFields || hasIncludedUnavailableAudioFields
-      {
-        settingGroupEditor("Audio", group: .audio, systemImage: "speaker.wave.2") {
-          audioOptions
-        }
-      }
-    case .network:
-      if ProfileEditorSurfacePolicy.visibleGroups.contains(.network),
-        hasVisibleNetworkFields || hasIncludedUnavailableNetworkFields
-      {
-        settingGroupEditor("Network", group: .network, systemImage: "network") {
-          networkOptions
-        }
-      }
-    case .input:
-      EmptyView()
-    }
-  }
-
-  @ViewBuilder
-  private func settingGroupEditor<Content: View>(
+  private func simpleControlRow<Content: View>(
     _ title: String.LocalizationValue,
-    group: SettingGroup,
-    systemImage: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
     let localizedTitle = appLocalized(title)
-
-    GroupBox {
-      VStack(alignment: .leading, spacing: 12) {
-        Label(localizedTitle, systemImage: systemImage)
-          .font(.headline)
-          .lineLimit(2)
-          .multilineTextAlignment(.leading)
-          .accessibilityAddTraits(.isHeader)
-          .accessibilityIdentifier("profile-group-\(group.rawValue)")
-          .accessibilityInvalid(firstValidationIssue(in: group) != nil)
-          .focused($focusedField, equals: .group(group))
-
-        if let issue = validation.issue(for: .group(group)) {
-          inlineValidationMessage(
-            validationMessage(for: issue),
-            fieldID: issue.fieldID
-          )
-        }
-
-        Divider()
-        VStack(alignment: .leading, spacing: 8) {
+    if dynamicTypeSize.isAccessibilitySize {
+      VStack(alignment: .leading, spacing: 8) {
+        Text(localizedTitle)
+          .fontWeight(.medium)
+        content()
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 12)
+    } else {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 18) {
+          Text(localizedTitle)
+            .fontWeight(.medium)
+          Spacer(minLength: 12)
           content()
         }
+        VStack(alignment: .leading, spacing: 8) {
+          Text(localizedTitle)
+            .fontWeight(.medium)
+          content()
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
       }
-      .padding(ProfileSettingInclusionLayoutPolicy.groupContentInset)
+      .padding(.horizontal, 14)
+      .padding(.vertical, 12)
     }
+  }
+
+  private func advancedSettingsDisclosure<Content: View>(
+    group: SettingGroup,
+    caption: String.LocalizationValue,
+    @ViewBuilder content: @escaping () -> Content
+  ) -> some View {
+    AccessibleDisclosureGroup(
+      appLocalized("Advanced settings"),
+      accessibilityIdentifier: "profile-advanced-\(group.rawValue)",
+      isExpanded: advancedDisclosureBinding(for: group)
+    ) {
+      VStack(alignment: .leading, spacing: 10) {
+        Text(appLocalized(caption))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        content()
+      }
+    }
+    .padding(.horizontal, 4)
+  }
+
+  private func advancedDisclosureBinding(for group: SettingGroup) -> Binding<Bool> {
+    Binding(
+      get: { expandedAdvancedGroup == group },
+      set: { isExpanded in
+        expandedAdvancedGroup = isExpanded ? group : nil
+      }
+    )
+  }
+
+  private var displayArrangementIncludedBinding: Binding<Bool> {
+    let includesOutputMode =
+      !isVisible(.displayOutputMode)
+      || displayOutputModeIncludedBinding.wrappedValue
+    let includesPrimary =
+      !isVisible(.displayPrimary)
+      || primaryDisplayIncludedBinding.wrappedValue
+    return Binding(
+      get: { includesOutputMode && includesPrimary },
+      set: { isIncluded in
+        if isVisible(.displayOutputMode) {
+          displayOutputModeIncludedBinding.wrappedValue = isIncluded
+        }
+        if isVisible(.displayPrimary) {
+          primaryDisplayIncludedBinding.wrappedValue = isIncluded
+        }
+      }
+    )
+  }
+
+  private func simpleAudioDeviceChoices(scope: AudioDeviceScope) -> [AudioDeviceChoice] {
+    let rawChoices = audioDeviceChoices.filter { $0.scopes.contains(scope) }
+    let labels = FriendlyNameDisambiguator().labels(
+      for: rawChoices.map { (id: $0.uid, name: $0.name) }
+    )
+    return rawChoices.map { choice in
+      AudioDeviceChoice(
+        uid: choice.uid,
+        name: labels[choice.uid] ?? choice.name,
+        scopes: choice.scopes
+      )
+    }
+  }
+
+  private var simpleAudioOutputDeviceBinding: Binding<String?> {
+    Binding(
+      get: { profile.settings.audio.value.defaultOutputUID.value },
+      set: { selectedUID in
+        profile.settings.audio.value.defaultOutputUID.value = selectedUID
+        profile.settings.audio.value.defaultOutputUID.isIncluded = selectedUID != nil
+      }
+    )
+  }
+
+  private var simpleAudioOutputVolumeBinding: Binding<Double> {
+    let capability = audioVolumeCapability(role: .output)
+    return Binding(
+      get: {
+        (profile.settings.audio.value.outputVolume.value
+          ?? capability.suggestedValue ?? 0.5) * 100
+      },
+      set: { percentage in
+        profile.settings.audio.value.outputVolume.value = min(max(percentage, 0), 100) / 100
+        profile.settings.audio.value.outputVolume.isIncluded = true
+      }
+    )
+  }
+
+  private var audioOutputIncludedBinding: Binding<Bool> {
+    let choices = simpleAudioDeviceChoices(scope: .output)
+    let outputCapability = audioVolumeCapability(role: .output)
+    return Binding(
+      get: {
+        let includesDevice =
+          choices.isEmpty
+          || profile.settings.audio.value.defaultOutputUID.isIncluded
+        let includesVolume =
+          !outputCapability.isWritable
+          || profile.settings.audio.value.outputVolume.isIncluded
+        return includesDevice && includesVolume
+      },
+      set: { isIncluded in
+        if !choices.isEmpty {
+          profile.settings.audio.value.defaultOutputUID.isIncluded = isIncluded
+          if isIncluded, profile.settings.audio.value.defaultOutputUID.value == nil {
+            profile.settings.audio.value.defaultOutputUID.value =
+              systemSnapshot?.profileSettings.audio.value.defaultOutputUID.value
+              ?? choices.first?.uid
+          }
+        }
+        if outputCapability.isWritable {
+          profile.settings.audio.value.outputVolume.isIncluded = isIncluded
+          if isIncluded, profile.settings.audio.value.outputVolume.value == nil {
+            profile.settings.audio.value.outputVolume.value = outputCapability.suggestedValue ?? 0.5
+          }
+        }
+      }
+    )
+  }
+
+  private var simpleNetworkServiceChoices: [NetworkServiceIPv4Settings] {
+    NetworkServiceKind.allCases.flatMap(availableNetworkServices(kind:))
+  }
+
+  private var simpleNetworkSelectedIdentity: NetworkServiceIdentity? {
+    let availableIdentities = Set(simpleNetworkServiceChoices.map(\.identity))
+    if let selectedNetworkIdentity,
+      availableIdentities.contains(selectedNetworkIdentity)
+    {
+      return selectedNetworkIdentity
+    }
+    return profile.settings.network.value.serviceIPv4.first {
+      $0.configuration.isIncluded && availableIdentities.contains($0.identity)
+    }?.identity ?? simpleNetworkServiceChoices.first?.identity
+  }
+
+  private var simpleNetworkSelectionBinding: Binding<NetworkServiceIdentity?> {
+    Binding(
+      get: { simpleNetworkSelectedIdentity },
+      set: { selectedIdentity in
+        selectedNetworkIdentity = selectedIdentity
+      }
+    )
+  }
+
+  private var networkIncludedBinding: Binding<Bool> {
+    Binding(
+      get: {
+        guard let selectedIdentity = simpleNetworkSelectedIdentity else { return false }
+        return profile.settings.network.value.serviceIPv4.first {
+          $0.identity == selectedIdentity
+        }?.configuration.isIncluded ?? false
+      },
+      set: { isIncluded in
+        guard let selectedIdentity = simpleNetworkSelectedIdentity else { return }
+        profile.settings.network.value.serviceIPv4 =
+          ProfileEditorNetworkSelectionPolicy.updatingInclusion(
+            in: profile.settings.network.value.serviceIPv4,
+            selectedIdentity: selectedIdentity,
+            isIncluded: isIncluded,
+            runtimeChoices: simpleNetworkServiceChoices
+          )
+      }
+    )
+  }
+
+  private var simpleNetworkConfigurationSummary: String {
+    guard let selectedIdentity = simpleNetworkSelectedIdentity,
+      let configuration = profile.settings.network.value.serviceIPv4.first(where: {
+        $0.identity == selectedIdentity
+      })?.configuration.value
+    else {
+      return appLocalized("Automatic network settings")
+    }
+    switch configuration {
+    case .dhcp:
+      return appLocalized("Automatic network settings")
+    case .manual:
+      return appLocalized("Manual network details")
+    }
+  }
+
+  private var orderedVisibleGroups: [SettingGroup] {
+    ProfileEditorStepPolicy.orderedGroups
   }
 
   @ViewBuilder
@@ -2347,8 +2956,21 @@ private struct ProfileEditorForm: View {
   }
 
   private func revealAndFocus(_ fieldID: DraftFieldIdentifier) {
+    if let group = ProfileEditorStepPolicy.group(for: fieldID) {
+      selectedGroup = group
+      let requiresAdvancedDisclosure =
+        if fieldID == .audio(.outputVolume) {
+          !audioVolumeCapability(role: .output).isWritable
+        } else {
+          ProfileEditorStepPolicy.requiresAdvancedDisclosure(fieldID)
+        }
+      if requiresAdvancedDisclosure {
+        expandedAdvancedGroup = group
+      }
+    }
     let focusTarget = focusTarget(for: fieldID)
     Task { @MainActor in
+      await Task.yield()
       await Task.yield()
       focusedField = focusTarget
       requestedValidationFocus = nil
@@ -2363,14 +2985,25 @@ private struct ProfileEditorForm: View {
         showsValidationSummary = true
         revealAndFocus(firstValidationItem.fieldID)
       }
-    case .editor, .editorPolish, .editorAudio, .editorAudioUnsupported, .editorDisplay,
-      .editorDisplayColor,
-      .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
-      .editorNetworkWiFiDHCP, .editorNetworkWiFiManual,
+    case .editorAudio, .editorAudioUnsupported:
+      selectedGroup = .audio
+      if uiAuditConfiguration.variant == .editorAudioUnsupported {
+        expandedAdvancedGroup = .audio
+      }
+    case .editorNetwork:
+      selectedGroup = .network
+    case .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
+      .editorNetworkWiFiDHCP, .editorNetworkWiFiManual:
+      selectedGroup = .network
+      expandedAdvancedGroup = .network
+    case .editorDisplayColor:
+      selectedGroup = .display
+      expandedAdvancedGroup = .display
+    case .editor, .editorPolish, .editorDisplay,
       .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
       .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
       .permissions, .diagnostics:
-      break
+      selectedGroup = .display
     }
   }
 
@@ -2949,6 +3582,17 @@ private let invalidPrimaryDisplaySelectionID = UUID(
 )!
 
 extension View {
+  fileprivate func simpleSettingsSurface() -> some View {
+    background(
+      Color(nsColor: .controlBackgroundColor).opacity(0.32),
+      in: RoundedRectangle(cornerRadius: 10)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 10)
+        .stroke(Color.secondary.opacity(0.12))
+    }
+  }
+
   /// SwiftUI has no dedicated macOS invalid-field modifier. Expose the same
   /// semantic as custom accessibility content while keeping one modifier
   /// hierarchy as validation changes, so a text field retains focus/caret.

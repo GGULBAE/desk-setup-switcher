@@ -197,6 +197,33 @@ import Testing
       #expect(!ProfileEditorSurfacePolicy.showsDescription)
       #expect(!ProfileEditorSurfacePolicy.showsConditions)
       #expect(!ProfileEditorSurfacePolicy.showsCurrentSettingsDraftRefresh)
+      #expect(ProfileEditorStepPolicy.defaultGroup == .display)
+      #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio, .network])
+      #expect(ProfileEditorStepPolicy.group(for: .displayPrimary) == .display)
+      #expect(
+        ProfileEditorStepPolicy.group(for: .audio(.defaultOutputDevice)) == .audio
+      )
+      #expect(
+        ProfileEditorStepPolicy.group(for: .networkService(at: 0, .ipv4Address))
+          == .network
+      )
+      #expect(ProfileEditorStepPolicy.group(for: .profileName) == nil)
+      #expect(!ProfileEditorStepPolicy.requiresAdvancedDisclosure(.displayPrimary))
+      #expect(
+        !ProfileEditorStepPolicy.requiresAdvancedDisclosure(
+          .audio(.defaultOutputDevice)
+        )
+      )
+      #expect(
+        ProfileEditorStepPolicy.requiresAdvancedDisclosure(
+          .audio(.outputVolume)
+        )
+      )
+      #expect(
+        ProfileEditorStepPolicy.requiresAdvancedDisclosure(
+          .networkService(at: 0, .ipv4Address)
+        )
+      )
       #expect(
         ProfileEditorSavePolicy.canAttemptSave(
           hasDraft: true,
@@ -478,6 +505,65 @@ import Testing
       session.finishRefresh(snapshot: refreshed)
       #expect(session.snapshot == refreshed)
       #expect(session.hasConsumedRefresh)
+    }
+
+    @Test("simple network selection preserves other included connections")
+    func simpleNetworkSelectionPreservesOtherConnections() {
+      let ethernet = NetworkServiceIdentity(
+        kind: .ethernet,
+        serviceName: "Synthetic Ethernet",
+        interfaceType: "Ethernet"
+      )
+      let wifi = NetworkServiceIdentity(
+        kind: .wifi,
+        serviceName: "Synthetic Wi-Fi",
+        interfaceType: "IEEE80211"
+      )
+      let targets = [
+        NetworkServiceIPv4Settings(
+          identity: ethernet,
+          configuration: .init(value: .dhcp)
+        ),
+        NetworkServiceIPv4Settings(
+          identity: wifi,
+          configuration: .init(value: .dhcp)
+        ),
+      ]
+
+      let updated = ProfileEditorNetworkSelectionPolicy.updatingInclusion(
+        in: targets,
+        selectedIdentity: ethernet,
+        isIncluded: false,
+        runtimeChoices: targets
+      )
+
+      #expect(updated[0].configuration.isIncluded == false)
+      #expect(updated[1].configuration.isIncluded == true)
+
+      let thunderbolt = NetworkServiceIdentity(
+        kind: .ethernet,
+        serviceName: "Synthetic Thunderbolt",
+        interfaceType: "Ethernet"
+      )
+      let runtimeChoices =
+        targets + [
+          NetworkServiceIPv4Settings(
+            identity: thunderbolt,
+            configuration: .init(isIncluded: false, value: nil)
+          )
+        ]
+      let appended = ProfileEditorNetworkSelectionPolicy.updatingInclusion(
+        in: targets,
+        selectedIdentity: thunderbolt,
+        isIncluded: true,
+        runtimeChoices: runtimeChoices
+      )
+
+      #expect(appended.count == 3)
+      #expect(appended[0].configuration.isIncluded == true)
+      #expect(appended[1].configuration.isIncluded == true)
+      #expect(appended[2].configuration.isIncluded == true)
+      #expect(appended[2].configuration.value == .dhcp)
     }
 
     @Test("runtime settings window exposes stable resizable geometry")

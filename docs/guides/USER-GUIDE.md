@@ -58,8 +58,10 @@ Declining Location does not block unrelated display, audio, or wired-network val
 Choose **Edit Profile** on a profile to open **Settings → Profiles**.
 
 - Give the profile a recognizable name and icon.
-- For each visible setting, use **Apply with profile** to choose whether it belongs to this profile. **Included** and **Not included** are shown with text and a symbol, not color alone.
-- Configure only the values you intend to change. The current editor exposes supported display mode/primary-display/ColorSync choices, audio defaults, settable volumes, independently includable output mute, and exact Ethernet or Wi-Fi service DHCP/manual IPv4 where the current capability catalog allows them.
+- Work through the stable numbered **Display**, **Sound**, and **Network** steps. At the minimum window size or an accessibility text size, the same steps become a compact segmented selector.
+- Start with the common controls: screen arrangement and main display; sound output and volume; or a network connection and its Automatic/Manual summary. The switch at the bottom of each card decides whether that common setup changes with the profile.
+- Open **Advanced settings** only for resolution, refresh rate, ColorSync, audio input/mute, or DHCP/manual IP details. Existing included advanced values stay part of the draft while the disclosure is closed. If an advanced value is invalid, Save opens the right step and disclosure before moving focus to it.
+- Choosing a connection in the Network step changes which connection is shown; it does not silently disable another included connection. Use the nearby switch for the selected connection, or **Advanced settings** when a profile intentionally manages more than one service.
 - Save the profile. `⌘S` saves a valid dirty draft.
 
 An unavailable saved target remains visible with a warning when possible. Reconnect the device or turn **Apply with profile** off for that row before saving. Do not infer support from a value that is absent: the app hides choices that cannot complete its capture/apply/verify/rollback contract on the current snapshot.

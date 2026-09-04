@@ -248,6 +248,16 @@ Release publication, push, Gatekeeper, physical Intel, required TCC testing, sig
 
 The final integrated non-live `make verify` and current `git diff --check` pass: 194 XCTest cases, 331 Swift Testing cases across 39 suites, one isolated native popover regression, release tooling, builds, Analyze, package, and mounted universal-DMG verification completed successfully. The local unsigned development DMG SHA-256 is `1b1b2d5c0bf0b3dcfe7155ecae94648ffde693f8fffa7c1f427cd2e83b02f96e`; it was not installed, uploaded, or published. Behavior-focused commit `015e6bb` records the M4.12 implementation and evidence. No installed-app, real accessibility-setting, Capture/Apply, TCC/login, Keychain, CI, or hardware-mutation evidence is claimed by M4.12.
 
+## M4.13 — one-step-at-a-time profile editor (implemented; local verification passed)
+
+- Replace the equal-weight Display/Audio/Network stack with one stable numbered step rail and one selected editor. Use the same three steps in a segmented selector only at minimum width or accessibility text sizes.
+- Lead with screen arrangement, sound output/volume, or one connection. Move resolution/refresh/ColorSync, audio input/mute, and DHCP/manual IP details behind a localized **Advanced settings** disclosure without deleting or excluding hidden values.
+- Route invalid fields to their owning step and automatically open Advanced before focus transfer.
+- Keep network connection choice as transient view state. Toggling the selected connection must preserve every other included connection, with deterministic regression coverage.
+- Cover English/Korean, light/dark, common/Advanced, validation, minimum, large-text, and accessibility states in the expanded 18-fixture offscreen matrix. Finish with the canonical non-live gate and a behavior-focused commit; do not claim installed interaction or hardware mutation.
+
+The final integrated non-live `make verify` and current `git diff --check` pass: 194 XCTest cases, 332 Swift Testing cases across 39 suites, one isolated native popover regression, the complete release-tooling policy/mock suite, Swift and universal Xcode Debug/Release builds, Analyze, package, checksum, and mounted universal-DMG verification completed successfully. The local unsigned development DMG SHA-256 is `81b16cdd9f2a0e56c8849fdc028fa2208b1dfac8a62e0c69ed59866be728b58d`; it was not uploaded or published. Installed interaction, VoiceOver, Capture/Apply, TCC/login, Keychain, CI, and hardware mutation remain outside this synthetic/local evidence boundary. The behavior commit is recorded separately before the completion-ledger item is checked.
+
 ## M6 — Free open-source public beta release (unsigned GitHub path selected; execution/publication pending)
 
 The first public beta remains bounded to the simple **Capture → Edit → Review & Apply** product flow. It does not add accounts, cloud services, telemetry, automatic profile switching, arbitrary shell execution, UI automation, private APIs, or a new plugin/SDK surface.
