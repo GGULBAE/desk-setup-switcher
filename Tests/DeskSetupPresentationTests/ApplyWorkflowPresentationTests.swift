@@ -18,7 +18,7 @@ struct ApplyWorkflowPresentationTests {
     #expect(state.kind == .normal)
     #expect(state.mode == .normal)
     #expect(state.isEnabled)
-    #expect(state.defaultLabel == "Review…")
+    #expect(state.defaultLabel == "Review Changes…")
     #expect(state.localizationKey == "menu.action.review")
   }
 
@@ -34,7 +34,7 @@ struct ApplyWorkflowPresentationTests {
     #expect(state.kind == .availableItems)
     #expect(state.mode == .force)
     #expect(state.isEnabled)
-    #expect(state.defaultLabel == "Review Available…")
+    #expect(state.defaultLabel == "Review Available Changes…")
     #expect(state.localizationKey == "menu.action.reviewAvailable")
   }
 

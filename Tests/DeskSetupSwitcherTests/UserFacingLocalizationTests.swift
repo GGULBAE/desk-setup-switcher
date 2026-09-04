@@ -13,8 +13,14 @@ final class UserFacingLocalizationTests: XCTestCase {
   func testExactKeyResolvesEnglishAndKorean() {
     XCTAssertEqual(appLocalizedRuntime("Apply…", languageCode: "en"), "Apply…")
     XCTAssertEqual(appLocalizedRuntime("Apply…", languageCode: "ko"), "적용…")
-    XCTAssertEqual(appLocalizedRuntime("Review…", languageCode: "en"), "Review…")
-    XCTAssertEqual(appLocalizedRuntime("Review…", languageCode: "ko"), "검토…")
+    XCTAssertEqual(
+      appLocalizedRuntime("Review Changes…", languageCode: "en"),
+      "Review Changes…"
+    )
+    XCTAssertEqual(
+      appLocalizedRuntime("Review Changes…", languageCode: "ko"),
+      "변경 사항 검토…"
+    )
   }
 
   func testLocationPermissionCopyDescribesSSIDAuthorizationWithoutCoordinates() {

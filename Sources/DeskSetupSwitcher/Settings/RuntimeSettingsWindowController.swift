@@ -584,6 +584,7 @@ private struct SystemSettingsView: View {
   @EnvironmentObject private var locationPermission: LocationPermissionController
   @State private var showsAdvancedDiagnostics = false
   @State private var isLoginExplanationExpanded = false
+  @State private var isLocationExplanationExpanded = false
 
   var body: some View {
     Form {
@@ -637,7 +638,7 @@ private struct SystemSettingsView: View {
       Section(appLocalized("System permissions")) {
         Text(
           appLocalized(
-            "macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates."
+            "Location access is used only to read the current Wi-Fi network name during Capture."
           )
         )
         LabeledContent(appLocalized("Location"), value: locationPermission.statusText)
@@ -651,6 +652,20 @@ private struct SystemSettingsView: View {
           Text(
             appLocalized(
               "After changing Location access, return to the menu bar and capture again."
+            )
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        }
+
+        AccessibleDisclosureGroup(
+          appLocalized("Why is Location access needed?"),
+          accessibilityIdentifier: "settings.location-explanation",
+          isExpanded: $isLocationExplanationExpanded
+        ) {
+          Text(
+            appLocalized(
+              "macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates."
             )
           )
           .font(.caption)
@@ -1100,35 +1115,38 @@ struct AboutSettingsView: View {
   @AccessibilityFocusState private var isHeadingAccessibilityFocused: Bool
 
   var body: some View {
-    ScrollView {
-      VStack(spacing: 14) {
-        Image(systemName: "switch.2")
-          .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 42 : 56))
-          .accessibilityHidden(true)
-        Text(appLocalized("Desk Setup Switcher"))
-          .font(.title2.bold())
-          .accessibilityAddTraits(.isHeader)
-          .accessibilityFocused($isHeadingAccessibilityFocused)
-        Text(appLocalized("Version \(appVersion)"))
-          .foregroundStyle(.secondary)
-        Text(appLocalized("Free and open source under the MIT License"))
-          .font(.caption)
+    GeometryReader { geometry in
+      ScrollView {
+        VStack(spacing: 14) {
+          Image(systemName: "switch.2")
+            .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 42 : 56))
+            .accessibilityHidden(true)
+          Text(appLocalized("Desk Setup Switcher"))
+            .font(.title2.bold())
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityFocused($isHeadingAccessibilityFocused)
+          Text(appLocalized("Version \(appVersion)"))
+            .foregroundStyle(.secondary)
+          Text(appLocalized("Free and open source under the MIT License"))
+            .font(.caption)
 
-        Divider()
-          .frame(maxWidth: 360)
+          Divider()
+            .frame(maxWidth: 360)
 
-        aboutLinks
-          .focusSection()
+          aboutLinks
+            .focusSection()
 
-        Text(appLocalized("Links open only when you choose them and use your default browser."))
-          .font(.caption)
-          .foregroundStyle(.secondary)
+          Text(appLocalized("Links open only when you choose them and use your default browser."))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: geometry.size.height, alignment: .center)
       }
-      .padding(.vertical, 12)
-      .frame(maxWidth: .infinity)
+      .defaultScrollAnchor(.top)
+      .scrollBounceBehavior(.basedOnSize)
     }
-    .defaultScrollAnchor(.top)
-    .scrollBounceBehavior(.basedOnSize)
     .task {
       await Task.yield()
       isHeadingAccessibilityFocused = true

@@ -574,7 +574,12 @@ import Testing
         presentation.beginApplyWorkflow(profileID: targetProfile.id, mode: .normal)
         let prompt = try #require(presentation.applyDraftPrompt)
         #expect(prompt.targetProfileName == targetProfile.name)
-        #expect(presentation.applyDraftMessage.contains(targetProfile.name))
+        #expect(
+          presentation.applyDraftMessage
+            == appLocalizedRuntime(
+              "Choose whether to save or discard the open draft before reviewing the target profile."
+            )
+        )
       }
 
       let size = CGSize(width: 520, height: 360)

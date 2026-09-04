@@ -120,11 +120,15 @@ import Testing
           == TrayScrollResetRequest(sessionGeneration: 31, anchor: .top)
       )
 
-      presentation.reportHandoffFailure("Synthetic destination failure")
+      presentation.reportHandoffFailure(
+        "Synthetic destination failure",
+        retryDestination: .settings
+      )
 
       #expect(presentation.focusTarget == .handoffError)
       #expect(presentation.handoffErrorKind == .destinationHandoff)
       #expect(presentation.handoffErrorTitle == "Could Not Open Destination")
+      #expect(presentation.handoffRetryAction == .openSettings)
       #expect(
         presentation.scrollResetRequest
           == TrayScrollResetRequest(
@@ -136,6 +140,7 @@ import Testing
 
       presentation.dismissHandoffError()
       #expect(presentation.handoffError == nil)
+      #expect(presentation.handoffRetryAction == nil)
       #expect(presentation.focusTarget == nil)
 
       let profileID = model.profiles[0].id

@@ -29,8 +29,8 @@ public enum PrimaryApplyActionKind: String, Equatable, Sendable {
 
   public var defaultLabel: String {
     switch self {
-    case .normal: "Review…"
-    case .availableItems: "Review Available…"
+    case .normal: "Review Changes…"
+    case .availableItems: "Review Available Changes…"
     }
   }
 }

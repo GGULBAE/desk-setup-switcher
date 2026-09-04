@@ -108,6 +108,7 @@ struct TrayActionRouterTests {
     #expect(surface.closeRequests.isEmpty)
     #expect(surface.isTrayVisible)
     #expect(executor.errors == ["Window could not be shown."])
+    #expect(executor.retryDestinations == [.settings])
   }
 
   @Test("double-click while handoff is pending creates one destination")
@@ -195,13 +196,15 @@ struct TrayActionRouterTests {
 private final class ActionExecutorSpy: TrayActionExecuting {
   private(set) var actions: [TrayAction] = []
   private(set) var errors: [String] = []
+  private(set) var retryDestinations: [TrayDestination?] = []
 
   func executeStayOpen(_ action: TrayAction) async {
     actions.append(action)
   }
 
-  func reportHandoffFailure(_ message: String) {
+  func reportHandoffFailure(_ message: String, retryDestination: TrayDestination?) {
     errors.append(message)
+    retryDestinations.append(retryDestination)
   }
 }
 

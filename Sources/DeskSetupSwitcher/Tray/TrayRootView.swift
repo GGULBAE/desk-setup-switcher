@@ -465,11 +465,22 @@ struct TrayRootView: View {
           .font(.caption.bold())
         Text(message)
           .font(.caption)
-        Button(appLocalized("Dismiss")) {
-          presentation.dismissHandoffError()
+        HStack {
+          Button(appLocalized("Dismiss")) {
+            presentation.dismissHandoffError()
+          }
+          .controlSize(.small)
+          .focused($focusedControl, equals: .handoffError)
+
+          if let retryAction = presentation.handoffRetryAction {
+            Button(appLocalized("Try Again")) {
+              presentation.dismissHandoffError()
+              route(retryAction)
+            }
+            .controlSize(.small)
+            .buttonStyle(.borderedProminent)
+          }
         }
-        .controlSize(.small)
-        .focused($focusedControl, equals: .handoffError)
       }
       .padding(TrayGeometry.cardPadding)
       .frame(maxWidth: .infinity, alignment: .leading)

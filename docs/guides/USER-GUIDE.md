@@ -35,7 +35,7 @@ Keyboard behavior, accessibility names and values, and non-color state cues are 
 
 1. **Capture:** Open the menu-bar item and choose **Capture Current Settings**. Capture reads the Mac and creates a new reviewable profile; it does not apply a change.
 2. **Edit:** Choose **Edit Profile**, name the profile, select only the settings you want under **Display**, **Audio**, and **Network**, then save.
-3. **Review & Apply:** Choose **Review…** or **Review Available…**. Check every change and omission. Nothing changes until you explicitly choose **Apply Profile** or **Apply Available Settings**.
+3. **Review & Apply:** Choose **Review Changes…** or **Review Available Changes…**. Check every change and omission. Nothing changes until you explicitly choose **Apply Profile** or **Apply Available Settings**.
 
 There is no timer, condition, or background rule that applies a profile automatically.
 
@@ -70,12 +70,12 @@ If you switch profiles, import, apply, or quit with unsaved changes, the app ask
 
 Each profile exposes one state-aware review action:
 
-- **Review…** means all included applicable settings can be prepared.
-- **Review Available…** means some executable settings exist but other items will be omitted, blocked, unsupported, or unavailable.
+- **Review Changes…** means all included applicable settings can be prepared.
+- **Review Available Changes…** means some executable settings exist but other items will be omitted, blocked, unsupported, or unavailable.
 
 The review is read-only. Inspect the target values, operation list, omissions, and technical details before continuing.
 
-The top of Apply Preview carries a **Beta** text-and-shield status: Apply and rollback are not hardware-verified, so check System Settings after applying. Review content and decision actions form one scroll sequence; at reduced height or large text, scroll through the plan before the buttons become reachable. Escape cancels, while Return alone does not apply.
+The top of Apply Preview carries a **Beta** text-and-shield status: Apply and rollback are not hardware-verified, so check System Settings after applying. One Safety summary explains that the screen is still a review and identifies temporary display/network changes; a refreshed-plan notice remains separate because it represents a new state. Review content and decision actions form one scroll sequence; at reduced height or large text, scroll through the plan before the buttons become reachable. Escape cancels, while Return alone does not apply.
 
 - **Apply Profile** starts a complete plan.
 - **Apply Available Settings** applies only the listed executable items. Use it only when every omission is expected.
@@ -147,7 +147,7 @@ Use [SUPPORT.md](../../SUPPORT.md) for public support and bug-report routes. For
 | --- | --- |
 | The app opened but no window appeared | Look for the menu-bar icon. The app is menu-bar-only by design. |
 | The Wi-Fi name was not captured | Allow Location after the explanation, or explicitly use **Capture Without Wi-Fi**. After changing permission in System Settings, return and capture again. |
-| A profile is Partial or Unavailable | Choose **Edit Profile**, inspect warning rows, reconnect the required device/service, or exclude an unavailable setting. Use **Review Available…** only when every omission is intentional. |
+| A profile is Partial or Unavailable | Choose **Edit Profile**, inspect warning rows, reconnect the required device/service, or exclude an unavailable setting. Use **Review Available Changes…** only when every omission is intentional. |
 | Review shows no operation | The profile already matches the current readable state, or no included setting can be safely applied. Nothing needs to run. |
 | Review refreshes instead of applying | The profile, capability, current value, or rollback evidence changed after the first review. This is a safety stop; inspect the new plan. |
 | Profile storage shows an error | Use **Retry Loading** for a load failure or **Dismiss Error** after an ordinary failed operation. Do not edit managed files while the app is running. Restore through a reviewed export/import if needed. |

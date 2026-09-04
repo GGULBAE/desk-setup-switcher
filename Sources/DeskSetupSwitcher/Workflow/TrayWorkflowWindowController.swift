@@ -919,28 +919,7 @@ struct ApplyPreviewView: View {
 
   @ViewBuilder
   private var applyNotices: some View {
-    if request.preparation.mode == .force {
-      Label(
-        appLocalized(
-          "Only available operations will run. Review every skipped item before continuing."),
-        systemImage: "exclamationmark.triangle"
-      )
-      .padding(10)
-      .background(.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    switch request.reviewReason {
-    case .initial:
-      Label(
-        ApplyPreviewActionCopy.reviewNotice(
-          for: request.reviewReason,
-          actionTitle: applyActionTitle
-        ),
-        systemImage: "info.circle"
-      )
-      .padding(10)
-      .background(.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
-    case .refreshedSystemState:
+    if request.reviewReason == .refreshedSystemState {
       Label(
         ApplyPreviewActionCopy.reviewNotice(
           for: request.reviewReason,
@@ -952,16 +931,44 @@ struct ApplyPreviewView: View {
       .background(.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
     }
 
-    if request.preparation.operations.contains(where: { $0.risk == .high }) {
+    VStack(alignment: .leading, spacing: 8) {
       Label(
-        appLocalized(
-          "High-risk display and network changes remain temporary. Desk Setup Switcher will attempt to restore the previous configuration if the safety window closes, the app exits, or you do not confirm within 15 seconds."
-        ),
+        appLocalized("Safety summary"),
         systemImage: "exclamationmark.shield"
       )
-      .padding(10)
-      .background(.yellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+      .font(.headline)
+
+      if request.preparation.mode == .force {
+        Label(
+          appLocalized("Available settings only; skipped items are listed below."),
+          systemImage: "minus.circle"
+        )
+      }
+
+      Label(
+        ApplyPreviewActionCopy.reviewNotice(
+          for: .initial,
+          actionTitle: applyActionTitle
+        ),
+        systemImage: "info.circle"
+      )
+
+      if request.preparation.operations.contains(where: { $0.risk == .high }) {
+        Label(
+          appLocalized(
+            "Display and network changes stay temporary for 15 seconds unless you keep them."
+          ),
+          systemImage: "timer"
+        )
+      }
     }
+    .font(.callout)
+    .fixedSize(horizontal: false, vertical: true)
+    .padding(10)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.yellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("apply-preview-safety-summary")
   }
 
   @ViewBuilder
@@ -1756,32 +1763,42 @@ struct WorkflowErrorView: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    GeometryReader { geometry in
       ScrollView {
-        VStack(alignment: .leading, spacing: 12) {
-          Label(appLocalized("Could Not Continue"), systemImage: "exclamationmark.triangle")
-            .font(.title2.bold())
-            .accessibilityAddTraits(.isHeader)
-            .accessibilityFocused($isHeadingAccessibilityFocused)
-          Text(message)
+        VStack {
+          Spacer(minLength: 0)
+
+          VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+              Label(appLocalized("Could Not Continue"), systemImage: "exclamationmark.triangle")
+                .font(.title2.bold())
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($isHeadingAccessibilityFocused)
+              Text(message)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Divider()
+            AdaptiveWorkflowActionBar(
+              cancelAction: WorkflowFooterAction(
+                id: "close",
+                title: appLocalized("Close"),
+                role: .cancel,
+                shortcut: .cancel,
+                perform: onClose
+              ),
+              trailingActions: [],
+              focusRequestID: message
+            )
+          }
+          .frame(maxWidth: 680)
+
+          Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minHeight: geometry.size.height)
       }
       .defaultScrollAnchor(.top)
       .scrollBounceBehavior(.basedOnSize)
-
-      Divider()
-      AdaptiveWorkflowActionBar(
-        cancelAction: WorkflowFooterAction(
-          id: "close",
-          title: appLocalized("Close"),
-          role: .cancel,
-          shortcut: .cancel,
-          perform: onClose
-        ),
-        trailingActions: [],
-        focusRequestID: message
-      )
     }
     .padding(WorkflowSurfaceMetrics.contentInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -2137,7 +2154,9 @@ struct TrayWorkflowRootView: View {
               $accessibilityFocusTarget,
               equals: .dirtyApply(prompt.id)
             )
+          dirtyApplyComparison(prompt)
           Text(presentation.applyDraftMessage)
+            .font(.callout)
             .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2163,6 +2182,50 @@ struct TrayWorkflowRootView: View {
     }
     .padding(WorkflowSurfaceMetrics.contentInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  @ViewBuilder
+  private func dirtyApplyComparison(_ prompt: TrayApplyDraftPrompt) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      switch prompt.kind {
+      case .targetDraft:
+        dirtyApplyProfileRow(
+          title: appLocalized("Unsaved changes"),
+          profileName: prompt.targetProfileName,
+          systemImage: "pencil.circle"
+        )
+      case .otherDraft(_, let openProfileName):
+        dirtyApplyProfileRow(
+          title: appLocalized("Unsaved changes"),
+          profileName: openProfileName,
+          systemImage: "pencil.circle"
+        )
+        dirtyApplyProfileRow(
+          title: appLocalized("Profile to apply"),
+          profileName: prompt.targetProfileName,
+          systemImage: "arrow.right.circle"
+        )
+      }
+    }
+    .padding(12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+  }
+
+  private func dirtyApplyProfileRow(
+    title: String,
+    profileName: String,
+    systemImage: String
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 3) {
+      Label(title, systemImage: systemImage)
+        .font(.caption.bold())
+        .foregroundStyle(.secondary)
+      Text(profileName)
+        .lineLimit(3)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .accessibilityElement(children: .combine)
   }
 
   private func dirtyApplyActions(_ prompt: TrayApplyDraftPrompt) -> [WorkflowFooterAction] {

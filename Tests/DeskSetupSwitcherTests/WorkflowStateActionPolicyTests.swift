@@ -266,7 +266,7 @@ import Testing
       )
       #expect(
         ApplyPreviewActionCopy.hardwareVerificationNotice(languageCode: "ko")
-          == "Beta · 적용/롤백은 실제 하드웨어 검증 전입니다. 적용 후 시스템 설정을 확인하세요."
+          == "베타 · 적용/롤백은 실제 하드웨어 검증 전입니다. 적용 후 시스템 설정을 확인하세요."
       )
       #expect(
         ApplyPreviewHardwareVerificationStatus.localized(languageCode: "en")
@@ -281,9 +281,9 @@ import Testing
         ApplyPreviewHardwareVerificationStatus.localized(languageCode: "ko")
           == ApplyPreviewHardwareVerificationStatus(
             text:
-              "Beta · 적용/롤백은 실제 하드웨어 검증 전입니다. 적용 후 시스템 설정을 확인하세요.",
+              "베타 · 적용/롤백은 실제 하드웨어 검증 전입니다. 적용 후 시스템 설정을 확인하세요.",
             systemImage: "exclamationmark.shield",
-            accessibilityLabel: "Beta 하드웨어 검증 상태"
+            accessibilityLabel: "베타 하드웨어 검증 상태"
           )
       )
       #expect(ApplyPreviewDecisionPolicy.primaryActionShortcut == .none)

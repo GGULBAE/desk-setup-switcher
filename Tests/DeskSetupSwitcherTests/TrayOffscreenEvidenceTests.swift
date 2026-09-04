@@ -294,7 +294,10 @@ import Testing
           #expect(rendered.accessibility.contains("declared-partial-profile-actions="))
           #expect(
             rendered.accessibility.contains(
-              appLocalizedRuntime("Review Available…", languageCode: fixture.languageCode)
+              appLocalizedRuntime(
+                "Review Available Changes…",
+                languageCode: fixture.languageCode
+              )
             )
           )
         }
@@ -327,6 +330,12 @@ import Testing
           #expect(errorAccentBounds.upperBound < rendered.viewport.height - 40)
           #expect(rendered.accessibility.contains("handoff-scroll-anchor=top"))
           #expect(rendered.accessibility.contains("handoff-focus-target=dismiss"))
+          #expect(
+            rendered.accessibility.contains(
+              "handoff-retry-action="
+                + appLocalizedRuntime("Try Again", languageCode: fixture.languageCode)
+            )
+          )
         }
 
         if let outputDirectory {
@@ -478,6 +487,14 @@ import Testing
           size: CGSize(width: 900, height: 568),
           dynamicTypeSizeOverride: .accessibility5
         ),
+        SettingsFixture(
+          name: "26-validation-ko-minimum-large-text",
+          variant: .validation,
+          languageCode: "ko",
+          colorScheme: .light,
+          displayMode: .largeText,
+          size: CGSize(width: 680, height: 480)
+        ),
       ]
       let selectedFixture = ProcessInfo.processInfo.environment[
         "DESK_SETUP_REFINEMENT_EVIDENCE_FIXTURE"
@@ -540,6 +557,26 @@ import Testing
           #expect(rendered.accessibility.contains("dynamic-type=accessibility5"))
           #expect(rendered.accessibility.contains("inclusion-summary-line-limit=unlimited"))
           #expect(rendered.accessibility.contains("inclusion-header-layout=stacked"))
+        }
+        if fixture.variant == .validation {
+          #expect(rendered.accessibility.contains("validation-summary-visible=true"))
+          #expect(
+            rendered.accessibility.contains(
+              "declared-validation-heading="
+                + appLocalizedRuntime("Review Before Saving", languageCode: fixture.languageCode)
+            )
+          )
+          #expect(rendered.storageErrorAccentPixelCount > 100)
+        }
+        if [.editorNetworkEthernetManual, .editorNetworkWiFiManual].contains(fixture.variant) {
+          #expect(
+            rendered.accessibility.contains(
+              "declared-manual-ipv4-labels="
+                + ["IP address", "Subnet mask", "Router (optional)"]
+                .map { appLocalizedRuntime($0, languageCode: fixture.languageCode) }
+                .joined(separator: "|")
+            )
+          )
         }
         if !fixture.isProfileSurface {
           #expect(rendered.accessibility.contains("settings-tab=system"))
@@ -1230,6 +1267,9 @@ import Testing
         "storage-error-action=\(fixture.state == .storageError ? appLocalizedRuntime("Dismiss Error") : "none")",
         "profile-workspace-disabled=\(fixture.state == .storageError)",
         "storage-error-focus-target=\(fixture.state == .storageError ? "heading" : "none")",
+        "validation-summary-visible=\(fixture.variant == .validation)",
+        "declared-validation-heading=\(fixture.variant == .validation ? appLocalizedRuntime("Review Before Saving") : "none")",
+        "declared-manual-ipv4-labels=\([.editorNetworkEthernetManual, .editorNetworkWiFiManual].contains(fixture.variant) ? ["IP address", "Subnet mask", "Router (optional)"].map(appLocalizedRuntime).joined(separator: "|") : "none")",
         "footer-dark-pixel-threshold=0.63",
         "footer-dark-pixel-count=\(footerDarkPixelCount)",
         "storage-error-accent-pixel-count=\(storageErrorAccentPixelCount)",
@@ -1454,7 +1494,8 @@ import Testing
       }
       if let handoffErrorKey = fixture.handoffErrorKey {
         presentation.reportHandoffFailure(
-          appLocalizedRuntime(handoffErrorKey, languageCode: fixture.languageCode)
+          appLocalizedRuntime(handoffErrorKey, languageCode: fixture.languageCode),
+          retryDestination: .settings
         )
       }
 
@@ -1566,9 +1607,9 @@ import Testing
       let partialProfileActions =
         fixture.usesPartialProfileOnly
         ? [
-          appLocalizedRuntime("Review Available…", languageCode: fixture.languageCode),
+          appLocalizedRuntime("Review Available Changes…", languageCode: fixture.languageCode),
           appLocalizedRuntime("Edit Profile", languageCode: fixture.languageCode),
-          appLocalizedRuntime("Delete", languageCode: fixture.languageCode),
+          appLocalizedRuntime("More Profile Actions", languageCode: fixture.languageCode),
         ].joined(separator: " | ")
         : "not-applicable"
       var lines = [
@@ -1596,6 +1637,7 @@ import Testing
         "declared-handoff-error=\(fixture.handoffErrorKey.map { appLocalizedRuntime($0, languageCode: fixture.languageCode) } ?? "none")",
         "handoff-scroll-anchor=\(fixture.handoffErrorKey == nil ? "none" : "top")",
         "handoff-focus-target=\(fixture.handoffErrorKey == nil ? "none" : "dismiss")",
+        "handoff-retry-action=\(fixture.handoffErrorKey == nil ? "none" : appLocalizedRuntime("Try Again", languageCode: fixture.languageCode))",
         "offscreen-ax-limit=virtual SwiftUI children may remain pending without ordering the window front",
       ]
       var visited: Set<ObjectIdentifier> = []

@@ -372,7 +372,7 @@ final class ApplicationModel: ObservableObject {
       launchAtLoginDesired = true
       loginItemEnabled = false
       loginItemStatus = appLocalized(
-        "Requested; approval is required in System Settings > General > Login Items.")
+        "Requested; approval is required in System Settings › General › Login Items.")
       canRetryLoginItemRegistration = false
       readinessByProfile = fixture.readinessByProfile
       operationCountByProfile = fixture.operationCountByProfile
@@ -1895,7 +1895,7 @@ final class ApplicationModel: ObservableObject {
         loginItemStatus = appLocalized("Requested and enabled by macOS.")
       case .requiresApproval:
         loginItemStatus = appLocalized(
-          "Requested; approval is required in System Settings > General > Login Items.")
+          "Requested; approval is required in System Settings › General › Login Items.")
       case .notFound:
         loginItemStatus = registrationFailureStatus(
           fallback: appLocalized(

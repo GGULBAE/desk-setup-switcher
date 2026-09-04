@@ -170,6 +170,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   @Published private(set) var isWorkflowTaskInFlight = false
   @Published private(set) var handoffError: String?
   @Published private(set) var handoffErrorKind: TrayPresentedErrorKind?
+  @Published private(set) var handoffRetryDestination: TrayDestination?
   @Published private(set) var activeSessionGeneration: UInt64?
   @Published private(set) var scrollResetRequest: TrayScrollResetRequest?
   @Published private(set) var viewport: CGSize = .zero
@@ -206,6 +207,23 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     appLocalizedRuntime(
       handoffErrorKind?.titleKey ?? TrayPresentedErrorKind.operation.titleKey
     )
+  }
+
+  var handoffRetryAction: TrayAction? {
+    switch handoffRetryDestination {
+    case .settings:
+      .openSettings
+    case .profileEditor(let profileID):
+      .editProfile(profileID)
+    case .permission(let workflow):
+      .openPermissionWorkflow(workflow)
+    case .applyPreview(let profileID, let mode):
+      .openApplyPreview(profileID, mode)
+    case .resultDetails:
+      .openResultDetails
+    case nil:
+      nil
+    }
   }
   private var statusItemPresentationHandler: (@MainActor (TrayStatusItemPresentation) -> Void)?
   private var modelStatusObservation: AnyCancellable?
@@ -343,12 +361,10 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     guard let prompt = applyDraftPrompt else { return "" }
     switch prompt.kind {
     case .targetDraft:
+      return appLocalized("Save these exact values before building the apply preview.")
+    case .otherDraft:
       return appLocalized(
-        "\(prompt.targetProfileName) has unsaved changes. Save those exact values before building the apply preview."
-      )
-    case .otherDraft(_, let openProfileName):
-      return appLocalized(
-        "Choose what to do with \(openProfileName) before applying \(prompt.targetProfileName)."
+        "Choose whether to save or discard the open draft before reviewing the target profile."
       )
     }
   }
@@ -458,11 +474,15 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     }
   }
 
-  func reportHandoffFailure(_ message: String) {
+  func reportHandoffFailure(_ message: String, retryDestination: TrayDestination?) {
+    handoffRetryDestination = retryDestination
     reportPresentedError(message, kind: .destinationHandoff)
   }
 
   private func reportPresentedError(_ message: String, kind: TrayPresentedErrorKind) {
+    if kind != .destinationHandoff {
+      handoffRetryDestination = nil
+    }
     handoffError = message
     handoffErrorKind = kind
     focusTarget = .handoffError
@@ -961,6 +981,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   private func clearHandoffError() {
     handoffError = nil
     handoffErrorKind = nil
+    handoffRetryDestination = nil
     guard focusTarget == .handoffError else { return }
     focusTarget = deletion.pendingProfileID.map(TrayFocusTarget.cancelDelete)
     focusRequestRevision &+= 1

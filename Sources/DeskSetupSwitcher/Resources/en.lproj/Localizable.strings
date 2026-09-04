@@ -52,6 +52,9 @@
 "This is a review. No setting changes until you press %@ below." = "This is a review. No setting changes until you press %@ below.";
 "Beta · Apply/rollback not hardware-verified. Check System Settings after applying." = "Beta · Apply/rollback not hardware-verified. Check System Settings after applying.";
 "Beta hardware verification status" = "Beta hardware verification status";
+"Safety summary" = "Safety summary";
+"Available settings only; skipped items are listed below." = "Available settings only; skipped items are listed below.";
+"Display and network changes stay temporary for 15 seconds unless you keep them." = "Display and network changes stay temporary for 15 seconds unless you keep them.";
 "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press %@ again." = "The Mac changed after this preview opened. Nothing was applied; review the refreshed plan and press %@ again.";
 "Executes the reviewed operations and then shows itemized results." = "Executes the reviewed operations and then shows itemized results.";
 "The apply preview is no longer current. Reopen it and try again." = "The apply preview is no longer current. Reopen it and try again.";
@@ -87,6 +90,9 @@
 "Not enabled" = "Not enabled";
 "Retry Registration" = "Retry Registration";
 "Refresh Status" = "Refresh Status";
+"Location access is used only to read the current Wi-Fi network name during Capture." = "Location access is used only to read the current Wi-Fi network name during Capture.";
+"Why is Location access needed?" = "Why is Location access needed?";
+"Try Again" = "Try Again";
 "macOS accepts login-item registration only for an eligible installed and code-signed app. The requested preference does not guarantee registration." = "macOS accepts login-item registration only for an eligible installed and code-signed app. The requested preference does not guarantee registration.";
 "System permissions" = "System permissions";
 "macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates." = "macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates.";
@@ -301,7 +307,7 @@
 "Checking…" = "Checking…";
 "Could not update login item: %@" = "Could not update login item: %@";
 "Requested and enabled by macOS." = "Requested and enabled by macOS.";
-"Requested; approval is required in System Settings > General > Login Items." = "Requested; approval is required in System Settings > General > Login Items.";
+"Requested; approval is required in System Settings › General › Login Items." = "Requested; approval is required in System Settings › General › Login Items.";
 "Requested, but macOS rejected registration. This build or install location may not be eligible." = "Requested, but macOS rejected registration. This build or install location may not be eligible.";
 "Requested, but macOS rejected this build’s code signature. Install a properly signed build or turn this preference off." = "Requested, but macOS rejected this build’s code signature. Install a properly signed build or turn this preference off.";
 "Requested, but macOS denied registration. Review Login Items in System Settings or turn this preference off." = "Requested, but macOS denied registration. Review Login Items in System Settings or turn this preference off.";
@@ -752,6 +758,7 @@
 "Preview and apply this complete profile." = "Preview and apply this complete profile.";
 "Apply Available Settings…" = "Apply Available Settings…";
 "More Profile Actions" = "More Profile Actions";
+"More actions for %@" = "More actions for %@";
 "Enable this profile to apply it." = "Enable this profile to apply it.";
 "Checking whether this profile can be applied…" = "Checking whether this profile can be applied…";
 "This profile is being applied." = "This profile is being applied.";
@@ -856,12 +863,12 @@
 /* Apply reliability and editor usability */
 "Apply…" = "Apply…";
 "Apply Available…" = "Apply Available…";
-"Review…" = "Review…";
-"Review Available…" = "Review Available…";
+"Review Changes…" = "Review Changes…";
+"Review Available Changes…" = "Review Available Changes…";
 "menu.action.apply" = "Apply…";
 "menu.action.applyAvailable" = "Apply Available…";
-"menu.action.review" = "Review…";
-"menu.action.reviewAvailable" = "Review Available…";
+"menu.action.review" = "Review Changes…";
+"menu.action.reviewAvailable" = "Review Available Changes…";
 "Preparing this profile…" = "Preparing this profile…";
 "menu.apply.disabled.preparing" = "Preparing this profile…";
 "menu.apply.disabled.readinessRefreshing" = "Checking whether this profile can be applied…";
@@ -878,6 +885,9 @@
 /* Dirty-draft apply protection */
 "Unsaved Profile Changes" = "Unsaved Profile Changes";
 "Save changes before applying this profile?" = "Save changes before applying this profile?";
+"Profile to apply" = "Profile to apply";
+"Save these exact values before building the apply preview." = "Save these exact values before building the apply preview.";
+"Choose whether to save or discard the open draft before reviewing the target profile." = "Choose whether to save or discard the open draft before reviewing the target profile.";
 "Resolve unsaved changes before applying another profile?" = "Resolve unsaved changes before applying another profile?";
 "Save and Apply" = "Save and Apply";
 "Save %@ and Apply %@" = "Save %@ and Apply %@";

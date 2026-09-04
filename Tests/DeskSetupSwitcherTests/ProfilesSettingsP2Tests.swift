@@ -84,7 +84,7 @@ struct ProfilesSettingsP2Tests {
 
   @Test("profile option rows stay flat while increased contrast strengthens their boundaries")
   func profileOptionRowStyle() {
-    #expect(ProfileSettingRowStylePolicy.contentLeadingInset == 8)
+    #expect(ProfileSettingRowStylePolicy.contentLeadingInset == 4)
     #expect(ProfileSettingRowStylePolicy.cornerRadius == 8)
     #expect(
       ProfileSettingRowStylePolicy.backgroundOpacity(increasedContrast: false)

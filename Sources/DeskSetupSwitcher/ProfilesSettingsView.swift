@@ -258,15 +258,15 @@ enum ProfileSettingInclusionLayoutPolicy {
 }
 
 enum ProfileSettingRowStylePolicy {
-  static let contentLeadingInset: CGFloat = 8
+  static let contentLeadingInset: CGFloat = 4
   static let cornerRadius: CGFloat = 8
 
   static func backgroundOpacity(increasedContrast: Bool) -> Double {
-    increasedContrast ? 0.56 : 0.34
+    increasedContrast ? 0.5 : 0.24
   }
 
   static func borderOpacity(increasedContrast: Bool) -> Double {
-    increasedContrast ? 0.34 : 0.08
+    increasedContrast ? 0.34 : 0.06
   }
 
   static func borderWidth(increasedContrast: Bool) -> CGFloat {
@@ -1209,7 +1209,7 @@ private struct ProfileEditorForm: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: 12) {
         profileDetailsCard
 
         if showsValidationSummary, !validation.isValid {
@@ -1225,7 +1225,7 @@ private struct ProfileEditorForm: View {
         }
       }
       .padding(.horizontal, ProfileSettingInclusionLayoutPolicy.formHorizontalInset)
-      .padding(.vertical, 16)
+      .padding(.vertical, 12)
       .frame(maxWidth: 860)
       .frame(maxWidth: .infinity, alignment: .top)
     }
@@ -1379,12 +1379,14 @@ private struct ProfileEditorForm: View {
     GroupBox {
       VStack(alignment: .leading, spacing: 10) {
         Label(
-          "Fix the highlighted fields before saving.",
+          appLocalized("Fix the highlighted fields before saving."),
           systemImage: "exclamationmark.triangle.fill"
         )
         .foregroundStyle(.red)
-        .accessibilityLabel("Profile validation failed")
-        .accessibilityHint("Review the first issue or choose a highlighted field")
+        .accessibilityLabel(appLocalized("Profile validation failed"))
+        .accessibilityHint(
+          appLocalized("Review the first issue or choose a highlighted field")
+        )
 
         if let item = firstValidationItem {
           Button {
@@ -1402,12 +1404,12 @@ private struct ProfileEditorForm: View {
           .accessibilityLabel(
             "\(appLocalized("First validation issue")): \(item.message)"
           )
-          .accessibilityHint("Moves keyboard focus to the invalid field")
+          .accessibilityHint(appLocalized("Moves keyboard focus to the invalid field"))
         }
       }
       .padding(8)
     } label: {
-      Text("Review Before Saving")
+      Text(appLocalized("Review Before Saving"))
         .font(.headline)
         .accessibilityAddTraits(.isHeader)
     }
@@ -1721,39 +1723,52 @@ private struct ProfileEditorForm: View {
           .focused($focusedField, equals: ipv4Field)
 
           if case .manual = option.wrappedValue.value {
-            TextField(appLocalized("IP address"), text: manualIPv4AddressBinding(option.value))
-              .accessibilityLabel(appLocalized("Manual IPv4 address"))
-              .accessibilityHint(
-                validationAccessibilityHint(
-                  for: addressField,
-                  fallback: "Enter the IPv4 address for this service"
-                )
-              )
-              .focused($focusedField, equals: addressField)
-              .accessibilityInvalid(validation.issue(for: addressField) != nil)
-            TextField(appLocalized("Subnet mask"), text: manualIPv4SubnetMaskBinding(option.value))
-              .accessibilityLabel(appLocalized("Manual IPv4 subnet mask"))
-              .accessibilityHint(
-                validationAccessibilityHint(
-                  for: subnetField,
-                  fallback: "Enter a contiguous IPv4 subnet mask"
-                )
-              )
-              .focused($focusedField, equals: subnetField)
-              .accessibilityInvalid(validation.issue(for: subnetField) != nil)
-            TextField(appLocalized("Router"), text: manualIPv4RouterBinding(option.value))
-              .accessibilityLabel(appLocalized("Manual IPv4 router"))
-              .accessibilityHint(
-                validationAccessibilityHint(
-                  for: routerField,
-                  fallback: "Enter the optional IPv4 router address"
-                )
-              )
-              .focused($focusedField, equals: routerField)
-              .accessibilityInvalid(validation.issue(for: routerField) != nil)
+            manualIPv4Field(
+              title: appLocalized("IP address"),
+              accessibilityLabel: appLocalized("Manual IPv4 address"),
+              text: manualIPv4AddressBinding(option.value),
+              fieldID: addressField,
+              fallbackHint: "Enter the IPv4 address for this service"
+            )
+            manualIPv4Field(
+              title: appLocalized("Subnet mask"),
+              accessibilityLabel: appLocalized("Manual IPv4 subnet mask"),
+              text: manualIPv4SubnetMaskBinding(option.value),
+              fieldID: subnetField,
+              fallbackHint: "Enter a contiguous IPv4 subnet mask"
+            )
+            manualIPv4Field(
+              title: appLocalized("Router (optional)"),
+              accessibilityLabel: appLocalized("Manual IPv4 router"),
+              text: manualIPv4RouterBinding(option.value),
+              fieldID: routerField,
+              fallbackHint: "Enter the optional IPv4 router address"
+            )
           }
         }
       }
+    }
+  }
+
+  private func manualIPv4Field(
+    title: String,
+    accessibilityLabel: String,
+    text: Binding<String>,
+    fieldID: DraftFieldIdentifier,
+    fallbackHint: LocalizedStringKey
+  ) -> some View {
+    LabeledContent(title) {
+      TextField(text: text) {
+        Text(accessibilityLabel)
+      }
+      .labelsHidden()
+      .textFieldStyle(.roundedBorder)
+      .accessibilityLabel(accessibilityLabel)
+      .accessibilityHint(
+        validationAccessibilityHint(for: fieldID, fallback: fallbackHint)
+      )
+      .focused($focusedField, equals: fieldID)
+      .accessibilityInvalid(validation.issue(for: fieldID) != nil)
     }
   }
 
@@ -1838,7 +1853,7 @@ private struct ProfileEditorForm: View {
         }
 
         Divider()
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
           content()
         }
       }

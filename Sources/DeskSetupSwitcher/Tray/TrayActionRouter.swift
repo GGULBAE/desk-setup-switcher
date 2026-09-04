@@ -79,7 +79,13 @@ enum TrayRoutingEvent: Equatable, Sendable {
 @MainActor
 protocol TrayActionExecuting: AnyObject {
   func executeStayOpen(_ action: TrayAction) async
-  func reportHandoffFailure(_ message: String)
+  func reportHandoffFailure(_ message: String, retryDestination: TrayDestination?)
+}
+
+extension TrayActionExecuting {
+  func reportHandoffFailure(_ message: String) {
+    reportHandoffFailure(message, retryDestination: nil)
+  }
 }
 
 @MainActor
@@ -140,7 +146,10 @@ final class TrayActionRouter {
       isDestinationHandoffInFlight = true
       defer { isDestinationHandoffInFlight = false }
       guard let destinationPresenter else {
-        executor?.reportHandoffFailure(appLocalized("The destination could not be opened."))
+        executor?.reportHandoffFailure(
+          appLocalized("The destination could not be opened."),
+          retryDestination: destination
+        )
         return
       }
       eventSink(.destinationRequested(destination))
@@ -155,7 +164,9 @@ final class TrayActionRouter {
         }
         guard isVisible, isKeyOrActive else {
           executor?.reportHandoffFailure(
-            appLocalized("The destination window did not become visible and active."))
+            appLocalized("The destination window did not become visible and active."),
+            retryDestination: destination
+          )
           return
         }
         guard let surface,
@@ -168,9 +179,12 @@ final class TrayActionRouter {
         surface.requestClose(sessionGeneration: sessionGeneration)
 
       case .failed(let message):
-        executor?.reportHandoffFailure(message)
+        executor?.reportHandoffFailure(message, retryDestination: destination)
       case .cancelled:
-        executor?.reportHandoffFailure(appLocalized("Opening the destination was cancelled."))
+        executor?.reportHandoffFailure(
+          appLocalized("Opening the destination was cancelled."),
+          retryDestination: nil
+        )
       }
 
     case .terminate:

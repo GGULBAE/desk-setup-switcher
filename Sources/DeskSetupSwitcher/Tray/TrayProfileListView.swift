@@ -54,16 +54,27 @@ struct TrayProfileListView: View {
   @ViewBuilder
   private func profileHeader(_ profile: DeskProfile, readiness: ProfileReadiness) -> some View {
     if TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: dynamicTypeSize) {
-      VStack(alignment: .leading, spacing: 5) {
-        profileTitle(profile)
-        readinessLabel(readiness)
-      }
+      stackedProfileHeader(profile, readiness: readiness)
     } else {
-      HStack(alignment: .firstTextBaseline) {
-        profileTitle(profile)
-        Spacer(minLength: 8)
-        readinessLabel(readiness)
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .firstTextBaseline) {
+          profileTitle(profile)
+          Spacer(minLength: 8)
+          readinessLabel(readiness)
+            .fixedSize(horizontal: true, vertical: true)
+        }
+        stackedProfileHeader(profile, readiness: readiness)
       }
+    }
+  }
+
+  private func stackedProfileHeader(
+    _ profile: DeskProfile,
+    readiness: ProfileReadiness
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+      profileTitle(profile)
+      readinessLabel(readiness)
     }
   }
 
@@ -97,24 +108,41 @@ struct TrayProfileListView: View {
         .foregroundStyle(.secondary)
     }
 
-    if TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: dynamicTypeSize) {
-      if action.disabledReason != .alreadyMatches {
-        styledApplyButton(profile, action: action)
-      }
-      HStack(spacing: 8) {
-        editButton(profile)
-        Spacer(minLength: 8)
-        deleteButton(profile)
-      }
+    if action.disabledReason == .alreadyMatches {
+      secondaryActionRow(profile)
+    } else if TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: dynamicTypeSize) {
+      stackedActionRow(profile, action: action)
     } else {
-      HStack(spacing: 8) {
-        if action.disabledReason != .alreadyMatches {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 8) {
           styledApplyButton(profile, action: action)
+            .fixedSize(horizontal: true, vertical: false)
+          Spacer(minLength: 8)
+          editButton(profile)
+            .fixedSize(horizontal: true, vertical: false)
+          profileActionsMenu(profile)
         }
-        Spacer(minLength: 8)
-        editButton(profile)
-        deleteButton(profile)
+        stackedActionRow(profile, action: action)
       }
+    }
+  }
+
+  private func stackedActionRow(
+    _ profile: DeskProfile,
+    action: PrimaryApplyActionState
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      styledApplyButton(profile, action: action)
+        .fixedSize(horizontal: false, vertical: true)
+      secondaryActionRow(profile)
+    }
+  }
+
+  private func secondaryActionRow(_ profile: DeskProfile) -> some View {
+    HStack(spacing: 8) {
+      editButton(profile)
+      Spacer(minLength: 8)
+      profileActionsMenu(profile)
     }
   }
 
@@ -144,23 +172,32 @@ struct TrayProfileListView: View {
     .help(appLocalized("Edit Profile"))
   }
 
-  private func deleteButton(_ profile: DeskProfile) -> some View {
-    Button {
-      route(.requestDelete(profile.id))
+  private func profileActionsMenu(_ profile: DeskProfile) -> some View {
+    Menu {
+      Button(role: .destructive) {
+        route(.requestDelete(profile.id))
+      } label: {
+        Label(appLocalized("Delete Profile"), systemImage: "trash")
+      }
     } label: {
-      Label(appLocalized("Delete Profile"), systemImage: "trash")
+      Label(appLocalized("More Profile Actions"), systemImage: "ellipsis.circle")
         .labelStyle(.iconOnly)
     }
-    .buttonStyle(.plain)
+    .menuStyle(.borderlessButton)
     .frame(minWidth: 28, minHeight: 28)
+    .focused(focusedControl, equals: .delete(profile.id))
     .disabled(
       model.isProfileMutationLocked || profileEditor.activity.isBusy
         || profileEditor.session.pendingSelection != nil
         || presentation.deletionInFlightProfileID != nil
     )
-    .focused(focusedControl, equals: .delete(profile.id))
-    .accessibilityLabel(appLocalized("Delete \(profile.name)"))
-    .help(appLocalized("Delete \(profile.name)"))
+    .accessibilityLabel(
+      String.localizedStringWithFormat(
+        appLocalized("More actions for %@"),
+        profile.name
+      )
+    )
+    .help(appLocalized("More Profile Actions"))
   }
 
   private func deletionConfirmation(_ profile: DeskProfile) -> some View {
