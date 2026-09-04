@@ -258,6 +258,8 @@ The final integrated non-live `make verify` and current `git diff --check` pass:
 
 The final integrated non-live `make verify` and current `git diff --check` pass: 194 XCTest cases, 332 Swift Testing cases across 39 suites, one isolated native popover regression, the complete release-tooling policy/mock suite, Swift and universal Xcode Debug/Release builds, Analyze, package, checksum, and mounted universal-DMG verification completed successfully. The local unsigned development DMG SHA-256 is `81b16cdd9f2a0e56c8849fdc028fa2208b1dfac8a62e0c69ed59866be728b58d`; it was not uploaded or published. Behavior-focused commit `a9a5578` records the implementation and evidence. Installed interaction, VoiceOver, Capture/Apply, TCC/login, Keychain, CI, and hardware mutation remain outside this synthetic/local evidence boundary.
 
+A separately authorized reinstall copied the verified mounted package to `/Applications`, confirmed the installed executable at SHA-256 `f6accf8edc908a426f0082bcba1b11807f7f1bf8f862033ecd56c7e6c8d7cdcc` with `x86_64 arm64` and a valid ad-hoc signature, and launched that installed path. Profile primary and backup hashes remained unchanged and the previous app remains recoverable from a build-local backup. This proves replacement and launch only; the profile editor was not interactively exercised and no system-setting mutation ran.
+
 ## M6 — Free open-source public beta release (unsigned GitHub path selected; execution/publication pending)
 
 The first public beta remains bounded to the simple **Capture → Edit → Review & Apply** product flow. It does not add accounts, cloud services, telemetry, automatic profile switching, arbitrary shell execution, UI automation, private APIs, or a new plugin/SDK surface.
