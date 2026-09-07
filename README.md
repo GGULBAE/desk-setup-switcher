@@ -42,6 +42,8 @@ The [minimal profile scope](docs/MINIMAL-PROFILE-SCOPE-2026-09-07.md) supersedes
 
 The grouped Sound 2026-09-07 follow-up passed `make verify` on retry and the 19-fixture offscreen matrix, was reinstalled, and launched from `/Applications`. Both profile files remained byte-identical after startup; the old app and profile files are backed up. This is installation/startup evidence, not installed keyboard or hardware verification; see the [current verification and installation record](docs/AUDIO-SECTIONS-2026-09-07.md).
 
+The requested installed keyboard/scroll follow-up is still unverified: the app process and executable identity were confirmed, but the native screen connection timed out before a usable accessibility tree or screenshot was available. No keyboard, scrolling, Save, or Apply action was attempted. See the [follow-up verification boundary](docs/AUDIO-SECTIONS-2026-09-07.md#installed-interaction-follow-up).
+
 ## Install
 
 Supported binaries will be provided only through versioned GitHub Releases. There is no App Store release and the initial public beta does not require a paid Apple Developer Program membership. When this README identifies a release as supported:

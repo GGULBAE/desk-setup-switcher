@@ -26,6 +26,12 @@ The first canonical attempt stopped in the release collector harness after its w
 - Private recovery directory: `.build/installed-app-audio-20260907.pNHfAA/` (0700), with `Previous.app`, both profile backups (0600), and `RESTORE.md`. No user data was removed.
 - The package includes the pre-existing local Apply Preview edits; those changes remain outside this milestone's commit. Nothing was pushed, uploaded, or published. Installed keyboard/VoiceOver and physical Apply/rollback remain unverified.
 
+## Installed interaction follow-up
+
+The user requested a standard/minimum-window keyboard and scrolling check and a push. The installed process was running and its executable still matched the mounted/installed digest above. Two attempts to connect to `/Applications/Desk Setup Switcher.app` through native Computer Use timed out before returning a usable accessibility tree or screenshot. A bundle-ID lookup was ambiguous because build copies share the identifier; the exact installed path was retained. No keyboard, scroll, Save, Apply, or permission action was performed. This is a blocked capture attempt, not completed interactive or visual-audit evidence. The next bounded check is to retry after the user opens Profiles → Sound; a usable screen connection is still required. Native interaction and VoiceOver remain unverified.
+
+This follow-up changes documentation only. The preceding complete `make verify` result covers the unchanged app and tests; documentation lint and diff checks are rerun before its commit. Push and CI outcomes are reported separately and do not turn the blocked interaction check into a pass.
+
 ## Next verification
 
 Review the installed Sound sections using normal user keyboard and scrolling at standard and minimum window sizes, without Apply or permission changes. Record any issue and update README/support status. Hardware mutation requires a separate opt-in with preflight and rollback.
