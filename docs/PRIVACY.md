@@ -18,11 +18,11 @@ Treat exported profiles as potentially sensitive. Before sharing one, review or 
 
 ## Credentials
 
-Passwords are never model fields and are never written to profile JSON, backups, exports, operations, or logs. Saved Wi-Fi association uses credentials already managed by macOS rather than asking the app to store a password. A separate Security-framework Keychain boundary exists for future secret references and is mock tested with synthetic bytes; its live write test has deliberately not been run.
+Passwords are never model fields and are never written to profile JSON, backups, exports, operations, or logs. Current profiles do not capture or apply Wi-Fi/network settings and do not request a Wi-Fi password. A separate Security-framework Keychain boundary exists for future secret references and is mock tested with synthetic bytes; its live write test has deliberately not been run.
 
 ## Permissions
 
-The app requests the minimum permission needed for a selected feature and explains the reason before triggering the system prompt. macOS may require Location authorization to reveal the current Wi-Fi SSID during Capture. Desk Setup Switcher checks that authorization state but does not request or store coordinates. Denial disables only the Wi-Fi-dependent captured value. Listing or selecting an audio input device does not capture audio and does not require microphone recording permission.
+Current Capture reads only main display, resolutions, output device/volume, and input device/volume. It does not request Location permission or store network settings in new profiles; existing Location authorization does not gate capture. The app does not request or store coordinates. Listing or selecting an audio input device does not capture audio and does not require microphone recording permission. Dormant location conditions in older imported files remain a separate compatibility/privacy concern.
 
 ## Diagnostics
 
@@ -30,7 +30,7 @@ Diagnostics are local and rotate by size/count. Before writing, the app removes 
 
 ## Network configuration
 
-Reading local interface state is not telemetry. The app does not probe internet hosts or use external IP/geolocation services. Applying a saved Wi-Fi selection can cause macOS to communicate with that network only after the user explicitly applies a profile.
+No network setting is part of current profile Capture, Edit, or Apply, including imported service IPv4/Wi-Fi values and Force mode. Historical local network/condition primitives may remain for read-only diagnostics or compatibility tests; they are not telemetry, internet probes, or profile mutations. The app does not use external IP/geolocation services.
 
 ## Public project site
 

@@ -1,5 +1,7 @@
 # Profile navigation and Advanced settings correction
 
+> Historical correction. The subsequent [six-option profile scope](MINIMAL-PROFILE-SCOPE-2026-09-07.md) explicitly removes Advanced and Network and supersedes the option list below. Navigation stability remains required.
+
 Date: 2026-09-07
 
 ## Scope

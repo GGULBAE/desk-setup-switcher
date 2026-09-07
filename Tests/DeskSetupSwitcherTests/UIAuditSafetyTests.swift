@@ -191,7 +191,7 @@ import Testing
       #expect(ProfileWorkspaceLayoutPolicy.sidebarWidth == 210)
       #expect(ProfileWorkspaceLayoutPolicy.minimumEditorWidth == 390)
       #expect(ProfileWorkspaceLayoutPolicy.minimumContentWidth <= 640)
-      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio, .network])
+      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio])
       #expect(!ProfileEditorSurfacePolicy.visibleGroups.contains(.input))
       #expect(!ProfileEditorSurfacePolicy.showsActivationControl)
       #expect(!ProfileEditorSurfacePolicy.showsUnsupportedControls)
@@ -199,14 +199,14 @@ import Testing
       #expect(!ProfileEditorSurfacePolicy.showsConditions)
       #expect(!ProfileEditorSurfacePolicy.showsCurrentSettingsDraftRefresh)
       #expect(ProfileEditorStepPolicy.defaultGroup == .display)
-      #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio, .network])
+      #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio])
       #expect(ProfileEditorStepPolicy.group(for: .displayPrimary) == .display)
       #expect(
         ProfileEditorStepPolicy.group(for: .audio(.defaultOutputDevice)) == .audio
       )
       #expect(
         ProfileEditorStepPolicy.group(for: .networkService(at: 0, .ipv4Address))
-          == .network
+          == nil
       )
       #expect(ProfileEditorStepPolicy.group(for: .profileName) == nil)
       #expect(
@@ -252,18 +252,10 @@ import Testing
         !ProfileEditorWorkspaceLayoutPolicy.usesRail(
           availableWidth: 1_200, dynamicTypeSize: .accessibility3
         ))
-      let displayID = UUID()
-      #expect(ProfileEditorStepPolicy.requiresAdvancedDisclosure(.display(displayID, .modeWidth)))
-      #expect(ProfileEditorStepPolicy.requiresAdvancedDisclosure(.audio(.defaultInputDevice)))
-      #expect(ProfileEditorStepPolicy.requiresAdvancedDisclosure(.audio(.inputVolume)))
-      #expect(ProfileEditorStepPolicy.requiresAdvancedDisclosure(.audio(.outputMute)))
-      for field: DraftFieldIdentifier in [
-        .profileName, .displayPrimary, .group(.display), .group(.audio),
-        .audio(.defaultOutputDevice), .audio(.outputVolume),
-        .networkService(at: 1, .ipv4Address),
-      ] {
-        #expect(!ProfileEditorStepPolicy.requiresAdvancedDisclosure(field))
-      }
+      #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio])
+      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio])
+      #expect(ProfileEditorStepPolicy.group(for: .audio(.defaultInputDevice)) == .audio)
+      #expect(ProfileEditorStepPolicy.group(for: .networkService(at: 1, .ipv4Address)) == nil)
     }
 
     @Test("apply result count presentation hides zero outcomes without losing safety states")

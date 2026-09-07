@@ -9,7 +9,7 @@ import Testing
 
 @Suite("Core Graphics display adapter")
 struct DisplayAdapterTests {
-  @Test("snapshot captures stable identity, bounds, primary, mirroring, and mode")
+  @Test("snapshot captures stable identity, primary, and resolution only")
   func snapshotCapturesPublicDisplayState() async throws {
     var displays = makeDisplays()
     displays[1].bounds = DisplaySystemBounds(x: 0, y: 0, width: 2560, height: 1440)
@@ -32,9 +32,12 @@ struct DisplayAdapterTests {
     #expect(settings.displays[0].identity.isBuiltIn)
     #expect(settings.displays[0].isPrimary.value)
     #expect(settings.displays[0].origin.value == DisplayPoint(x: 0, y: 0))
-    #expect(settings.displays[0].mode.value == displays[0].currentMode)
-    #expect(settings.displays[1].mirroring.value == .mirrors(displays[0].identity))
-    #expect(settings.displays[1].rotationDegrees.value == 90)
+    #expect(settings.displays[0].mode.value.refreshRate == 0)
+    #expect(settings.displays[0].mode.value.width == displays[0].currentMode?.width)
+    #expect(!settings.displays[0].origin.isIncluded)
+    #expect(settings.displays[1].mirroring.value == .extended)
+    #expect(!settings.displays[1].mirroring.isIncluded)
+    #expect(settings.displays[1].rotationDegrees.value == 0)
     #expect(!settings.displays[1].rotationDegrees.isIncluded)
     #expect(settings.displays[1].isActive.value == false)
     #expect(!settings.displays[1].isActive.isIncluded)
@@ -43,6 +46,60 @@ struct DisplayAdapterTests {
     #expect(snapshot.displayModeCatalog?[1].identity == displays[1].identity)
     #expect(snapshot.displayModeCatalog?[1].modes == displays[1].supportedModes)
     #expect(snapshot.displayColorEvidence?.map(\.colorSpaceName) == ["Synthetic sRGB", "P3"])
+  }
+
+  @Test("resolution ignores saved refresh and preserves current mirroring and rollback")
+  func resolutionOnlyPreservesOtherSettings() async throws {
+    var displays = makeDisplays()
+    displays[1].mirrorSourceSessionID = displays[0].sessionID
+    let api = MockDisplaySystemAPI(displays: displays)
+    let adapter = CoreGraphicsDisplayAdapter(systemAPI: api)
+    let snapshot = try await adapter.snapshot()
+    var desired = try displaySettings(from: snapshot)
+    desired.displays[1].mode.value = .init(width: 1_920, height: 1_080, refreshRate: 144)
+    desired.displays[1].mirroring = .init(value: .extended)
+    desired.displays[1].origin = .init(value: .init(x: 999, y: 999))
+    let profile = ProfileApplicabilityNormalizer().normalize(
+      DeskProfile(name: "Synthetic resolution", settings: .init(display: .init(value: desired)))
+    )
+    let plan = try await adapter.plan(
+      .display(profile.settings.display.value), from: snapshot, mode: .force
+    )
+    let operation = try #require(plan.operations.first)
+    let configuration = try JSONDecoder().decode(
+      DisplayAtomicConfiguration.self, from: operation.payload)
+    let target = try #require(configuration.targets.first { $0.identity == displays[1].identity })
+    #expect(target.mode.width == 1_920)
+    #expect(target.mode.refreshRate == 59.94)
+    #expect(target.origin == .init(x: displays[1].bounds.x, y: displays[1].bounds.y))
+    #expect(target.mirrorSource == displays[0].identity)
+    #expect(await adapter.apply(operation).status == .succeeded)
+    #expect(await adapter.rollback(operation).status == .rolledBack)
+    let restored = try await api.activeDisplays()
+    #expect(restored[1].currentMode == displays[1].currentMode)
+    #expect(restored[1].mirrorSourceSessionID == displays[1].mirrorSourceSessionID)
+  }
+
+  @Test("resolution cannot change refresh rate even in force mode")
+  func resolutionFailsClosedWhenCurrentRefreshIsUnavailable() async throws {
+    var displays = makeDisplays()
+    displays[1].supportedModes.append(.init(width: 1_280, height: 720, refreshRate: 144))
+    let adapter = CoreGraphicsDisplayAdapter(systemAPI: MockDisplaySystemAPI(displays: displays))
+    let snapshot = try await adapter.snapshot()
+    var desired = try displaySettings(from: snapshot)
+    desired.displays[1].mode.value = .init(width: 1_280, height: 720, refreshRate: 144)
+    for mode in [ApplyMode.normal, .force] {
+      let plan = try await adapter.plan(.display(desired), from: snapshot, mode: mode)
+      #expect(plan.operations.isEmpty)
+      #expect(plan.omissions.contains { $0.key.hasSuffix(".mode") && $0.status == .unsupported })
+    }
+    let resolutions = DisplayResolutionMatcher().resolutions(from: [
+      .init(width: 1_920, height: 1_080, refreshRate: 60),
+      .init(width: 1_920, height: 1_080, refreshRate: 144),
+      .init(width: 1_920, height: 1_080, pixelWidth: 3_840, pixelHeight: 2_160, refreshRate: 60),
+    ])
+    #expect(resolutions.count == 2)
+    #expect(resolutions.allSatisfy { $0.refreshRate == 0 })
   }
 
   @Test("an unchanged snapshot plans no operation")
@@ -73,7 +130,7 @@ struct DisplayAdapterTests {
     let externalIndex = try #require(
       settings.displays.firstIndex { !$0.identity.isBuiltIn }
     )
-    settings.displays[externalIndex].origin.value = DisplayPoint(x: 1_800, y: 100)
+    settings.displays[externalIndex].origin = .init(value: DisplayPoint(x: 1_800, y: 100))
     settings.displays[externalIndex].mode.value = DisplayMode(
       width: 1_920,
       height: 1_080,
@@ -137,7 +194,7 @@ struct DisplayAdapterTests {
     let adapter = CoreGraphicsDisplayAdapter(systemAPI: api)
     let snapshot = try await adapter.snapshot()
     var settings = try displaySettings(from: snapshot)
-    settings.displays[1].origin.value = DisplayPoint(x: 1_900, y: 0)
+    settings.displays[1].origin = .init(value: DisplayPoint(x: 1_900, y: 0))
 
     let plan = try await adapter.plan(
       .display(settings),
@@ -161,7 +218,7 @@ struct DisplayAdapterTests {
     let externalIndex = try #require(
       settings.displays.firstIndex { !$0.identity.isBuiltIn }
     )
-    settings.displays[externalIndex].origin.value = DisplayPoint(x: 1_900, y: 0)
+    settings.displays[externalIndex].origin = .init(value: DisplayPoint(x: 1_900, y: 0))
     settings.displays[externalIndex].mode.value = DisplayMode(
       width: 800,
       height: 600,

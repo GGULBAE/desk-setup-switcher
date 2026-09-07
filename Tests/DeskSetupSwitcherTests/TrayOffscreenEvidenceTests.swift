@@ -391,8 +391,8 @@ import Testing
           size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
-          name: "15-network-en-dark",
-          variant: .editorNetworkEthernetManual,
+          name: "15-audio-en-dark",
+          variant: .editorAudio,
           languageCode: "en",
           colorScheme: .dark,
           displayMode: .standard,
@@ -441,7 +441,7 @@ import Testing
           size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
-          name: "18-display-details-en-dark",
+          name: "18-display-resolution-en-dark",
           variant: .editorDisplayColor,
           languageCode: "en",
           colorScheme: .dark,
@@ -457,33 +457,32 @@ import Testing
           size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
-          name: "19b-audio-details-ko-light",
+          name: "19b-audio-four-options-ko-light",
           variant: .editorAudio,
           languageCode: "ko",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 900, height: 900),
-          expandsProfileDetails: true
+          size: CGSize(width: 900, height: 900)
         ),
         SettingsFixture(
-          name: "20-ethernet-dhcp-en-light",
-          variant: .editorNetworkEthernetDHCP,
+          name: "20-display-en-minimum",
+          variant: .editorDisplay,
           languageCode: "en",
           colorScheme: .light,
-          displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          displayMode: .minimum,
+          size: CGSize(width: 680, height: 480)
         ),
         SettingsFixture(
-          name: "21-wifi-dhcp-ko-light",
-          variant: .editorNetworkWiFiDHCP,
+          name: "21-audio-ko-minimum",
+          variant: .editorAudio,
           languageCode: "ko",
           colorScheme: .light,
-          displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          displayMode: .minimum,
+          size: CGSize(width: 680, height: 480)
         ),
         SettingsFixture(
-          name: "22-wifi-manual-en-dark",
-          variant: .editorNetworkWiFiManual,
+          name: "22-display-ko-dark",
+          variant: .editorDisplay,
           languageCode: "en",
           colorScheme: .dark,
           displayMode: .standard,
@@ -523,7 +522,7 @@ import Testing
           size: CGSize(width: 680, height: 480)
         ),
         SettingsFixture(
-          name: "27-network-simple-en-light",
+          name: "27-legacy-network-editor-en-light",
           variant: .editorNetwork,
           languageCode: "en",
           colorScheme: .light,

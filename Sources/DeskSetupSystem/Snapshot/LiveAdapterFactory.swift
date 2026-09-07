@@ -11,8 +11,6 @@ public enum LiveAdapterFactory {
     [
       CoreGraphicsDisplayAdapter(),
       CoreAudioAdapter(),
-      NetworkAdapter(),
-      InputPreferencesAdapter(),
     ]
   }
 }

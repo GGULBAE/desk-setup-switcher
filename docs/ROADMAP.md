@@ -1,5 +1,11 @@
 # Roadmap
 
+## Current scope — six display/sound settings (2026-09-07)
+
+The current profile contract is limited to main display, resolution, output device/volume, and input device/volume. Display/Sound retain stable width-driven navigation; every option is direct, with no Network or Advanced section. Capture queries only the two relevant adapters and never gates on Location permission. Saved refresh rates are ignored; resolution changes preserve the current rate or are skipped. Legacy excluded values remain round-trip compatible but are never applied, even in Force. See [minimal profile scope](MINIMAL-PROFILE-SCOPE-2026-09-07.md). Older milestones below describe historical adapter primitives, not additional current profile options.
+
+The canonical non-live `make verify` gate and 19-fixture offscreen matrix passed. The app was reinstalled and launched from `/Applications`; both profile files passed the value-preservation audit after retired-field normalization. Installed keyboard/VoiceOver and hardware mutation remain unverified.
+
 The roadmap is evidence-based. “Implemented” means source exists; “verified” names the evidence boundary; “done” additionally requires current documentation and the commit or push evidence required by that milestone's explicit contract. Dates are intentionally omitted because safety gates determine sequence.
 
 ## M0 — Repository and product contract (done)

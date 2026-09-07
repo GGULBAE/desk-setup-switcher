@@ -2,7 +2,7 @@
 
 A simple, local-only macOS menu-bar app for moving between desk setups without changing settings behind your back.
 
-Save selected display, audio, and network settings as a profile. When you want to use it, review the exact plan and decide what to apply.
+Save selected display and audio settings as a profile. When you want to use it, review the exact plan and decide what to apply.
 
 > [!IMPORTANT]
 > **Unreleased public beta:** there is no supported public download yet. The first supported build will be a free, Developer ID-unsigned DMG on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after the [public-beta completion gates](docs/COMPLETION-CRITERIA.md) pass. Its app carries an ad-hoc integrity signature but is not notarized, so macOS will require a one-time **Open Anyway** decision. Local and ordinary CI artifacts remain unsupported; do not redistribute them or create or push a `v*` tag.
@@ -19,10 +19,11 @@ Choose **Capture Current Settings** from the menu-bar app. Capture reads the cur
 
 ### 2. Edit
 
-Name the profile and keep only the display, audio, and network values that should change. Unsupported or unavailable values are not presented as safe, runnable choices.
-For supported output devices, Audio captures volume and the separate output-mute state (`소리 끔`) so either value can be included or excluded independently.
+Name the profile and choose **main display**, **resolution**, **output device/volume**, and **input device/volume**. These are the only captured and applied setting kinds; Network and Advanced are absent. Each setting has its own inclusion switch. Legacy excluded values remain dormant for compatibility.
 
-![Synthetic profile editor showing display settings and saved profiles](site/public/screenshots/edit.png)
+![Historical synthetic profile editor showing display settings and saved profiles](site/public/screenshots/edit.png)
+
+The packaged public-surface image above predates the current six-option scope; see the [current implementation and verification note](docs/MINIMAL-PROFILE-SCOPE-2026-09-07.md).
 
 ### 3. Review, then apply
 
@@ -35,11 +36,11 @@ The screenshots contain synthetic data from a non-mutating demo state. They show
 When a saved profile matches the current Mac, the menu-bar indicator shows its profile name on one horizontal line.
 The App Information page keeps its four project links centered as one compact group, with aligned icon and text columns.
 
-The current productization polish turns profile editing into one focused step at a time: **Display**, **Sound**, and **Network** stay in a stable numbered rail at normal window sizes and collapse into a segmented selector only when space or text size requires it. Display and Sound retain their compact basic cards; **Advanced settings** reveals resolution/refresh or input/mute controls without changing navigation. Network retains its connection and DHCP/manual IP cards. Color profiles are no longer captured, edited, or applied; legacy JSON values remain dormant. The rail/compact choice depends only on viewport width and accessibility text, not the selected section or disclosure state. Profiles no longer show a **Last application** history section. Validation selects the owning step and network connection before focusing an invalid field, and browsing connections preserves other saved connections. **App Settings** contains launch-at-login preferences, Wi-Fi capture access, and an on-demand Diagnostics action; registration details remain available inside **Login item details**. A three-profile tray now uses a content-sized viewport instead of the maximum-height bucket. Apply Preview leads with change/skip/review counts and compact before → after rows; omissions and validation stay in one disclosure unless they block Apply. The Beta warning, protected-change timer, refreshed-plan state, Escape behavior, and minimum-window scroll order remain explicit. These are deterministic synthetic/offscreen improvements only; installed accessibility, hardware mutation/rollback, and release-distribution evidence remain required.
+Profiles now capture, edit, and apply exactly six setting kinds: **main display**, **resolution**, **output device**, **output volume**, **input device**, and **input volume**. **Display** and **Sound** keep the stable numbered rail at normal widths; small windows and accessibility text use a segmented selector. All options are directly visible, with no Advanced or Network section. Resolution selection preserves the current refresh rate; an unavailable resolution/rate combination is skipped instead of changing the rate. Legacy mirroring, mute, ColorSync, network, and other excluded values round-trip dormant and cannot reach Apply, including Force. Profile snapshots query only Display and Audio and no longer needs Location access. Profiles do not show Last application history. **App Settings** contains launch-at-login preferences and on-demand Diagnostics; registration details remain in **Login item details**. A three-profile tray now uses a content-sized viewport instead of the maximum-height bucket. Apply Preview leads with change/skip/review counts and compact before → after rows; omissions and validation stay in one disclosure unless they block Apply. The Beta warning, protected-change timer, refreshed-plan state, Escape behavior, and minimum-window scroll order remain explicit. These are deterministic synthetic/offscreen improvements only; installed accessibility, hardware mutation/rollback, and release-distribution evidence remain required.
 
-The [profile UI correction](docs/PROFILE-UI-CORRECTION-2026-09-07.md) records restored basic/Advanced screens, stable navigation, and removal of color profile options.
+The [minimal profile scope](docs/MINIMAL-PROFILE-SCOPE-2026-09-07.md) supersedes the earlier basic/Advanced correction and records the six-option contract and verification boundary.
 
-The corrected 2026-09-07 build passed `make verify`, was reinstalled, and launched from `/Applications`. A value-free comparison verified profile preservation after applicability normalization; the old app and profile files remain backed up. This is installation/startup evidence, not installed keyboard or hardware verification; see the [correction and installation record](docs/PROFILE-UI-CORRECTION-2026-09-07.md).
+The minimal six-option 2026-09-07 build passed `make verify`, was reinstalled, and launched from `/Applications`. A value-free comparison verified both profile files preserve their values and identity after applicability normalization; the old app and profile files remain backed up. This is installation/startup evidence, not installed keyboard or hardware verification; see the [current verification and installation record](docs/MINIMAL-PROFILE-SCOPE-2026-09-07.md).
 
 ## Install
 
@@ -72,7 +73,7 @@ Exports can contain device labels, SSIDs, network ranges, stable identifiers, an
 
 Selecting an audio input device does not record audio and does not require microphone access.
 
-The planned initial public beta targets Apple Silicon and macOS 14 Sonoma, but exact-candidate Sonoma lifecycle evidence is still required before that becomes a support claim. The project builds an `x86_64` slice, but physical Intel installation and runtime testing have not passed, so Intel is not supported. The public DMG will be Developer ID-unsigned and not notarized; that packaging status is a deliberate cost-free distribution choice, not an Apple trust claim. Current user-facing profile work is limited to Display, Audio, and Network; no live setting mutation or hardware rollback is claimed as verified. See the [support matrix](docs/SUPPORT-MATRIX.md) for capability-level evidence.
+The planned initial public beta targets Apple Silicon and macOS 14 Sonoma, but exact-candidate Sonoma lifecycle evidence is still required before that becomes a support claim. The project builds an `x86_64` slice, but physical Intel installation and runtime testing have not passed, so Intel is not supported. The public DMG will be Developer ID-unsigned and not notarized; that packaging status is a deliberate cost-free distribution choice, not an Apple trust claim. Current user-facing profile work is limited to the six Display/Sound setting kinds; no live setting mutation or hardware rollback is claimed as verified. See the [support matrix](docs/SUPPORT-MATRIX.md) for capability-level evidence.
 
 ## Build from source
 

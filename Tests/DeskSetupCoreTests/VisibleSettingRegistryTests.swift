@@ -9,6 +9,7 @@ struct VisibleSettingRegistryTests {
   func completeContracts() {
     let contracts = VisibleSettingRegistry.contracts
 
+    #expect(contracts.count == 6)
     #expect(contracts.count == VisibleSettingKind.allCases.count)
     #expect(Set(contracts.map(\.kind)) == Set(VisibleSettingKind.allCases))
     #expect(Set(contracts.map(\.kind)).count == contracts.count)
@@ -26,7 +27,6 @@ struct VisibleSettingRegistryTests {
     let fields = VisibleSettingRegistry().fields(snapshots: supportedSnapshots)
     let counts = Dictionary(grouping: fields, by: { $0.contract.kind }).mapValues(\.count)
 
-    #expect(counts[.displayOutputMode] == 1)
     #expect(counts[.displayPrimary] == 1)
     #expect(counts[.displayMode] == 2)
     #expect(!fields.contains { $0.contract.snapshotKey == "display.colorProfile" })
@@ -34,8 +34,6 @@ struct VisibleSettingRegistryTests {
     #expect(counts[.audioDefaultOutput] == 1)
     #expect(counts[.audioInputVolume] == 1)
     #expect(counts[.audioOutputVolume] == 1)
-    #expect(counts[.audioOutputMute] == 1)
-    #expect(counts[.networkServiceIPv4] == 2)
     #expect(fields.allSatisfy { $0.contract.stages.contains(.rollback) })
   }
 
@@ -64,8 +62,6 @@ struct VisibleSettingRegistryTests {
 
     #expect(!kinds.contains(.audioInputVolume))
     #expect(!kinds.contains(.audioOutputVolume))
-    #expect(!kinds.contains(.audioOutputMute))
-    #expect(!kinds.contains(.networkServiceIPv4))
     #expect(kinds.contains(.audioDefaultInput))
     #expect(kinds.contains(.audioDefaultOutput))
   }
@@ -77,10 +73,10 @@ struct VisibleSettingRegistryTests {
     snapshots[2].networkIPv4RollbackCatalog?.append(try! #require(duplicate))
 
     let networkFields = VisibleSettingRegistry().fields(snapshots: snapshots).filter {
-      $0.contract.kind == .networkServiceIPv4
+      $0.contract.group == .network
     }
 
-    #expect(networkFields.count == 1)
+    #expect(networkFields.isEmpty)
   }
 
   private var supportedSnapshots: [AdapterSnapshot] {

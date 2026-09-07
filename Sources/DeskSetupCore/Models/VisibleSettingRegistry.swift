@@ -1,15 +1,12 @@
 import Foundation
 
 public enum VisibleSettingKind: String, CaseIterable, Codable, Hashable, Sendable {
-  case displayOutputMode
   case displayPrimary
   case displayMode
   case audioDefaultInput
   case audioDefaultOutput
   case audioInputVolume
   case audioOutputVolume
-  case audioOutputMute
-  case networkServiceIPv4
 }
 
 public enum VisibleSettingStage: String, CaseIterable, Codable, Hashable, Sendable {
@@ -83,17 +80,6 @@ public struct VisibleSettingField: Codable, Hashable, Sendable, Identifiable {
 public struct VisibleSettingRegistry: Sendable {
   public static let contracts: [VisibleSettingContract] = [
     .init(
-      kind: .displayOutputMode,
-      group: .display,
-      snapshotKey: "display.mirroring",
-      runtimeCatalogSource: "displayModeCatalog",
-      validationKey: "display.mirroring",
-      operationKeyPrefix: "display.atomic-configuration",
-      editorKind: .segmentedPicker,
-      localizationKey: "editor.display.outputMode",
-      accessibilityLabelKey: "editor.display.outputMode.accessibility"
-    ),
-    .init(
       kind: .displayPrimary,
       group: .display,
       snapshotKey: "display.primary",
@@ -159,28 +145,6 @@ public struct VisibleSettingRegistry: Sendable {
       localizationKey: "editor.audio.outputVolume",
       accessibilityLabelKey: "editor.audio.outputVolume.accessibility"
     ),
-    .init(
-      kind: .audioOutputMute,
-      group: .audio,
-      snapshotKey: "outputMute",
-      runtimeCatalogSource: "audio.outputMute.settable",
-      validationKey: "outputMute",
-      operationKeyPrefix: "outputMute",
-      editorKind: .toggle,
-      localizationKey: "editor.audio.outputMute",
-      accessibilityLabelKey: "editor.audio.outputMute.accessibility"
-    ),
-    .init(
-      kind: .networkServiceIPv4,
-      group: .network,
-      snapshotKey: "network.serviceIPv4",
-      runtimeCatalogSource: "networkIPv4RollbackCatalog",
-      validationKey: "network.serviceIPv4",
-      operationKeyPrefix: "network.serviceIPv4.",
-      editorKind: .ipv4Form,
-      localizationKey: "editor.network.serviceIPv4",
-      accessibilityLabelKey: "editor.network.serviceIPv4.accessibility"
-    ),
   ]
 
   public init() {}
@@ -194,9 +158,6 @@ public struct VisibleSettingRegistry: Sendable {
     if let display = snapshots.first(where: { $0.group == .display }) {
       let modes = display.displayModeCatalog ?? []
       if !modes.isEmpty, let contract = contractByKind[.displayPrimary] {
-        fields.append(.init(id: contract.kind.rawValue, contract: contract))
-      }
-      if modes.count >= 2, let contract = contractByKind[.displayOutputMode] {
         fields.append(.init(id: contract.kind.rawValue, contract: contract))
       }
       if let contract = contractByKind[.displayMode] {
@@ -229,21 +190,6 @@ public struct VisibleSettingRegistry: Sendable {
         if let contract = contractByKind[kind] {
           fields.append(.init(id: contract.kind.rawValue, contract: contract))
         }
-      }
-      if (audio.audioMuteControlCatalog ?? []).contains(where: {
-        $0.canApply && $0.currentValue != nil && $0.deviceUID != nil
-      }), let contract = contractByKind[.audioOutputMute] {
-        fields.append(.init(id: contract.kind.rawValue, contract: contract))
-      }
-    }
-
-    if let network = snapshots.first(where: { $0.group == .network }),
-      let contract = contractByKind[.networkServiceIPv4]
-    {
-      let catalog = network.networkIPv4RollbackCatalog ?? []
-      let counts = Dictionary(grouping: catalog, by: \.identity).mapValues(\.count)
-      for index in catalog.indices where counts[catalog[index].identity] == 1 {
-        fields.append(.init(id: "\(contract.kind.rawValue).\(index)", contract: contract))
       }
     }
 

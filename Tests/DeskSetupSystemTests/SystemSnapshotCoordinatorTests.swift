@@ -65,18 +65,22 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     XCTAssertEqual(result.groups.map(\.group), [.display, .audio, .network, .input])
     XCTAssertFalse(result.settings.display.isIncluded)
     XCTAssertTrue(result.settings.audio.isIncluded)
-    XCTAssertTrue(result.settings.network.isIncluded)
+    XCTAssertFalse(result.settings.network.isIncluded)
     XCTAssertFalse(result.settings.input.isIncluded)
     XCTAssertEqual(result.settings.display.value, displayValue)
-    XCTAssertEqual(result.settings.audio.value, audioValue)
-    XCTAssertEqual(result.settings.network.value.serviceIPv4, networkValue.serviceIPv4)
+    XCTAssertEqual(result.settings.audio.value.defaultInputUID, audioValue.defaultInputUID)
+    XCTAssertEqual(
+      result.settings.network.value.serviceIPv4.map(\.configuration.value),
+      networkValue.serviceIPv4.map(\.configuration.value))
+    XCTAssertTrue(
+      result.settings.network.value.serviceIPv4.allSatisfy { !$0.configuration.isIncluded })
     XCTAssertEqual(result.settings.network.value.wifiPower.value, true)
     XCTAssertFalse(result.settings.network.value.wifiPower.isIncluded)
     XCTAssertEqual(result.settings.input.value.pointerSpeed.value, 1.25)
     XCTAssertFalse(result.settings.input.value.pointerSpeed.isIncluded)
     XCTAssertFalse(result.settings.audio.value.outputVolume.isIncluded)
     XCTAssertEqual(result.settings.audio.value.outputVolume.value, 0.8)
-    XCTAssertTrue(result.settings.audio.value.outputMuted.isIncluded)
+    XCTAssertFalse(result.settings.audio.value.outputMuted.isIncluded)
     XCTAssertEqual(result.settings.audio.value.outputMuted.value, true)
     XCTAssertFalse(result.settings.network.value.wifiSSID.isIncluded)
     XCTAssertEqual(result.settings.network.value.wifiSSID.value, "Office")
@@ -175,8 +179,12 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     XCTAssertEqual(audioResult.unreadableItems.map(\.key), ["capability"])
     XCTAssertFalse(result.settings.audio.isIncluded)
     XCTAssertNil(result.settings.audio.value.defaultOutputUID.value)
-    XCTAssertTrue(result.settings.network.isIncluded)
-    XCTAssertEqual(result.settings.network.value.serviceIPv4, networkValue.serviceIPv4)
+    XCTAssertFalse(result.settings.network.isIncluded)
+    XCTAssertEqual(
+      result.settings.network.value.serviceIPv4.map(\.configuration.value),
+      networkValue.serviceIPv4.map(\.configuration.value))
+    XCTAssertTrue(
+      result.settings.network.value.serviceIPv4.allSatisfy { !$0.configuration.isIncluded })
     let mismatchedInvocations = await mismatchedAudio.recordedInvocations()
     let networkInvocations = await network.recordedInvocations()
     XCTAssertEqual(mismatchedInvocations, [.capability])
@@ -292,11 +300,9 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
   func testLiveFactoryReturnsEveryConcreteAdapterWithoutPerformingIO() {
     let adapters = LiveAdapterFactory.makeAdapters()
 
-    XCTAssertEqual(adapters.map(\.group), [.display, .audio, .network, .input])
+    XCTAssertEqual(adapters.map(\.group), [.display, .audio])
     XCTAssertTrue(adapters[0] is CoreGraphicsDisplayAdapter)
     XCTAssertTrue(adapters[1] is CoreAudioAdapter)
-    XCTAssertTrue(adapters[2] is NetworkAdapter)
-    XCTAssertTrue(adapters[3] is InputPreferencesAdapter)
   }
 
   private func makeAdapter(

@@ -148,7 +148,7 @@ public enum FriendlyValueFormatter {
   }
 
   public static func displayMode(_ mode: DisplayMode) -> String {
-    "\(mode.width) × \(mode.height) at \(decimal(mode.refreshRate)) Hz"
+    "\(mode.width) × \(mode.height)"
   }
 
   public static func percentage(_ value: Double) -> String {

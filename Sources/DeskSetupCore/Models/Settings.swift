@@ -125,6 +125,42 @@ public struct DisplayModeMatcher: Sendable {
   }
 }
 
+/// Profile modes describe resolution only. Refresh rate is selected from the current
+/// session, never from a saved profile. If that rate is unavailable at the requested
+/// resolution, the setting is skipped instead of silently changing another setting.
+public struct DisplayResolutionMatcher: Sendable {
+  public init() {}
+
+  public func matches(_ lhs: DisplayMode, _ rhs: DisplayMode) -> Bool {
+    lhs.width == rhs.width && lhs.height == rhs.height
+      && lhs.pixelWidth == rhs.pixelWidth && lhs.pixelHeight == rhs.pixelHeight
+  }
+
+  public func match<S: Sequence>(
+    _ desired: DisplayMode, among candidates: S
+  ) -> DisplayMode? where S.Element == DisplayMode {
+    candidates.first { matches($0, desired) }
+  }
+
+  public func mode(
+    for resolution: DisplayMode, preserving current: DisplayMode, among candidates: [DisplayMode]
+  ) -> DisplayMode? {
+    ([current] + candidates).first {
+      matches($0, resolution)
+        && abs($0.refreshRate - current.refreshRate) <= DisplayModeMatcher.refreshRateTolerance
+    }
+  }
+
+  public func resolutions(from modes: [DisplayMode]) -> [DisplayMode] {
+    var result: [DisplayMode] = []
+    for var mode in modes where match(mode, among: result) == nil {
+      mode.refreshRate = 0  // No refresh-rate preference is captured or edited.
+      result.append(mode)
+    }
+    return result
+  }
+}
+
 public enum DisplayMirroring: Codable, Hashable, Sendable {
   case extended
   case mirrors(DisplayIdentity)

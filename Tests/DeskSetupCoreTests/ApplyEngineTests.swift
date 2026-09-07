@@ -62,6 +62,37 @@ struct ApplyEngineTests {
     #expect(profile.settings.display.value.displays[0].colorProfile.isIncluded)
   }
 
+  @Test("legacy mirroring, mute, and network never reach adapters in either apply mode")
+  func retiredOptionsCannotApply() async throws {
+    let adapters = SettingGroup.allCases.map { MockSystemSettingsAdapter(group: $0) }
+    let engine = ApplyEngine(registry: try AdapterRegistry(adapters))
+    var profile = makeProfile(including: [.display, .network])
+    profile.settings.display.value.displays[0].isPrimary.isIncluded = false
+    profile.settings.display.value.displays[0].mirroring = .init(value: .extended)
+    profile.settings.audio.value.outputMuted = .init(value: true)
+    let original = profile
+    for mode in [ApplyMode.normal, .force] {
+      let result = await engine.apply(profile: profile, mode: mode)
+      #expect(!result.didExecute)
+      #expect(result.preparation.includedGroups.isEmpty)
+      #expect(result.preparation.operations.isEmpty)
+    }
+    for adapter in adapters { #expect(await adapter.recordedInvocations().isEmpty) }
+    #expect(profile == original)
+    profile.createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+    profile.updatedAt = profile.createdAt
+    let codec = ProfileJSONCodec()
+    let imported = try codec.decode(codec.encode(.init(profiles: [profile])))
+    let normalized = try #require(imported.document.profiles.first)
+    #expect(normalized.settings.display.value.displays[0].mirroring.value == .extended)
+    #expect(normalized.settings.audio.value.outputMuted.value == true)
+    #expect(normalized.settings.network.value.serviceIPv4[0].configuration.value == .dhcp)
+    #expect(!normalized.settings.display.isIncluded)
+    #expect(!normalized.settings.audio.isIncluded)
+    #expect(!normalized.settings.network.isIncluded)
+    #expect(!ProfileApplicabilityNormalizer().normalize(normalized).settings.network.isIncluded)
+  }
+
   @Test("a group toggle without included leaf settings is not applicable")
   func emptyIncludedGroupIsRejected() async {
     var settings = ProfileSettings()
@@ -279,15 +310,15 @@ struct ApplyEngineTests {
   @Test("force mode rejects a zero-operation plan")
   func forceRejectsZeroOperations() async throws {
     let adapter = MockSystemSettingsAdapter(
-      group: .network,
+      group: .audio,
       plan: AdapterPlan(
-        group: .network,
+        group: .audio,
         omissions: [
           PlanOmission(
-            group: .network,
-            key: "wifiSSID",
+            group: .audio,
+            key: "defaultOutput",
             status: .skipped,
-            reason: "The saved network is unavailable."
+            reason: "The saved output device is unavailable."
           )
         ]
       )
@@ -295,7 +326,7 @@ struct ApplyEngineTests {
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
 
     let preparation = await engine.prepare(
-      profile: makeProfile(including: [.network]),
+      profile: makeProfile(including: [.audio]),
       mode: .force
     )
 
@@ -357,7 +388,6 @@ struct ApplyEngineTests {
         "display.low",
         "audio.moderate",
         "display.high",
-        "network.low",
       ])
     #expect(await inputAdapter.recordedInvocations().isEmpty)
   }

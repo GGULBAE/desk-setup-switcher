@@ -1220,8 +1220,8 @@
 "editor.display.outputMode.accessibility" = "Choose extended desktop or mirroring";
 "editor.display.primary" = "Primary display";
 "editor.display.primary.accessibility" = "Choose the primary display";
-"editor.display.mode" = "Display mode";
-"editor.display.mode.accessibility" = "Choose resolution and refresh rate";
+"editor.display.mode" = "Resolution";
+"editor.display.mode.accessibility" = "Choose resolution (preserves current refresh rate)";
 "editor.display.colorProfile" = "ColorSync ICC profile";
 "editor.display.colorProfile.accessibility" = "Choose the display color profile";
 "editor.audio.defaultInput" = "Default input";
@@ -1284,3 +1284,14 @@
 "Wi-Fi capture" = "Wi-Fi capture";
 "Open Diagnostics…" = "Open Diagnostics…";
 "Start the menu-bar app when you sign in to your Mac" = "Start the menu-bar app when you sign in to your Mac";
+
+/* Minimal display and sound profile scope. */
+"Resolution" = "Resolution";
+"Main display and resolution" = "Main display and resolution";
+"Input, output, and volume" = "Input, output, and volume";
+"Choose a supported resolution; the current refresh rate is preserved" = "Choose a supported resolution; the current refresh rate is preserved";
+"The requested resolution is unavailable at the current refresh rate." = "The requested resolution is unavailable at the current refresh rate.";
+"Display settings" = "Display settings";
+"Sound settings" = "Sound settings";
+"Choose the main display and resolution for this profile." = "Choose the main display and resolution for this profile.";
+"Choose input and output devices and their volumes." = "Choose input and output devices and their volumes.";

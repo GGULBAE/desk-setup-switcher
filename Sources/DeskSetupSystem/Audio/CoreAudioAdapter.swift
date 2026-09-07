@@ -49,15 +49,8 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       devices: devices,
       items: &items
     )
-    let systemOutputUID = readDefaultDevice(
-      role: .systemOutput,
-      devices: devices,
-      items: &items
-    )
-
     var inputVolume = SettingOption<Double?>(isIncluded: false, value: nil)
     var outputVolume = SettingOption<Double?>(isIncluded: false, value: nil)
-    var outputMuted = SettingOption<Bool?>(isIncluded: false, value: nil)
     if let defaultInputUID {
       inputVolume = readInputVolume(deviceUID: defaultInputUID, items: &items)
     } else {
@@ -72,7 +65,6 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
     }
     if let defaultOutputUID {
       outputVolume = readVolume(deviceUID: defaultOutputUID, items: &items)
-      outputMuted = readMute(deviceUID: defaultOutputUID, items: &items)
     } else {
       items.append(
         SnapshotItem(
@@ -82,14 +74,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
           detail: "No default output device is available."
         )
       )
-      items.append(
-        SnapshotItem(
-          key: "outputMute",
-          label: "Output mute",
-          state: .unreadable,
-          detail: "No default output device is available."
-        )
-      )
+
     }
 
     let settings = AudioProfileSettings(
@@ -101,13 +86,10 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
         isIncluded: defaultOutputUID != nil,
         value: defaultOutputUID
       ),
-      systemOutputUID: SettingOption(
-        isIncluded: systemOutputUID != nil,
-        value: systemOutputUID
-      ),
+      systemOutputUID: SettingOption(isIncluded: false, value: nil),
       inputVolume: inputVolume,
       outputVolume: outputVolume,
-      outputMuted: outputMuted
+      outputMuted: SettingOption(isIncluded: false, value: nil)
     )
     return AdapterSnapshot(
       group: group,
@@ -122,8 +104,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
           supportsOutput: $0.supportsOutput
         )
       },
-      audioVolumeControlCatalog: volumeControlCatalog(for: devices),
-      audioMuteControlCatalog: muteControlCatalog(for: devices)
+      audioVolumeControlCatalog: volumeControlCatalog(for: devices)
     )
   }
 

@@ -111,25 +111,25 @@ struct MockIntegrationTests {
 
   @Test("force mode omits a fatal item but applies safe items from the same group")
   func forceModeFiltersFatalItem() async throws {
-    let unsafe = PlannedOperation(group: .network, key: "staticIP", summary: "Static IP")
-    let safe = PlannedOperation(group: .network, key: "wifiPower", summary: "Wi-Fi power")
+    let unsafe = PlannedOperation(group: .audio, key: "inputVolume", summary: "Input volume")
+    let safe = PlannedOperation(group: .audio, key: "defaultOutput", summary: "Output device")
     let adapter = MockSystemSettingsAdapter(
-      group: .network,
+      group: .audio,
       validationIssues: [
         ValidationIssue(
-          group: .network,
+          group: .audio,
           key: unsafe.key,
           severity: .error,
           isFatal: true,
           message: "Administrative authorization is unavailable."
         )
       ],
-      plan: AdapterPlan(group: .network, operations: [unsafe, safe])
+      plan: AdapterPlan(group: .audio, operations: [unsafe, safe])
     )
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
 
     let result = await engine.apply(
-      profile: makeIntegrationProfile(including: [.network]),
+      profile: makeIntegrationProfile(including: [.audio]),
       mode: .force
     )
 
@@ -144,16 +144,16 @@ struct MockIntegrationTests {
   @Test("a fatal operation with backup state is rolled back even when apply reports failure")
   func fatalAttemptIsConservativelyRolledBack() async throws {
     let fatal = PlannedOperation(
-      group: .network,
-      key: "association",
-      summary: "Join network",
+      group: .audio,
+      key: "outputVolume",
+      summary: "Output volume",
       risk: .high,
       isFatalOnFailure: true,
       rollbackPayload: Data([0x01])
     )
     let adapter = MockSystemSettingsAdapter(
-      group: .network,
-      plan: AdapterPlan(group: .network, operations: [fatal]),
+      group: .audio,
+      plan: AdapterPlan(group: .audio, operations: [fatal]),
       applyResults: [
         fatal.id: OperationResult(
           operationID: fatal.id,
@@ -165,13 +165,13 @@ struct MockIntegrationTests {
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
 
     let result = await engine.apply(
-      profile: makeIntegrationProfile(including: [.network]),
+      profile: makeIntegrationProfile(including: [.audio]),
       mode: .normal
     )
 
     #expect(result.status == .failed)
     #expect(result.safetyConfirmationID == nil)
-    #expect(result.rollbackResults.map(\.key) == ["association"])
+    #expect(result.rollbackResults.map(\.key) == ["outputVolume"])
     #expect(result.rollbackResults.map(\.status) == [.rolledBack])
     #expect(
       await adapter.recordedInvocations().suffix(2) == [

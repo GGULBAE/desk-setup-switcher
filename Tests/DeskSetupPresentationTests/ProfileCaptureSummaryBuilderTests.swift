@@ -47,7 +47,7 @@ struct ProfileCaptureSummaryBuilderTests {
 
     #expect(summary.status == .complete)
     #expect(!summary.items.contains { $0.group == .network })
-    #expect(summary.applicableCount == 3)
+    #expect(summary.applicableCount == 2)
     #expect(!summary.items.contains { $0.key.contains("colorProfile") })
     #expect(summary.excludedCount == 0)
     #expect(summary.unreadableCount == 0)
@@ -76,7 +76,7 @@ struct ProfileCaptureSummaryBuilderTests {
     #expect(!summary.canCreateProfile)
   }
 
-  @Test("captured output mute is reported as an applicable audio setting")
+  @Test("legacy output mute cannot be captured as an applicable setting")
   func capturedOutputMuteIsApplicable() {
     let settings = ProfileSettings(
       audio: .init(
@@ -89,12 +89,8 @@ struct ProfileCaptureSummaryBuilderTests {
       evidence: []
     )
 
-    #expect(summary.status == .complete)
-    #expect(
-      summary.items == [
-        .init(group: .audio, key: "outputMute", disposition: .savedApplicable)
-      ]
-    )
+    #expect(summary.status == .failure)
+    #expect(summary.items.isEmpty)
   }
 
   @Test("unreadable and unsupported evidence is omitted from the user-facing result")

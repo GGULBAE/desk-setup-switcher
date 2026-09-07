@@ -32,9 +32,6 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
 
   public func snapshot() async throws -> AdapterSnapshot {
     let displays = try await systemAPI.activeDisplays()
-    let displayBySessionID = Dictionary(
-      uniqueKeysWithValues: displays.map { ($0.sessionID, $0) }
-    )
     var targets: [DisplayTargetSettings] = []
     var items: [SnapshotItem] = []
 
@@ -44,40 +41,38 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
         height: display.bounds.height,
         refreshRate: 0
       )
-      let mirrorSource = display.mirrorSourceSessionID.flatMap {
-        displayBySessionID[$0]?.identity
-      }
-      let mirrorWasReadable = display.mirrorSourceSessionID == nil || mirrorSource != nil
-      let mirroring: DisplayMirroring = mirrorSource.map(DisplayMirroring.mirrors) ?? .extended
       let target = DisplayTargetSettings(
         id: display.identity.uuid ?? UUID(),
         identity: display.identity,
         isPrimary: SettingOption(value: display.isMain),
         origin: SettingOption(
-          value: DisplayPoint(x: display.bounds.x, y: display.bounds.y)
+          isIncluded: false,
+          value: DisplayPoint(x: 0, y: 0)
         ),
         mirroring: SettingOption(
-          isIncluded: mirrorWasReadable,
-          value: mirroring
+          isIncluded: false,
+          value: .extended
         ),
         mode: SettingOption(
           isIncluded: display.currentMode != nil,
-          value: display.currentMode ?? fallbackMode
+          value: DisplayResolutionMatcher().resolutions(
+            from: [display.currentMode ?? fallbackMode]
+          )[0]
         ),
         // Color profiles are no longer captured as profile options.
         colorProfile: SettingOption(isIncluded: false, value: nil),
         rotationDegrees: SettingOption(
           isIncluded: false,
-          value: display.rotationDegrees
+          value: 0
         ),
         isActive: SettingOption(
           isIncluded: false,
-          value: display.isActive
+          value: false
         )
       )
       targets.append(target)
 
-      let readable = display.currentMode != nil && mirrorWasReadable
+      let readable = display.currentMode != nil
       let label =
         display.identity.productName
         ?? (display.identity.isBuiltIn ? "Built-in Display" : "External Display")
@@ -88,7 +83,7 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
           label: label,
           state: readable ? .storable : .unreadable,
           detail:
-            "Bounds \(display.bounds.width)×\(display.bounds.height) at (\(display.bounds.x), \(display.bounds.y))."
+            "Resolution \(display.bounds.width)×\(display.bounds.height)."
         )
       )
 
@@ -704,16 +699,16 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
       }
 
       if target.mode.isIncluded {
-        let candidates = display.supportedModes + [display.currentMode].compactMap { $0 }
-        if let supportedMode = DisplayModeMatcher().match(
-          target.mode.value,
-          among: candidates
-        ) {
+        if let currentMode = display.currentMode,
+          let supportedMode = DisplayResolutionMatcher().mode(
+            for: target.mode.value, preserving: currentMode, among: display.supportedModes
+          )
+        {
           finalTargets[configurationIndex].mode = supportedMode
         } else {
           record(
             key: "\(keyPrefix).mode",
-            message: "The requested logical size, pixel size, or refresh rate is unsupported.",
+            message: "The requested resolution is unavailable at the current refresh rate.",
             isFatal: false,
             status: .unsupported,
             in: &analysis

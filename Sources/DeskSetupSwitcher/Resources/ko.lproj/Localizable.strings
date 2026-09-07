@@ -1220,8 +1220,8 @@
 "editor.display.outputMode.accessibility" = "확장 데스크탑 또는 미러링 선택";
 "editor.display.primary" = "주 디스플레이";
 "editor.display.primary.accessibility" = "주 디스플레이 선택";
-"editor.display.mode" = "디스플레이 모드";
-"editor.display.mode.accessibility" = "해상도 및 재생률 선택";
+"editor.display.mode" = "해상도";
+"editor.display.mode.accessibility" = "해상도 선택 (현재 주사율 유지)";
 "editor.display.colorProfile" = "ColorSync ICC 프로필";
 "editor.display.colorProfile.accessibility" = "디스플레이 색상 프로필 선택";
 "editor.audio.defaultInput" = "기본 입력";
@@ -1284,3 +1284,14 @@
 "Wi-Fi capture" = "Wi-Fi 캡처";
 "Open Diagnostics…" = "진단 열기…";
 "Start the menu-bar app when you sign in to your Mac" = "Mac에 로그인하면 메뉴 막대 앱을 실행합니다";
+
+/* Minimal display and sound profile scope. */
+"Resolution" = "해상도";
+"Main display and resolution" = "주 디스플레이와 해상도";
+"Input, output, and volume" = "입출력 기기와 음량";
+"Choose a supported resolution; the current refresh rate is preserved" = "지원되는 해상도를 선택하세요. 현재 주사율은 유지됩니다.";
+"The requested resolution is unavailable at the current refresh rate." = "요청한 해상도는 현재 주사율에서 사용할 수 없습니다.";
+"Display settings" = "디스플레이 설정";
+"Sound settings" = "소리 설정";
+"Choose the main display and resolution for this profile." = "이 프로필의 주 디스플레이와 해상도를 선택하세요.";
+"Choose input and output devices and their volumes." = "입출력 기기와 각각의 음량을 선택하세요.";

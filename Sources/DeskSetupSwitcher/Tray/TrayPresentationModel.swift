@@ -327,16 +327,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     if profileEditor.isDirty || profileEditor.session.pendingSelection != nil {
       return .openPermissionWorkflow(.captureDirtyDraft)
     }
-    switch locationPermission.authorizationStatus {
-    case .notDetermined:
-      return .openPermissionWorkflow(.captureExplanation)
-    case .denied, .restricted:
-      return .openPermissionWorkflow(.captureDenied)
-    case .authorizedAlways, .authorized:
-      return .capture
-    @unknown default:
-      return .capture
-    }
+    return .capture
   }
 
   var openDraftIsValid: Bool {

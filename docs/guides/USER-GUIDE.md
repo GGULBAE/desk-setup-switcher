@@ -2,7 +2,7 @@
 
 [한국어](USER-GUIDE.ko.md) · [Guide index](README.md)
 
-Desk Setup Switcher saves selected display, audio, and network settings as local profiles. Nothing is applied automatically. The normal flow is **Capture → Edit → Review & Apply**.
+Desk Setup Switcher saves selected display and audio settings as local profiles. Nothing is applied automatically. The normal flow is **Capture → Edit → Review & Apply**.
 
 ## Before you install
 
@@ -34,7 +34,7 @@ Keyboard behavior, accessibility names and values, and non-color state cues are 
 ## One-minute workflow
 
 1. **Capture:** Open the menu-bar item and choose **Capture Current Settings**. Capture reads the Mac and creates a new reviewable profile; it does not apply a change.
-2. **Edit:** Choose **Edit Profile**, name the profile, select only the settings you want under **Display**, **Audio**, and **Network**, then save.
+2. **Edit:** Choose **Edit Profile**, name the profile, select only the settings you want under **Display** and **Sound**, then save.
 3. **Review & Apply:** Choose **Review Changes…** or **Review Available Changes…**. Check every change and omission. Nothing changes until you explicitly choose **Apply Profile** or **Apply Available Settings**.
 
 There is no timer, condition, or background rule that applies a profile automatically.
@@ -43,24 +43,16 @@ There is no timer, condition, or background rule that applies a profile automati
 
 Open the menu-bar item and choose **Capture Current Settings**. On an empty first run, this is the single main action in the body. When profiles already exist, Capture is in the header.
 
-Capture records readable snapshot values in the local profile for format compatibility. The editor presents a value as runnable only when the current app can carry it through capture, validation, planning, apply, verification, and rollback. Unsupported or unreadable values do not become runnable; dormant or snapshot-only values can remain stored with inclusion off and can therefore appear in exported JSON.
-
-macOS may require Location access to reveal the current Wi-Fi network name. The app explains this before requesting permission. You can:
-
-- choose **Allow Location and Capture**;
-- choose **Capture Without Wi-Fi**; or
-- open macOS System Settings and return to Capture afterward.
-
-Declining Location does not block unrelated display, audio, or wired-network values. The permission is used only so macOS can disclose the current Wi-Fi name; Desk Setup Switcher does not request coordinates or upload location data.
+Capture stores only the main display, resolutions, output device/volume, and input device/volume when readable and applicable. It does not capture network settings or require Location access. Older imported values outside this scope remain stored with inclusion off for compatibility and may appear in exported JSON.
 
 ## 2. Edit
 
 Choose **Edit Profile** on a profile to open **Settings → Profiles**.
 
 - Give the profile a recognizable name and icon.
-- Work through the stable numbered **Display**, **Sound**, and **Network** steps. At the minimum window size or an accessibility text size, the same steps become a compact segmented selector.
-- Choose screen arrangement in **Display** and output/volume in **Sound**. Expand **Advanced settings** for per-display resolution/refresh or audio input/mute. **Network** keeps its connection and DHCP/manual IP cards. Opening details does not move the section selector. Color profiles are no longer captured or editable, and legacy values are excluded from Apply. Use the inclusion switches to choose what the profile applies.
-- Network has one connection selector. Browsing another connection preserves all saved inclusion choices; its **Apply with profile** switch changes only the selected connection. If a value is invalid, Save selects the owning step and connection before moving focus to it.
+- Work through the stable numbered **Display** and **Sound** steps. At the minimum window size or an accessibility text size, the same steps become a compact segmented selector.
+- **Display** has only **Main display** and per-display **Resolution**. **Sound** has **Output device**, **Output volume**, **Input device**, and **Input volume**. All options are shown directly; there is no Advanced or Network section. Inclusion switches determine what Apply changes. Resolution keeps the current refresh rate, or is skipped when that combination is unavailable. Capture reads only these settings and does not need Location access. Old mirroring, mute, color, and network values remain dormant and are never applied.
+- If a value is invalid, Save selects the owning step before focusing it.
 - The editor contains profile settings only. Itemized application results remain available after Apply.
 - Save the profile. `⌘S` saves a valid dirty draft.
 
@@ -102,8 +94,7 @@ Desk Setup Switcher is local-only. It has no account, cloud sync, app-owned serv
 
 | Access | Why it may appear | If declined |
 | --- | --- | --- |
-| Location | macOS can require it to reveal the current Wi-Fi name during Capture | Capture without Wi-Fi; unrelated capabilities continue |
-| macOS authorization for a protected network change | An included service-specific IPv4 change can require authorized SystemConfiguration access | Cancel or denial leaves the item failed/not applied |
+| Location | Not needed for the current Display/Sound Capture flow | Capture is available regardless of Location status |
 | Microphone | Not used; choosing an audio input device does not record audio | No microphone permission should be needed |
 
 Profiles and diagnostics stay under `~/Library/Application Support/Desk Setup Switcher/`. Imports are read from, and exports are written to, locations you select. The app does not store Wi-Fi passwords in profiles or logs; saved-network credentials remain managed by macOS.
@@ -148,7 +139,7 @@ Use [SUPPORT.md](../../SUPPORT.md) for public support and bug-report routes. For
 | Symptom | What to do |
 | --- | --- |
 | The app opened but no window appeared | Look for the menu-bar icon. The app is menu-bar-only by design. |
-| The Wi-Fi name was not captured | Allow Location after the explanation, or explicitly use **Capture Without Wi-Fi**. After changing permission in System Settings, return and capture again. |
+| Network settings are missing | Expected: profiles now capture and apply only the six Display/Sound setting kinds. |
 | A profile is Partial or Unavailable | Choose **Edit Profile**, inspect warning rows, reconnect the required device/service, or exclude an unavailable setting. Use **Review Available Changes…** only when every omission is intentional. |
 | Review shows no operation | The profile already matches the current readable state, or no included setting can be safely applied. Nothing needs to run. |
 | Review refreshes instead of applying | The profile, capability, current value, or rollback evidence changed after the first review. This is a safety stop; inspect the new plan. |

@@ -10,8 +10,7 @@ struct VisibleSettingEndToEndInvariantTests {
   func everyProjectedFieldHasAnExecutableVerticalSlice() async throws {
     let display = try await makeDisplaySlice()
     let audio = try await makeAudioSlice()
-    let network = try await makeNetworkSlice()
-    let slices = [display, audio, network]
+    let slices = [display, audio]
     let snapshots = slices.map(\.snapshot)
     let fields = VisibleSettingRegistry().fields(snapshots: snapshots)
 
@@ -165,8 +164,7 @@ struct VisibleSettingEndToEndInvariantTests {
       defaultInputUID: .init(value: "input-B"),
       defaultOutputUID: .init(value: "output-B"),
       inputVolume: .init(value: 0.7),
-      outputVolume: .init(value: 0.8),
-      outputMuted: .init(value: true)
+      outputVolume: .init(value: 0.8)
     )
     let payload = SettingsPayload.audio(desired)
     let issues = await adapter.validate(payload, against: snapshot)

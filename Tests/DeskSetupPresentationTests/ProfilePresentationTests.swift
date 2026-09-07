@@ -46,9 +46,8 @@ struct ProfilePresentationTests {
 
     let summaries = ProfilePresentationBuilder().summaries(for: profile)
 
-    #expect(summaries.map(\.group) == [.display, .audio, .network])
-    #expect(summaries[2].items.map(\.kind) == [.networkServiceIPv4])
-    #expect(!summaries[2].summaryText.contains("Excluded Network"))
+    #expect(summaries.map(\.group) == [.display, .audio])
+    #expect(!summaries.contains { $0.group == .network })
   }
 
   @Test("display summary favors product details and hides identifiers")
@@ -72,7 +71,7 @@ struct ProfilePresentationTests {
 
     #expect(summary?.items.map(\.kind) == [.display, .displayMode, .displayRole])
     #expect(summary?.summaryText.contains("Synthetic Studio Panel") == true)
-    #expect(summary?.summaryText.contains("2560 × 1440 at 60 Hz") == true)
+    #expect(summary?.summaryText.contains("2560 × 1440") == true)
     #expect(summary?.summaryText.contains(identifier.uuidString) == false)
     #expect(summary?.summaryText.contains("303") == false)
     #expect(summary?.technicalDetails.contains { $0.value == identifier.uuidString } == true)
@@ -99,13 +98,13 @@ struct ProfilePresentationTests {
 
     #expect(
       summary?.items.map(\.kind) == [
-        .defaultInput, .defaultOutput, .outputVolume, .outputMute,
+        .defaultInput, .defaultOutput, .outputVolume,
       ]
     )
     #expect(summary?.summaryText.contains("Synthetic Speakers") == true)
     #expect(summary?.summaryText.contains("Selected input device") == true)
     #expect(summary?.summaryText.contains("70%") == true)
-    #expect(summary?.summaryText.contains("Off") == true)
+    #expect(summary?.summaryText.contains("Off") == false)
     #expect(summary?.summaryText.contains("synthetic-output-uid") == false)
     #expect(summary?.summaryText.contains("synthetic-input-uid") == false)
     #expect(
@@ -173,10 +172,10 @@ struct ProfilePresentationTests {
 
     #expect(
       audio?.items.map(\.value.primaryText) == [
-        "No device saved", "Value unavailable", "Value unavailable",
+        "No device saved", "Value unavailable",
       ]
     )
-    #expect(network?.items.map(\.value.primaryText) == ["Value unavailable"])
+    #expect(network == nil)
   }
 
   @Test("service IPv4 values format deterministically while input remains dormant")
@@ -221,9 +220,7 @@ struct ProfilePresentationTests {
     let network = builder.summary(for: .network, in: settings)
     let input = builder.summary(for: .input, in: settings)
 
-    #expect(network?.items.map(\.kind) == [.networkServiceIPv4])
-    #expect(network?.items[0].value.primaryText == "Manual — 192.0.2.20")
-    #expect(network?.items[0].value.secondaryText?.contains("255.255.255.0") == true)
+    #expect(network == nil)
     #expect(input == nil)
   }
 

@@ -32,13 +32,18 @@ public struct ProfileApplicabilityNormalizer: Sendable {
     for index in normalized.display.value.displays.indices {
       // Retired from profile capture/edit/apply. Keep legacy values dormant for JSON compatibility.
       normalized.display.value.displays[index].colorProfile.isIncluded = false
+      normalized.display.value.displays[index].mirroring.isIncluded = false
       normalized.display.value.displays[index].origin.isIncluded = false
       normalized.display.value.displays[index].rotationDegrees.isIncluded = false
       normalized.display.value.displays[index].isActive.isIncluded = false
     }
 
     normalized.audio.value.systemOutputUID.isIncluded = false
+    normalized.audio.value.outputMuted.isIncluded = false
 
+    for index in normalized.network.value.serviceIPv4.indices {
+      normalized.network.value.serviceIPv4[index].configuration.isIncluded = false
+    }
     normalized.network.value.wifiPower.isIncluded = false
     normalized.network.value.wifiSSID.isIncluded = false
     normalized.network.value.ipv4.isIncluded = false

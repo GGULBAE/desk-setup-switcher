@@ -89,7 +89,7 @@ struct SafetyRollbackTests {
       ])
   }
 
-  @Test("network applies last and is the first protected operation rolled back")
+  @Test("retired network is never queried while display retains safety rollback")
   func networkIsLastAppliedAndFirstRolledBack() async throws {
     let audio = PlannedOperation(group: .audio, key: "audio", summary: "Audio")
     let display = PlannedOperation(
@@ -128,19 +128,15 @@ struct SafetyRollbackTests {
     let confirmationID = try #require(result.safetyConfirmationID)
     let reverted = await engine.revertSafetyRollback(confirmationID)
 
-    #expect(result.itemResults.map(\.key) == ["audio", "display", "network"])
-    #expect(reverted.rollbackResults.map(\.key) == ["network", "display"])
+    #expect(result.itemResults.map(\.key) == ["audio", "display"])
+    #expect(reverted.rollbackResults.map(\.key) == ["display"])
     #expect(await audioAdapter.recordedInvocations().last == .apply(audio.id))
     #expect(
       await displayAdapter.recordedInvocations().suffix(2) == [
         .apply(display.id),
         .rollback(display.id),
       ])
-    #expect(
-      await networkAdapter.recordedInvocations().suffix(2) == [
-        .apply(network.id),
-        .rollback(network.id),
-      ])
+    #expect(await networkAdapter.recordedInvocations().isEmpty)
   }
 
   @Test("rollback failure is reported and still consumes the token")

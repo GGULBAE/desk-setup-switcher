@@ -102,9 +102,10 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(normalized.settings.audio.isIncluded)
     #expect(normalized.settings.audio.value.defaultInputUID.isIncluded)
     #expect(!normalized.settings.audio.value.systemOutputUID.isIncluded)
-    #expect(normalized.settings.audio.value.outputMuted.isIncluded)
+    #expect(!normalized.settings.audio.value.outputMuted.isIncluded)
+    #expect(normalized.settings.audio.value.outputMuted.value == true)
     #expect(normalized.settings.network.value.serviceIPv4[0].configuration.value == ipv4)
-    #expect(normalized.settings.network.value.serviceIPv4[0].configuration.isIncluded)
+    #expect(!normalized.settings.network.value.serviceIPv4[0].configuration.isIncluded)
     #expect(normalized.settings.network.value.ipv4.value == ipv4)
     #expect(!normalized.settings.network.value.ipv4.isIncluded)
     #expect(normalized.settings.network.value.dnsServers.value == ["192.0.2.53", "2001:db8::53"])
@@ -113,7 +114,7 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(!normalized.settings.network.value.webProxy.isIncluded)
     #expect(normalized.settings.network.value.secureWebProxy.value == secureProxy)
     #expect(!normalized.settings.network.value.secureWebProxy.isIncluded)
-    #expect(normalized.settings.network.isIncluded)
+    #expect(!normalized.settings.network.isIncluded)
     #expect(!normalized.settings.input.isIncluded)
     #expect(normalized.settings.input.value.pointerSpeed.value == 4.5)
     #expect(!normalized.settings.input.value.pointerSpeed.isIncluded)
@@ -156,17 +157,17 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(roundTrip.document == imported.document)
   }
 
-  @Test("output mute remains applicable and keeps the audio group included")
+  @Test("legacy output mute stays dormant without deleting its value")
   func outputMuteRemainsApplicable() {
     var settings = ProfileSettings()
     settings.audio.value.outputMuted = .init(value: true)
 
     let normalized = normalizer.normalize(settings)
 
-    #expect(normalized.audio.isIncluded)
-    #expect(normalized.audio.value.outputMuted.isIncluded)
+    #expect(!normalized.audio.isIncluded)
+    #expect(!normalized.audio.value.outputMuted.isIncluded)
     #expect(normalized.audio.value.outputMuted.value == true)
-    #expect(normalized.payload(for: .audio) == .audio(normalized.audio.value))
+    #expect(normalized.payload(for: .audio) == nil)
   }
 
   @Test("groups with no applicable leaves are disabled without deleting values")

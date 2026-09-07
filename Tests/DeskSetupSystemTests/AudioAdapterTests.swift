@@ -31,13 +31,14 @@ final class AudioAdapterTests: XCTestCase {
     }
     XCTAssertEqual(settings.defaultInputUID.value, "input-A")
     XCTAssertEqual(settings.defaultOutputUID.value, "output-A")
-    XCTAssertEqual(settings.systemOutputUID.value, "output-A")
+    XCTAssertNil(settings.systemOutputUID.value)
+    XCTAssertFalse(settings.systemOutputUID.isIncluded)
     XCTAssertEqual(settings.inputVolume.value, 0.35)
     XCTAssertEqual(settings.outputVolume.value, 0.25)
-    XCTAssertEqual(settings.outputMuted.value, false)
+    XCTAssertNil(settings.outputMuted.value)
     XCTAssertTrue(settings.inputVolume.isIncluded)
     XCTAssertTrue(settings.outputVolume.isIncluded)
-    XCTAssertTrue(settings.outputMuted.isIncluded)
+    XCTAssertFalse(settings.outputMuted.isIncluded)
     let volumeCatalog = try XCTUnwrap(snapshot.audioVolumeControlCatalog)
     XCTAssertEqual(volumeCatalog.count, 4)
     XCTAssertTrue(
@@ -52,16 +53,41 @@ final class AudioAdapterTests: XCTestCase {
           && $0.canApply
       }
     )
-    let muteCatalog = try XCTUnwrap(snapshot.audioMuteControlCatalog)
-    XCTAssertEqual(muteCatalog.count, 2)
-    XCTAssertTrue(
-      muteCatalog.contains {
-        $0.deviceUID == "output-B" && $0.currentValue == false && $0.canApply
-      }
-    )
+    XCTAssertNil(snapshot.audioMuteControlCatalog)
+    XCTAssertFalse(snapshot.items.contains { ["systemOutput", "outputMute"].contains($0.key) })
 
     let capability = await adapter.capability()
     XCTAssertEqual(capability.state, .supported)
+  }
+
+  func testProfileApplyUsesOnlyFourAudioFieldsEvenWithLegacyMuteAndSystemOutput() async throws {
+    let api = makeAPI()
+    let adapter = makeAdapter(api: api)
+    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+    let profile = DeskProfile(
+      name: "Synthetic four audio options",
+      settings: .init(
+        audio: .init(
+          value: .init(
+            defaultInputUID: .init(value: "input-B"),
+            defaultOutputUID: .init(value: "output-B"),
+            systemOutputUID: .init(value: "output-B"),
+            inputVolume: .init(value: 0.65),
+            outputVolume: .init(value: 0.75),
+            outputMuted: .init(value: true)
+          )))
+    )
+    let result = await engine.apply(profile: profile, mode: .force)
+    XCTAssertEqual(result.status, .applied)
+    XCTAssertEqual(
+      result.preparation.operations.map(\.key),
+      [
+        "defaultInput", "defaultOutput", "inputVolume", "outputVolume",
+      ])
+    XCTAssertEqual(api.defaultUID(for: .systemOutput), "output-A")
+    XCTAssertEqual(api.mute(for: "output-B")?.value, false)
+    XCTAssertEqual(api.inputVolume(for: "input-B")?.value, 0.65)
+    XCTAssertEqual(api.volume(for: "output-B")?.value, 0.75)
   }
 
   func testPlansTypedUIDOperationsAndApplyRollbackRoundTrip() async throws {

@@ -258,6 +258,21 @@ import Testing
       #expect(presentation.capturePhase == .failure("Current second failure"))
     }
 
+    @Test("display and sound capture never requires Location access")
+    func captureDoesNotGateOnLocation() {
+      let model = UIAuditFixtures.makeModel(configuration: .disabled)
+      for status: CLAuthorizationStatus in [.notDetermined, .denied, .restricted, .authorized] {
+        let presentation = TrayPresentationModel(
+          model: model,
+          locationPermission: LocationPermissionController(
+            allowsSystemRequests: false, syntheticAuthorizationStatus: status
+          ),
+          profileEditor: ProfileEditorModel()
+        )
+        #expect(presentation.captureAction == .capture)
+      }
+    }
+
     private func makePresentation(
       model: ApplicationModel,
       capture: TrayPresentationModel.CaptureOperation? = nil,

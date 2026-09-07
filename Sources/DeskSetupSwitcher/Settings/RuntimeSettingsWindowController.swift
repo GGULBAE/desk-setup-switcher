@@ -584,7 +584,6 @@ private struct AppSettingsView: View {
   @EnvironmentObject private var locationPermission: LocationPermissionController
   @State private var showsDiagnostics = false
   @State private var isLoginExplanationExpanded = false
-  @State private var isLocationExplanationExpanded = false
 
   var body: some View {
     Form {
@@ -633,44 +632,6 @@ private struct AppSettingsView: View {
         }
       }
 
-      Section(appLocalized("Wi-Fi capture")) {
-        Text(
-          appLocalized(
-            "Location access is used only to read the current Wi-Fi network name during Capture."
-          )
-        )
-        LabeledContent(appLocalized("Location"), value: locationPermission.statusText)
-        if let locationPermissionActionTitle {
-          Button(locationPermissionActionTitle) {
-            performLocationPermissionAction()
-          }
-          .accessibilityHint(locationPermissionActionHint)
-        }
-        if !locationPermission.isAuthorized {
-          Text(
-            appLocalized(
-              "After changing Location access, return to the menu bar and capture again."
-            )
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        }
-
-        AccessibleDisclosureGroup(
-          appLocalized("Why is Location access needed?"),
-          accessibilityIdentifier: "settings.location-explanation",
-          isExpanded: $isLocationExplanationExpanded
-        ) {
-          Text(
-            appLocalized(
-              "macOS can require Location Services to reveal the current Wi-Fi network name during Capture. Desk Setup Switcher does not request or store your coordinates."
-            )
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        }
-      }
-
       Section(appLocalized("Troubleshooting")) {
         Text(
           appLocalized(
@@ -703,44 +664,6 @@ private struct AppSettingsView: View {
     model.launchAtLoginDesired != model.loginItemEnabled
   }
 
-  private var locationPermissionActionTitle: String? {
-    switch locationPermission.authorizationStatus {
-    case .notDetermined:
-      appLocalized("Request Location Access")
-    case .denied, .restricted:
-      appLocalized("Open macOS System Settings")
-    case .authorizedAlways, .authorized:
-      nil
-    @unknown default:
-      appLocalized("Open macOS System Settings")
-    }
-  }
-
-  private var locationPermissionActionHint: String {
-    switch locationPermission.authorizationStatus {
-    case .notDetermined:
-      appLocalized("Shows the macOS permission prompt only after this explanation")
-    case .denied, .restricted:
-      appLocalized("Opens macOS System Settings to change Location access")
-    case .authorizedAlways, .authorized:
-      ""
-    @unknown default:
-      appLocalized("Opens macOS System Settings to change Location access")
-    }
-  }
-
-  private func performLocationPermissionAction() {
-    switch locationPermission.authorizationStatus {
-    case .notDetermined:
-      locationPermission.requestAccess()
-    case .authorizedAlways, .authorized:
-      break
-    case .denied, .restricted:
-      locationPermission.openSystemSettings()
-    @unknown default:
-      locationPermission.openSystemSettings()
-    }
-  }
 }
 
 struct AdvancedDiagnosticsSheet: View {
