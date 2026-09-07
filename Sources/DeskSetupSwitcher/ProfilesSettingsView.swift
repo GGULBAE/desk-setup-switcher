@@ -127,18 +127,18 @@ enum ProfileEditorStepPolicy {
     if rawValue.hasPrefix("settings.network") { return .network }
     return nil
   }
-
-  static func requiresAdvancedDisclosure(_ fieldID: DraftFieldIdentifier) -> Bool {
-    let basicFields: Set<DraftFieldIdentifier> = [
-      .displayPrimary,
-      .audio(.defaultOutputDevice),
-    ]
-    guard group(for: fieldID) != nil else { return false }
-    return !basicFields.contains(fieldID)
-  }
 }
 
 enum ProfileEditorNetworkSelectionPolicy {
+  static func identity(
+    for fieldID: DraftFieldIdentifier,
+    in targets: [NetworkServiceIPv4Settings]
+  ) -> NetworkServiceIdentity? {
+    targets.indices.first { index in
+      fieldID.rawValue.hasPrefix("settings.network.serviceIPv4.\(index).")
+    }.map { targets[$0].identity }
+  }
+
   static func updatingInclusion(
     in targets: [NetworkServiceIPv4Settings],
     selectedIdentity: NetworkServiceIdentity,
@@ -1252,9 +1252,7 @@ private struct ProfileEditorForm: View {
   @FocusState private var focusedField: DraftFieldIdentifier?
   @State private var showsValidationSummary = false
   @State private var showsImportedIconTechnicalInformation = false
-  @State private var showsLastApplicationDetails = false
   @State private var selectedGroup = ProfileEditorStepPolicy.defaultGroup
-  @State private var expandedAdvancedGroup: SettingGroup?
   @State private var selectedNetworkIdentity: NetworkServiceIdentity?
 
   var body: some View {
@@ -1268,10 +1266,6 @@ private struct ProfileEditorForm: View {
 
         if !availableGroups.isEmpty {
           stepWorkspace
-        }
-
-        if let lastApplication = profile.lastApplication {
-          lastApplicationDisclosure(lastApplication)
         }
       }
       .padding(.horizontal, ProfileSettingInclusionLayoutPolicy.formHorizontalInset)
@@ -1293,9 +1287,7 @@ private struct ProfileEditorForm: View {
       requestedValidationFocus = nil
       showsValidationSummary = false
       showsImportedIconTechnicalInformation = false
-      showsLastApplicationDetails = false
       selectedGroup = initialSelectedGroup
-      expandedAdvancedGroup = nil
       selectedNetworkIdentity = nil
     }
     .onChange(of: presentationGeneration) {
@@ -1303,9 +1295,7 @@ private struct ProfileEditorForm: View {
       requestedValidationFocus = nil
       showsValidationSummary = false
       showsImportedIconTechnicalInformation = false
-      showsLastApplicationDetails = false
       selectedGroup = initialSelectedGroup
-      expandedAdvancedGroup = nil
       selectedNetworkIdentity = nil
     }
     .onChange(of: requestedValidationFocus) {
@@ -1563,8 +1553,8 @@ private struct ProfileEditorForm: View {
 
   private func stepHeading(_ group: SettingGroup) -> String {
     switch group {
-    case .display: appLocalized("How your screens are arranged")
-    case .audio: appLocalized("Your speakers and volume")
+    case .display: appLocalized("Display")
+    case .audio: appLocalized("Sound")
     case .network: appLocalized("Your network settings")
     case .input: appLocalized("Your input settings")
     }
@@ -1572,8 +1562,9 @@ private struct ProfileEditorForm: View {
 
   private func stepExplanation(_ group: SettingGroup) -> String {
     switch group {
-    case .display: appLocalized("Choose how your screens work together.")
-    case .audio: appLocalized("Choose the output you want to hear and its volume.")
+    case .display:
+      appLocalized("Choose screen arrangement, resolution, and color for this profile.")
+    case .audio: appLocalized("Choose output, input, and volume for this profile.")
     case .network: appLocalized("Choose the connection this profile should configure.")
     case .input: appLocalized("Choose the input behavior for this profile.")
     }
@@ -1595,55 +1586,6 @@ private struct ProfileEditorForm: View {
     case .network: profile.settings.network.value.hasIncludedOption
     case .input: profile.settings.input.value.hasIncludedOption
     }
-  }
-
-  private func lastApplicationDisclosure(_ lastApplication: ApplicationSummary) -> some View {
-    AccessibleDisclosureGroup(
-      appLocalized("Last application"),
-      accessibilityIdentifier: "profile-last-application",
-      isExpanded: $showsLastApplicationDetails
-    ) {
-      VStack(alignment: .leading, spacing: 10) {
-        LabeledContent(
-          "Status",
-          value: appApplicationStatusTitle(
-            lastApplication.status,
-            isAwaitingSafetyConfirmation: lastApplication.status == .applying
-              && lastApplication.items.contains {
-                $0.key == "high-risk-safety-confirmation"
-                  || $0.key == "display-safety-confirmation"
-              }
-          )
-        )
-        LabeledContent("Time", value: lastApplication.appliedAt.formatted())
-        if lastApplication.items.isEmpty {
-          Text("No itemized results were recorded.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        } else {
-          ForEach(Array(lastApplication.items.enumerated()), id: \.offset) { _, item in
-            VStack(alignment: .leading, spacing: 3) {
-              HStack(alignment: .firstTextBaseline) {
-                Text(appSettingGroupTitle(item.group))
-                  .font(.caption.bold())
-                Text(appApplicationItemTitle(item.key))
-                Spacer()
-                Text(appApplicationItemStatusTitle(item.status))
-                  .font(.caption.bold())
-              }
-              Text(appLocalizedRuntime(item.message))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-            }
-            .padding(.vertical, 2)
-            .accessibilityElement(children: .combine)
-          }
-        }
-      }
-      .padding(.top, 6)
-    }
-    .padding(.horizontal, 4)
   }
 
   private var validationSummary: some View {
@@ -1767,17 +1709,12 @@ private struct ProfileEditorForm: View {
         .simpleSettingsSurface()
       }
 
-      advancedSettingsDisclosure(
-        group: .display,
-        caption: "Resolution, refresh rate, and color profiles."
-      ) {
-        displayAdvancedOptions
-      }
+      displayDeviceOptions
     }
   }
 
   @ViewBuilder
-  private var displayAdvancedOptions: some View {
+  private var displayDeviceOptions: some View {
     if !profile.settings.display.value.displays.isEmpty {
       ForEach($profile.settings.display.value.displays) { $display in
         let supportedModes = supportedDisplayModes(for: display)
@@ -2014,29 +1951,12 @@ private struct ProfileEditorForm: View {
         .simpleSettingsSurface()
       }
 
-      advancedSettingsDisclosure(
-        group: .audio,
-        caption: "Input device, input volume, and mute."
-      ) {
-        audioAdvancedOptions
-      }
+      audioDeviceOptions
     }
   }
 
   @ViewBuilder
-  private var audioAdvancedOptions: some View {
-    audioDeviceOption(
-      "Default input device",
-      option: $profile.settings.audio.value.defaultInputUID,
-      scope: .input,
-      fieldID: .audio(.defaultInputDevice)
-    )
-    audioVolumeOption(
-      "Input volume",
-      role: .input,
-      option: $profile.settings.audio.value.inputVolume,
-      fieldID: .audio(.inputVolume)
-    )
+  private var audioDeviceOptions: some View {
     audioMuteOption(
       option: $profile.settings.audio.value.outputMuted,
       fieldID: .audio(.outputMute)
@@ -2052,6 +1972,19 @@ private struct ProfileEditorForm: View {
         fieldID: .audio(.outputVolume)
       )
     }
+
+    audioDeviceOption(
+      "Default input device",
+      option: $profile.settings.audio.value.defaultInputUID,
+      scope: .input,
+      fieldID: .audio(.defaultInputDevice)
+    )
+    audioVolumeOption(
+      "Input volume",
+      role: .input,
+      option: $profile.settings.audio.value.inputVolume,
+      fieldID: .audio(.inputVolume)
+    )
   }
 
   @ViewBuilder
@@ -2059,165 +1992,99 @@ private struct ProfileEditorForm: View {
     let choices = simpleNetworkServiceChoices
     VStack(alignment: .leading, spacing: 14) {
       if !choices.isEmpty {
-        VStack(alignment: .leading, spacing: 0) {
-          if !choices.isEmpty {
-            simpleControlRow("Connection") {
-              Picker(
-                appLocalized("Connection"),
-                selection: simpleNetworkSelectionBinding
-              ) {
-                ForEach(choices, id: \.identity) { target in
-                  Label(
-                    target.identity.serviceName,
-                    systemImage: target.identity.kind == .ethernet
-                      ? "cable.connector" : "wifi"
-                  )
-                  .tag(Optional(target.identity))
-                }
-              }
-              .labelsHidden()
-              .frame(maxWidth: 280)
-              .accessibilityLabel(appLocalized("Network connection"))
+        simpleControlRow("Connection") {
+          Picker(appLocalized("Connection"), selection: simpleNetworkSelectionBinding) {
+            ForEach(choices, id: \.identity) { target in
+              Label(
+                target.identity.serviceName,
+                systemImage: target.identity.kind == .ethernet ? "cable.connector" : "wifi"
+              )
+              .tag(Optional(target.identity))
             }
-            Divider()
-
-            simpleControlRow("Configuration") {
-              Text(simpleNetworkConfigurationSummary)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 280, alignment: .trailing)
-            }
-            Divider()
           }
-
-          Toggle(
-            appLocalized("Change this connection with this profile"),
-            isOn: networkIncludedBinding
-          )
-          .toggleStyle(.switch)
-          .padding(.horizontal, 14)
-          .padding(.vertical, 12)
+          .labelsHidden()
+          .frame(maxWidth: 280)
+          .accessibilityLabel(appLocalized("Network connection"))
           .accessibilityHint(
-            appLocalized("Includes the selected connection settings when applying")
+            appLocalized("Choose the network service whose IPv4 settings this profile applies")
           )
         }
         .simpleSettingsSurface()
+
+        if let selectedIdentity = simpleNetworkSelectedIdentity {
+          serviceIPv4Section(identity: selectedIdentity)
+        }
       }
 
-      advancedSettingsDisclosure(
-        group: .network,
-        caption: "Automatic or manual IP address details."
-      ) {
-        networkOptions
-      }
-    }
-  }
-
-  @ViewBuilder
-  private var networkOptions: some View {
-    ForEach(NetworkServiceKind.allCases, id: \.self) { kind in
-      let availableServices = availableNetworkServices(kind: kind)
-      let unavailableIndices = unavailableIncludedNetworkServiceIndices(kind: kind)
-      if !availableServices.isEmpty || !unavailableIndices.isEmpty {
-        GroupBox {
-          VStack(alignment: .leading, spacing: 12) {
-            if !availableServices.isEmpty {
-              serviceIPv4Section(kind: kind)
-            }
-            ForEach(unavailableIndices, id: \.self) { index in
-              let target = profile.settings.network.value.serviceIPv4[index]
-              unavailableIncludedOption(
-                "\(target.identity.serviceName) · \(appLocalized("IPv4 configuration"))",
-                isOn: $profile.settings.network.value.serviceIPv4[index].configuration.isIncluded,
-                validationFields: networkValidationFields(for: target.identity),
-                warning: appLocalized(
-                  "The included IPv4 setting for \(target.identity.serviceName) is unavailable in the current network configuration. Turn off Include to apply other available settings normally."
-                )
-              )
-            }
-          }
-          .padding(8)
-        } label: {
-          Label(
-            kind == .ethernet ? appLocalized("Ethernet") : appLocalized("Wi-Fi"),
-            systemImage: kind == .ethernet ? "cable.connector" : "wifi"
+      ForEach(NetworkServiceKind.allCases, id: \.self) { kind in
+        ForEach(unavailableIncludedNetworkServiceIndices(kind: kind), id: \.self) { index in
+          let target = profile.settings.network.value.serviceIPv4[index]
+          unavailableIncludedOption(
+            "\(target.identity.serviceName) · \(appLocalized("IPv4 configuration"))",
+            isOn: $profile.settings.network.value.serviceIPv4[index].configuration.isIncluded,
+            validationFields: networkValidationFields(for: target.identity),
+            warning: appLocalized(
+              "The included IPv4 setting for \(target.identity.serviceName) is unavailable in the current network configuration. Turn off Include to apply other available settings normally."
+            )
           )
-          .font(.headline)
         }
       }
     }
   }
 
   @ViewBuilder
-  private func serviceIPv4Section(kind: NetworkServiceKind) -> some View {
-    let targets = availableNetworkServices(kind: kind)
-    let selectedIdentity = selectedNetworkServiceIdentity(kind: kind)
-    VStack(alignment: .leading, spacing: 9) {
-      Picker(appLocalized("Service"), selection: networkServiceSelectionBinding(kind: kind)) {
-        ForEach(targets, id: \.identity) { target in
-          Text(target.identity.serviceName).tag(Optional(target.identity))
+  private func serviceIPv4Section(identity: NetworkServiceIdentity) -> some View {
+    let option = networkServiceConfigurationBinding(identity: identity)
+    let validationFields = networkValidationFields(for: identity)
+    let ipv4Field = validationFields[0]
+    let addressField = validationFields[1]
+    let subnetField = validationFields[2]
+    let routerField = validationFields[3]
+    optionEditor(
+      "IPv4 configuration",
+      isOn: networkIncludedBinding,
+      validationFields: validationFields,
+      onIncludeChange: IncludeChangeAction { isIncluded in
+        if isIncluded, option.wrappedValue.value == nil {
+          option.wrappedValue.value = .dhcp
         }
       }
-      .accessibilityLabel(
-        appLocalized(kind == .ethernet ? "Ethernet service" : "Wi-Fi service")
-      )
-      .accessibilityHint(
-        appLocalized("Choose the network service whose IPv4 settings this profile applies")
-      )
-
-      if let selectedIdentity {
-        let option = networkServiceConfigurationBinding(identity: selectedIdentity)
-        let validationFields = networkValidationFields(for: selectedIdentity)
-        let ipv4Field = validationFields[0]
-        let addressField = validationFields[1]
-        let subnetField = validationFields[2]
-        let routerField = validationFields[3]
-        optionEditor(
-          "IPv4 configuration",
-          isOn: option.isIncluded,
-          validationFields: validationFields,
-          onIncludeChange: IncludeChangeAction { isIncluded in
-            if isIncluded, option.wrappedValue.value == nil {
-              option.wrappedValue.value = .dhcp
-            }
-          }
-        ) {
-          Picker(
-            appLocalized("IPv4 mode"),
-            selection: ipv4ModeBinding(option.value)
-          ) {
-            ForEach(NetworkIPv4Mode.allCases, id: \.self) { mode in
-              Text(mode.title).tag(mode)
-            }
-          }
-          .accessibilityLabel(appLocalized("IPv4 configuration method"))
-          .accessibilityValue(ipv4Mode(option.wrappedValue.value).title)
-          .accessibilityHint(appLocalized("Choose DHCP or enter a manual IPv4 configuration"))
-          .focused($focusedField, equals: ipv4Field)
-
-          if case .manual = option.wrappedValue.value {
-            manualIPv4Field(
-              title: appLocalized("IP address"),
-              accessibilityLabel: appLocalized("Manual IPv4 address"),
-              text: manualIPv4AddressBinding(option.value),
-              fieldID: addressField,
-              fallbackHint: "Enter the IPv4 address for this service"
-            )
-            manualIPv4Field(
-              title: appLocalized("Subnet mask"),
-              accessibilityLabel: appLocalized("Manual IPv4 subnet mask"),
-              text: manualIPv4SubnetMaskBinding(option.value),
-              fieldID: subnetField,
-              fallbackHint: "Enter a contiguous IPv4 subnet mask"
-            )
-            manualIPv4Field(
-              title: appLocalized("Router (optional)"),
-              accessibilityLabel: appLocalized("Manual IPv4 router"),
-              text: manualIPv4RouterBinding(option.value),
-              fieldID: routerField,
-              fallbackHint: "Enter the optional IPv4 router address"
-            )
-          }
+    ) {
+      Picker(
+        appLocalized("IPv4 mode"),
+        selection: ipv4ModeBinding(option.value)
+      ) {
+        ForEach(NetworkIPv4Mode.allCases, id: \.self) { mode in
+          Text(mode.title).tag(mode)
         }
+      }
+      .accessibilityLabel(appLocalized("IPv4 configuration method"))
+      .accessibilityValue(ipv4Mode(option.wrappedValue.value).title)
+      .accessibilityHint(appLocalized("Choose DHCP or enter a manual IPv4 configuration"))
+      .focused($focusedField, equals: ipv4Field)
+
+      if case .manual = option.wrappedValue.value {
+        manualIPv4Field(
+          title: appLocalized("IP address"),
+          accessibilityLabel: appLocalized("Manual IPv4 address"),
+          text: manualIPv4AddressBinding(option.value),
+          fieldID: addressField,
+          fallbackHint: "Enter the IPv4 address for this service"
+        )
+        manualIPv4Field(
+          title: appLocalized("Subnet mask"),
+          accessibilityLabel: appLocalized("Manual IPv4 subnet mask"),
+          text: manualIPv4SubnetMaskBinding(option.value),
+          fieldID: subnetField,
+          fallbackHint: "Enter a contiguous IPv4 subnet mask"
+        )
+        manualIPv4Field(
+          title: appLocalized("Router (optional)"),
+          accessibilityLabel: appLocalized("Manual IPv4 router"),
+          text: manualIPv4RouterBinding(option.value),
+          fieldID: routerField,
+          fallbackHint: "Enter the optional IPv4 router address"
+        )
       }
     }
   }
@@ -2282,36 +2149,6 @@ private struct ProfileEditorForm: View {
       .padding(.horizontal, 14)
       .padding(.vertical, 12)
     }
-  }
-
-  private func advancedSettingsDisclosure<Content: View>(
-    group: SettingGroup,
-    caption: String.LocalizationValue,
-    @ViewBuilder content: @escaping () -> Content
-  ) -> some View {
-    AccessibleDisclosureGroup(
-      appLocalized("Advanced settings"),
-      accessibilityIdentifier: "profile-advanced-\(group.rawValue)",
-      isExpanded: advancedDisclosureBinding(for: group)
-    ) {
-      VStack(alignment: .leading, spacing: 10) {
-        Text(appLocalized(caption))
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-        content()
-      }
-    }
-    .padding(.horizontal, 4)
-  }
-
-  private func advancedDisclosureBinding(for group: SettingGroup) -> Binding<Bool> {
-    Binding(
-      get: { expandedAdvancedGroup == group },
-      set: { isExpanded in
-        expandedAdvancedGroup = isExpanded ? group : nil
-      }
-    )
   }
 
   private var displayArrangementIncludedBinding: Binding<Bool> {
@@ -2448,22 +2285,6 @@ private struct ProfileEditorForm: View {
           )
       }
     )
-  }
-
-  private var simpleNetworkConfigurationSummary: String {
-    guard let selectedIdentity = simpleNetworkSelectedIdentity,
-      let configuration = profile.settings.network.value.serviceIPv4.first(where: {
-        $0.identity == selectedIdentity
-      })?.configuration.value
-    else {
-      return appLocalized("Automatic network settings")
-    }
-    switch configuration {
-    case .dhcp:
-      return appLocalized("Automatic network settings")
-    case .manual:
-      return appLocalized("Manual network details")
-    }
   }
 
   private var orderedVisibleGroups: [SettingGroup] {
@@ -2958,14 +2779,12 @@ private struct ProfileEditorForm: View {
   private func revealAndFocus(_ fieldID: DraftFieldIdentifier) {
     if let group = ProfileEditorStepPolicy.group(for: fieldID) {
       selectedGroup = group
-      let requiresAdvancedDisclosure =
-        if fieldID == .audio(.outputVolume) {
-          !audioVolumeCapability(role: .output).isWritable
-        } else {
-          ProfileEditorStepPolicy.requiresAdvancedDisclosure(fieldID)
-        }
-      if requiresAdvancedDisclosure {
-        expandedAdvancedGroup = group
+      if group == .network,
+        let identity = ProfileEditorNetworkSelectionPolicy.identity(
+          for: fieldID, in: profile.settings.network.value.serviceIPv4
+        )
+      {
+        selectedNetworkIdentity = identity
       }
     }
     let focusTarget = focusTarget(for: fieldID)
@@ -2987,18 +2806,13 @@ private struct ProfileEditorForm: View {
       }
     case .editorAudio, .editorAudioUnsupported:
       selectedGroup = .audio
-      if uiAuditConfiguration.variant == .editorAudioUnsupported {
-        expandedAdvancedGroup = .audio
-      }
     case .editorNetwork:
       selectedGroup = .network
     case .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
       .editorNetworkWiFiDHCP, .editorNetworkWiFiManual:
       selectedGroup = .network
-      expandedAdvancedGroup = .network
     case .editorDisplayColor:
       selectedGroup = .display
-      expandedAdvancedGroup = .display
     case .editor, .editorPolish, .editorDisplay,
       .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
       .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
@@ -3254,47 +3068,6 @@ private struct ProfileEditorForm: View {
       in: profile.settings.network.value.serviceIPv4,
       kind: kind,
       availableIdentities: availableIdentities
-    )
-  }
-
-  private func selectedNetworkServiceIdentity(
-    kind: NetworkServiceKind
-  ) -> NetworkServiceIdentity? {
-    let choices = availableNetworkServices(kind: kind).map(\.identity)
-    return profile.settings.network.value.serviceIPv4.first {
-      $0.identity.kind == kind
-        && $0.configuration.isIncluded
-        && choices.contains($0.identity)
-    }?.identity
-      ?? profile.settings.network.value.serviceIPv4.first {
-        $0.identity.kind == kind && choices.contains($0.identity)
-      }?.identity
-      ?? choices.first
-  }
-
-  private func networkServiceSelectionBinding(
-    kind: NetworkServiceKind
-  ) -> Binding<NetworkServiceIdentity?> {
-    Binding(
-      get: { selectedNetworkServiceIdentity(kind: kind) },
-      set: { selected in
-        guard let selected else { return }
-        for index in profile.settings.network.value.serviceIPv4.indices
-        where profile.settings.network.value.serviceIPv4[index].identity.kind == kind {
-          profile.settings.network.value.serviceIPv4[index].configuration.isIncluded = false
-        }
-        if let index = profile.settings.network.value.serviceIPv4.firstIndex(where: {
-          $0.identity == selected
-        }) {
-          profile.settings.network.value.serviceIPv4[index].configuration.isIncluded = true
-        } else if let runtime = availableNetworkServices(kind: kind).first(where: {
-          $0.identity == selected
-        }) {
-          var selectedTarget = runtime
-          selectedTarget.configuration.isIncluded = true
-          profile.settings.network.value.serviceIPv4.append(selectedTarget)
-        }
-      }
     )
   }
 

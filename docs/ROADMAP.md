@@ -260,6 +260,14 @@ The final integrated non-live `make verify` and current `git diff --check` pass:
 
 A separately authorized reinstall copied the verified mounted package to `/Applications`, confirmed the installed executable at SHA-256 `f6accf8edc908a426f0082bcba1b11807f7f1bf8f862033ecd56c7e6c8d7cdcc` with `x86_64 arm64` and a valid ad-hoc signature, and launched that installed path. Profile primary and backup hashes remained unchanged and the previous app remains recoverable from a build-local backup. This proves replacement and launch only; the profile editor was not interactively exercised and no system-setting mutation ran.
 
+## Profile editing and App Settings clarification — 2026-09-07
+
+The current editor supersedes M4.13's Advanced disclosures with directly visible controls inside Display, Sound, and Network. Last application history is removed from profile editing. Network uses one transient connection selector and exposes DHCP/manual fields for that connection; validation selects the service that owns the invalid field without changing other included services.
+
+The former System tab is now **App Settings**: app behavior, Wi-Fi capture access, and an on-demand **Open Diagnostics…** action. Login registration status and refresh are available in **Login item details**; mismatches and retry actions remain visible next to the launch toggle.
+
+Implementation and verification are tracked in [the follow-up evidence note](PROFILE-APP-SETTINGS-2026-09-07.md). This changes presentation and selection/focus behavior; hardware verification remains pending.
+
 ## M4.14 — tray and apply-preview density refinement (implemented; local verification passed)
 
 - Give exactly three standard profile cards a 480-point tray viewport instead of the 560-point overflow maximum; retain the existing 0/1/2 and 4+ height contracts and screen clamping.

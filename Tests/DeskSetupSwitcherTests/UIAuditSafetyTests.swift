@@ -1,3 +1,4 @@
+import DeskSetupPresentation
 import Foundation
 import ServiceManagement
 import SwiftUI
@@ -208,22 +209,6 @@ import Testing
           == .network
       )
       #expect(ProfileEditorStepPolicy.group(for: .profileName) == nil)
-      #expect(!ProfileEditorStepPolicy.requiresAdvancedDisclosure(.displayPrimary))
-      #expect(
-        !ProfileEditorStepPolicy.requiresAdvancedDisclosure(
-          .audio(.defaultOutputDevice)
-        )
-      )
-      #expect(
-        ProfileEditorStepPolicy.requiresAdvancedDisclosure(
-          .audio(.outputVolume)
-        )
-      )
-      #expect(
-        ProfileEditorStepPolicy.requiresAdvancedDisclosure(
-          .networkService(at: 0, .ipv4Address)
-        )
-      )
       #expect(
         ProfileEditorSavePolicy.canAttemptSave(
           hasDraft: true,
@@ -505,6 +490,44 @@ import Testing
       session.finishRefresh(snapshot: refreshed)
       #expect(session.snapshot == refreshed)
       #expect(session.hasConsumedRefresh)
+    }
+
+    @Test("network validation selects the service that owns the invalid field")
+    func networkValidationSelectsOwningConnection() {
+      let targets = (0...10).map { index in
+        NetworkServiceIPv4Settings(
+          identity: NetworkServiceIdentity(
+            kind: .ethernet,
+            serviceName: "Synthetic Connection \(index)",
+            interfaceType: "Ethernet"
+          ),
+          configuration: .init(value: .dhcp)
+        )
+      }
+      for field: NetworkDraftField in [.ipv4, .ipv4Address, .ipv4SubnetMask, .ipv4Router] {
+        #expect(
+          ProfileEditorNetworkSelectionPolicy.identity(
+            for: .networkService(at: 1, field), in: targets
+          ) == targets[1].identity
+        )
+        #expect(
+          ProfileEditorNetworkSelectionPolicy.identity(
+            for: .networkService(at: 10, field), in: targets
+          ) == targets[10].identity
+        )
+      }
+      let unrelatedFields: [DraftFieldIdentifier] = [
+        .profileName, .audio(.outputVolume),
+        .network(.ipv4), .networkService(at: 11, .ipv4Address),
+      ]
+      for field in unrelatedFields {
+        #expect(ProfileEditorNetworkSelectionPolicy.identity(for: field, in: targets) == nil)
+      }
+      #expect(
+        ProfileEditorNetworkSelectionPolicy.identity(
+          for: .networkService(at: 0, .ipv4Address), in: []
+        ) == nil
+      )
     }
 
     @Test("simple network selection preserves other included connections")

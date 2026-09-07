@@ -1273,3 +1273,13 @@
 "Requests permanent deletion of the selected profile" = "선택한 프로필의 영구 삭제를 요청합니다";
 "Expands this section" = "이 섹션을 펼칩니다";
 "Collapses this section" = "이 섹션을 접습니다";
+
+/* App settings and direct profile editing */
+"App Settings" = "앱 설정";
+"Choose screen arrangement, resolution, and color for this profile." = "이 프로필의 화면 배치, 해상도, 색상을 설정합니다.";
+"Choose output, input, and volume for this profile." = "이 프로필의 출력 기기, 입력 기기, 음량을 설정합니다.";
+"App behavior" = "앱 실행";
+"Login item details" = "로그인 실행 세부 정보";
+"Wi-Fi capture" = "Wi-Fi 캡처";
+"Open Diagnostics…" = "진단 열기…";
+"Start the menu-bar app when you sign in to your Mac" = "Mac에 로그인하면 메뉴 막대 앱을 실행합니다";

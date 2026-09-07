@@ -565,9 +565,9 @@ struct SettingsView: View {
         .tabItem { Label(appLocalized("Profiles"), systemImage: "rectangle.stack") }
         .tag(SettingsTab.profiles)
 
-      SystemSettingsView()
+      AppSettingsView()
         .environmentObject(model)
-        .tabItem { Label(appLocalized("System"), systemImage: "gearshape.2") }
+        .tabItem { Label(appLocalized("App Settings"), systemImage: "gearshape") }
         .tag(SettingsTab.system)
 
       AboutSettingsView()
@@ -578,17 +578,17 @@ struct SettingsView: View {
   }
 }
 
-private struct SystemSettingsView: View {
+private struct AppSettingsView: View {
   @Environment(\.uiAuditConfiguration) private var uiAuditConfiguration
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var locationPermission: LocationPermissionController
-  @State private var showsAdvancedDiagnostics = false
+  @State private var showsDiagnostics = false
   @State private var isLoginExplanationExpanded = false
   @State private var isLocationExplanationExpanded = false
 
   var body: some View {
     Form {
-      Section(appLocalized("Login")) {
+      Section(appLocalized("App behavior")) {
         Toggle(
           appLocalized("Launch Desk Setup Switcher at login"),
           isOn: Binding(
@@ -596,11 +596,7 @@ private struct SystemSettingsView: View {
             set: { model.setLaunchAtLogin($0) }
           )
         )
-
-        LabeledContent(
-          appLocalized("macOS registration"),
-          value: model.loginItemEnabled ? appLocalized("Enabled") : appLocalized("Not enabled")
-        )
+        .accessibilityHint(appLocalized("Start the menu-bar app when you sign in to your Mac"))
 
         if loginItemStatesDiffer || model.canRetryLoginItemRegistration {
           Label(model.loginItemStatus, systemImage: "exclamationmark.triangle")
@@ -609,22 +605,21 @@ private struct SystemSettingsView: View {
             .accessibilityLabel(appLocalized("Login item status: \(model.loginItemStatus)"))
         }
 
-        HStack {
-          if model.canRetryLoginItemRegistration {
-            Button(appLocalized("Retry Registration")) {
-              model.retryLaunchAtLoginRegistration()
-            }
-          }
-          Button(appLocalized("Refresh Status")) {
-            model.refreshLoginItemStatusFromSystem()
+        if model.canRetryLoginItemRegistration {
+          Button(appLocalized("Retry Registration")) {
+            model.retryLaunchAtLoginRegistration()
           }
         }
 
         AccessibleDisclosureGroup(
-          appLocalized("Why can these states differ?"),
+          appLocalized("Login item details"),
           accessibilityIdentifier: "settings.login-state-explanation",
           isExpanded: $isLoginExplanationExpanded
         ) {
+          LabeledContent(
+            appLocalized("macOS registration"),
+            value: model.loginItemEnabled ? appLocalized("Enabled") : appLocalized("Not enabled")
+          )
           Text(
             appLocalized(
               "macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration."
@@ -632,10 +627,13 @@ private struct SystemSettingsView: View {
           )
           .font(.caption)
           .foregroundStyle(.secondary)
+          Button(appLocalized("Refresh Status")) {
+            model.refreshLoginItemStatusFromSystem()
+          }
         }
       }
 
-      Section(appLocalized("System permissions")) {
+      Section(appLocalized("Wi-Fi capture")) {
         Text(
           appLocalized(
             "Location access is used only to read the current Wi-Fi network name during Capture."
@@ -681,8 +679,8 @@ private struct SystemSettingsView: View {
         )
         .font(.caption)
         .foregroundStyle(.secondary)
-        Button(appLocalized("Open Advanced Diagnostics…")) {
-          showsAdvancedDiagnostics = true
+        Button(appLocalized("Open Diagnostics…")) {
+          showsDiagnostics = true
         }
         .accessibilityHint(
           appLocalized("Shows redacted local status, snapshot details, and recent events")
@@ -690,13 +688,13 @@ private struct SystemSettingsView: View {
       }
     }
     .formStyle(.grouped)
-    .sheet(isPresented: $showsAdvancedDiagnostics) {
+    .sheet(isPresented: $showsDiagnostics) {
       AdvancedDiagnosticsSheet()
         .environmentObject(model)
     }
     .onAppear {
       if uiAuditConfiguration.isEnabled, uiAuditConfiguration.variant == .diagnostics {
-        showsAdvancedDiagnostics = true
+        showsDiagnostics = true
       }
     }
   }
@@ -804,7 +802,7 @@ struct AdvancedDiagnosticsSheet: View {
   }
 
   private var diagnosticsTitle: some View {
-    Label(appLocalized("Advanced Diagnostics"), systemImage: "stethoscope")
+    Label(appLocalized("Diagnostics"), systemImage: "stethoscope")
       .font(.title3.bold())
       .accessibilityAddTraits(.isHeader)
       .accessibilityFocused($isHeadingAccessibilityFocused)

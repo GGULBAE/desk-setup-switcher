@@ -1273,3 +1273,13 @@
 "Requests permanent deletion of the selected profile" = "Requests permanent deletion of the selected profile";
 "Expands this section" = "Expands this section";
 "Collapses this section" = "Collapses this section";
+
+/* App settings and direct profile editing */
+"App Settings" = "App Settings";
+"Choose screen arrangement, resolution, and color for this profile." = "Choose screen arrangement, resolution, and color for this profile.";
+"Choose output, input, and volume for this profile." = "Choose output, input, and volume for this profile.";
+"App behavior" = "App behavior";
+"Login item details" = "Login item details";
+"Wi-Fi capture" = "Wi-Fi capture";
+"Open Diagnostics…" = "Open Diagnostics…";
+"Start the menu-bar app when you sign in to your Mac" = "Start the menu-bar app when you sign in to your Mac";

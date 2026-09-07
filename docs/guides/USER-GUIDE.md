@@ -29,7 +29,7 @@ Keyboard behavior, accessibility names and values, and non-color state cues are 
 5. Recheck the release URL and SHA-256. Then open **System Settings → Privacy & Security**, choose **Open Anyway**, and confirm. Do not disable Gatekeeper globally, run a quarantine-removal command, or continue when the checksum differs.
 6. Look for the Desk Setup Switcher icon in the menu bar. The app is menu-bar-only, so it does not normally show a Dock icon or a main window at launch.
 
-**Launch at login is off by default.** Enable it only if wanted in **Settings → System → Login**. The app shows the requested setting and macOS registration status separately because macOS may require approval.
+**Launch at login is off by default.** Enable it only if wanted in **Settings → App Settings → App behavior**. The switch controls the requested setting. If macOS registration differs, a warning appears; **Login item details** shows the registration status and refresh action.
 
 ## One-minute workflow
 
@@ -59,9 +59,9 @@ Choose **Edit Profile** on a profile to open **Settings → Profiles**.
 
 - Give the profile a recognizable name and icon.
 - Work through the stable numbered **Display**, **Sound**, and **Network** steps. At the minimum window size or an accessibility text size, the same steps become a compact segmented selector.
-- Start with the common controls: screen arrangement and main display; sound output and volume; or a network connection and its Automatic/Manual summary. The switch at the bottom of each card decides whether that common setup changes with the profile.
-- Open **Advanced settings** only for resolution, refresh rate, ColorSync, audio input/mute, or DHCP/manual IP details. Existing included advanced values stay part of the draft while the disclosure is closed. If an advanced value is invalid, Save opens the right step and disclosure before moving focus to it.
-- Choosing a connection in the Network step changes which connection is shown; it does not silently disable another included connection. Use the nearby switch for the selected connection, or **Advanced settings** when a profile intentionally manages more than one service.
+- Edit screen arrangement, resolution, refresh rate, and ColorSync in **Display**; output, mute, input, and volume in **Sound**; and DHCP/manual IP fields in **Network**. These controls are shown directly within their step. Use the inclusion switches to choose what the profile applies.
+- Network has one connection selector. Browsing another connection preserves all saved inclusion choices; its **Apply with profile** switch changes only the selected connection. If a value is invalid, Save selects the owning step and connection before moving focus to it.
+- The editor contains profile settings only. Itemized application results remain available after Apply.
 - Save the profile. `⌘S` saves a valid dirty draft.
 
 An unavailable saved target remains visible with a warning when possible. Reconnect the device or turn **Apply with profile** off for that row before saving. Do not infer support from a value that is absent: the app hides choices that cannot complete its capture/apply/verify/rollback contract on the current snapshot.
@@ -134,7 +134,7 @@ Import is replacement, not merge. The app rejects invalid, oversized, unsafe, un
 
 For a Capture, readiness, storage, or Apply problem:
 
-1. Open **Settings → System → Open Advanced Diagnostics…**.
+1. Open **Settings → App Settings → Open Diagnostics…**.
 2. Choose **Refresh** for recent redacted events. **Refresh Readiness** performs a read-only update of current facts.
 3. Review the last result, last snapshot, readiness facts, and item-level status.
 4. Choose **Clear Events…** to delete only the app's rotated diagnostic event files.
@@ -156,7 +156,7 @@ Use [SUPPORT.md](../../SUPPORT.md) for public support and bug-report routes. For
 | A protected change is unusable | Choose **Revert Now** before the 15-second timer ends. Then confirm the original state in macOS System Settings and inspect the result. |
 | The unsigned official DMG is blocked on first launch | This is expected. Confirm the canonical Release URL and SHA-256, then use **System Settings → Privacy & Security → Open Anyway** once. Never disable Gatekeeper globally or remove quarantine from the command line. |
 | macOS reports that the app is damaged or the checksum differs | Stop. Delete the download and report the exact message without private data; do not create a security exception. |
-| Launch at login was requested but is not enabled | Open **Settings → System**, compare the requested setting with **macOS registration**, approve it in macOS Login Items if prompted, then choose **Refresh Status** or **Retry Registration**. |
+| Launch at login was requested but is not enabled | Open **Settings → App Settings → Login item details**, compare the requested setting with **macOS registration**, approve it in macOS Login Items if prompted, then choose **Refresh Status** or **Retry Registration**. |
 
 ## Update
 
@@ -166,7 +166,7 @@ The app does not check the network for updates. After a public release exists, o
 
 Removing the app does not automatically delete profiles or diagnostics.
 
-1. If enabled, turn off **Settings → System → Launch Desk Setup Switcher at login** and confirm **macOS registration** is not enabled.
+1. If enabled, turn off **Settings → App Settings → Launch Desk Setup Switcher at login** and open **Login item details** to confirm **macOS registration** is not enabled.
 2. From the menu-bar app, choose **Quit Desk Setup Switcher**.
 3. Move **Desk Setup Switcher.app** from **Applications** to the Trash.
 4. To delete profiles, backup/quarantine files, and diagnostics, open Finder's **Go → Go to Folder…** and remove `~/Library/Application Support/Desk Setup Switcher/`. Export anything you want to keep first.

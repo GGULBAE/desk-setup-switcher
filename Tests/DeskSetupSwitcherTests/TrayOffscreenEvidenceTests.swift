@@ -367,7 +367,7 @@ import Testing
       }
     }
 
-    @Test("profile and System settings render offscreen in English and Korean")
+    @Test("profile and App Settings render offscreen in English and Korean")
     func rendersSimplifiedProfileSections() throws {
       let allFixtures = [
         SettingsFixture(
@@ -573,7 +573,7 @@ import Testing
           #expect(rendered.accessibility.contains("inclusion-header-layout=stacked"))
           #expect(
             rendered.accessibility.contains(
-              "inclusion-state-cues=label,switch;advanced=text,symbol,switch"
+              "inclusion-state-cues=label,switch;options=text,symbol,switch"
             )
           )
           #expect(rendered.accessibility.contains("sidebar-primary-action="))
@@ -1357,7 +1357,7 @@ import Testing
         "inclusion-expected-control-width-limit=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.maximumExpectedControlWidth)) : "not-applicable")",
         "step-navigation=\(fixture.isProfileSurface ? "display,sound,network" : "not-applicable")",
         "step-state-cues=\(fixture.isProfileSurface ? "number,title,checkmark" : "not-applicable")",
-        "inclusion-state-cues=\(fixture.isProfileSurface ? "label,switch;advanced=text,symbol,switch" : "not-applicable")",
+        "inclusion-state-cues=\(fixture.isProfileSurface ? "label,switch;options=text,symbol,switch" : "not-applicable")",
         "declared-dirty-export-notice=\(fixture.state == .dirtyDraft ? appLocalizedRuntime(ProfileExportScopePolicy.unsavedDraftNotice) : "none")",
         "export-source=persisted-document-only",
         "storage-error-card-visible=\(fixture.state == .storageError)",
