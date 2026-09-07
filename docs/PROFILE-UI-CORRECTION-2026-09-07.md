@@ -13,6 +13,8 @@ The prior `3bf2324` change flattened Display/Sound controls beyond the requested
 
 ## Verification
 
+Implementation commit: `cde1903`.
+
 The 337-test Swift Testing suite and the isolated native-popover regression passed. The Settings test covers 19 English/Korean, light/dark, minimum/accessibility, validation, unavailable-audio, Network, and expanded-detail fixtures. Standard-width cases assert actual numbered-rail accent pixels rather than recalculating a declared layout policy. The changed Display/Sound basic and expanded screens, compact/large-text layouts, and validation view were visually inspected. The canonical `make verify` gate passed: localization/lint, XCTest and Swift Testing, isolated native popover, release-tooling regression guards, Swift and universal Xcode Debug/Release builds, Analyze, DMG checksum/mounted resources, and app-bundle compatibility checks. The initial run exposed a timestamp-sensitive new test; a fixed synthetic timestamp resolved it, and the complete gate was rerun successfully. No hardware setting Apply, UI automation, explicit permission/login action, remote push, or publication was performed. The user's unrelated Apply Preview edits are preserved; combined-working-tree test/package evidence is not an exact-commit release artifact.
 
 ## Authorized corrected-build installation

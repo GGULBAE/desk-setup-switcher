@@ -99,7 +99,7 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 
 ## UI hardening
 
-- [ ] Commit the verified profile UI correction: restore Display/Sound basic and Advanced views, stabilize navigation across sections/expansion, and exclude color profiles from capture/edit/apply while retaining dormant legacy values. Evidence: [PROFILE-UI-CORRECTION-2026-09-07.md](PROFILE-UI-CORRECTION-2026-09-07.md).
+- [x] Commit `cde1903` records the verified profile UI correction: restored Display/Sound basic and Advanced views, stable navigation across sections/expansion, and color profiles excluded from capture/edit/apply while retaining dormant legacy values. Evidence: [PROFILE-UI-CORRECTION-2026-09-07.md](PROFILE-UI-CORRECTION-2026-09-07.md).
 
 Current correction installation, 2026-09-07: the full non-live gate passed and the corrected DMG app was reinstalled and launched. A value-free comparison matched normalized pre-install profile data against persisted post-launch data; prior app/profile files remain backed up. This does not check installed keyboard/VoiceOver or hardware gates. See [the correction record](PROFILE-UI-CORRECTION-2026-09-07.md).
 
