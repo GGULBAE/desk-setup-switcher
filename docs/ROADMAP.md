@@ -6,6 +6,8 @@ The current profile contract is limited to main display, resolution, output devi
 
 The canonical non-live `make verify` gate and 19-fixture offscreen matrix passed. The app was reinstalled and launched from `/Applications`; both profile files passed the value-preservation audit after retired-field normalization. Installed keyboard/VoiceOver and hardware mutation remain unverified.
 
+Sound now groups device and volume controls inside **Output** and **Input** cards, preserving independent inclusion and target-device capability checks. This presentation-only follow-up does not change the six-setting capture/apply contract. Its full `make verify` retry, 19-fixture offscreen matrix, and local reinstall/startup passed; both profile files remained byte-identical. See [grouped Sound evidence](AUDIO-SECTIONS-2026-09-07.md).
+
 The roadmap is evidence-based. “Implemented” means source exists; “verified” names the evidence boundary; “done” additionally requires current documentation and the commit or push evidence required by that milestone's explicit contract. Dates are intentionally omitted because safety gates determine sequence.
 
 ## M0 — Repository and product contract (done)

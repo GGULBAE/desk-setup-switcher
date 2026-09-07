@@ -1,5 +1,9 @@
 # Completion criteria and evidence ledger
 
+## Grouped Sound sections — 2026-09-07
+
+- [ ] Commit the verified presentation-only Output/Input grouping, with device and volume in each section, independent inclusion, unchanged capture/apply scope, and synthetic rendering evidence. See [grouped Sound evidence](AUDIO-SECTIONS-2026-09-07.md).
+
 ## Current six-option profile scope — 2026-09-07
 
 - [x] Commit `a21b4ed` records the verified six-kind capture/edit/apply allowlist: main display, resolution, output device/volume, input device/volume; no Network, Advanced, Location capture gate, or legacy-field application. Full `make verify`, 19 synthetic views, local reinstall/startup, and both profile value-preservation audits passed. See [current evidence](MINIMAL-PROFILE-SCOPE-2026-09-07.md).

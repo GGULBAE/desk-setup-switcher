@@ -1768,31 +1768,54 @@ private struct ProfileEditorForm: View {
   @ViewBuilder
   private var audioSimpleOptions: some View {
     VStack(alignment: .leading, spacing: 14) {
-      audioDeviceOption(
-        "Output device",
-        option: $profile.settings.audio.value.defaultOutputUID,
-        scope: .output,
-        fieldID: .audio(.defaultOutputDevice)
-      )
-      audioVolumeOption(
-        "Output volume",
-        role: .output,
-        option: $profile.settings.audio.value.outputVolume,
-        fieldID: .audio(.outputVolume)
-      )
-      audioDeviceOption(
-        "Input device",
-        option: $profile.settings.audio.value.defaultInputUID,
-        scope: .input,
-        fieldID: .audio(.defaultInputDevice)
-      )
-      audioVolumeOption(
-        "Input volume",
-        role: .input,
-        option: $profile.settings.audio.value.inputVolume,
-        fieldID: .audio(.inputVolume)
-      )
+      audioSection("Output", systemImage: "speaker.wave.2", identifier: "audio-output") {
+        audioDeviceOption(
+          "Output device",
+          option: $profile.settings.audio.value.defaultOutputUID,
+          scope: .output,
+          fieldID: .audio(.defaultOutputDevice)
+        )
+        audioVolumeOption(
+          "Output volume",
+          role: .output,
+          option: $profile.settings.audio.value.outputVolume,
+          fieldID: .audio(.outputVolume)
+        )
+      }
+      audioSection("Input", systemImage: "mic", identifier: "audio-input") {
+        audioDeviceOption(
+          "Input device",
+          option: $profile.settings.audio.value.defaultInputUID,
+          scope: .input,
+          fieldID: .audio(.defaultInputDevice)
+        )
+        audioVolumeOption(
+          "Input volume",
+          role: .input,
+          option: $profile.settings.audio.value.inputVolume,
+          fieldID: .audio(.inputVolume)
+        )
+      }
     }
+  }
+
+  private func audioSection<Content: View>(
+    _ title: String.LocalizationValue,
+    systemImage: String,
+    identifier: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    GroupBox {
+      VStack(alignment: .leading, spacing: 16, content: content)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+    } label: {
+      Label(appLocalized(title), systemImage: systemImage)
+        .font(.headline)
+        .accessibilityAddTraits(.isHeader)
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(identifier)
   }
 
   @ViewBuilder
@@ -2083,6 +2106,7 @@ private struct ProfileEditorForm: View {
   private func optionEditor<Content: View>(
     _ title: String.LocalizationValue,
     isOn: Binding<Bool>,
+    embeddedTitle: String.LocalizationValue? = nil,
     validationFields: [DraftFieldIdentifier] = [],
     onIncludeChange: IncludeChangeAction? = nil,
     @ViewBuilder content: () -> Content
@@ -2092,6 +2116,7 @@ private struct ProfileEditorForm: View {
     VStack(alignment: .leading, spacing: 8) {
       optionInclusionHeader(
         title: localizedTitle,
+        visibleTitle: embeddedTitle.map { appLocalized($0) },
         isOn: isOn,
         validationFields: validationFields,
         onIncludeChange: onIncludeChange
@@ -2109,12 +2134,13 @@ private struct ProfileEditorForm: View {
         )
       }
     }
-    .padding(ProfileSettingInclusionLayoutPolicy.optionContentInset)
+    .padding(embeddedTitle == nil ? ProfileSettingInclusionLayoutPolicy.optionContentInset : 0)
     .background(
       Color(nsColor: .controlBackgroundColor).opacity(
-        ProfileSettingRowStylePolicy.backgroundOpacity(
-          increasedContrast: colorSchemeContrast == .increased
-        )
+        embeddedTitle == nil
+          ? ProfileSettingRowStylePolicy.backgroundOpacity(
+            increasedContrast: colorSchemeContrast == .increased
+          ) : 0
       ),
       in: RoundedRectangle(cornerRadius: ProfileSettingRowStylePolicy.cornerRadius)
     )
@@ -2122,9 +2148,10 @@ private struct ProfileEditorForm: View {
       RoundedRectangle(cornerRadius: ProfileSettingRowStylePolicy.cornerRadius)
         .stroke(
           Color.secondary.opacity(
-            ProfileSettingRowStylePolicy.borderOpacity(
-              increasedContrast: colorSchemeContrast == .increased
-            )
+            embeddedTitle == nil
+              ? ProfileSettingRowStylePolicy.borderOpacity(
+                increasedContrast: colorSchemeContrast == .increased
+              ) : 0
           ),
           lineWidth: ProfileSettingRowStylePolicy.borderWidth(
             increasedContrast: colorSchemeContrast == .increased
@@ -2136,12 +2163,14 @@ private struct ProfileEditorForm: View {
   private func unavailableIncludedOption(
     _ title: String,
     isOn: Binding<Bool>,
+    embeddedTitle: String.LocalizationValue? = nil,
     validationFields: [DraftFieldIdentifier] = [],
     warning: String
   ) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       optionInclusionHeader(
         title: title,
+        visibleTitle: embeddedTitle.map { appLocalized($0) },
         isOn: isOn,
         validationFields: validationFields
       )
@@ -2159,12 +2188,13 @@ private struct ProfileEditorForm: View {
         )
       }
     }
-    .padding(ProfileSettingInclusionLayoutPolicy.optionContentInset)
+    .padding(embeddedTitle == nil ? ProfileSettingInclusionLayoutPolicy.optionContentInset : 0)
     .background(
       Color(nsColor: .controlBackgroundColor).opacity(
-        ProfileSettingRowStylePolicy.backgroundOpacity(
-          increasedContrast: colorSchemeContrast == .increased
-        )
+        embeddedTitle == nil
+          ? ProfileSettingRowStylePolicy.backgroundOpacity(
+            increasedContrast: colorSchemeContrast == .increased
+          ) : 0
       ),
       in: RoundedRectangle(cornerRadius: ProfileSettingRowStylePolicy.cornerRadius)
     )
@@ -2172,9 +2202,10 @@ private struct ProfileEditorForm: View {
       RoundedRectangle(cornerRadius: ProfileSettingRowStylePolicy.cornerRadius)
         .stroke(
           Color.orange.opacity(
-            ProfileSettingRowStylePolicy.warningBorderOpacity(
-              increasedContrast: colorSchemeContrast == .increased
-            )
+            embeddedTitle == nil
+              ? ProfileSettingRowStylePolicy.warningBorderOpacity(
+                increasedContrast: colorSchemeContrast == .increased
+              ) : 0
           ),
           lineWidth: ProfileSettingRowStylePolicy.borderWidth(
             increasedContrast: colorSchemeContrast == .increased
@@ -2231,6 +2262,7 @@ private struct ProfileEditorForm: View {
   @ViewBuilder
   private func optionInclusionHeader(
     title: String,
+    visibleTitle: String? = nil,
     isOn: Binding<Bool>,
     validationFields: [DraftFieldIdentifier],
     onIncludeChange: IncludeChangeAction? = nil
@@ -2245,7 +2277,7 @@ private struct ProfileEditorForm: View {
 
     if ProfileSettingInclusionLayoutPolicy.usesStackedHeader(for: dynamicTypeSize) {
       VStack(alignment: .leading, spacing: 8) {
-        optionTitle(title, validationFields: validationFields)
+        optionTitle(visibleTitle ?? title, validationFields: validationFields)
         HStack {
           Spacer(minLength: 0)
           compactIncludeToggle(isOn: toggleBinding, settingTitle: title)
@@ -2253,7 +2285,7 @@ private struct ProfileEditorForm: View {
       }
     } else {
       HStack(spacing: 12) {
-        optionTitle(title, validationFields: validationFields)
+        optionTitle(visibleTitle ?? title, validationFields: validationFields)
         compactIncludeToggle(isOn: toggleBinding, settingTitle: title)
       }
     }
@@ -2303,6 +2335,7 @@ private struct ProfileEditorForm: View {
       optionEditor(
         title,
         isOn: option.isIncluded,
+        embeddedTitle: "Device",
         validationFields: [fieldID],
         onIncludeChange: IncludeChangeAction { isIncluded in
           if isIncluded, option.wrappedValue.value == nil {
@@ -2352,6 +2385,7 @@ private struct ProfileEditorForm: View {
       optionEditor(
         title,
         isOn: option.isIncluded,
+        embeddedTitle: "Volume",
         validationFields: [fieldID],
         onIncludeChange: IncludeChangeAction { isIncluded in
           if isIncluded, option.wrappedValue.value == nil {
@@ -2376,6 +2410,7 @@ private struct ProfileEditorForm: View {
             } maximumValueLabel: {
               Text("100")
             }
+            .accessibilityLabel(appLocalized(title))
             TextField(
               appLocalized("Volume percent"),
               value: percentageBinding(option.value),
@@ -2384,6 +2419,7 @@ private struct ProfileEditorForm: View {
             .frame(width: 58)
             .multilineTextAlignment(.trailing)
             .focused($focusedField, equals: fieldID)
+            .accessibilityLabel(appLocalized(title))
             .accessibilityHint(
               validationAccessibilityHint(
                 for: fieldID,
@@ -2404,6 +2440,7 @@ private struct ProfileEditorForm: View {
       unavailableIncludedOption(
         appLocalized(title),
         isOn: option.isIncluded,
+        embeddedTitle: "Volume",
         validationFields: [fieldID],
         warning: appLocalized(
           "This included volume setting is unavailable for the selected device. Turn off Include to apply other available settings normally."

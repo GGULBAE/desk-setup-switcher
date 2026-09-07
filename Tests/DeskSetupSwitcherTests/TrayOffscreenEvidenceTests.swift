@@ -457,7 +457,7 @@ import Testing
           size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
-          name: "19b-audio-four-options-ko-light",
+          name: "19b-audio-grouped-sections-ko-light",
           variant: .editorAudio,
           languageCode: "ko",
           colorScheme: .light,
@@ -564,6 +564,36 @@ import Testing
 
         #expect(rendered.png.count > 10_000)
         #expect(rendered.accessibility.contains("synthetic-settings-host=true"))
+        if fixture.name == "19b-audio-grouped-sections-ko-light" {
+          let representation = try #require(NSBitmapImageRep(data: rendered.png))
+          // Sample the inset before row labels in the full-height Sound view.
+          // Two continuous tall surfaces prove device and volume share each
+          // section, rather than merely declaring a two-section policy.
+          let scaleX = CGFloat(representation.pixelsWide) / fixture.size.width
+          let scaleY = CGFloat(representation.pixelsHigh) / fixture.size.height
+          var runs: [ClosedRange<Int>] = []
+          var runStart: Int?
+          for y in 190..<700 {
+            let color = representation.colorAt(
+              x: Int(448 * scaleX), y: Int(CGFloat(y) * scaleY)
+            )?.usingColorSpace(.deviceRGB)
+            let isSectionBackground =
+              color.map {
+                $0.redComponent > 0.93 && $0.redComponent < 0.99
+                  && abs($0.redComponent - $0.greenComponent) < 0.01
+                  && abs($0.redComponent - $0.blueComponent) < 0.01
+              } ?? false
+            if isSectionBackground, runStart == nil {
+              runStart = y
+            } else if !isSectionBackground, let start = runStart {
+              if y - start > 10 { runs.append(start...(y - 1)) }
+              runStart = nil
+            }
+          }
+          #expect(runStart == nil, "Both Sound sections must fit the tall fixture")
+          #expect(runs.count == 2, "Sound must have one Output and one Input surface")
+          #expect(runs.allSatisfy { $0.count > 120 }, "Device and volume must share a surface")
+        }
         if fixture.isProfileSurface, fixture.size.width == 900,
           !fixture.dynamicTypeSize.isAccessibilitySize, fixture.state == .standard
         {
@@ -1387,7 +1417,7 @@ import Testing
         "inclusion-minimum-available-width=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.minimumAvailableHeaderWidth)) : "not-applicable")",
         "inclusion-expected-control-width-limit=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.maximumExpectedControlWidth)) : "not-applicable")",
         "rail-selection-pixel-count=\(railSelectionPixelCount)",
-        "step-navigation=\(fixture.isProfileSurface ? "display,sound,network" : "not-applicable")",
+        "step-navigation=\(fixture.isProfileSurface ? "display,sound" : "not-applicable")",
         "step-state-cues=\(fixture.isProfileSurface ? "number,title,checkmark" : "not-applicable")",
         "inclusion-state-cues=\(fixture.isProfileSurface ? "label,switch;options=text,symbol,switch" : "not-applicable")",
         "declared-dirty-export-notice=\(fixture.state == .dirtyDraft ? appLocalizedRuntime(ProfileExportScopePolicy.unsavedDraftNotice) : "none")",
