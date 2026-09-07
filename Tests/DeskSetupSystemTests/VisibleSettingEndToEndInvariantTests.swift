@@ -142,8 +142,6 @@ struct VisibleSettingEndToEndInvariantTests {
     desired.displays[1].mirroring.value = .extended
     desired.displays[0].mode.value = builtInModes[1]
     desired.displays[1].mode.value = externalModes[1]
-    desired.displays[0].colorProfile = .init(value: targetProfile)
-    desired.displays[1].colorProfile = .init(value: targetProfile)
     let payload = SettingsPayload.display(desired)
     let issues = await adapter.validate(payload, against: snapshot)
     let plan = try await adapter.plan(payload, from: snapshot, mode: .normal)

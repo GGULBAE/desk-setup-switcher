@@ -433,10 +433,14 @@ struct DisplayAdapterTests {
     var settings = try displaySettings(from: snapshot)
     settings.displays[0].colorProfile = .init(value: target)
 
-    #expect(snapshot.items.count == displays.count + 1)
+    #expect(snapshot.items.count == displays.count)
+    #expect(!snapshot.items.contains { $0.key.hasPrefix("display.colorProfile.") })
+    #expect(snapshot.displayColorProfileCatalog == nil)
+    let captured = try displaySettings(from: snapshot)
     #expect(
-      snapshot.items.count(where: { $0.key.hasPrefix("display.colorProfile.") }) == 1
-    )
+      captured.displays.allSatisfy { !$0.colorProfile.isIncluded && $0.colorProfile.value == nil })
+    // Direct legacy adapter primitives remain rollback-tested, but the profile
+    // registry and ApplyEngine normalization no longer expose or request them.
 
     let validation = await adapter.validate(.display(settings), against: snapshot)
     let plan = try await adapter.plan(.display(settings), from: snapshot, mode: .normal)
@@ -648,8 +652,8 @@ struct DisplayAdapterTests {
     #expect(plan.operations[0].key.hasPrefix("display.colorProfile."))
   }
 
-  @Test("display topology applies before color and rollback reverses that order")
-  func topologyAndColorTransactionOrdering() async throws {
+  @Test("profile transactions apply and roll back topology without retired color settings")
+  func topologyTransactionIgnoresLegacyColorProfile() async throws {
     let original = colorProfile("original", hash: "e", name: "Original ICC")
     let target = colorProfile("target", hash: "f", name: "Target ICC")
     var displays = makeDisplays()
@@ -683,8 +687,6 @@ struct DisplayAdapterTests {
     #expect(
       await api.recordedMutationNames() == [
         "topology.appOnly",
-        "color.set",
-        "color.restore",
         "topology.sessionOnly",
       ]
     )

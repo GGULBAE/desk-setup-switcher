@@ -62,6 +62,7 @@ struct UIAuditConfiguration {
   let variant: UIAuditVariant
   let displayMode: UIAuditDisplayMode
   let showsStatusPopover: Bool
+  var expandsProfileDetails = false
 
   static var current: Self {
     #if DEBUG
@@ -209,7 +210,6 @@ extension View {
       }
       let snapshot = syntheticSnapshot(
         settings: ready.settings,
-        supportsDisplayModes: variant != .editorDisplayColor,
         supportsAudioVolume: variant != .editorAudioUnsupported
       )
       let captureSummary: ProfileCaptureSummary? =
@@ -411,7 +411,6 @@ extension View {
 
     private static func syntheticSnapshot(
       settings: ProfileSettings,
-      supportsDisplayModes: Bool = true,
       supportsAudioVolume: Bool = true
     ) -> SystemSnapshotResult {
       let displaySettings = settings.display.value
@@ -430,7 +429,7 @@ extension View {
         capturedAt: capturedAt,
         payload: .display(displaySettings),
         items: [],
-        displayModeCatalog: supportsDisplayModes ? displayCatalog : [],
+        displayModeCatalog: displayCatalog,
         displayColorProfileCatalog: displaySettings.displays.compactMap { display in
           guard let profile = display.colorProfile.value else { return nil }
           return DisplayColorProfileCatalogEntry(

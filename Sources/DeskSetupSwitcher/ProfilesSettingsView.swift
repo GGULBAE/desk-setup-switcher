@@ -116,6 +116,17 @@ enum ProfileEditorSurfacePolicy {
   static let showsCurrentSettingsDraftRefresh = false
 }
 
+enum ProfileEditorWorkspaceLayoutPolicy {
+  static let railWidth: CGFloat = 160
+  static let spacing: CGFloat = 14
+  static let minimumDetailWidth: CGFloat = 360
+  static let minimumRailWorkspaceWidth = railWidth + spacing * 2 + 1 + minimumDetailWidth
+
+  static func usesRail(availableWidth: CGFloat, dynamicTypeSize: DynamicTypeSize) -> Bool {
+    !dynamicTypeSize.isAccessibilitySize && availableWidth >= minimumRailWorkspaceWidth
+  }
+}
+
 enum ProfileEditorStepPolicy {
   static let defaultGroup: SettingGroup = .display
   static let orderedGroups: [SettingGroup] = [.display, .audio, .network]
@@ -126,6 +137,20 @@ enum ProfileEditorStepPolicy {
     if rawValue.hasPrefix("settings.audio") { return .audio }
     if rawValue.hasPrefix("settings.network") { return .network }
     return nil
+  }
+  static func requiresAdvancedDisclosure(_ fieldID: DraftFieldIdentifier) -> Bool {
+    switch group(for: fieldID) {
+    case .display:
+      return fieldID != .displayPrimary && fieldID != .group(.display)
+    case .audio:
+      return ![
+        DraftFieldIdentifier.audio(.defaultOutputDevice),
+        .audio(.outputVolume),
+        .group(.audio),
+      ].contains(fieldID)
+    default:
+      return false
+    }
   }
 }
 
@@ -412,14 +437,6 @@ enum ProfileEditorAudioMuteCapabilityResolver {
 }
 
 enum ProfileEditorUnavailableIncludedSettingPolicy {
-  static func isSelectedColorProfileAvailable(
-    _ selectedProfile: ColorSyncProfileTarget?,
-    in availableProfiles: [ColorSyncProfileTarget]
-  ) -> Bool {
-    guard let selectedProfile else { return !availableProfiles.isEmpty }
-    return availableProfiles.contains(selectedProfile)
-  }
-
   static func showsRepairControl(
     isIncluded: Bool,
     isRuntimeAvailable: Bool,
@@ -1254,8 +1271,18 @@ private struct ProfileEditorForm: View {
   @State private var showsImportedIconTechnicalInformation = false
   @State private var selectedGroup = ProfileEditorStepPolicy.defaultGroup
   @State private var selectedNetworkIdentity: NetworkServiceIdentity?
+  @State private var expandedAdvancedGroup: SettingGroup?
 
   var body: some View {
+    GeometryReader { geometry in
+      editorScrollView(
+        availableWidth: min(geometry.size.width, 860)
+          - 2 * ProfileSettingInclusionLayoutPolicy.formHorizontalInset
+      )
+    }
+  }
+
+  private func editorScrollView(availableWidth: CGFloat) -> some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 12) {
         profileDetailsCard
@@ -1265,7 +1292,7 @@ private struct ProfileEditorForm: View {
         }
 
         if !availableGroups.isEmpty {
-          stepWorkspace
+          stepWorkspace(availableWidth: availableWidth)
         }
       }
       .padding(.horizontal, ProfileSettingInclusionLayoutPolicy.formHorizontalInset)
@@ -1289,6 +1316,7 @@ private struct ProfileEditorForm: View {
       showsImportedIconTechnicalInformation = false
       selectedGroup = initialSelectedGroup
       selectedNetworkIdentity = nil
+      expandedAdvancedGroup = nil
     }
     .onChange(of: presentationGeneration) {
       focusedField = nil
@@ -1297,6 +1325,7 @@ private struct ProfileEditorForm: View {
       showsImportedIconTechnicalInformation = false
       selectedGroup = initialSelectedGroup
       selectedNetworkIdentity = nil
+      expandedAdvancedGroup = nil
     }
     .onChange(of: requestedValidationFocus) {
       guard let fieldID = requestedValidationFocus else { return }
@@ -1383,20 +1412,27 @@ private struct ProfileEditorForm: View {
   }
 
   @ViewBuilder
-  private var stepWorkspace: some View {
-    if dynamicTypeSize.isAccessibilitySize {
-      compactStepWorkspace
-    } else {
-      ViewThatFits(in: .horizontal) {
-        HStack(alignment: .top, spacing: 14) {
-          stepRail
-            .frame(width: 160)
-          Divider()
-          selectedStepContent
-            .frame(minWidth: 360, maxWidth: .infinity, alignment: .topLeading)
-        }
-        compactStepWorkspace
+  private func stepWorkspace(availableWidth: CGFloat) -> some View {
+    // Navigation depends only on the viewport, never on a section's intrinsic
+    // content width or whether its advanced settings are expanded.
+    if ProfileEditorWorkspaceLayoutPolicy.usesRail(
+      availableWidth: availableWidth, dynamicTypeSize: dynamicTypeSize
+    ) {
+      HStack(alignment: .top, spacing: ProfileEditorWorkspaceLayoutPolicy.spacing) {
+        stepRail
+          .frame(width: ProfileEditorWorkspaceLayoutPolicy.railWidth)
+        Divider()
+        selectedStepContent
+          .frame(
+            width: availableWidth - ProfileEditorWorkspaceLayoutPolicy.railWidth
+              - ProfileEditorWorkspaceLayoutPolicy.spacing * 2 - 1,
+            alignment: .topLeading
+          )
       }
+      .accessibilityIdentifier("profile-workspace-rail")
+    } else {
+      compactStepWorkspace
+        .accessibilityIdentifier("profile-workspace-compact")
     }
   }
 
@@ -1521,7 +1557,7 @@ private struct ProfileEditorForm: View {
     switch group {
     case .display:
       ProfileEditorSurfacePolicy.visibleGroups.contains(.display)
-        && (hasVisibleDisplayFields || hasIncludedUnavailableDisplayFields)
+        && hasVisibleDisplayFields
     case .audio:
       ProfileEditorSurfacePolicy.visibleGroups.contains(.audio)
         && (hasVisibleAudioFields || hasIncludedUnavailableAudioFields)
@@ -1553,8 +1589,8 @@ private struct ProfileEditorForm: View {
 
   private func stepHeading(_ group: SettingGroup) -> String {
     switch group {
-    case .display: appLocalized("Display")
-    case .audio: appLocalized("Sound")
+    case .display: appLocalized("How your screens are arranged")
+    case .audio: appLocalized("Your speakers and volume")
     case .network: appLocalized("Your network settings")
     case .input: appLocalized("Your input settings")
     }
@@ -1562,9 +1598,8 @@ private struct ProfileEditorForm: View {
 
   private func stepExplanation(_ group: SettingGroup) -> String {
     switch group {
-    case .display:
-      appLocalized("Choose screen arrangement, resolution, and color for this profile.")
-    case .audio: appLocalized("Choose output, input, and volume for this profile.")
+    case .display: appLocalized("Choose how your screens work together.")
+    case .audio: appLocalized("Choose the output you want to hear and its volume.")
     case .network: appLocalized("Choose the connection this profile should configure.")
     case .input: appLocalized("Choose the input behavior for this profile.")
     }
@@ -1709,7 +1744,15 @@ private struct ProfileEditorForm: View {
         .simpleSettingsSurface()
       }
 
-      displayDeviceOptions
+      if profile.settings.display.value.displays.contains(where: {
+        !supportedDisplayModes(for: $0).isEmpty
+      }) {
+        advancedSettingsDisclosure(
+          group: .display, caption: "Resolution and refresh rate for each display."
+        ) {
+          displayDeviceOptions
+        }
+      }
     }
   }
 
@@ -1718,19 +1761,7 @@ private struct ProfileEditorForm: View {
     if !profile.settings.display.value.displays.isEmpty {
       ForEach($profile.settings.display.value.displays) { $display in
         let supportedModes = supportedDisplayModes(for: display)
-        let colorProfiles = supportedColorProfiles(for: display)
-        let isSelectedColorProfileAvailable =
-          ProfileEditorUnavailableIncludedSettingPolicy.isSelectedColorProfileAvailable(
-            display.colorProfile.value,
-            in: colorProfiles
-          )
-        let showsUnavailableColorProfile =
-          ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
-            isIncluded: display.colorProfile.isIncluded,
-            isRuntimeAvailable: isSelectedColorProfileAvailable,
-            hasRuntimeEvidence: systemSnapshot != nil
-          )
-        if !supportedModes.isEmpty || !colorProfiles.isEmpty || showsUnavailableColorProfile {
+        if !supportedModes.isEmpty {
           GroupBox {
             VStack(alignment: .leading, spacing: 10) {
               if !supportedModes.isEmpty {
@@ -1788,50 +1819,6 @@ private struct ProfileEditorForm: View {
                 }
               }
 
-              if !colorProfiles.isEmpty && !showsUnavailableColorProfile {
-                optionEditor(
-                  "Color profile",
-                  isOn: $display.colorProfile.isIncluded,
-                  validationFields: [.display(display.id, .colorProfile)],
-                  onIncludeChange: IncludeChangeAction { isIncluded in
-                    if isIncluded, display.colorProfile.value == nil {
-                      display.colorProfile.value = colorProfiles.first
-                    }
-                  }
-                ) {
-                  Picker(
-                    appLocalized("ColorSync ICC profile"),
-                    selection: $display.colorProfile.value
-                  ) {
-                    Text(appLocalized("Choose a color profile"))
-                      .tag(Optional<ColorSyncProfileTarget>.none)
-                    ForEach(colorProfiles, id: \.self) { profile in
-                      Text(profile.displayName).tag(Optional(profile))
-                    }
-                  }
-                  .labelsHidden()
-                  .accessibilityLabel(appLocalized("Display color profile"))
-                  .accessibilityValue(
-                    display.colorProfile.value?.displayName ?? appLocalized("Choose")
-                  )
-                  .accessibilityHint(
-                    appLocalized("Choose a ColorSync ICC profile available for this display")
-                  )
-                  .focused($focusedField, equals: .display(display.id, .colorProfile))
-                  .accessibilityInvalid(
-                    validation.issue(for: .display(display.id, .colorProfile)) != nil
-                  )
-                }
-              } else if showsUnavailableColorProfile {
-                unavailableIncludedOption(
-                  appLocalized("Color profile"),
-                  isOn: $display.colorProfile.isIncluded,
-                  validationFields: [.display(display.id, .colorProfile)],
-                  warning: appLocalized(
-                    "This included ColorSync profile setting is unavailable for the saved display. Turn off Include to apply other available settings normally."
-                  )
-                )
-              }
             }
           } label: {
             HStack {
@@ -1951,7 +1938,11 @@ private struct ProfileEditorForm: View {
         .simpleSettingsSurface()
       }
 
-      audioDeviceOptions
+      advancedSettingsDisclosure(
+        group: .audio, caption: "Input device, input volume, and mute."
+      ) {
+        audioDeviceOptions
+      }
     }
   }
 
@@ -2149,6 +2140,30 @@ private struct ProfileEditorForm: View {
       .padding(.horizontal, 14)
       .padding(.vertical, 12)
     }
+  }
+
+  private func advancedSettingsDisclosure<Content: View>(
+    group: SettingGroup,
+    caption: String.LocalizationValue,
+    @ViewBuilder content: @escaping () -> Content
+  ) -> some View {
+    AccessibleDisclosureGroup(
+      appLocalized("Advanced settings"),
+      accessibilityIdentifier: "profile-advanced-\(group.rawValue)",
+      isExpanded: Binding(
+        get: { expandedAdvancedGroup == group },
+        set: { expandedAdvancedGroup = $0 ? group : nil }
+      )
+    ) {
+      VStack(alignment: .leading, spacing: 10) {
+        Text(appLocalized(caption))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        content()
+      }
+    }
+    .padding(.horizontal, 4)
   }
 
   private var displayArrangementIncludedBinding: Binding<Bool> {
@@ -2779,6 +2794,12 @@ private struct ProfileEditorForm: View {
   private func revealAndFocus(_ fieldID: DraftFieldIdentifier) {
     if let group = ProfileEditorStepPolicy.group(for: fieldID) {
       selectedGroup = group
+      if ProfileEditorStepPolicy.requiresAdvancedDisclosure(fieldID)
+        || fieldID == .audio(.outputVolume)
+          && !audioVolumeCapability(role: .output).isWritable
+      {
+        expandedAdvancedGroup = group
+      }
       if group == .network,
         let identity = ProfileEditorNetworkSelectionPolicy.identity(
           for: fieldID, in: profile.settings.network.value.serviceIPv4
@@ -2804,8 +2825,11 @@ private struct ProfileEditorForm: View {
         showsValidationSummary = true
         revealAndFocus(firstValidationItem.fieldID)
       }
-    case .editorAudio, .editorAudioUnsupported:
+    case .editorAudio:
       selectedGroup = .audio
+    case .editorAudioUnsupported:
+      selectedGroup = .audio
+      expandedAdvancedGroup = .audio
     case .editorNetwork:
       selectedGroup = .network
     case .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
@@ -2813,11 +2837,15 @@ private struct ProfileEditorForm: View {
       selectedGroup = .network
     case .editorDisplayColor:
       selectedGroup = .display
+      expandedAdvancedGroup = .display
     case .editor, .editorPolish, .editorDisplay,
       .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
       .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
       .permissions, .diagnostics:
       selectedGroup = .display
+    }
+    if uiAuditConfiguration.expandsProfileDetails {
+      expandedAdvancedGroup = selectedGroup
     }
   }
 
@@ -2961,22 +2989,6 @@ private struct ProfileEditorForm: View {
     return DisplayModeMatcher().deduplicated(entry.modes)
   }
 
-  private func supportedColorProfiles(
-    for display: DisplayTargetSettings
-  ) -> [ColorSyncProfileTarget] {
-    let entries = systemSnapshot?.displayColorProfileCatalog ?? []
-    guard
-      case .matched(let matchedIdentity) = DisplayIdentityMatcher().match(
-        display.identity,
-        among: entries.map(\.identity)
-      ), let entry = entries.first(where: { $0.identity == matchedIdentity }),
-      entry.canApply
-    else {
-      return []
-    }
-    return entry.profiles
-  }
-
   private var hasVisibleDisplayFields: Bool {
     visibleSettingFields.contains { $0.contract.group == .display }
   }
@@ -2987,21 +2999,6 @@ private struct ProfileEditorForm: View {
 
   private var hasVisibleNetworkFields: Bool {
     visibleSettingFields.contains { $0.contract.group == .network }
-  }
-
-  private var hasIncludedUnavailableDisplayFields: Bool {
-    profile.settings.display.value.displays.contains { display in
-      let colorProfiles = supportedColorProfiles(for: display)
-      return ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
-        isIncluded: display.colorProfile.isIncluded,
-        isRuntimeAvailable:
-          ProfileEditorUnavailableIncludedSettingPolicy.isSelectedColorProfileAvailable(
-            display.colorProfile.value,
-            in: colorProfiles
-          ),
-        hasRuntimeEvidence: systemSnapshot != nil
-      )
-    }
   }
 
   private var hasIncludedUnavailableAudioFields: Bool {

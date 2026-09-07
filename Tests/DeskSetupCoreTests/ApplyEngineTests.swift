@@ -39,6 +39,29 @@ struct ApplyEngineTests {
     #expect(profile.settings.network.value.dnsServers.value == ["192.0.2.53"])
   }
 
+  @Test("legacy color-only profiles never reach the display adapter in normal or force mode")
+  func retiredColorProfilesCannotApply() async throws {
+    let adapter = MockSystemSettingsAdapter(group: .display)
+    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+    var profile = makeProfile(including: [.display])
+    profile.settings.display.value.displays[0].isPrimary.isIncluded = false
+    profile.settings.display.value.displays[0].colorProfile = .init(
+      value: .init(
+        registeredProfileID: "synthetic-legacy",
+        fileSHA256: String(repeating: "a", count: 64),
+        displayName: "Synthetic Legacy ICC"
+      )
+    )
+    for mode in [ApplyMode.normal, .force] {
+      let preparation = await engine.prepare(profile: profile, mode: mode)
+      #expect(preparation.includedGroups.isEmpty)
+      #expect(preparation.operations.isEmpty)
+      #expect(!preparation.canExecute)
+    }
+    #expect(await adapter.recordedInvocations().isEmpty)
+    #expect(profile.settings.display.value.displays[0].colorProfile.isIncluded)
+  }
+
   @Test("a group toggle without included leaf settings is not applicable")
   func emptyIncludedGroupIsRejected() async {
     var settings = ProfileSettings()

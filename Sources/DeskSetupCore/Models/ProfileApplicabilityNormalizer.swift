@@ -30,6 +30,8 @@ public struct ProfileApplicabilityNormalizer: Sendable {
     normalizePrimaryDisplayApplicability(&normalized.display.value.displays)
 
     for index in normalized.display.value.displays.indices {
+      // Retired from profile capture/edit/apply. Keep legacy values dormant for JSON compatibility.
+      normalized.display.value.displays[index].colorProfile.isIncluded = false
       normalized.display.value.displays[index].origin.isIncluded = false
       normalized.display.value.displays[index].rotationDegrees.isIncluded = false
       normalized.display.value.displays[index].isActive.isIncluded = false

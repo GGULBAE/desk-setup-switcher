@@ -119,6 +119,43 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(!normalized.settings.input.value.pointerSpeed.isIncluded)
   }
 
+  @Test("legacy color profiles stay dormant after normalization and JSON import")
+  func legacyColorProfileIsExcludedWithoutDeletingItsValue() throws {
+    let color = ColorSyncProfileTarget(
+      registeredProfileID: "synthetic-legacy",
+      fileSHA256: String(repeating: "a", count: 64),
+      displayName: "Synthetic Legacy ICC"
+    )
+    let display = DisplayTargetSettings(
+      identity: DisplayIdentity(productName: "Synthetic Panel"),
+      isPrimary: .init(isIncluded: false, value: true),
+      origin: .init(isIncluded: false, value: .init(x: 0, y: 0)),
+      mirroring: .init(isIncluded: false, value: .extended),
+      mode: .init(isIncluded: false, value: .init(width: 1_920, height: 1_080, refreshRate: 60)),
+      colorProfile: .init(value: color),
+      rotationDegrees: .init(isIncluded: false, value: 0),
+      isActive: .init(isIncluded: false, value: true)
+    )
+    let profile = DeskProfile(
+      name: "Synthetic legacy color",
+      settings: .init(display: .init(value: .init(displays: [display]))),
+      createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+      updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+    let normalized = normalizer.normalize(profile)
+    #expect(!normalized.settings.display.isIncluded)
+    #expect(!normalized.settings.display.value.displays[0].colorProfile.isIncluded)
+    #expect(normalized.settings.display.value.displays[0].colorProfile.value == color)
+    #expect(normalizer.normalize(normalized) == normalized)
+    let codec = ProfileJSONCodec()
+    let imported = try codec.decode(codec.encode(ProfileDocument(profiles: [profile])))
+    #expect(imported.wasNormalized)
+    #expect(imported.document.profiles[0] == normalized)
+    let roundTrip = try codec.decode(codec.encode(imported.document))
+    #expect(!roundTrip.wasNormalized)
+    #expect(roundTrip.document == imported.document)
+  }
+
   @Test("output mute remains applicable and keeps the audio group included")
   func outputMuteRemainsApplicable() {
     var settings = ProfileSettings()

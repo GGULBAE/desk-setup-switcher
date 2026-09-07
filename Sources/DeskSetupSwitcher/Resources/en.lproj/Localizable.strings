@@ -226,6 +226,7 @@
 "Main display" = "Main display";
 "Change screen arrangement with this profile" = "Change screen arrangement with this profile";
 "Includes the screen arrangement and main display when applying" = "Includes the screen arrangement and main display when applying";
+"Resolution and refresh rate for each display." = "Resolution and refresh rate for each display.";
 "Advanced settings" = "Advanced settings";
 "Resolution, refresh rate, and color profiles." = "Resolution, refresh rate, and color profiles.";
 "Output" = "Output";

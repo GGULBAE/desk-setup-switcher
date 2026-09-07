@@ -56,11 +56,6 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
         .display,
         "\(prefix).mode"
       )
-      applicable(
-        display.colorProfile.isIncluded,
-        .display,
-        "\(prefix).colorProfile"
-      )
     }
 
     let audio = settings.audio.value

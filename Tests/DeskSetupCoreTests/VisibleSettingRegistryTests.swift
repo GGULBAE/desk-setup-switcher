@@ -29,7 +29,7 @@ struct VisibleSettingRegistryTests {
     #expect(counts[.displayOutputMode] == 1)
     #expect(counts[.displayPrimary] == 1)
     #expect(counts[.displayMode] == 2)
-    #expect(counts[.displayColorProfile] == 1)
+    #expect(!fields.contains { $0.contract.snapshotKey == "display.colorProfile" })
     #expect(counts[.audioDefaultInput] == 1)
     #expect(counts[.audioDefaultOutput] == 1)
     #expect(counts[.audioInputVolume] == 1)
@@ -62,7 +62,6 @@ struct VisibleSettingRegistryTests {
 
     let kinds = VisibleSettingRegistry().fields(snapshots: snapshots).map(\.contract.kind)
 
-    #expect(!kinds.contains(.displayColorProfile))
     #expect(!kinds.contains(.audioInputVolume))
     #expect(!kinds.contains(.audioOutputVolume))
     #expect(!kinds.contains(.audioOutputMute))

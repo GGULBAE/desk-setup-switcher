@@ -2,6 +2,8 @@
 
 Date: 2026-09-07
 
+Historical record: the direct Display/Sound controls below were an over-broad interpretation and are superseded by [the profile UI correction](PROFILE-UI-CORRECTION-2026-09-07.md). The original renders did not catch content-dependent navigation changes. Last-application removal, Network cards, and App Settings remain.
+
 ## Behavior
 
 - Profiles no longer render Last application history. Stored application summaries and the post-Apply result workflow remain intact.

@@ -4,7 +4,6 @@ public enum VisibleSettingKind: String, CaseIterable, Codable, Hashable, Sendabl
   case displayOutputMode
   case displayPrimary
   case displayMode
-  case displayColorProfile
   case audioDefaultInput
   case audioDefaultOutput
   case audioInputVolume
@@ -117,17 +116,6 @@ public struct VisibleSettingRegistry: Sendable {
       accessibilityLabelKey: "editor.display.mode.accessibility"
     ),
     .init(
-      kind: .displayColorProfile,
-      group: .display,
-      snapshotKey: "display.colorProfile",
-      runtimeCatalogSource: "displayColorProfileCatalog",
-      validationKey: "display.colorProfile",
-      operationKeyPrefix: "display.colorProfile.",
-      editorKind: .picker,
-      localizationKey: "editor.display.colorProfile",
-      accessibilityLabelKey: "editor.display.colorProfile.accessibility"
-    ),
-    .init(
       kind: .audioDefaultInput,
       group: .audio,
       snapshotKey: "defaultInput",
@@ -216,12 +204,7 @@ public struct VisibleSettingRegistry: Sendable {
           fields.append(.init(id: "\(contract.kind.rawValue).\(index)", contract: contract))
         }
       }
-      if let contract = contractByKind[.displayColorProfile] {
-        for (index, entry) in (display.displayColorProfileCatalog ?? []).enumerated()
-        where entry.canApply && !entry.profiles.isEmpty {
-          fields.append(.init(id: "\(contract.kind.rawValue).\(index)", contract: contract))
-        }
-      }
+
     }
 
     if let audio = snapshots.first(where: { $0.group == .audio }) {

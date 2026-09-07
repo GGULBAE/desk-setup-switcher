@@ -237,6 +237,35 @@ import Testing
       #expect(handoff.presentationChanged(isPresented: false) == .none)
     }
 
+    @Test("section navigation uses viewport width and keeps basic-field validation collapsed")
+    func stableProfileSectionNavigation() {
+      let minimum = ProfileEditorWorkspaceLayoutPolicy.minimumRailWorkspaceWidth
+      #expect(
+        ProfileEditorWorkspaceLayoutPolicy.usesRail(
+          availableWidth: minimum, dynamicTypeSize: .large
+        ))
+      #expect(
+        !ProfileEditorWorkspaceLayoutPolicy.usesRail(
+          availableWidth: minimum - 1, dynamicTypeSize: .large
+        ))
+      #expect(
+        !ProfileEditorWorkspaceLayoutPolicy.usesRail(
+          availableWidth: 1_200, dynamicTypeSize: .accessibility3
+        ))
+      let displayID = UUID()
+      #expect(ProfileEditorStepPolicy.requiresAdvancedDisclosure(.display(displayID, .modeWidth)))
+      #expect(ProfileEditorStepPolicy.requiresAdvancedDisclosure(.audio(.defaultInputDevice)))
+      #expect(ProfileEditorStepPolicy.requiresAdvancedDisclosure(.audio(.inputVolume)))
+      #expect(ProfileEditorStepPolicy.requiresAdvancedDisclosure(.audio(.outputMute)))
+      for field: DraftFieldIdentifier in [
+        .profileName, .displayPrimary, .group(.display), .group(.audio),
+        .audio(.defaultOutputDevice), .audio(.outputVolume),
+        .networkService(at: 1, .ipv4Address),
+      ] {
+        #expect(!ProfileEditorStepPolicy.requiresAdvancedDisclosure(field))
+      }
+    }
+
     @Test("apply result count presentation hides zero outcomes without losing safety states")
     func applyResultCountPresentationFiltersOnlyZeros() throws {
       var summary = try #require(UIAuditFixtures.fixture(.trayApplyResult).applySummary)
@@ -333,42 +362,6 @@ import Testing
 
     @Test("only included unavailable settings receive an editor repair control")
     func unavailableIncludedSettingsRemainRepairable() {
-      let savedColorProfile = ColorSyncProfileTarget(
-        registeredProfileID: "saved-profile",
-        fileSHA256: String(repeating: "a", count: 64),
-        displayName: "Saved synthetic ICC"
-      )
-      let otherColorProfile = ColorSyncProfileTarget(
-        registeredProfileID: "other-profile",
-        fileSHA256: String(repeating: "b", count: 64),
-        displayName: "Other synthetic ICC"
-      )
-
-      #expect(
-        ProfileEditorUnavailableIncludedSettingPolicy.isSelectedColorProfileAvailable(
-          savedColorProfile,
-          in: [savedColorProfile, otherColorProfile]
-        )
-      )
-      #expect(
-        !ProfileEditorUnavailableIncludedSettingPolicy.isSelectedColorProfileAvailable(
-          savedColorProfile,
-          in: [otherColorProfile]
-        )
-      )
-      #expect(
-        ProfileEditorUnavailableIncludedSettingPolicy.isSelectedColorProfileAvailable(
-          nil,
-          in: [otherColorProfile]
-        )
-      )
-      #expect(
-        !ProfileEditorUnavailableIncludedSettingPolicy.isSelectedColorProfileAvailable(
-          nil,
-          in: []
-        )
-      )
-
       #expect(
         ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
           isIncluded: true,

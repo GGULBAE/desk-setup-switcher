@@ -226,6 +226,7 @@
 "Main display" = "주 디스플레이";
 "Change screen arrangement with this profile" = "이 프로필로 화면 배치 변경";
 "Includes the screen arrangement and main display when applying" = "적용할 때 화면 배치와 주 디스플레이를 포함합니다";
+"Resolution and refresh rate for each display." = "디스플레이별 해상도와 주사율을 설정하세요.";
 "Advanced settings" = "고급 설정";
 "Resolution, refresh rate, and color profiles." = "해상도, 새로 고침 빈도 및 색상 프로파일입니다.";
 "Output" = "출력";

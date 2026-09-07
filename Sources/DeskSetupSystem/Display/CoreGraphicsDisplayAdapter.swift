@@ -64,12 +64,8 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
           isIncluded: display.currentMode != nil,
           value: display.currentMode ?? fallbackMode
         ),
-        colorProfile: SettingOption(
-          isIncluded: display.canSetColorProfile
-            && display.currentColorProfile != nil
-            && display.currentColorProfileMapping != nil,
-          value: display.currentColorProfile
-        ),
+        // Color profiles are no longer captured as profile options.
+        colorProfile: SettingOption(isIncluded: false, value: nil),
         rotationDegrees: SettingOption(
           isIncluded: false,
           value: display.rotationDegrees
@@ -95,16 +91,7 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
             "Bounds \(display.bounds.width)×\(display.bounds.height) at (\(display.bounds.x), \(display.bounds.y))."
         )
       )
-      if target.colorProfile.isIncluded {
-        items.append(
-          SnapshotItem(
-            key: "display.colorProfile.\(index)",
-            label: "ColorSync ICC profile",
-            state: .storable,
-            detail: "A public ColorSync profile catalog and rollback mapping are available."
-          )
-        )
-      }
+
     }
 
     if displays.isEmpty {
@@ -130,14 +117,6 @@ public struct CoreGraphicsDisplayAdapter: SystemSettingsAdapter {
         display.currentColorSpaceName.map {
           DisplayColorEvidenceEntry(identity: display.identity, colorSpaceName: $0)
         }
-      },
-      displayColorProfileCatalog: displays.map {
-        DisplayColorProfileCatalogEntry(
-          identity: $0.identity,
-          profiles: $0.availableColorProfiles,
-          canApply: $0.canSetColorProfile
-            && $0.currentColorProfileMapping != nil
-        )
       }
     )
   }

@@ -59,7 +59,7 @@ Choose **Edit Profile** on a profile to open **Settings → Profiles**.
 
 - Give the profile a recognizable name and icon.
 - Work through the stable numbered **Display**, **Sound**, and **Network** steps. At the minimum window size or an accessibility text size, the same steps become a compact segmented selector.
-- Edit screen arrangement, resolution, refresh rate, and ColorSync in **Display**; output, mute, input, and volume in **Sound**; and DHCP/manual IP fields in **Network**. These controls are shown directly within their step. Use the inclusion switches to choose what the profile applies.
+- Choose screen arrangement in **Display** and output/volume in **Sound**. Expand **Advanced settings** for per-display resolution/refresh or audio input/mute. **Network** keeps its connection and DHCP/manual IP cards. Opening details does not move the section selector. Color profiles are no longer captured or editable, and legacy values are excluded from Apply. Use the inclusion switches to choose what the profile applies.
 - Network has one connection selector. Browsing another connection preserves all saved inclusion choices; its **Apply with profile** switch changes only the selected connection. If a value is invalid, Save selects the owning step and connection before moving focus to it.
 - The editor contains profile settings only. Itemized application results remain available after Apply.
 - Save the profile. `⌘S` saves a valid dirty draft.

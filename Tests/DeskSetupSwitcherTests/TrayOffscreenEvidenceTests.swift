@@ -79,6 +79,7 @@ import Testing
       let size: CGSize
       let state: State
       let dynamicTypeSizeOverride: DynamicTypeSize?
+      let expandsProfileDetails: Bool
 
       var dynamicTypeSize: DynamicTypeSize {
         dynamicTypeSizeOverride ?? (displayMode == .largeText ? .accessibility3 : .large)
@@ -109,7 +110,8 @@ import Testing
         displayMode: UIAuditDisplayMode,
         size: CGSize,
         state: State = .standard,
-        dynamicTypeSizeOverride: DynamicTypeSize? = nil
+        dynamicTypeSizeOverride: DynamicTypeSize? = nil,
+        expandsProfileDetails: Bool = false
       ) {
         self.name = name
         self.variant = variant
@@ -119,12 +121,14 @@ import Testing
         self.size = size
         self.state = state
         self.dynamicTypeSizeOverride = dynamicTypeSizeOverride
+        self.expandsProfileDetails = expandsProfileDetails
       }
     }
 
     struct SettingsRenderEvidence {
       let png: Data
       let accessibility: String
+      let railSelectionPixelCount: Int
       let sidebarActionGeometry: SidebarActionGeometry?
       let footerDarkPixelCount: Int
       let storageErrorAccentPixelCount: Int
@@ -437,12 +441,12 @@ import Testing
           size: CGSize(width: 900, height: 568)
         ),
         SettingsFixture(
-          name: "18-display-color-en-dark",
+          name: "18-display-details-en-dark",
           variant: .editorDisplayColor,
           languageCode: "en",
           colorScheme: .dark,
           displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          size: CGSize(width: 900, height: 900)
         ),
         SettingsFixture(
           name: "19-audio-unsupported-en-light",
@@ -451,6 +455,15 @@ import Testing
           colorScheme: .light,
           displayMode: .standard,
           size: CGSize(width: 900, height: 568)
+        ),
+        SettingsFixture(
+          name: "19b-audio-details-ko-light",
+          variant: .editorAudio,
+          languageCode: "ko",
+          colorScheme: .light,
+          displayMode: .standard,
+          size: CGSize(width: 900, height: 900),
+          expandsProfileDetails: true
         ),
         SettingsFixture(
           name: "20-ethernet-dhcp-en-light",
@@ -552,6 +565,13 @@ import Testing
 
         #expect(rendered.png.count > 10_000)
         #expect(rendered.accessibility.contains("synthetic-settings-host=true"))
+        if fixture.isProfileSurface, fixture.size.width == 900,
+          !fixture.dynamicTypeSize.isAccessibilitySize, fixture.state == .standard
+        {
+          // Pixel evidence from the actual numbered rail, not a declaration
+          // recomputed from the policy. Catches content-dependent fallback.
+          #expect(rendered.railSelectionPixelCount > 100, "Missing rail in \(fixture.name)")
+        }
         #expect(!rendered.accessibility.contains("/Users/"))
         #expect(!rendered.accessibility.localizedCaseInsensitiveContains("password"))
         if fixture.colorScheme == .light {
@@ -1201,7 +1221,8 @@ import Testing
         isEnabled: true,
         variant: fixture.variant,
         displayMode: fixture.displayMode,
-        showsStatusPopover: false
+        showsStatusPopover: false,
+        expandsProfileDetails: fixture.expandsProfileDetails
       )
       let model = UIAuditFixtures.makeModel(configuration: configuration)
       let locationPermission = LocationPermissionController(
@@ -1290,6 +1311,17 @@ import Testing
       let evidenceRepresentation = try #require(NSBitmapImageRep(data: png))
       #expect(!evidenceRepresentation.hasAlpha)
       let imageStatistics = sampledImageStatistics(in: evidenceRepresentation)
+      // At a 900-point viewport this band contains only the rail's numbered
+      // selection circles, never the saved-profile sidebar or detail controls.
+      let railSelectionPixelCount = pixelCount(
+        in: evidenceRepresentation,
+        viewport: size,
+        logicalRegion: CGRect(x: 260, y: 130, width: 28, height: 225)
+      ) { color in
+        color.blueComponent > 0.65
+          && color.blueComponent - color.redComponent > 0.25
+          && color.blueComponent - color.greenComponent > 0.15
+      }
       let sidebarActionGeometry = sidebarActionGeometry(
         in: evidenceRepresentation,
         viewport: size
@@ -1355,6 +1387,7 @@ import Testing
         "inclusion-summary-line-limit=\(inclusionSummaryLineLimit)",
         "inclusion-minimum-available-width=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.minimumAvailableHeaderWidth)) : "not-applicable")",
         "inclusion-expected-control-width-limit=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.maximumExpectedControlWidth)) : "not-applicable")",
+        "rail-selection-pixel-count=\(railSelectionPixelCount)",
         "step-navigation=\(fixture.isProfileSurface ? "display,sound,network" : "not-applicable")",
         "step-state-cues=\(fixture.isProfileSurface ? "number,title,checkmark" : "not-applicable")",
         "inclusion-state-cues=\(fixture.isProfileSurface ? "label,switch;options=text,symbol,switch" : "not-applicable")",
@@ -1380,6 +1413,7 @@ import Testing
       return SettingsRenderEvidence(
         png: png,
         accessibility: lines.joined(separator: "\n") + "\n",
+        railSelectionPixelCount: railSelectionPixelCount,
         sidebarActionGeometry: sidebarActionGeometry,
         footerDarkPixelCount: footerDarkPixelCount,
         storageErrorAccentPixelCount: storageErrorAccentPixelCount,

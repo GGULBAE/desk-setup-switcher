@@ -262,13 +262,13 @@ A separately authorized reinstall copied the verified mounted package to `/Appli
 
 ## Profile editing and App Settings clarification — 2026-09-07
 
-The current editor supersedes M4.13's Advanced disclosures with directly visible controls inside Display, Sound, and Network. Last application history is removed from profile editing. Network uses one transient connection selector and exposes DHCP/manual fields for that connection; validation selects the service that owns the invalid field without changing other included services.
+The first implementation flattened Advanced controls, but that exceeded the requested scope. The [profile UI correction](PROFILE-UI-CORRECTION-2026-09-07.md) restores Display/Sound basic cards and Advanced disclosures, retains Network's connection/IPv4 cards, and makes rail selection independent of content width. Color profiles are excluded from capture/edit/apply; legacy values remain dormant. Last application history is removed from profile editing. Network uses one transient connection selector and exposes DHCP/manual fields for that connection; validation selects the service that owns the invalid field without changing other included services.
 
 The former System tab is now **App Settings**: app behavior, Wi-Fi capture access, and an on-demand **Open Diagnostics…** action. Login registration status and refresh are available in **Login item details**; mismatches and retry actions remain visible next to the launch toggle.
 
-Implementation and verification are tracked in [the follow-up evidence note](PROFILE-APP-SETTINGS-2026-09-07.md). This changes presentation and selection/focus behavior; hardware verification remains pending.
+Current implementation and verification are tracked in [the correction evidence](PROFILE-UI-CORRECTION-2026-09-07.md); the [initial follow-up](PROFILE-APP-SETTINGS-2026-09-07.md) remains historical. Hardware verification remains pending.
 
-The separately authorized 2026-09-07 reinstall copied the verified signed app from the read-only DMG to `/Applications` and launched that installed path. Installed executable SHA-256 is `2969f417716fbd4021f84585f9926ac3557b6be52333f84c99905db104c9da89`; profile primary/backup hashes were unchanged and the previous app remains in a build-local recovery directory. This is replacement/launch evidence only, not an interactive editor or hardware-mutation result.
+The earlier, separately authorized 2026-09-07 reinstall copied the verified signed app from the read-only DMG to `/Applications` and launched that installed path. Installed executable SHA-256 is `2969f417716fbd4021f84585f9926ac3557b6be52333f84c99905db104c9da89`; profile primary/backup hashes were unchanged and the previous app remains in a build-local recovery directory. This is replacement/launch evidence only, not an interactive editor or hardware-mutation result.
 
 ## M4.14 — tray and apply-preview density refinement (implemented; local verification passed)
 

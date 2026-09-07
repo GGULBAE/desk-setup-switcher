@@ -13,6 +13,12 @@ struct ProfileCaptureSummaryBuilderTests {
       origin: .init(value: DisplayPoint(x: 0, y: 0)),
       mirroring: .init(value: .extended),
       mode: .init(value: DisplayMode(width: 1_920, height: 1_080, refreshRate: 60)),
+      colorProfile: .init(
+        value: .init(
+          registeredProfileID: "synthetic-legacy",
+          fileSHA256: String(repeating: "a", count: 64),
+          displayName: "Synthetic Legacy ICC"
+        )),
       rotationDegrees: .init(isIncluded: false, value: 90),
       isActive: .init(isIncluded: false, value: true)
     )
@@ -42,6 +48,7 @@ struct ProfileCaptureSummaryBuilderTests {
     #expect(summary.status == .complete)
     #expect(!summary.items.contains { $0.group == .network })
     #expect(summary.applicableCount == 3)
+    #expect(!summary.items.contains { $0.key.contains("colorProfile") })
     #expect(summary.excludedCount == 0)
     #expect(summary.unreadableCount == 0)
     #expect(summary.permissionRequiredCount == 0)
