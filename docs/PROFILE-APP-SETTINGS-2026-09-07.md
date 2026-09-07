@@ -29,7 +29,15 @@ swift test --filter TrayOffscreenEvidenceTests.rendersSimplifiedProfileSections
 
 Verification exercised the combined working tree, including pre-existing Apply Preview edits. Only this follow-up's profile/App Settings changes are committed here; the generated package is local working-tree evidence, not an exact-commit release candidate. The verified unsigned DMG SHA-256 is `af214010467f99f9e9f1a0f315d9e7208baec0ef6210315de9caa0d2de708570`. Final `git diff --check` and localization/lint passed after the documentation update.
 
-These checks use synthetic/mock state. They do not establish installed keyboard/VoiceOver behavior, live TCC/login actions, or physical display/audio/network apply/rollback. No installed app replacement, remote push, or publication is part of this follow-up.
+These checks use synthetic/mock state. They do not establish installed keyboard/VoiceOver behavior, live TCC/login actions, or physical display/audio/network apply/rollback. The implementation verification above did not replace the installed app, push remotely, or publish. The subsequent user-authorized installation is recorded below.
+
+## Authorized local installation — 2026-09-07
+
+The user requested installation on the current Mac. The exact previously verified DMG (`af214010467f99f9e9f1a0f315d9e7208baec0ef6210315de9caa0d2de708570`) was mounted read-only; its ad-hoc-signed app was validated, staged, and moved to `/Applications/Desk Setup Switcher.app`. The old app was not running and was preserved in a build-local recovery directory with rollback instructions. The DMG was detached before launching the installed app.
+
+The installed process runs from the expected `/Applications` executable path. The installed executable SHA-256 is `2969f417716fbd4021f84585f9926ac3557b6be52333f84c99905db104c9da89`; strict/deep signature verification and the `x86_64 arm64` architecture check passed. This packaged executable differs from the unsigned build output because packaging adds the ad-hoc integrity signature. The Korean App Settings resource is present, and profile primary/backup hashes are unchanged after launch.
+
+This proves replacement, startup, and profile-file preservation only. No UI automation, profile Apply, permission prompt, login registration action, hardware mutation, or remote publication was performed.
 
 ## Next verification task
 

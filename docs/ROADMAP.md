@@ -268,6 +268,8 @@ The former System tab is now **App Settings**: app behavior, Wi-Fi capture acces
 
 Implementation and verification are tracked in [the follow-up evidence note](PROFILE-APP-SETTINGS-2026-09-07.md). This changes presentation and selection/focus behavior; hardware verification remains pending.
 
+The separately authorized 2026-09-07 reinstall copied the verified signed app from the read-only DMG to `/Applications` and launched that installed path. Installed executable SHA-256 is `2969f417716fbd4021f84585f9926ac3557b6be52333f84c99905db104c9da89`; profile primary/backup hashes were unchanged and the previous app remains in a build-local recovery directory. This is replacement/launch evidence only, not an interactive editor or hardware-mutation result.
+
 ## M4.14 — tray and apply-preview density refinement (implemented; local verification passed)
 
 - Give exactly three standard profile cards a 480-point tray viewport instead of the 560-point overflow maximum; retain the existing 0/1/2 and 4+ height contracts and screen clamping.

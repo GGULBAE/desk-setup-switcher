@@ -99,6 +99,8 @@ No test evidence contains a real SSID, exact location, IP host address, credenti
 
 ## UI hardening
 
+Installation evidence, 2026-09-07: the user-authorized replacement and launch of the verified DMG app succeeded, with matching installed executable hash/signature and unchanged profile primary/backup files. The previous app remains recoverable. This does not check any installed keyboard, scrolling, VoiceOver, or hardware-mutation gate; see [the installation record](PROFILE-APP-SETTINGS-2026-09-07.md).
+
 - [x] Commit `3bf2324` records direct profile editing and App Settings: Last application and Advanced disclosures removed from the editor; Network uses one transient selector with service-specific validation focus; App Settings groups app behavior, Wi-Fi capture, and on-demand diagnostics. Implementation and successful non-live verification are recorded in [the follow-up evidence note](PROFILE-APP-SETTINGS-2026-09-07.md). Installed keyboard/VoiceOver and hardware behavior remain unverified.
 
 - [x] A pure app-lifetime draft session distinguishes saved and editable profile values, detects user-field changes, and unit-tests save/discard/cancel selection resolution, failed or mismatched save completion, external refreshes, and authoritative metadata preservation.
