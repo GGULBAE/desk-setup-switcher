@@ -8,6 +8,8 @@ This is a UI-only follow-up to the [minimal profile scope](MINIMAL-PROFILE-SCOPE
 
 ## Verification status
 
+Implementation commit: `b6a8723` (local only; no push or new CI run).
+
 The 19-fixture offscreen matrix passed in 105 seconds and exported 19 PNGs plus metadata to `.build/audio-grouping-ui-2026-09-07/` (log: `.build/audio-grouping-ui.log`). Seven Sound renders were visually inspected: Korean normal/full-height/minimum/accessibility text, English dark/large text, and unavailable-volume repair. The regression fixture checks two continuous section surfaces in the actual full-height Korean Sound render, rather than four independent option cards. English/Korean, dark, minimum-window, large-text, unavailable-volume, validation, and stable-navigation fixtures remain covered. The full canonical `make verify` retry passed (`.build/audio-grouping-verify-retry.log`): lint/localization, 195 XCTest cases (five opt-in skips), 341 Swift Testing cases in 39 suites (two opt-in skips), the isolated native popover regression, release-tooling safety mocks, Swift/Xcode Debug and Release, Analyze, packaging, and mounted metadata/resources/architectures/signature checks. `git diff --check` passed.
 
 No live hardware setting, permission, login-item, or third-party configuration mutation is performed. Synthetic rendering does not prove installed keyboard/VoiceOver behavior or hardware Apply/rollback. Existing unrelated Apply Preview work is preserved and excluded from this milestone's commit.

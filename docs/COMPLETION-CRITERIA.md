@@ -2,7 +2,7 @@
 
 ## Grouped Sound sections — 2026-09-07
 
-- [ ] Commit the verified presentation-only Output/Input grouping, with device and volume in each section, independent inclusion, unchanged capture/apply scope, and synthetic rendering evidence. See [grouped Sound evidence](AUDIO-SECTIONS-2026-09-07.md).
+- [x] Commit `b6a8723` records the presentation-only Output/Input grouping, with device and volume in each section, independent inclusion, and unchanged capture/apply scope. Full `make verify` retry, 19 synthetic views, local reinstall/startup, and byte-identical preservation of both profile files passed. See [grouped Sound evidence](AUDIO-SECTIONS-2026-09-07.md).
 
 ## Current six-option profile scope — 2026-09-07
 
