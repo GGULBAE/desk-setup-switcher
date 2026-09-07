@@ -12,6 +12,8 @@ Date: 2026-09-07
 
 ## Verification
 
+Implementation commit: `3bf2324`.
+
 The canonical non-live `make verify` gate passed: localization/lint, unit/mock tests, release-tooling tests, Debug/Release builds, universal Xcode builds, static analysis, and mounted unsigned-DMG/resource verification. The Swift Testing run passed 334 tests; the existing XCTest and isolated native-popover checks also completed successfully, with live opt-in checks remaining outside this evidence boundary.
 
 The 18-fixture Settings offscreen matrix passed and every generated PNG was visually inspected. The fixtures cover English/Korean, light/dark, minimum windows, large/accessibility text, validation, unavailable audio, ColorSync, and DHCP/manual IPv4. Direct controls, warning/repair rows, fixed Save/Revert actions, and the App Settings sections retain their layout. Long forms continue to scroll; screenshots do not prove installed scrolling or keyboard behavior.
@@ -25,7 +27,7 @@ DESK_SETUP_REFINEMENT_EVIDENCE_DIR="$PWD/.build/profile-app-settings-2026-09-07"
 swift test --filter TrayOffscreenEvidenceTests.rendersSimplifiedProfileSections
 ```
 
-Verification exercised the combined working tree, including pre-existing Apply Preview edits. Only this follow-up's profile/App Settings changes are committed here; the generated package is local working-tree evidence, not an exact-commit release candidate. Final `git diff --check` and localization/lint are rerun after the documentation update.
+Verification exercised the combined working tree, including pre-existing Apply Preview edits. Only this follow-up's profile/App Settings changes are committed here; the generated package is local working-tree evidence, not an exact-commit release candidate. The verified unsigned DMG SHA-256 is `af214010467f99f9e9f1a0f315d9e7208baec0ef6210315de9caa0d2de708570`. Final `git diff --check` and localization/lint passed after the documentation update.
 
 These checks use synthetic/mock state. They do not establish installed keyboard/VoiceOver behavior, live TCC/login actions, or physical display/audio/network apply/rollback. No installed app replacement, remote push, or publication is part of this follow-up.
 
