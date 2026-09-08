@@ -51,6 +51,8 @@ The presentation-only Sound follow-up groups device and volume within Output/Inp
 
 ## App, profiles, and safety engine
 
+Current 2026-09-08 follow-up: Display/Sound detail headings are omitted while named section containers and validation targets remain; footer/sidebar controls gain insets. Short trays use a detached pre-open content fit, never live resize feedback. Existing ON login preferences do not request registration at startup; ON/Retry in App Settings remains explicit, and opt-out cleanup is unchanged. No `sfltool` invocation is part of the app or this verification pass. See [verification boundaries](SPACING-LOGIN-2026-09-08.md).
+
 | Area | Capability | Status and evidence |
 | --- | --- | --- |
 | App | Background/menu-bar-only lifecycle | `LSUIElement` and the app-owned `NSStatusItem`/`NSPopover` source retain the preceding build/package verification. Persistent Settings/workflow presentation has a liveness deadline, consumer-local cancellation, red-close detachment, immediate-reopen defense, and identity-guarded stale completion. P2 final-DMG reinstall and bounded routing/disclosure inspection passed; full focus and accessibility behavior remain pending |

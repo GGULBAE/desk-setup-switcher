@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 #if canImport(DeskSetupCore)
@@ -6,6 +7,32 @@ import SwiftUI
 #if canImport(DeskSetupPresentation)
   import DeskSetupPresentation
 #endif
+
+private struct TrayContentSizingKey: EnvironmentKey {
+  static let defaultValue = false
+}
+
+extension EnvironmentValues {
+  var trayMeasuresContent: Bool {
+    get { self[TrayContentSizingKey.self] }
+    set { self[TrayContentSizingKey.self] = newValue }
+  }
+}
+
+@MainActor
+enum TrayContentMeasurement {
+  static func height<Content: View>(of content: Content, width: CGFloat) -> CGFloat {
+    // Detached, non-interactive layout of the same content at the real width.
+    // No scroll/focus tasks run and no attached-frame feedback is installed.
+    let host = NSHostingController(
+      rootView:
+        content
+        .environment(\.trayMeasuresContent, true)
+        .frame(width: width)
+    )
+    return host.sizeThatFits(in: CGSize(width: width, height: TrayGeometry.maximumHeight)).height
+  }
+}
 
 enum TrayAccessibilityCopy {
   static let captureLabel = "Capture Current Settings"
@@ -123,6 +150,7 @@ enum TrayBodyPresentationPolicy {
 
 struct TrayRootView: View {
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @Environment(\.trayMeasuresContent) private var measuresContent
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var profileEditor: ProfileEditorModel
   @ObservedObject var presentation: TrayPresentationModel
@@ -134,7 +162,9 @@ struct TrayRootView: View {
     VStack(alignment: .leading, spacing: TrayGeometry.sectionGap) {
       header
       Divider()
-      if usesStaticEmptyBody {
+      if measuresContent {
+        bodyContent
+      } else if usesStaticEmptyBody {
         profileContent
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
       } else {
@@ -142,7 +172,10 @@ struct TrayRootView: View {
       }
     }
     .padding(TrayGeometry.outerPadding)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .frame(
+      maxWidth: .infinity, maxHeight: measuresContent ? nil : .infinity,
+      alignment: .topLeading
+    )
     .onExitCommand {
       presentation.requestEscape()
     }
@@ -249,16 +282,7 @@ struct TrayRootView: View {
   private var scrollableBody: some View {
     ScrollViewReader { proxy in
       ScrollView {
-        VStack(alignment: .leading, spacing: TrayGeometry.sectionGap) {
-          handoffError
-          profileContent
-            .id(TrayScrollAnchor.top)
-          captureStatus
-          captureSummary
-          applySummary
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .padding(.bottom, 2)
+        bodyContent
       }
       .id(presentation.activeSessionGeneration)
       .defaultScrollAnchor(.top)
@@ -283,6 +307,19 @@ struct TrayRootView: View {
         proxy.scrollTo(profileID, anchor: .center)
       }
     }
+  }
+
+  private var bodyContent: some View {
+    VStack(alignment: .leading, spacing: TrayGeometry.sectionGap) {
+      handoffError
+      profileContent
+        .id(TrayScrollAnchor.top)
+      captureStatus
+      captureSummary
+      applySummary
+    }
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+    .padding(.bottom, 2)
   }
 
   @ViewBuilder

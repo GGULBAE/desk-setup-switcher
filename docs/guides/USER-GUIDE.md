@@ -31,6 +31,8 @@ Keyboard behavior, accessibility names and values, and non-color state cues are 
 
 **Launch at login is off by default.** Enable it only if wanted in **Settings → App Settings → App behavior**. The switch controls the requested setting. If macOS registration differs, a warning appears; **Login item details** shows the registration status and refresh action.
 
+Registration is requested only when you turn the switch on or choose **Retry Registration**. Opening the app or refreshing status does not retry a missing registration, even if the saved preference is ON. Existing enabled registration continues to work. The app does not run `sfltool`; you do not need to grant that diagnostic tool Keychain access to use the app.
+
 ## One-minute workflow
 
 1. **Capture:** Open the menu-bar item and choose **Capture Current Settings**. Capture reads the Mac and creates a new reviewable profile; it does not apply a change.

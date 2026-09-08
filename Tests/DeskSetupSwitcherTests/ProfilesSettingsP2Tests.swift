@@ -9,6 +9,12 @@ import Testing
 @Suite("P2 profile settings", .serialized)
 @MainActor
 struct ProfilesSettingsP2Tests {
+  @Test("sidebar actions and the end of the editor retain breathing room")
+  func workspaceClosingInsets() {
+    #expect(ProfileWorkspaceLayoutPolicy.sidebarActionInset == 12)
+    #expect(ProfileWorkspaceLayoutPolicy.formBottomInset == 24)
+  }
+
   @Test("profile creation remains direct while management and file actions are secondary")
   func profileActionHierarchy() {
     #expect(ProfileManagementActionPolicy.primaryActions == [.create])

@@ -9,6 +9,34 @@ import XCTest
 @Suite("Owned tray popover surface")
 @MainActor
 struct TrayPopoverControllerTests {
+  @Test("content is measured once per open and updated only after reopening")
+  func fitsBeforeOpeningWithoutResizeFeedback() {
+    let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 3))
+    let factory = SurfaceFactorySpy()
+    let measurement = TrayMeasurementSpy()
+    let controller = TrayPopoverController(
+      rootView: Color.clear,
+      sessionState: state,
+      measureContentHeight: { width in
+        #expect(width == 368)
+        measurement.calls += 1
+        return measurement.height
+      },
+      factory: factory
+    )
+    controller.show()
+    #expect(measurement.calls == 1)
+    #expect(controller.contentSize.height == 404)
+    measurement.height = 330
+    controller.show()
+    #expect(measurement.calls == 1)
+    #expect(controller.contentSize.height == 404)
+    controller.requestClose(sessionGeneration: 1)
+    controller.show()
+    #expect(measurement.calls == 2)
+    #expect(controller.contentSize.height == 330)
+  }
+
   @Test("controller owns one application-defined popover with matching viewport bounds")
   func ownsOneSurfaceAndMatchesBounds() {
     let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 3))
@@ -387,6 +415,12 @@ struct TrayPopoverControllerTests {
     #expect(state.closeGenerations == [generation!])
     #expect(factory.monitor.stopCount == 1)
   }
+}
+
+@MainActor
+private final class TrayMeasurementSpy {
+  var calls = 0
+  var height: CGFloat = 403.25
 }
 
 /// Keep the native AppKit contract isolated from the parallel offscreen suite.

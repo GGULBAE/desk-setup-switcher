@@ -14,6 +14,8 @@ enum ProfileWorkspaceLayoutPolicy {
   static let sidebarWidth: CGFloat = 210
   static let minimumEditorWidth: CGFloat = 390
   static let dividerWidth: CGFloat = 1
+  static let sidebarActionInset: CGFloat = 12
+  static let formBottomInset: CGFloat = 24
   static let minimumContentWidth = sidebarWidth + dividerWidth + minimumEditorWidth
 }
 
@@ -721,6 +723,8 @@ struct ProfilesSettingsView: View {
         .accessibilityLabel(appLocalized("More Profile Actions"))
         .help(appLocalized("More Profile Actions"))
       }
+      .padding(ProfileWorkspaceLayoutPolicy.sidebarActionInset)
+      .accessibilityIdentifier("profile-sidebar-actions")
     }
   }
 
@@ -1281,7 +1285,8 @@ private struct ProfileEditorForm: View {
         }
       }
       .padding(.horizontal, ProfileSettingInclusionLayoutPolicy.formHorizontalInset)
-      .padding(.vertical, 12)
+      .padding(.top, 12)
+      .padding(.bottom, ProfileWorkspaceLayoutPolicy.formBottomInset)
       .frame(maxWidth: 860)
       .frame(maxWidth: .infinity, alignment: .top)
     }
@@ -1488,19 +1493,6 @@ private struct ProfileEditorForm: View {
 
   private var selectedStepContent: some View {
     VStack(alignment: .leading, spacing: 14) {
-      VStack(alignment: .leading, spacing: 4) {
-        Label(stepHeading(selectedGroup), systemImage: stepSystemImage(selectedGroup))
-          .font(.title3.bold())
-          .accessibilityAddTraits(.isHeader)
-          .accessibilityIdentifier("profile-group-\(selectedGroup.rawValue)")
-          .accessibilityInvalid(firstValidationIssue(in: selectedGroup) != nil)
-          .focused($focusedField, equals: .group(selectedGroup))
-        Text(stepExplanation(selectedGroup))
-          .font(.callout)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-
       if let issue = validation.issue(for: .group(selectedGroup)) {
         inlineValidationMessage(
           validationMessage(for: issue),
@@ -1508,10 +1500,14 @@ private struct ProfileEditorForm: View {
         )
       }
 
-      Divider()
       selectedStepOptions
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel(stepTitle(selectedGroup))
+    .accessibilityIdentifier("profile-group-\(selectedGroup.rawValue)")
+    .accessibilityInvalid(firstValidationIssue(in: selectedGroup) != nil)
+    .focused($focusedField, equals: .group(selectedGroup))
   }
 
   @ViewBuilder
@@ -1565,24 +1561,6 @@ private struct ProfileEditorForm: View {
     case .audio: appLocalized("Input, output, and volume")
     case .network: appLocalized("Your internet connection")
     case .input: appLocalized("Your keyboard and pointer")
-    }
-  }
-
-  private func stepHeading(_ group: SettingGroup) -> String {
-    switch group {
-    case .display: appLocalized("Display settings")
-    case .audio: appLocalized("Sound settings")
-    case .network: appLocalized("Your network settings")
-    case .input: appLocalized("Your input settings")
-    }
-  }
-
-  private func stepExplanation(_ group: SettingGroup) -> String {
-    switch group {
-    case .display: appLocalized("Choose the main display and resolution for this profile.")
-    case .audio: appLocalized("Choose input and output devices and their volumes.")
-    case .network: appLocalized("Choose the connection this profile should configure.")
-    case .input: appLocalized("Choose the input behavior for this profile.")
     }
   }
 

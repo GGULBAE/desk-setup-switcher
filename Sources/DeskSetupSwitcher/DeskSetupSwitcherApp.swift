@@ -245,7 +245,10 @@ struct DeskSetupSwitcherApp: App {
       .uiAuditEnvironment(uiAuditConfiguration)
       let popoverController = TrayPopoverController(
         rootView: trayRoot,
-        sessionState: presentation
+        sessionState: presentation,
+        measureContentHeight: { width in
+          TrayContentMeasurement.height(of: trayRoot, width: width)
+        }
       )
       trayPopoverController = popoverController
       actionRouter.surface = popoverController

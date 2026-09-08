@@ -1,5 +1,9 @@
 # Roadmap
 
+## Profile spacing, fitted tray, and explicit login requests — 2026-09-08
+
+Remove duplicate Display/Sound headings and explanations without removing section navigation, validation targets, or Output/Input grouping. Add sidebar-action and form-bottom breathing room. Fit one-to-three-profile trays from a detached measurement of the same content at the real width before opening, then freeze the viewport until close. Saved ON preferences are observed at startup; missing registration waits for explicit ON/Retry. Default-off/legacy opt-out cleanup remains intact, and no `sfltool` command is added. Verification and limitations are tracked in [the follow-up record](SPACING-LOGIN-2026-09-08.md).
+
 ## Current scope — six display/sound settings (2026-09-07)
 
 The current profile contract is limited to main display, resolution, output device/volume, and input device/volume. Display/Sound retain stable width-driven navigation; every option is direct, with no Network or Advanced section. Capture queries only the two relevant adapters and never gates on Location permission. Saved refresh rates are ignored; resolution changes preserve the current rate or are skipped. Legacy excluded values remain round-trip compatible but are never applied, even in Force. See [minimal profile scope](MINIMAL-PROFILE-SCOPE-2026-09-07.md). Older milestones below describe historical adapter primitives, not additional current profile options.

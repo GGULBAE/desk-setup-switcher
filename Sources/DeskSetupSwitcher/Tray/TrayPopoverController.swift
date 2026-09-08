@@ -478,6 +478,7 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
   private let hostingController: NSHostingController<AnyView>
   private let popoverContentController: TrayPopoverContentController
   private let traceRecorder: any TrayGeometryTraceRecording
+  private let measureContentHeight: (@MainActor (CGFloat) -> CGFloat)?
   private var sessionGeometry: TrayOpenSessionGeometry
   private var generationCounter: UInt64 = 0
   private var finalizedPresentationGeneration: UInt64?
@@ -491,12 +492,14 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
   init<Content: View>(
     rootView: Content,
     sessionState: any TraySessionStateUpdating,
+    measureContentHeight: (@MainActor (CGFloat) -> CGFloat)? = nil,
     geometry: TrayGeometry = TrayGeometry(),
     factory: any TraySurfaceFactory = AppKitTraySurfaceFactory(),
     traceRecorder: any TrayGeometryTraceRecording = DebugTrayGeometryTraceRecorder()
   ) {
     self.factory = factory
     self.sessionState = sessionState
+    self.measureContentHeight = measureContentHeight
     statusItem = factory.makeStatusItem()
     popover = factory.makePopover()
     dismissalMonitor = factory.makeDismissalMonitor()
@@ -585,8 +588,12 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     generationCounter &+= 1
     let generation = generationCounter
     let screen = factory.screenMetrics(for: anchorView)
+    var context = sessionState.geometryContext
+    if (1...3).contains(context.profileCount) {
+      context.fittedContentHeight = measureContentHeight?(TrayGeometry.width)
+    }
     let viewport = sessionGeometry.open(
-      context: sessionState.geometryContext,
+      context: context,
       screen: screen
     )
     activeSessionGeneration = generation

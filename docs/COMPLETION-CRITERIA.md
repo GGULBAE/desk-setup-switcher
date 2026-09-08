@@ -1,5 +1,9 @@
 # Completion criteria and evidence ledger
 
+## Profile spacing, fitted tray, and explicit login requests — 2026-09-08
+
+Implementation follow-up, not a newly checked completion gate: remove redundant detail headings, inset sidebar actions and form endings, fit short trays once before opening, and stop automatic registration of saved ON preferences during startup. Keep section accessibility/validation, open-generation sizing, explicit ON/Retry registration, and off-state cleanup. See [scope and verification](SPACING-LOGIN-2026-09-08.md); current installed interaction, authorization prompts, and reboot behavior require separate evidence.
+
 ## Grouped Sound sections — 2026-09-07
 
 - [x] Commit `b6a8723` records the presentation-only Output/Input grouping, with device and volume in each section, independent inclusion, and unchanged capture/apply scope. Full `make verify` retry, 19 synthetic views, local reinstall/startup, and byte-identical preservation of both profile files passed. See [grouped Sound evidence](AUDIO-SECTIONS-2026-09-07.md).

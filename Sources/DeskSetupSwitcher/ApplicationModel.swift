@@ -1858,11 +1858,10 @@ final class ApplicationModel: ObservableObject {
   private func reconcileLoginItemRegistrationAtStartup() {
     let status = loginItemService.status
     if launchAtLoginDesired {
-      if status == .notRegistered || status == .notFound {
-        updateLoginItemRegistration(enabled: true)
-      } else {
-        refreshLoginItemStatus()
-      }
+      // Launch is observation-only for an existing opt-in. Missing or failed
+      // registration must wait for an explicit ON / Retry action in Settings,
+      // so an ordinary launch cannot produce a new authorization request.
+      refreshLoginItemStatus()
     } else if status == .enabled || status == .requiresApproval {
       updateLoginItemRegistration(enabled: false)
     } else {

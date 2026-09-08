@@ -68,6 +68,28 @@ struct TrayGeometryTests {
     #expect(insets.trailing == TrayGeometry.outerPadding)
   }
 
+  @Test("a pre-open fit removes count-bucket slack and rounds up without clipping")
+  func fittedHeightOverridesBuckets() {
+    for count in 1...3 {
+      let viewport = policy.viewport(
+        for: TrayGeometryContext(profileCount: count, fittedContentHeight: 403.25),
+        on: primaryScreen
+      )
+      #expect(viewport.height == 404)
+    }
+    for invalid: CGFloat in [0, -1, .nan, .infinity] {
+      #expect(
+        policy.viewport(
+          for: TrayGeometryContext(profileCount: 3, fittedContentHeight: invalid),
+          on: primaryScreen
+        ).height == TrayGeometry.threeProfileHeight)
+    }
+    #expect(
+      policy.viewport(
+        for: TrayGeometryContext(profileCount: 3, fittedContentHeight: 900), on: primaryScreen
+      ).height == TrayGeometry.maximumHeight)
+  }
+
   @Test("all state changes preserve the current open-session viewport")
   func openSessionIsImmutable() {
     var session = TrayOpenSessionGeometry(policy: policy)

@@ -179,6 +179,14 @@ import Testing
           name: "03b-three-ko-dark", variant: .overview, languageCode: "ko", colorScheme: .dark,
           largeText: false, reduceTransparency: false, increasedContrast: false),
         Fixture(
+          name: "03c-three-compact-ko-light", variant: .overview, languageCode: "ko",
+          colorScheme: .light, largeText: false, reduceTransparency: false,
+          increasedContrast: false),
+        Fixture(
+          name: "03d-three-compact-en-light", variant: .overview, languageCode: "en",
+          colorScheme: .light, largeText: false, reduceTransparency: false,
+          increasedContrast: false),
+        Fixture(
           name: "04-overflow-en-light", variant: .trayOverflow, languageCode: "en",
           colorScheme: .light, largeText: false, reduceTransparency: false, increasedContrast: false
         ),
@@ -289,6 +297,21 @@ import Testing
         #expect(!rendered.accessibility.localizedCaseInsensitiveContains("password"))
 
         let representation = try #require(NSBitmapImageRep(data: rendered.png))
+        if fixture.name.contains("three-compact") {
+          let cardBounds = try #require(
+            logicalVerticalBounds(
+              in: representation,
+              viewport: rendered.viewport,
+              logicalRegion: CGRect(x: 24, y: 80, width: 2, height: rendered.viewport.height - 80)
+            ) { color in
+              let brightness = perceivedBrightness(color)
+              return brightness > 0.8 && brightness < 0.98
+            })
+          let closingInset = rendered.viewport.height - cardBounds.upperBound
+          #expect(closingInset >= 12, "Last card needs breathing room")
+          #expect(closingInset <= 28, "Measured compact cards must not leave a large empty tail")
+          #expect(rendered.viewport.height <= TrayGeometry.maximumHeight)
+        }
         if fixture.largeText, fixture.variant != .trayEmpty {
           let headerActionRegions = [
             CGRect(x: 198, y: 20, width: 52, height: 130),
@@ -564,6 +587,14 @@ import Testing
 
         #expect(rendered.png.count > 10_000)
         #expect(rendered.accessibility.contains("synthetic-settings-host=true"))
+        if fixture.isProfileSurface {
+          for removedHeading in ["Display settings", "Sound settings"] {
+            #expect(
+              !rendered.accessibility.contains(
+                appLocalizedRuntime(removedHeading, languageCode: fixture.languageCode)
+              ))
+          }
+        }
         if fixture.name == "19b-audio-grouped-sections-ko-light" {
           let representation = try #require(NSBitmapImageRep(data: rendered.png))
           // Sample the inset before row labels in the full-height Sound view.
@@ -573,7 +604,7 @@ import Testing
           let scaleY = CGFloat(representation.pixelsHigh) / fixture.size.height
           var runs: [ClosedRange<Int>] = []
           var runStart: Int?
-          for y in 190..<700 {
+          for y in 140..<700 {
             let color = representation.colorAt(
               x: Int(448 * scaleX), y: Int(CGFloat(y) * scaleY)
             )?.usingColorSpace(.deviceRGB)
@@ -1591,6 +1622,27 @@ import Testing
         showsStatusPopover: false
       )
       let model = UIAuditFixtures.makeModel(configuration: configuration)
+      if fixture.name.contains("three-compact") {
+        let state = UIAuditFixtures.fixture(.overview)
+        let ids = state.profiles.map(\.id)
+        let compactProfiles = state.profiles.enumerated().map { index, original in
+          var profile = original
+          profile.name = fixture.languageCode == "ko" ? "테스트 \(index + 1)" : "Test \(index + 1)"
+          return profile
+        }
+        model.configureForUIAudit(
+          UIAuditFixtureState(
+            profiles: compactProfiles,
+            selectedProfileID: ids[0],
+            snapshot: state.snapshot,
+            readinessByProfile: [ids[0]: .ready, ids[1]: .partial, ids[2]: .unavailable],
+            operationCountByProfile: [ids[0]: 0, ids[1]: 7, ids[2]: 0],
+            availableOperationCountByProfile: [ids[0]: 0, ids[1]: 3, ids[2]: 0],
+            captureSummary: nil,
+            applySummary: nil
+          )
+        )
+      }
       if fixture.name == "03b-three-ko-dark" {
         let state = UIAuditFixtures.fixture(.overview)
         model.configureForUIAudit(
@@ -1681,8 +1733,21 @@ import Testing
         destinationPresenter: destinationPresenter,
         terminateApplication: {}
       )
+      let trayContent = TrayRootView(presentation: presentation, router: router)
+        .environmentObject(model)
+        .environmentObject(locationPermission)
+        .environmentObject(profileEditor)
+        .environment(\.locale, Locale(identifier: fixture.languageCode))
+        .dynamicTypeSize(fixture.dynamicTypeSize)
+        .preferredColorScheme(fixture.colorScheme)
+      var geometryContext = presentation.geometryContext
+      if (1...3).contains(geometryContext.profileCount) {
+        geometryContext.fittedContentHeight = TrayContentMeasurement.height(
+          of: trayContent, width: TrayGeometry.width
+        )
+      }
       let viewport = TrayGeometry().viewport(
-        for: presentation.geometryContext,
+        for: geometryContext,
         on: TrayScreenMetrics(
           visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
           backingScaleFactor: 2
@@ -1691,13 +1756,8 @@ import Testing
       presentation.trayDidOpen(sessionGeneration: 1, viewport: viewport)
       presentation.trayContentDidAttach(sessionGeneration: 1)
 
-      let root = TrayRootView(presentation: presentation, router: router)
-        .environmentObject(model)
-        .environmentObject(locationPermission)
-        .environmentObject(profileEditor)
-        .environment(\.locale, Locale(identifier: fixture.languageCode))
-        .dynamicTypeSize(fixture.dynamicTypeSize)
-        .preferredColorScheme(fixture.colorScheme)
+      let root =
+        trayContent
         .frame(width: viewport.width, height: viewport.height)
         .background(fixture.colorScheme == .dark ? Color.black : Color.white)
 

@@ -71,8 +71,60 @@ struct ApplicationModelLoginItemTests {
 
     #expect(fixture.model.launchAtLoginDesired == enabled)
     #expect(fixture.defaults.bool(forKey: "launchAtLoginEnabled") == enabled)
-    #expect(fixture.loginItem.registerCount == (enabled ? 1 : 0))
+    #expect(fixture.loginItem.registerCount == 0)
+    #expect(fixture.model.canRetryLoginItemRegistration == enabled)
 
+    await finishAndCleanUp(fixture)
+  }
+
+  @Test(
+    "startup and status refresh never register an existing opt-in",
+    arguments: [SMAppService.Status.notRegistered, .notFound, .requiresApproval, .enabled])
+  func startupOnlyObservesOptIn(status: SMAppService.Status) async throws {
+    let fixture = try makeFixture(storedPreference: true, consentVersion: 1, systemStatus: status)
+    fixture.model.start()
+    fixture.model.refreshLoginItemStatusFromSystem()
+    fixture.model.start()
+    #expect(fixture.model.launchAtLoginDesired)
+    #expect(fixture.loginItem.registerCount == 0)
+    #expect(fixture.loginItem.unregisterCount == 0)
+    #expect(fixture.loginItem.status == status)
+    #expect(fixture.model.loginItemEnabled == (status == .enabled))
+    await finishAndCleanUp(fixture)
+  }
+
+  @Test("missing registration waits for explicit retry and repeated ON is idempotent")
+  func explicitRetryRepairsMissingRegistration() async throws {
+    let fixture = try makeFixture(storedPreference: true, consentVersion: 1)
+    fixture.model.start()
+    #expect(fixture.loginItem.registerCount == 0)
+    #expect(fixture.model.canRetryLoginItemRegistration)
+    fixture.model.retryLaunchAtLoginRegistration()
+    fixture.model.setLaunchAtLogin(true)
+    #expect(fixture.loginItem.registerCount == 1)
+    #expect(fixture.model.loginItemEnabled)
+    #expect(!fixture.model.canRetryLoginItemRegistration)
+    fixture.model.setLaunchAtLogin(false)
+    fixture.model.retryLaunchAtLoginRegistration()
+    #expect(fixture.loginItem.registerCount == 1)
+    #expect(fixture.loginItem.unregisterCount == 1)
+    await finishAndCleanUp(fixture)
+  }
+
+  @Test("failed registration does not retry during status refresh")
+  func registrationFailureWaitsForUser() async throws {
+    let fixture = try makeFixture()
+    fixture.loginItem.shouldFailRegistration = true
+    fixture.model.start()
+    fixture.model.setLaunchAtLogin(true)
+    fixture.model.refreshLoginItemStatusFromSystem()
+    #expect(fixture.loginItem.registerCount == 1)
+    #expect(!fixture.model.loginItemEnabled)
+    #expect(fixture.model.canRetryLoginItemRegistration)
+    fixture.loginItem.shouldFailRegistration = false
+    fixture.model.retryLaunchAtLoginRegistration()
+    #expect(fixture.loginItem.registerCount == 2)
+    #expect(fixture.model.loginItemEnabled)
     await finishAndCleanUp(fixture)
   }
 
@@ -195,6 +247,7 @@ private final class RecordingLoginItemService: LoginItemServicing {
   private(set) var status: SMAppService.Status
   private(set) var registerCount = 0
   private(set) var unregisterCount = 0
+  var shouldFailRegistration = false
 
   init(status: SMAppService.Status) {
     self.status = status
@@ -202,6 +255,9 @@ private final class RecordingLoginItemService: LoginItemServicing {
 
   func register() throws {
     registerCount += 1
+    if shouldFailRegistration {
+      throw NSError(domain: "SyntheticLoginRegistration", code: 1)
+    }
     status = .enabled
   }
 

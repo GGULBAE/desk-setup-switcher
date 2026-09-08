@@ -31,24 +31,28 @@ struct TrayGeometryContext: Equatable, Sendable {
   var capturePhase: TrayCaptureGeometryPhase
   var applyBannerVisible: Bool
   var usesLargeText: Bool
+  var fittedContentHeight: CGFloat?
 
   init(
     profileCount: Int,
     deletionConfirmationVisible: Bool = false,
     capturePhase: TrayCaptureGeometryPhase = .idle,
     applyBannerVisible: Bool = false,
-    usesLargeText: Bool = false
+    usesLargeText: Bool = false,
+    fittedContentHeight: CGFloat? = nil
   ) {
     self.profileCount = max(0, profileCount)
     self.deletionConfirmationVisible = deletionConfirmationVisible
     self.capturePhase = capturePhase
     self.applyBannerVisible = applyBannerVisible
     self.usesLargeText = usesLargeText
+    self.fittedContentHeight = fittedContentHeight
   }
 }
 
 /// Owns every value that can affect the outer tray viewport. SwiftUI content
-/// may scroll within this viewport but never feeds a measured height back here.
+/// may scroll within this viewport. A one-shot pre-open content measurement
+/// can replace the fallback size; attached content never resizes an open tray.
 struct TrayGeometry: Equatable, Sendable {
   static let width: CGFloat = 368
   static let compactHeight: CGFloat = 260
@@ -78,7 +82,7 @@ struct TrayGeometry: Equatable, Sendable {
   }
 
   func viewport(for context: TrayGeometryContext, on screen: TrayScreenMetrics) -> CGSize {
-    let idealHeight: CGFloat
+    var idealHeight: CGFloat
     switch context.profileCount {
     case 0:
       idealHeight = Self.compactHeight
@@ -90,6 +94,13 @@ struct TrayGeometry: Equatable, Sendable {
       idealHeight = Self.threeProfileHeight
     default:
       idealHeight = Self.maximumHeight
+    }
+
+    if (1...3).contains(context.profileCount),
+      let fittedHeight = context.fittedContentHeight,
+      fittedHeight.isFinite, fittedHeight > 0
+    {
+      idealHeight = max(Self.headerHeight + Self.outerPadding * 2, ceil(fittedHeight))
     }
 
     // Banners, inline confirmation, and large text intentionally do not
