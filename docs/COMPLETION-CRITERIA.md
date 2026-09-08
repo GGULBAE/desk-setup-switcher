@@ -1,5 +1,9 @@
 # Completion criteria and evidence ledger
 
+## Compact tray profile actions — 2026-09-08
+
+Presentation follow-up, not a newly checked release gate: expose direct trash, align short Apply/Edit actions, and replace passive explanation text with a blank caption line. Preview/confirmation and storage safeguards remain unchanged. [The follow-up record](TRAY-ACTIONS-2026-09-08.md) distinguishes deterministic rendering/routing evidence from live settings or deletion.
+
 ## Profile spacing, fitted tray, and explicit login requests — 2026-09-08
 
 Implementation follow-up, not a newly checked completion gate: remove redundant detail headings, inset sidebar actions and form endings, fit short trays once before opening, and stop automatic registration of saved ON preferences during startup. Keep section accessibility/validation, open-generation sizing, explicit ON/Retry registration, and off-state cleanup. See [scope and verification](SPACING-LOGIN-2026-09-08.md); current installed interaction, authorization prompts, and reboot behavior require separate evidence.

@@ -4,6 +4,9 @@
 "Capture the current Mac to create your first editable profile." = "현재 Mac 설정을 캡처해 편집 가능한 첫 프로필을 만드세요.";
 "Profile status: %@" = "프로필 상태: %@";
 "Apply" = "적용";
+"tray.profile.action.apply" = "적용하기";
+"tray.profile.action.edit" = "수정하기";
+"tray.profile.action.apply.named" = "%@ 적용하기";
 "Normal apply requires every included setting and condition to be ready." = "일반 적용을 사용하려면 포함된 모든 설정과 조건이 준비되어야 합니다.";
 "Force Apply…" = "강제 적용…";
 "Shows a current read-only plan and every availability explanation." = "현재 읽기 전용 계획과 모든 가용성 설명을 표시합니다.";

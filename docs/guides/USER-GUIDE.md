@@ -36,8 +36,8 @@ Registration is requested only when you turn the switch on or choose **Retry Reg
 ## One-minute workflow
 
 1. **Capture:** Open the menu-bar item and choose **Capture Current Settings**. Capture reads the Mac and creates a new reviewable profile; it does not apply a change.
-2. **Edit:** Choose **Edit Profile**, name the profile, select only the settings you want under **Display** and **Sound**, then save.
-3. **Review & Apply:** Choose **Review Changes…** or **Review Available Changes…**. Check every change and omission. Nothing changes until you explicitly choose **Apply Profile** or **Apply Available Settings**.
+2. **Edit:** Choose **Edit** on the tray card, name the profile, select only the settings you want under **Display** and **Sound**, then save.
+3. **Review & Apply:** Choose **Apply** on the tray card. Check every change and omission. Nothing changes until you explicitly choose **Apply Profile** or **Apply Available Settings** in the preview.
 
 There is no timer, condition, or background rule that applies a profile automatically.
 
@@ -49,7 +49,7 @@ Capture stores only the main display, resolutions, output device/volume, and inp
 
 ## 2. Edit
 
-Choose **Edit Profile** on a profile to open **Settings → Profiles**.
+Choose **Edit** on a tray profile to open **Settings → Profiles**. The trash icon on the same row opens inline deletion confirmation directly; Cancel/Escape leaves the profile unchanged.
 
 - Give the profile a recognizable name and icon.
 - Work through the stable numbered **Display** and **Sound** steps. At the minimum window size or an accessibility text size, the same steps become a compact segmented selector.
@@ -64,10 +64,11 @@ If you switch profiles, import, apply, or quit with unsaved changes, the app ask
 
 ## 3. Review & Apply
 
-Each profile exposes one state-aware review action:
+Each tray card shows **Apply / Edit / trash** on one line. Apply opens a state-aware, read-only review:
 
-- **Review Changes…** means all included applicable settings can be prepared.
-- **Review Available Changes…** means some executable settings exist but other items will be omitted, blocked, unsupported, or unavailable.
+- **Ready:** all included applicable settings can be prepared when changes exist.
+- **Partial:** some executable settings exist but other items will be omitted, blocked, unsupported, or unavailable.
+- A matched or unavailable profile keeps Apply disabled. The status text and symbol remain, but passive explanation sentences leave a blank line; hover the disabled button for its reason.
 
 The review is read-only. Start with the summary counts, then scan each compact current → target row. **Review details** groups omissions, validation issues, and rejected items; open it before applying an available-items plan. A blocking plan opens those details automatically.
 
@@ -142,7 +143,7 @@ Use [SUPPORT.md](../../SUPPORT.md) for public support and bug-report routes. For
 | --- | --- |
 | The app opened but no window appeared | Look for the menu-bar icon. The app is menu-bar-only by design. |
 | Network settings are missing | Expected: profiles now capture and apply only the six Display/Sound setting kinds. |
-| A profile is Partial or Unavailable | Choose **Edit Profile**, inspect warning rows, reconnect the required device/service, or exclude an unavailable setting. Use **Review Available Changes…** only when every omission is intentional. |
+| A profile is Partial or Unavailable | Choose **Edit**, inspect warning rows, reconnect the required device/service, or exclude an unavailable setting. If **Apply** is enabled, inspect the preview and proceed only when every omission is intentional. |
 | Review shows no operation | The profile already matches the current readable state, or no included setting can be safely applied. Nothing needs to run. |
 | Review refreshes instead of applying | The profile, capability, current value, or rollback evidence changed after the first review. This is a safety stop; inspect the new plan. |
 | Profile storage shows an error | Use **Retry Loading** for a load failure or **Dismiss Error** after an ordinary failed operation. Do not edit managed files while the app is running. Restore through a reviewed export/import if needed. |

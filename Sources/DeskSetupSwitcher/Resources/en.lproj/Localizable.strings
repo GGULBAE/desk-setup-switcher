@@ -4,6 +4,9 @@
 "Capture the current Mac to create your first editable profile." = "Capture the current Mac to create your first editable profile.";
 "Profile status: %@" = "Profile status: %@";
 "Apply" = "Apply";
+"tray.profile.action.apply" = "Apply";
+"tray.profile.action.edit" = "Edit";
+"tray.profile.action.apply.named" = "Apply %@";
 "Normal apply requires every included setting and condition to be ready." = "Normal apply requires every included setting and condition to be ready.";
 "Force Apply…" = "Force Apply…";
 "Shows a current read-only plan and every availability explanation." = "Shows a current read-only plan and every availability explanation.";

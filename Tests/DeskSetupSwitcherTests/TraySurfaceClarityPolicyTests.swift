@@ -1,9 +1,47 @@
+import Foundation
 import Testing
 
+@testable import DeskSetupPresentation
 @testable import DeskSetupSwitcher
 
 @Suite("Tray and profile surface clarity policies")
 struct TraySurfaceClarityPolicyTests {
+  @Test("compact profile actions ship concise English and Korean labels")
+  func compactProfileActionCopy() {
+    for (language, apply, edit) in [("en", "Apply", "Edit"), ("ko", "적용하기", "수정하기")] {
+      #expect(
+        appLocalizedRuntime(TrayProfileCardPolicy.applyLabelKey, languageCode: language) == apply)
+      #expect(
+        appLocalizedRuntime(TrayProfileCardPolicy.editLabelKey, languageCode: language) == edit)
+    }
+  }
+
+  @Test("passive profile explanations become blank while actionable reasons remain")
+  func compactProfileStatusSlot() {
+    for reason: PrimaryApplyDisabledReason? in [nil, .alreadyMatches, .noAvailableOperations] {
+      #expect(TrayProfileCardPolicy.visibleDisabledReason(reason) == nil)
+    }
+    for reason: PrimaryApplyDisabledReason in [
+      .preparing, .readinessRefreshing, .applying, .transactionInProgress,
+      .pendingSafetyConfirmation, .noIncludedSettings, .temporarilyUnavailable,
+    ] {
+      #expect(TrayProfileCardPolicy.visibleDisabledReason(reason) == reason)
+    }
+  }
+
+  @Test("short Apply and direct trash keep preview and confirmation routing")
+  func compactProfileActionRouting() {
+    let profileID = UUID()
+    for kind: PrimaryApplyActionKind in [.normal, .availableItems] {
+      let state = PrimaryApplyActionState(kind: kind, isEnabled: true)
+      #expect(
+        TrayProfileCardPolicy.applyAction(profileID: profileID, state: state)
+          == .openApplyPreview(profileID, kind.mode))
+    }
+    #expect(TrayProfileCardPolicy.deleteAction(profileID: profileID) == .requestDelete(profileID))
+    #expect(TrayProfileCardPolicy.deleteAction(profileID: profileID).disposition == .stayOpen)
+  }
+
   @Test("pristine empty tray exposes one primary capture action instead of a header icon")
   func pristineEmptyTrayCapturePlacement() {
     let placement = TrayCaptureAffordancePolicy.placement(
@@ -174,7 +212,7 @@ struct TraySurfaceClarityPolicyTests {
     #expect(!accessibility)
   }
 
-  @Test("fixed-width tray stacks header and profile actions at accessibility sizes")
+  @Test("fixed-width tray stacks header and profile titles at accessibility sizes")
   func accessibilityLayoutProtectsActions() {
     #expect(!TrayAdaptiveLayoutPolicy.usesStackedHeader(for: .large))
     #expect(!TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: .large))

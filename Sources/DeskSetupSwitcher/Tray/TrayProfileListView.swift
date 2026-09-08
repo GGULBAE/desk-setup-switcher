@@ -13,6 +13,28 @@ enum TrayDeletionProgressCopy {
     "Saving the deletion to local storage. It cannot be cancelled after it starts."
 }
 
+enum TrayProfileCardPolicy {
+  static let applyLabelKey = "tray.profile.action.apply"
+  static let editLabelKey = "tray.profile.action.edit"
+
+  static func visibleDisabledReason(
+    _ reason: PrimaryApplyDisabledReason?
+  ) -> PrimaryApplyDisabledReason? {
+    switch reason {
+    case nil, .alreadyMatches, .noAvailableOperations: nil
+    default: reason
+    }
+  }
+
+  static func applyAction(profileID: UUID, state: PrimaryApplyActionState) -> TrayAction {
+    .openApplyPreview(profileID, state.mode)
+  }
+
+  static func deleteAction(profileID: UUID) -> TrayAction {
+    .requestDelete(profileID)
+  }
+}
+
 struct TrayProfileListView: View {
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @EnvironmentObject private var model: ApplicationModel
@@ -95,54 +117,30 @@ struct TrayProfileListView: View {
         appLocalized("Profile status: \(appReadinessTitle(readiness))"))
   }
 
-  @ViewBuilder
   private func actionRow(_ profile: DeskProfile, action: PrimaryApplyActionState) -> some View {
-    if action.disabledReason == .alreadyMatches {
-      Label(appLocalized("The Mac already matches this profile."), systemImage: "checkmark.circle")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .accessibilityLabel("Current Mac matches this profile")
-    } else if let reason = action.disabledReason {
-      Label(appLocalizedRuntime(reason.defaultMessage), systemImage: reason.symbolName)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-
-    if action.disabledReason == .alreadyMatches {
-      secondaryActionRow(profile)
-    } else if TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: dynamicTypeSize) {
-      stackedActionRow(profile, action: action)
-    } else {
-      ViewThatFits(in: .horizontal) {
-        HStack(spacing: 8) {
-          styledApplyButton(profile, action: action)
-            .fixedSize(horizontal: true, vertical: false)
-          Spacer(minLength: 8)
-          editButton(profile)
-            .fixedSize(horizontal: true, vertical: false)
-          profileActionsMenu(profile)
+    VStack(alignment: .leading, spacing: 9) {
+      // Preserve one caption line of breathing room without announcing passive
+      // matched/unavailable explanations. Actionable safety/progress copy stays.
+      ZStack(alignment: .leading) {
+        Text(verbatim: " ")
+          .accessibilityHidden(true)
+        if let reason = TrayProfileCardPolicy.visibleDisabledReason(action.disabledReason) {
+          Label(appLocalizedRuntime(reason.defaultMessage), systemImage: reason.symbolName)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
-        stackedActionRow(profile, action: action)
       }
-    }
-  }
+      .font(.caption)
+      .frame(maxWidth: .infinity, alignment: .leading)
 
-  private func stackedActionRow(
-    _ profile: DeskProfile,
-    action: PrimaryApplyActionState
-  ) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      styledApplyButton(profile, action: action)
-        .fixedSize(horizontal: false, vertical: true)
-      secondaryActionRow(profile)
-    }
-  }
-
-  private func secondaryActionRow(_ profile: DeskProfile) -> some View {
-    HStack(spacing: 8) {
-      editButton(profile)
-      Spacer(minLength: 8)
-      profileActionsMenu(profile)
+      HStack(spacing: 8) {
+        styledApplyButton(profile, action: action)
+        editButton(profile)
+        Spacer(minLength: 8)
+        deleteButton(profile)
+      }
+      .fixedSize(horizontal: false, vertical: true)
+      .accessibilityIdentifier("tray-profile-actions-\(profile.id)")
     }
   }
 
@@ -164,7 +162,9 @@ struct TrayProfileListView: View {
     Button {
       route(.editProfile(profile.id))
     } label: {
-      Label(appLocalized("Edit Profile"), systemImage: "pencil")
+      Label(appLocalizedRuntime(TrayProfileCardPolicy.editLabelKey), systemImage: "pencil")
+        .lineLimit(1)
+        .fixedSize()
     }
     .buttonStyle(.bordered)
     .disabled(model.isProfileMutationLocked || profileEditor.activity.isBusy)
@@ -172,32 +172,25 @@ struct TrayProfileListView: View {
     .help(appLocalized("Edit Profile"))
   }
 
-  private func profileActionsMenu(_ profile: DeskProfile) -> some View {
-    Menu {
-      Button(role: .destructive) {
-        route(.requestDelete(profile.id))
-      } label: {
-        Label(appLocalized("Delete Profile"), systemImage: "trash")
-      }
+  private func deleteButton(_ profile: DeskProfile) -> some View {
+    Button(role: .destructive) {
+      route(TrayProfileCardPolicy.deleteAction(profileID: profile.id))
     } label: {
-      Label(appLocalized("More Profile Actions"), systemImage: "ellipsis.circle")
+      Label(appLocalized("Delete Profile"), systemImage: "trash")
         .labelStyle(.iconOnly)
+        .frame(minWidth: 28, minHeight: 28)
+        .contentShape(Rectangle())
     }
-    .menuStyle(.borderlessButton)
-    .frame(minWidth: 28, minHeight: 28)
+    .buttonStyle(.borderless)
     .focused(focusedControl, equals: .delete(profile.id))
     .disabled(
       model.isProfileMutationLocked || profileEditor.activity.isBusy
         || profileEditor.session.pendingSelection != nil
         || presentation.deletionInFlightProfileID != nil
     )
-    .accessibilityLabel(
-      String.localizedStringWithFormat(
-        appLocalized("More actions for %@"),
-        profile.name
-      )
-    )
-    .help(appLocalized("More Profile Actions"))
+    .accessibilityLabel(appLocalized("Delete \(profile.name)"))
+    .accessibilityIdentifier("tray-profile-delete-\(profile.id)")
+    .help(appLocalized("Delete Profile"))
   }
 
   private func deletionConfirmation(_ profile: DeskProfile) -> some View {
@@ -269,13 +262,19 @@ struct TrayProfileListView: View {
     _ profile: DeskProfile,
     action: PrimaryApplyActionState
   ) -> some View {
-    Button(appLocalizedRuntime(action.defaultLabel)) {
-      route(.openApplyPreview(profile.id, action.mode))
+    Button {
+      route(TrayProfileCardPolicy.applyAction(profileID: profile.id, state: action))
+    } label: {
+      Text(appLocalizedRuntime(TrayProfileCardPolicy.applyLabelKey))
+        .lineLimit(1)
+        .fixedSize()
     }
     .disabled(!action.isEnabled)
     .focused(focusedControl, equals: .profile(profile.id))
     .accessibilityLabel(
-      appLocalized("\(appLocalizedRuntime(action.defaultLabel)) \(profile.name)")
+      String.localizedStringWithFormat(
+        appLocalized("tray.profile.action.apply.named"), profile.name
+      )
     )
     .help(
       action.disabledReason.map { appLocalizedRuntime($0.defaultMessage) }

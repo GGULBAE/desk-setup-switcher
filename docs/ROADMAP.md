@@ -1,5 +1,9 @@
 # Roadmap
 
+## Compact tray profile actions — 2026-09-08
+
+Use one **Apply / Edit / trash** row on each profile card, with no one-item trash menu. Passive matched/unavailable copy becomes a reserved blank caption line. Keep status symbols/text, all mutation locks, read-only normal/available-items preview routing, and inline deletion confirmation. See [scope and verification](TRAY-ACTIONS-2026-09-08.md); no new feature scope or hardware mutation is implied.
+
 ## Profile spacing, fitted tray, and explicit login requests — 2026-09-08
 
 Remove duplicate Display/Sound headings and explanations without removing section navigation, validation targets, or Output/Input grouping. Add sidebar-action and form-bottom breathing room. Fit one-to-three-profile trays from a detached measurement of the same content at the real width before opening, then freeze the viewport until close. Saved ON preferences are observed at startup; missing registration waits for explicit ON/Retry. Default-off/legacy opt-out cleanup remains intact, and no `sfltool` command is added. Verification and limitations are tracked in [the follow-up record](SPACING-LOGIN-2026-09-08.md).

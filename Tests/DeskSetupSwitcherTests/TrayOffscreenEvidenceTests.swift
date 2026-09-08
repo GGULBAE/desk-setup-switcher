@@ -311,6 +311,51 @@ import Testing
           #expect(closingInset >= 12, "Last card needs breathing room")
           #expect(closingInset <= 28, "Measured compact cards must not leave a large empty tail")
           #expect(rendered.viewport.height <= TrayGeometry.maximumHeight)
+
+          let scaleX = CGFloat(representation.pixelsWide) / rendered.viewport.width
+          let scaleY = CGFloat(representation.pixelsHigh) / rendered.viewport.height
+          var cardRuns: [ClosedRange<Int>] = []
+          var cardStart: Int?
+          for y in 80..<Int(rendered.viewport.height) {
+            let color = representation.colorAt(
+              x: Int(24 * scaleX), y: Int(CGFloat(y) * scaleY)
+            )?.usingColorSpace(.deviceRGB)
+            let isCard =
+              color.map {
+                let brightness = perceivedBrightness($0)
+                return brightness > 0.8 && brightness < 0.98
+              } ?? false
+            if isCard, cardStart == nil {
+              cardStart = y
+            } else if !isCard, let start = cardStart {
+              cardRuns.append(start...(y - 1))
+              cardStart = nil
+            }
+          }
+          #expect(cardRuns.count == 3)
+          for card in cardRuns {
+            let bottom = CGFloat(card.upperBound + 1)
+            let inkBounds = try [
+              CGRect(x: 28, y: bottom - 40, width: 57, height: 28),
+              CGRect(x: 128, y: bottom - 40, width: 30, height: 28),
+              CGRect(x: 316, y: bottom - 40, width: 18, height: 28),
+            ].map { region in
+              try #require(
+                logicalVerticalBounds(
+                  in: representation, viewport: rendered.viewport, logicalRegion: region
+                ) { perceivedBrightness($0) < 0.8 })
+            }
+            let centers = inkBounds.map { ($0.lowerBound + $0.upperBound) / 2 }
+            #expect(
+              (centers.max() ?? 0) - (centers.min() ?? 0) <= 6,
+              "Apply, Edit, and trash must share one action row")
+            #expect(
+              pixelCount(
+                in: representation, viewport: rendered.viewport,
+                logicalRegion: CGRect(x: 28, y: bottom - 63, width: 295, height: 14)
+              ) { perceivedBrightness($0) < 0.8 } == 0,
+              "Passive status copy must leave a blank caption line")
+          }
         }
         if fixture.largeText, fixture.variant != .trayEmpty {
           let headerActionRegions = [
@@ -331,12 +376,12 @@ import Testing
           }
         }
         if fixture.usesPartialProfileOnly {
-          #expect(rendered.accessibility.contains("profile-action-layout=stacked"))
+          #expect(rendered.accessibility.contains("profile-action-layout=inline"))
           #expect(rendered.accessibility.contains("declared-partial-profile-actions="))
           #expect(
             rendered.accessibility.contains(
               appLocalizedRuntime(
-                "Review Available Changes…",
+                TrayProfileCardPolicy.applyLabelKey,
                 languageCode: fixture.languageCode
               )
             )
@@ -1836,16 +1881,15 @@ import Testing
         actionCopy.settingsLabel,
         actionCopy.quitLabel,
       ].compactMap { $0 }.joined(separator: " | ")
-      let profileActionLayout =
-        TrayAdaptiveLayoutPolicy.usesStackedProfileCard(
-          for: fixture.dynamicTypeSize
-        ) ? "stacked" : "inline"
+      let profileActionLayout = "inline"
       let partialProfileActions =
         fixture.usesPartialProfileOnly
         ? [
-          appLocalizedRuntime("Review Available Changes…", languageCode: fixture.languageCode),
-          appLocalizedRuntime("Edit Profile", languageCode: fixture.languageCode),
-          appLocalizedRuntime("More Profile Actions", languageCode: fixture.languageCode),
+          appLocalizedRuntime(
+            TrayProfileCardPolicy.applyLabelKey, languageCode: fixture.languageCode),
+          appLocalizedRuntime(
+            TrayProfileCardPolicy.editLabelKey, languageCode: fixture.languageCode),
+          appLocalizedRuntime("Delete Profile", languageCode: fixture.languageCode),
         ].joined(separator: " | ")
         : "not-applicable"
       var lines = [
