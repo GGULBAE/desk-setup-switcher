@@ -98,13 +98,13 @@ struct ProfilePresentationTests {
 
     #expect(
       summary?.items.map(\.kind) == [
-        .defaultInput, .defaultOutput, .outputVolume,
+        .defaultInput, .defaultOutput, .outputVolume, .outputMute,
       ]
     )
     #expect(summary?.summaryText.contains("Synthetic Speakers") == true)
     #expect(summary?.summaryText.contains("Selected input device") == true)
     #expect(summary?.summaryText.contains("70%") == true)
-    #expect(summary?.summaryText.contains("Off") == false)
+    #expect(summary?.summaryText.contains("Off") == true)
     #expect(summary?.summaryText.contains("synthetic-output-uid") == false)
     #expect(summary?.summaryText.contains("synthetic-input-uid") == false)
     #expect(
@@ -172,7 +172,7 @@ struct ProfilePresentationTests {
 
     #expect(
       audio?.items.map(\.value.primaryText) == [
-        "No device saved", "Value unavailable",
+        "No device saved", "Value unavailable", "Value unavailable",
       ]
     )
     #expect(network == nil)

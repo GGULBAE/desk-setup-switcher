@@ -274,6 +274,7 @@
 "System output device" = "System output device";
 "Output volume" = "Output volume";
 "Output mute" = "Output mute";
+"Mute cannot be changed for this output device right now. Choose another device or review available settings before applying." = "Mute cannot be changed for this output device right now. Choose another device or review available settings before applying.";
 "Network options" = "Network options";
 "Wi-Fi power" = "Wi-Fi power";
 "Wi-Fi network" = "Wi-Fi network";

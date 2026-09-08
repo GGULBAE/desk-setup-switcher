@@ -80,7 +80,7 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     XCTAssertFalse(result.settings.input.value.pointerSpeed.isIncluded)
     XCTAssertTrue(result.settings.audio.value.outputVolume.isIncluded)
     XCTAssertEqual(result.settings.audio.value.outputVolume.value, 0.8)
-    XCTAssertFalse(result.settings.audio.value.outputMuted.isIncluded)
+    XCTAssertTrue(result.settings.audio.value.outputMuted.isIncluded)
     XCTAssertEqual(result.settings.audio.value.outputMuted.value, true)
     XCTAssertFalse(result.settings.network.value.wifiSSID.isIncluded)
     XCTAssertEqual(result.settings.network.value.wifiSSID.value, "Office")

@@ -35,10 +35,10 @@ final class AudioAdapterTests: XCTestCase {
     XCTAssertFalse(settings.systemOutputUID.isIncluded)
     XCTAssertEqual(settings.inputVolume.value, 0.35)
     XCTAssertEqual(settings.outputVolume.value, 0.25)
-    XCTAssertNil(settings.outputMuted.value)
+    XCTAssertEqual(settings.outputMuted.value, false)
     XCTAssertTrue(settings.inputVolume.isIncluded)
     XCTAssertTrue(settings.outputVolume.isIncluded)
-    XCTAssertFalse(settings.outputMuted.isIncluded)
+    XCTAssertTrue(settings.outputMuted.isIncluded)
     let volumeCatalog = try XCTUnwrap(snapshot.audioVolumeControlCatalog)
     XCTAssertEqual(volumeCatalog.count, 4)
     XCTAssertTrue(
@@ -53,41 +53,102 @@ final class AudioAdapterTests: XCTestCase {
           && $0.canApply
       }
     )
-    XCTAssertNil(snapshot.audioMuteControlCatalog)
-    XCTAssertFalse(snapshot.items.contains { ["systemOutput", "outputMute"].contains($0.key) })
+    let muteCatalog = try XCTUnwrap(snapshot.audioMuteControlCatalog)
+    XCTAssertEqual(muteCatalog.count, 2)
+    XCTAssertTrue(muteCatalog.allSatisfy { $0.currentValue == false && $0.canApply })
+    XCTAssertTrue(snapshot.items.contains { $0.key == "outputMute" && $0.state == .storable })
+    XCTAssertFalse(snapshot.items.contains { $0.key == "systemOutput" })
+    XCTAssertTrue(api.mutations().isEmpty)
 
     let capability = await adapter.capability()
     XCTAssertEqual(capability.state, .supported)
   }
 
-  func testProfileApplyUsesOnlyFourAudioFieldsEvenWithLegacyMuteAndSystemOutput() async throws {
+  func testProfileApplyIncludesOutputMuteButNotLegacySystemOutput() async throws {
+    for mode in [ApplyMode.normal, .force] {
+      let api = makeAPI()
+      let adapter = makeAdapter(api: api)
+      let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+      let profile = DeskProfile(
+        name: "Synthetic five audio options",
+        settings: .init(
+          audio: .init(
+            value: .init(
+              defaultInputUID: .init(value: "input-B"),
+              defaultOutputUID: .init(value: "output-B"),
+              systemOutputUID: .init(value: "output-B"),
+              inputVolume: .init(value: 0.65),
+              outputVolume: .init(value: 0.75),
+              outputMuted: .init(value: true)
+            )))
+      )
+      let result = await engine.apply(profile: profile, mode: mode)
+      XCTAssertEqual(result.status, .applied)
+      XCTAssertEqual(
+        result.preparation.operations.map(\.key),
+        [
+          "defaultInput", "defaultOutput", "inputVolume", "outputVolume", "outputMute",
+        ])
+      XCTAssertEqual(api.defaultUID(for: .systemOutput), "output-A")
+      XCTAssertEqual(api.mute(for: "output-B")?.value, true)
+      XCTAssertEqual(api.mute(for: "output-A")?.value, false)
+      XCTAssertEqual(api.inputVolume(for: "input-B")?.value, 0.65)
+      XCTAssertEqual(api.volume(for: "output-B")?.value, 0.75)
+    }
+  }
+
+  func testUnsupportedMuteCaptureDoesNotInventAnUnmutedValue() async throws {
     let api = makeAPI()
-    let adapter = makeAdapter(api: api)
-    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+    api.setMuteState(.unsupported, for: "output-A")
+    let snapshot = try await makeAdapter(api: api).snapshot()
+    guard case .audio(let settings)? = snapshot.payload else {
+      return XCTFail("Expected an audio payload")
+    }
+    XCTAssertNil(settings.outputMuted.value)
+    XCTAssertFalse(settings.outputMuted.isIncluded)
+    XCTAssertEqual(settings.outputVolume.value, 0.25)
+    XCTAssertTrue(snapshot.items.contains { $0.key == "outputMute" && $0.state == .unsupported })
+    XCTAssertTrue(
+      snapshot.audioMuteControlCatalog?.contains {
+        $0.deviceUID == "output-A" && !$0.canApply && $0.currentValue == nil
+      } == true)
+    XCTAssertTrue(api.mutations().isEmpty)
+  }
+
+  func testUnsupportedMuteBlocksNormalButAllowsAvailableVolumeInForceMode() async throws {
+    let api = makeAPI()
+    api.setMuteState(.unsupported, for: "output-A")
+    let engine = ApplyEngine(registry: try AdapterRegistry([makeAdapter(api: api)]))
     let profile = DeskProfile(
-      name: "Synthetic four audio options",
+      name: "Synthetic unsupported mute",
       settings: .init(
         audio: .init(
           value: .init(
-            defaultInputUID: .init(value: "input-B"),
-            defaultOutputUID: .init(value: "output-B"),
-            systemOutputUID: .init(value: "output-B"),
-            inputVolume: .init(value: 0.65),
-            outputVolume: .init(value: 0.75),
-            outputMuted: .init(value: true)
-          )))
-    )
-    let result = await engine.apply(profile: profile, mode: .force)
-    XCTAssertEqual(result.status, .applied)
-    XCTAssertEqual(
-      result.preparation.operations.map(\.key),
-      [
-        "defaultInput", "defaultOutput", "inputVolume", "outputVolume",
-      ])
-    XCTAssertEqual(api.defaultUID(for: .systemOutput), "output-A")
-    XCTAssertEqual(api.mute(for: "output-B")?.value, false)
-    XCTAssertEqual(api.inputVolume(for: "input-B")?.value, 0.65)
-    XCTAssertEqual(api.volume(for: "output-B")?.value, 0.75)
+            outputVolume: .init(value: 0.75), outputMuted: .init(value: true)
+          ))))
+    let normal = await engine.apply(profile: profile, mode: .normal)
+    XCTAssertFalse(normal.didExecute)
+    XCTAssertTrue(api.mutations().isEmpty)
+    let force = await engine.apply(profile: profile, mode: .force)
+    XCTAssertTrue(force.didExecute)
+    XCTAssertEqual(force.preparation.operations.map(\.key), ["outputVolume"])
+    XCTAssertEqual(force.preparation.omissions.map(\.key), ["outputMute"])
+    XCTAssertEqual(api.volume(for: "output-A")?.value, 0.75)
+    XCTAssertEqual(api.mutations(), [.setOutputVolume(deviceUID: "output-A", value: 0.75)])
+  }
+
+  func testProfileWithoutSavedMuteDoesNotUnmuteCurrentOutput() async throws {
+    let api = makeAPI()
+    api.setMuteState(.available(value: true, isSettable: true), for: "output-A")
+    let engine = ApplyEngine(registry: try AdapterRegistry([makeAdapter(api: api)]))
+    let profile = DeskProfile(
+      name: "Synthetic volume only",
+      settings: .init(
+        audio: .init(value: .init(outputVolume: .init(value: 0.75)))))
+    let result = await engine.apply(profile: profile, mode: .normal)
+    XCTAssertTrue(result.didExecute)
+    XCTAssertEqual(result.preparation.operations.map(\.key), ["outputVolume"])
+    XCTAssertEqual(api.mute(for: "output-A")?.value, true)
   }
 
   func testPlansTypedUIDOperationsAndApplyRollbackRoundTrip() async throws {

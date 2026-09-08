@@ -1,6 +1,6 @@
 import Foundation
 
-/// Applies the six-setting product policy without discarding saved values.
+/// Applies the current profile-setting policy without discarding saved values.
 ///
 /// Registered supported values participate; retired setting kinds remain dormant
 /// for round-trip compatibility and never request mutations. The transformation is
@@ -44,8 +44,8 @@ public struct ProfileApplicabilityNormalizer: Sendable {
     includeRegisteredValue(&normalized.audio.value.defaultOutputUID)
     includeRegisteredValue(&normalized.audio.value.inputVolume)
     includeRegisteredValue(&normalized.audio.value.outputVolume)
+    includeRegisteredValue(&normalized.audio.value.outputMuted)
     normalized.audio.value.systemOutputUID.isIncluded = false
-    normalized.audio.value.outputMuted.isIncluded = false
 
     for index in normalized.network.value.serviceIPv4.indices {
       normalized.network.value.serviceIPv4[index].configuration.isIncluded = false

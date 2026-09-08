@@ -274,6 +274,7 @@
 "System output device" = "시스템 출력 기기";
 "Output volume" = "출력 음량";
 "Output mute" = "소리 끔";
+"Mute cannot be changed for this output device right now. Choose another device or review available settings before applying." = "지금은 이 출력 기기의 소리 끔 설정을 변경할 수 없습니다. 다른 기기를 선택하거나 적용 전에 사용 가능한 설정을 확인하세요.";
 "Network options" = "네트워크 옵션";
 "Wi-Fi power" = "Wi-Fi 전원";
 "Wi-Fi network" = "Wi-Fi 네트워크";

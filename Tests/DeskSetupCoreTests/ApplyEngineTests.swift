@@ -5,8 +5,8 @@ import Testing
 
 @Suite("Apply engine planning")
 struct ApplyEngineTests {
-  @Test("both apply modes prepare all six registered settings without mutating hardware")
-  func sixRegisteredSettingsReachPreflight() async throws {
+  @Test("both apply modes prepare all seven registered settings without mutating hardware")
+  func sevenRegisteredSettingsReachPreflight() async throws {
     let displayAdapter = MockSystemSettingsAdapter(group: .display)
     let audioAdapter = MockSystemSettingsAdapter(group: .audio)
     let engine = ApplyEngine(registry: try AdapterRegistry([displayAdapter, audioAdapter]))
@@ -16,7 +16,8 @@ struct ApplyEngineTests {
       defaultInputUID: .init(isIncluded: false, value: "synthetic-input"),
       defaultOutputUID: .init(isIncluded: false, value: "synthetic-output"),
       inputVolume: .init(isIncluded: false, value: 0.2),
-      outputVolume: .init(isIncluded: false, value: 0.8)
+      outputVolume: .init(isIncluded: false, value: 0.8),
+      outputMuted: .init(isIncluded: false, value: false)
     )
     let original = profile
     for mode in [ApplyMode.normal, .force] {
@@ -110,7 +111,7 @@ struct ApplyEngineTests {
     var profile = makeProfile(including: [.display, .network])
     profile.settings.display.value.displays[0].isPrimary.isIncluded = false
     profile.settings.display.value.displays[0].mirroring = .init(value: .extended)
-    profile.settings.audio.value.outputMuted = .init(value: true)
+    profile.settings.audio.value.systemOutputUID = .init(value: "synthetic-alert-output")
     let original = profile
     for mode in [ApplyMode.normal, .force] {
       let result = await engine.apply(profile: profile, mode: mode)
@@ -128,11 +129,11 @@ struct ApplyEngineTests {
     let imported = try codec.decode(codec.encode(.init(profiles: [profile])))
     let normalized = try #require(imported.document.profiles.first)
     #expect(normalized.settings.display.value.displays[0].mirroring.value == .extended)
-    #expect(normalized.settings.audio.value.outputMuted.value == true)
+    #expect(normalized.settings.audio.value.systemOutputUID.value == "synthetic-alert-output")
     #expect(normalized.settings.network.value.serviceIPv4[0].configuration.value == .dhcp)
     #expect(normalized.settings.display.isIncluded)
     #expect(!normalized.settings.display.value.displays[0].mirroring.isIncluded)
-    #expect(!normalized.settings.audio.value.outputMuted.isIncluded)
+    #expect(!normalized.settings.audio.value.systemOutputUID.isIncluded)
     #expect(!normalized.settings.audio.isIncluded)
     #expect(!normalized.settings.network.isIncluded)
     #expect(!ProfileApplicabilityNormalizer().normalize(normalized).settings.network.isIncluded)

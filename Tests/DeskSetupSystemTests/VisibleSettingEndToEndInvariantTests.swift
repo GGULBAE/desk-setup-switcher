@@ -164,7 +164,8 @@ struct VisibleSettingEndToEndInvariantTests {
       defaultInputUID: .init(value: "input-B"),
       defaultOutputUID: .init(value: "output-B"),
       inputVolume: .init(value: 0.7),
-      outputVolume: .init(value: 0.8)
+      outputVolume: .init(value: 0.8),
+      outputMuted: .init(value: true)
     )
     let payload = SettingsPayload.audio(desired)
     let issues = await adapter.validate(payload, against: snapshot)

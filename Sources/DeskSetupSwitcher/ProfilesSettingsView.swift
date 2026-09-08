@@ -349,10 +349,7 @@ enum ProfileEditorAudioMuteCapabilityResolver {
     currentDeviceUID: String?,
     catalog: [AudioMuteControlCatalogEntry]
   ) -> ProfileEditorAudioMuteCapability {
-    let targetDeviceUID =
-      selectedDevice.isIncluded
-      ? selectedDevice.value
-      : currentDeviceUID
+    let targetDeviceUID = selectedDevice.value ?? currentDeviceUID
     guard
       let targetDeviceUID,
       let entry = catalog.first(where: { $0.deviceUID == targetDeviceUID })
@@ -1699,6 +1696,10 @@ private struct ProfileEditorForm: View {
           option: $profile.settings.audio.value.outputVolume,
           fieldID: .audio(.outputVolume)
         )
+        audioMuteOption(
+          option: $profile.settings.audio.value.outputMuted,
+          fieldID: .audio(.outputMute)
+        )
       }
       audioSection("Input", systemImage: "mic", identifier: "audio-input") {
         audioDeviceOption(
@@ -2214,11 +2215,12 @@ private struct ProfileEditorForm: View {
     if capability.isWritable {
       optionEditor(
         "Output mute",
+        embeddedTitle: "Output mute",
         validationFields: [fieldID]
       ) {
         if option.wrappedValue.value == nil {
           chooseSuggestedValueButton(fieldID: fieldID) {
-            option.wrappedValue.value = capability.suggestedValue ?? false
+            option.wrappedValue.value = capability.suggestedValue
           }
         } else {
           Toggle(
@@ -2243,16 +2245,13 @@ private struct ProfileEditorForm: View {
           .accessibilityInvalid(validation.issue(for: fieldID) != nil)
         }
       }
-    } else if ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
-      isIncluded: option.wrappedValue.isIncluded,
-      isRuntimeAvailable: capability.isWritable,
-      hasRuntimeEvidence: systemSnapshot != nil
-    ) {
+    } else {
       unavailableSavedOption(
         appLocalized("Output mute"),
+        embeddedTitle: "Output mute",
         validationFields: [fieldID],
         warning: appLocalized(
-          "This included mute setting is unavailable for the selected output device. Turn off Include to apply other available settings normally."
+          "Mute cannot be changed for this output device right now. Choose another device or review available settings before applying."
         )
       )
     }

@@ -360,6 +360,26 @@ import Testing
       )
     }
 
+    @Test(
+      "mute targets registered output despite legacy exclusion and never invents unreadable state")
+    func muteCapabilityHonorsRegisteredDeviceAndReadability() {
+      let catalog = [
+        AudioMuteControlCatalogEntry(deviceUID: "current", currentValue: false, canApply: true),
+        AudioMuteControlCatalogEntry(deviceUID: "saved", currentValue: true, canApply: false),
+        AudioMuteControlCatalogEntry(deviceUID: "unreadable", currentValue: nil, canApply: true),
+      ]
+      #expect(
+        ProfileEditorAudioMuteCapabilityResolver.resolve(
+          selectedDevice: .init(isIncluded: false, value: "saved"),
+          currentDeviceUID: "current", catalog: catalog
+        ) == ProfileEditorAudioMuteCapability(isWritable: false, suggestedValue: true))
+      #expect(
+        ProfileEditorAudioMuteCapabilityResolver.resolve(
+          selectedDevice: .init(value: "unreadable"),
+          currentDeviceUID: "current", catalog: catalog
+        ) == ProfileEditorAudioMuteCapability(isWritable: false, suggestedValue: nil))
+    }
+
     @Test("only included unavailable settings receive an editor repair control")
     func unavailableIncludedSettingsRemainRepairable() {
       #expect(

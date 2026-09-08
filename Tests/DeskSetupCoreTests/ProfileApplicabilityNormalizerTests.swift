@@ -31,7 +31,7 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(audio.inputVolume == .init(value: 0))
     #expect(audio.outputVolume == .init(value: 1))
     #expect(!audio.systemOutputUID.isIncluded)
-    #expect(!audio.outputMuted.isIncluded)
+    #expect(audio.outputMuted.isIncluded)
     #expect(!profile.settings.audio.value.defaultInputUID.isIncluded)
     let codec = ProfileJSONCodec()
     let decoded = try codec.decode(codec.encode(.init(profiles: [profile])))
@@ -156,7 +156,7 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(normalized.settings.audio.isIncluded)
     #expect(normalized.settings.audio.value.defaultInputUID.isIncluded)
     #expect(!normalized.settings.audio.value.systemOutputUID.isIncluded)
-    #expect(!normalized.settings.audio.value.outputMuted.isIncluded)
+    #expect(normalized.settings.audio.value.outputMuted.isIncluded)
     #expect(normalized.settings.audio.value.outputMuted.value == true)
     #expect(normalized.settings.network.value.serviceIPv4[0].configuration.value == ipv4)
     #expect(!normalized.settings.network.value.serviceIPv4[0].configuration.isIncluded)
@@ -211,17 +211,28 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(roundTrip.document == imported.document)
   }
 
-  @Test("legacy output mute stays dormant without deleting its value")
-  func outputMuteRemainsApplicable() {
+  @Test(
+    "registered mute and unmute values participate across JSON round trips",
+    arguments: [true, false])
+  func outputMuteRemainsApplicable(value: Bool) throws {
     var settings = ProfileSettings()
-    settings.audio.value.outputMuted = .init(value: true)
+    settings.audio.value.outputMuted = .init(isIncluded: false, value: value)
 
     let normalized = normalizer.normalize(settings)
 
-    #expect(!normalized.audio.isIncluded)
-    #expect(!normalized.audio.value.outputMuted.isIncluded)
-    #expect(normalized.audio.value.outputMuted.value == true)
-    #expect(normalized.payload(for: .audio) == nil)
+    #expect(normalized.audio.isIncluded)
+    #expect(normalized.audio.value.outputMuted == .init(value: value))
+    #expect(normalized.payload(for: .audio) == .audio(normalized.audio.value))
+    #expect(normalizer.normalize(normalized) == normalized)
+    let codec = ProfileJSONCodec()
+    let imported = try codec.decode(
+      codec.encode(
+        .init(profiles: [
+          DeskProfile(name: "Synthetic mute", settings: settings)
+        ])))
+    #expect(imported.document.profiles[0].settings == normalized)
+    #expect(!normalizer.normalize(ProfileSettings()).audio.value.outputMuted.isIncluded)
+    #expect(normalizer.normalize(ProfileSettings()).audio.value.outputMuted.value == nil)
   }
 
   @Test("registered resolution participates while empty and retired groups stay dormant")

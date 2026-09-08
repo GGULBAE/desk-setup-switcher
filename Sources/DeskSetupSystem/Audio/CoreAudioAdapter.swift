@@ -51,6 +51,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
     )
     var inputVolume = SettingOption<Double?>(isIncluded: false, value: nil)
     var outputVolume = SettingOption<Double?>(isIncluded: false, value: nil)
+    var outputMuted = SettingOption<Bool?>(isIncluded: false, value: nil)
     if let defaultInputUID {
       inputVolume = readInputVolume(deviceUID: defaultInputUID, items: &items)
     } else {
@@ -65,6 +66,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
     }
     if let defaultOutputUID {
       outputVolume = readVolume(deviceUID: defaultOutputUID, items: &items)
+      outputMuted = readMute(deviceUID: defaultOutputUID, items: &items)
     } else {
       items.append(
         SnapshotItem(
@@ -89,7 +91,7 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
       systemOutputUID: SettingOption(isIncluded: false, value: nil),
       inputVolume: inputVolume,
       outputVolume: outputVolume,
-      outputMuted: SettingOption(isIncluded: false, value: nil)
+      outputMuted: outputMuted
     )
     return AdapterSnapshot(
       group: group,
@@ -104,7 +106,8 @@ public struct CoreAudioAdapter: SystemSettingsAdapter {
           supportsOutput: $0.supportsOutput
         )
       },
-      audioVolumeControlCatalog: volumeControlCatalog(for: devices)
+      audioVolumeControlCatalog: volumeControlCatalog(for: devices),
+      audioMuteControlCatalog: muteControlCatalog(for: devices)
     )
   }
 

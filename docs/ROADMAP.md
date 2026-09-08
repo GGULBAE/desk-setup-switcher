@@ -1,8 +1,12 @@
 # Roadmap
 
+## Output mute restored — 2026-09-08
+
+Show a **소리 끔 / Output mute** value switch inside Output, alongside its device and volume. Restore readable mute capture, registered-value normalization, summary, and explicit apply/rollback through the existing Core Audio adapter. Leave Input unchanged and do not restore per-setting inclusion controls or retired options. Unsupported/unreadable mute shows a warning without inventing a value. See [scope and verification](OUTPUT-MUTE-2026-09-08.md).
+
 ## Registered profile values — 2026-09-08
 
-Remove per-setting inclusion copy and switches. All registered values in the six supported kinds participate across capture, edit/save, import, and preflight; missing values stay absent and retired settings stay dormant. Keep device-specific availability, explicit Apply Preview/confirmation, and rollback. See [scope and verification](REGISTERED-PROFILE-VALUES-2026-09-08.md).
+Remove per-setting inclusion copy and switches. All registered values in the supported kinds participate across capture, edit/save, import, and preflight; missing values stay absent and retired settings stay dormant. Keep device-specific availability, explicit Apply Preview/confirmation, and rollback. See [scope and verification](REGISTERED-PROFILE-VALUES-2026-09-08.md).
 
 ## Compact tray profile actions — 2026-09-08
 
@@ -12,9 +16,9 @@ Use one **Apply / Edit / trash** row on each profile card, with no one-item tras
 
 Remove duplicate Display/Sound headings and explanations without removing section navigation, validation targets, or Output/Input grouping. Add sidebar-action and form-bottom breathing room. Fit one-to-three-profile trays from a detached measurement of the same content at the real width before opening, then freeze the viewport until close. Saved ON preferences are observed at startup; missing registration waits for explicit ON/Retry. Default-off/legacy opt-out cleanup remains intact, and no `sfltool` command is added. Verification and limitations are tracked in [the follow-up record](SPACING-LOGIN-2026-09-08.md).
 
-## Current scope — six display/sound settings (2026-09-07)
+## Original six-setting scope (2026-09-07; output mute added 2026-09-08)
 
-The current profile contract is limited to main display, resolution, output device/volume, and input device/volume. Display/Sound retain stable width-driven navigation; every option is direct, with no Network or Advanced section. Capture queries only the two relevant adapters and never gates on Location permission. Saved refresh rates are ignored; resolution changes preserve the current rate or are skipped. Legacy retired setting kinds remain round-trip compatible but are never applied, even in Force. The 2026-09-08 registered-values policy supersedes per-setting exclusion for the six supported kinds. See [minimal profile scope](MINIMAL-PROFILE-SCOPE-2026-09-07.md). Older milestones below describe historical adapter primitives, not additional current profile options.
+The original profile contract was main display, resolution, output device/volume, and input device/volume. The 2026-09-08 follow-up adds output mute. Display/Sound retain stable width-driven navigation; every option is direct, with no Network or Advanced section. Capture queries only the two relevant adapters and never gates on Location permission. Saved refresh rates are ignored; resolution changes preserve the current rate or are skipped. Legacy retired setting kinds remain round-trip compatible but are never applied, even in Force. The 2026-09-08 registered-values policy supersedes per-setting exclusion for the six supported kinds. See [minimal profile scope](MINIMAL-PROFILE-SCOPE-2026-09-07.md). Older milestones below describe historical adapter primitives, not additional current profile options.
 
 The canonical non-live `make verify` gate and 19-fixture offscreen matrix passed. The app was reinstalled and launched from `/Applications`; both profile files passed the value-preservation audit after retired-field normalization. Installed keyboard/VoiceOver and hardware mutation remain unverified.
 

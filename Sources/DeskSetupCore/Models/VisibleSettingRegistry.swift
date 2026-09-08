@@ -7,6 +7,7 @@ public enum VisibleSettingKind: String, CaseIterable, Codable, Hashable, Sendabl
   case audioDefaultOutput
   case audioInputVolume
   case audioOutputVolume
+  case audioOutputMute
 }
 
 public enum VisibleSettingStage: String, CaseIterable, Codable, Hashable, Sendable {
@@ -145,6 +146,17 @@ public struct VisibleSettingRegistry: Sendable {
       localizationKey: "editor.audio.outputVolume",
       accessibilityLabelKey: "editor.audio.outputVolume.accessibility"
     ),
+    .init(
+      kind: .audioOutputMute,
+      group: .audio,
+      snapshotKey: "outputMute",
+      runtimeCatalogSource: "audioMuteControlCatalog",
+      validationKey: "outputMute",
+      operationKeyPrefix: "outputMute",
+      editorKind: .toggle,
+      localizationKey: "editor.audio.outputMute",
+      accessibilityLabelKey: "editor.audio.outputMute.accessibility"
+    ),
   ]
 
   public init() {}
@@ -190,6 +202,11 @@ public struct VisibleSettingRegistry: Sendable {
         if let contract = contractByKind[kind] {
           fields.append(.init(id: contract.kind.rawValue, contract: contract))
         }
+      }
+      if (audio.audioMuteControlCatalog ?? []).contains(where: {
+        $0.canApply && $0.currentValue != nil && $0.deviceUID != nil
+      }), let contract = contractByKind[.audioOutputMute] {
+        fields.append(.init(id: contract.kind.rawValue, contract: contract))
       }
     }
 

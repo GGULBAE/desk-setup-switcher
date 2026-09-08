@@ -76,11 +76,11 @@ struct ProfileCaptureSummaryBuilderTests {
     #expect(!summary.canCreateProfile)
   }
 
-  @Test("legacy output mute cannot be captured as an applicable setting")
-  func capturedOutputMuteIsApplicable() {
+  @Test("readable output mute can be captured as an applicable setting", arguments: [true, false])
+  func capturedOutputMuteIsApplicable(value: Bool) {
     let settings = ProfileSettings(
       audio: .init(
-        value: .init(outputMuted: .init(value: true))
+        value: .init(outputMuted: .init(value: value))
       )
     )
 
@@ -89,8 +89,10 @@ struct ProfileCaptureSummaryBuilderTests {
       evidence: []
     )
 
-    #expect(summary.status == .failure)
-    #expect(summary.items.isEmpty)
+    #expect(summary.status == .complete)
+    #expect(summary.items.map(\.key) == ["outputMute"])
+    #expect(summary.applicableCount == 1)
+    #expect(summary.canCreateProfile)
   }
 
   @Test("unreadable and unsupported evidence is omitted from the user-facing result")

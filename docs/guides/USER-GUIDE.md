@@ -45,7 +45,7 @@ There is no timer, condition, or background rule that applies a profile automati
 
 Open the menu-bar item and choose **Capture Current Settings**. On an empty first run, this is the single main action in the body. When profiles already exist, Capture is in the header.
 
-Capture stores only the main display, resolutions, output device/volume, and input device/volume when readable and applicable. It does not capture network settings or require Location access. Older imported values outside this scope remain stored with inclusion off for compatibility and may appear in exported JSON.
+Capture stores only the main display, resolutions, output device/volume/mute, and input device/volume when readable and applicable. It does not capture network settings or require Location access. Older imported values outside this scope remain stored with inclusion off for compatibility and may appear in exported JSON.
 
 ## 2. Edit
 
@@ -53,7 +53,7 @@ Choose **Edit** on a tray profile to open **Settings → Profiles**. The trash i
 
 - Give the profile a recognizable name and icon.
 - Work through the stable numbered **Display** and **Sound** steps. At the minimum window size or an accessibility text size, the same steps become a compact segmented selector.
-- **Display** has only **Main display** and per-display **Resolution**. **Sound** has two sections: **Output** and **Input**. Choose the device and volume together in each section. All options are shown directly; there is no Advanced or Network section. All registered values participate in Apply; there are no per-setting inclusion switches, including for previously excluded saved values. Missing values are not filled automatically. Resolution keeps the current refresh rate, or is skipped when that combination is unavailable. Capture reads only these settings and does not need Location access. Old mirroring, mute, color, and network values remain dormant and are never applied.
+- **Display** has only **Main display** and per-display **Resolution**. **Sound** has two sections: **Output** and **Input**. Choose the device and volume together in each section. **Output mute** also appears in Output and saves whether sound is off or on. It is a value switch, not an inclusion switch; an unreadable mute value is never guessed. All options are shown directly; there is no Advanced or Network section. All registered values participate in Apply; there are no per-setting inclusion switches, including for previously excluded saved values. Missing values are not filled automatically. Resolution keeps the current refresh rate, or is skipped when that combination is unavailable. Capture reads only these settings and does not need Location access. Old mirroring, color, and network values remain dormant and are never applied.
 - If a value is invalid, Save selects the owning step before focusing it.
 - The editor contains profile settings only. Itemized application results remain available after Apply.
 - Save the profile. `⌘S` saves a valid dirty draft.
@@ -142,7 +142,7 @@ Use [SUPPORT.md](../../SUPPORT.md) for public support and bug-report routes. For
 | Symptom | What to do |
 | --- | --- |
 | The app opened but no window appeared | Look for the menu-bar icon. The app is menu-bar-only by design. |
-| Network settings are missing | Expected: profiles now capture and apply only the six Display/Sound setting kinds. |
+| Network settings are missing | Expected: profiles now capture and apply only the seven Display/Sound setting kinds. |
 | A profile is Partial or Unavailable | Choose **Edit**, inspect warning rows, reconnect the required device/service, or exclude an unavailable setting. If **Apply** is enabled, inspect the preview and proceed only when every omission is intentional. |
 | Review shows no operation | The profile already matches the current readable state, or no included setting can be safely applied. Nothing needs to run. |
 | Review refreshes instead of applying | The profile, capability, current value, or rollback evidence changed after the first review. This is a safety stop; inspect the new plan. |

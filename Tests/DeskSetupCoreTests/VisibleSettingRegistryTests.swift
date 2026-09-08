@@ -9,7 +9,7 @@ struct VisibleSettingRegistryTests {
   func completeContracts() {
     let contracts = VisibleSettingRegistry.contracts
 
-    #expect(contracts.count == 6)
+    #expect(contracts.count == 7)
     #expect(contracts.count == VisibleSettingKind.allCases.count)
     #expect(Set(contracts.map(\.kind)) == Set(VisibleSettingKind.allCases))
     #expect(Set(contracts.map(\.kind)).count == contracts.count)
@@ -34,6 +34,7 @@ struct VisibleSettingRegistryTests {
     #expect(counts[.audioDefaultOutput] == 1)
     #expect(counts[.audioInputVolume] == 1)
     #expect(counts[.audioOutputVolume] == 1)
+    #expect(counts[.audioOutputMute] == 1)
     #expect(fields.allSatisfy { $0.contract.stages.contains(.rollback) })
   }
 
@@ -62,6 +63,7 @@ struct VisibleSettingRegistryTests {
 
     #expect(!kinds.contains(.audioInputVolume))
     #expect(!kinds.contains(.audioOutputVolume))
+    #expect(!kinds.contains(.audioOutputMute))
     #expect(kinds.contains(.audioDefaultInput))
     #expect(kinds.contains(.audioDefaultOutput))
   }
