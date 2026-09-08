@@ -572,7 +572,7 @@ final class ImportExportTests: XCTestCase {
     XCTAssertEqual(network.value.dnsServers.value, ["192.0.2.53"])
   }
 
-  func testImportNormalizesMixedPrimaryDisplayInclusionToDormant() throws {
+  func testImportNormalizesMixedPrimaryFlagsToRegisteredSelection() throws {
     let first = displayTarget(name: "Synthetic Panel A", isIncluded: true, value: false)
     let second = displayTarget(name: "Synthetic Panel B", isIncluded: false, value: true)
     var settings = ProfileSettings()
@@ -589,8 +589,9 @@ final class ImportExportTests: XCTestCase {
     let display = try XCTUnwrap(decoded.document.profiles.first?.settings.display)
 
     XCTAssertTrue(decoded.wasNormalized)
-    XCTAssertFalse(display.isIncluded)
-    XCTAssertEqual(display.value.displays.map(\.isPrimary.isIncluded), [false, false])
+    XCTAssertTrue(display.isIncluded)
+    XCTAssertEqual(display.value.displays.map(\.isPrimary.isIncluded), [true, true])
+    XCTAssertTrue(display.value.displays.allSatisfy(\.mode.isIncluded))
     XCTAssertEqual(display.value.displays.map(\.isPrimary.value), [false, true])
   }
 

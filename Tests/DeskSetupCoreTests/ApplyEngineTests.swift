@@ -5,6 +5,43 @@ import Testing
 
 @Suite("Apply engine planning")
 struct ApplyEngineTests {
+  @Test("both apply modes prepare all six registered settings without mutating hardware")
+  func sixRegisteredSettingsReachPreflight() async throws {
+    let displayAdapter = MockSystemSettingsAdapter(group: .display)
+    let audioAdapter = MockSystemSettingsAdapter(group: .audio)
+    let engine = ApplyEngine(registry: try AdapterRegistry([displayAdapter, audioAdapter]))
+    var profile = makeProfile(including: [.display, .audio])
+    profile.settings.display.value.displays[0].isPrimary.isIncluded = false
+    profile.settings.audio.value = .init(
+      defaultInputUID: .init(isIncluded: false, value: "synthetic-input"),
+      defaultOutputUID: .init(isIncluded: false, value: "synthetic-output"),
+      inputVolume: .init(isIncluded: false, value: 0.2),
+      outputVolume: .init(isIncluded: false, value: 0.8)
+    )
+    let original = profile
+    for mode in [ApplyMode.normal, .force] {
+      let preparation = await engine.prepare(profile: profile, mode: mode)
+      #expect(preparation.includedGroups == [.audio, .display])
+    }
+    let expected = ProfileApplicabilityNormalizer().normalize(profile).settings
+    #expect(
+      await displayAdapter.recordedDesiredPayloads()
+        == Array(
+          repeating: .display(expected.display.value), count: 2))
+    #expect(
+      await audioAdapter.recordedDesiredPayloads()
+        == Array(
+          repeating: .audio(expected.audio.value), count: 2))
+    for adapter in [displayAdapter, audioAdapter] {
+      #expect(
+        await adapter.recordedInvocations() == [
+          .capability, .snapshot, .validate, .plan(.normal),
+          .capability, .snapshot, .validate, .plan(.force),
+        ])
+    }
+    #expect(profile == original)
+  }
+
   @Test("planning defensively excludes unsupported leaves without mutating the profile value")
   func planningNormalizesUnsupportedLeaves() async throws {
     let displayOperation = PlannedOperation(
@@ -39,7 +76,7 @@ struct ApplyEngineTests {
     #expect(profile.settings.network.value.dnsServers.value == ["192.0.2.53"])
   }
 
-  @Test("legacy color-only profiles never reach the display adapter in normal or force mode")
+  @Test("legacy color remains dormant while registered display values reach planning")
   func retiredColorProfilesCannotApply() async throws {
     let adapter = MockSystemSettingsAdapter(group: .display)
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
@@ -54,15 +91,19 @@ struct ApplyEngineTests {
     )
     for mode in [ApplyMode.normal, .force] {
       let preparation = await engine.prepare(profile: profile, mode: mode)
-      #expect(preparation.includedGroups.isEmpty)
+      #expect(preparation.includedGroups == [.display])
       #expect(preparation.operations.isEmpty)
       #expect(!preparation.canExecute)
     }
-    #expect(await adapter.recordedInvocations().isEmpty)
+    #expect(await adapter.recordedInvocations().contains(.plan(.normal)))
+    #expect(await adapter.recordedInvocations().contains(.plan(.force)))
+    #expect(
+      !ProfileApplicabilityNormalizer().normalize(profile).settings.display.value.displays[0]
+        .colorProfile.isIncluded)
     #expect(profile.settings.display.value.displays[0].colorProfile.isIncluded)
   }
 
-  @Test("legacy mirroring, mute, and network never reach adapters in either apply mode")
+  @Test("retired settings remain dormant beside registered display values in either apply mode")
   func retiredOptionsCannotApply() async throws {
     let adapters = SettingGroup.allCases.map { MockSystemSettingsAdapter(group: $0) }
     let engine = ApplyEngine(registry: try AdapterRegistry(adapters))
@@ -74,10 +115,12 @@ struct ApplyEngineTests {
     for mode in [ApplyMode.normal, .force] {
       let result = await engine.apply(profile: profile, mode: mode)
       #expect(!result.didExecute)
-      #expect(result.preparation.includedGroups.isEmpty)
+      #expect(result.preparation.includedGroups == [.display])
       #expect(result.preparation.operations.isEmpty)
     }
-    for adapter in adapters { #expect(await adapter.recordedInvocations().isEmpty) }
+    for adapter in adapters where adapter.group != .display {
+      #expect(await adapter.recordedInvocations().isEmpty)
+    }
     #expect(profile == original)
     profile.createdAt = Date(timeIntervalSince1970: 1_700_000_000)
     profile.updatedAt = profile.createdAt
@@ -87,7 +130,9 @@ struct ApplyEngineTests {
     #expect(normalized.settings.display.value.displays[0].mirroring.value == .extended)
     #expect(normalized.settings.audio.value.outputMuted.value == true)
     #expect(normalized.settings.network.value.serviceIPv4[0].configuration.value == .dhcp)
-    #expect(!normalized.settings.display.isIncluded)
+    #expect(normalized.settings.display.isIncluded)
+    #expect(!normalized.settings.display.value.displays[0].mirroring.isIncluded)
+    #expect(!normalized.settings.audio.value.outputMuted.isIncluded)
     #expect(!normalized.settings.audio.isIncluded)
     #expect(!normalized.settings.network.isIncluded)
     #expect(!ProfileApplicabilityNormalizer().normalize(normalized).settings.network.isIncluded)
@@ -136,8 +181,8 @@ struct ApplyEngineTests {
       ])
   }
 
-  @Test("planning cannot execute a mixed primary-display inclusion state")
-  func mixedPrimaryDisplayInclusionCannotExecute() async throws {
+  @Test("planning resolves legacy mixed primary flags to the registered selection")
+  func mixedPrimaryDisplayInclusionUsesRegisteredSelection() async throws {
     let adapter = MockSystemSettingsAdapter(group: .display)
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
     var profile = makeProfile(including: [.display])
@@ -151,9 +196,9 @@ struct ApplyEngineTests {
 
     let preparation = await engine.prepare(profile: profile, mode: .force)
 
-    #expect(preparation.includedGroups.isEmpty)
-    #expect(preparation.rejectionReasons == [.noIncludedSettings, .noOperations])
-    #expect(await adapter.recordedInvocations().isEmpty)
+    #expect(preparation.includedGroups == [.display])
+    #expect(preparation.rejectionReasons == [.noOperations])
+    #expect(await adapter.recordedInvocations().contains(.plan(.force)))
   }
 
   @Test("legacy conditions do not block the default manual apply policy")
@@ -573,7 +618,7 @@ private func makeProfile(including groups: Set<SettingGroup>) -> DeskProfile {
   }
   settings.audio.isIncluded = groups.contains(.audio)
   settings.audio.value.defaultOutputUID = .init(
-    isIncluded: groups.contains(.audio), value: "test-output")
+    isIncluded: groups.contains(.audio), value: groups.contains(.audio) ? "test-output" : nil)
   settings.network.isIncluded = groups.contains(.network)
   settings.network.value.serviceIPv4 =
     groups.contains(.network)

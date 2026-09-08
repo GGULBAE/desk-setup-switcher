@@ -7,6 +7,60 @@ import Testing
 struct ProfileApplicabilityNormalizerTests {
   private let normalizer = ProfileApplicabilityNormalizer()
 
+  @Test("all registered sound values participate despite legacy exclusion flags")
+  func registeredAudioValuesParticipateAcrossJSONRoundTrip() throws {
+    var settings = ProfileSettings()
+    settings.audio.value = .init(
+      defaultInputUID: .init(isIncluded: false, value: "synthetic-input"),
+      defaultOutputUID: .init(isIncluded: false, value: "synthetic-output"),
+      systemOutputUID: .init(value: "synthetic-alert"),
+      inputVolume: .init(isIncluded: false, value: 0),
+      outputVolume: .init(isIncluded: false, value: 1),
+      outputMuted: .init(value: true)
+    )
+    let profile = DeskProfile(
+      name: "Registered values", settings: settings,
+      createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+      updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+    let normalized = normalizer.normalize(profile)
+    let audio = normalized.settings.audio.value
+    #expect(normalized.settings.audio.isIncluded)
+    #expect(audio.defaultInputUID == .init(value: "synthetic-input"))
+    #expect(audio.defaultOutputUID == .init(value: "synthetic-output"))
+    #expect(audio.inputVolume == .init(value: 0))
+    #expect(audio.outputVolume == .init(value: 1))
+    #expect(!audio.systemOutputUID.isIncluded)
+    #expect(!audio.outputMuted.isIncluded)
+    #expect(!profile.settings.audio.value.defaultInputUID.isIncluded)
+    let codec = ProfileJSONCodec()
+    let decoded = try codec.decode(codec.encode(.init(profiles: [profile])))
+    #expect(decoded.document.profiles == [normalized])
+    #expect(decoded.wasNormalized)
+    let roundTrip = try codec.decode(codec.encode(decoded.document))
+    #expect(roundTrip.document == decoded.document)
+    #expect(!roundTrip.requiresPersistence)
+  }
+
+  @Test("missing values stay absent and invalid requested values are not silently repaired")
+  func missingAndInvalidValuesAreNotInvented() throws {
+    var settings = ProfileSettings()
+    #expect(!normalizer.normalize(settings).audio.isIncluded)
+    settings.audio.value.defaultOutputUID = .init(value: "synthetic-output")
+    settings.audio.value.inputVolume = .init(value: nil)
+    settings.audio.value.outputVolume = .init(isIncluded: false, value: 2)
+    let normalized = normalizer.normalize(settings)
+    #expect(normalized.audio.value.defaultInputUID == .init(isIncluded: false, value: nil))
+    #expect(normalized.audio.value.inputVolume == .init(value: nil))
+    #expect(normalized.audio.value.outputVolume == .init(value: 2))
+    #expect(throws: (any Error).self) {
+      try ProfileJSONCodec().encode(
+        .init(profiles: [
+          DeskProfile(name: "Invalid volume", settings: normalized)
+        ]))
+    }
+  }
+
   @Test("unsupported snapshot values are preserved, excluded, and idempotent")
   func unsupportedValuesArePreservedAndNormalizationIsIdempotent() throws {
     let displayID = try #require(UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"))
@@ -144,7 +198,7 @@ struct ProfileApplicabilityNormalizerTests {
       updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
     )
     let normalized = normalizer.normalize(profile)
-    #expect(!normalized.settings.display.isIncluded)
+    #expect(normalized.settings.display.isIncluded)
     #expect(!normalized.settings.display.value.displays[0].colorProfile.isIncluded)
     #expect(normalized.settings.display.value.displays[0].colorProfile.value == color)
     #expect(normalizer.normalize(normalized) == normalized)
@@ -170,7 +224,7 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(normalized.payload(for: .audio) == nil)
   }
 
-  @Test("groups with no applicable leaves are disabled without deleting values")
+  @Test("registered resolution participates while empty and retired groups stay dormant")
   func emptyApplicableGroupsAreDisabled() {
     let display = DisplayTargetSettings(
       identity: DisplayIdentity(productName: "Snapshot-only Panel"),
@@ -195,20 +249,20 @@ struct ProfileApplicabilityNormalizerTests {
 
     let normalized = normalizer.normalize(settings)
 
-    #expect(!normalized.display.isIncluded)
+    #expect(normalized.display.isIncluded)
     #expect(!normalized.audio.isIncluded)
     #expect(!normalized.network.isIncluded)
     #expect(!normalized.input.isIncluded)
     #expect(normalized.display.value.displays[0].rotationDegrees.value == 90)
     #expect(normalized.display.value.displays[0].isActive.value)
     #expect(normalized.network.value.dnsServers.value == ["192.0.2.53"])
-    for group in SettingGroup.allCases {
+    for group in [SettingGroup.audio, .network, .input] {
       #expect(normalized.payload(for: group) == nil)
     }
   }
 
-  @Test("mixed primary-display inclusion fails closed without changing saved values")
-  func mixedPrimaryDisplayInclusionFailsClosed() {
+  @Test("mixed legacy primary flags cannot hide the registered selection")
+  func mixedPrimaryDisplayInclusionUsesRegisteredSelection() {
     let first = DisplayTargetSettings(
       identity: DisplayIdentity(productName: "Synthetic Panel A"),
       isPrimary: .init(isIncluded: true, value: false),
@@ -243,10 +297,10 @@ struct ProfileApplicabilityNormalizerTests {
     let normalizedAgain = normalizer.normalize(normalized)
 
     #expect(normalized == normalizedAgain)
-    #expect(!normalized.display.isIncluded)
-    #expect(normalized.display.value.displays.map(\.isPrimary.isIncluded) == [false, false])
+    #expect(normalized.display.isIncluded)
+    #expect(normalized.display.value.displays.map(\.isPrimary.isIncluded) == [true, true])
     #expect(normalized.display.value.displays.map(\.isPrimary.value) == [false, true])
-    #expect(normalized.payload(for: .display) == nil)
+    #expect(normalized.display.value.displays.allSatisfy { $0.mode.isIncluded })
   }
 
   @Test("ambiguous enabled primary selection also fails closed")
@@ -263,7 +317,8 @@ struct ProfileApplicabilityNormalizerTests {
 
     let normalized = normalizer.normalize(settings)
 
-    #expect(!normalized.display.isIncluded)
+    #expect(normalized.display.isIncluded)
+    #expect(normalized.display.value.displays.allSatisfy { $0.mode.isIncluded })
     #expect(normalized.display.value.displays.map(\.isPrimary.isIncluded) == [false, false])
     #expect(normalized.display.value.displays.map(\.isPrimary.value) == [true, true])
   }

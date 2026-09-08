@@ -5,6 +5,7 @@
 "Profile status: %@" = "프로필 상태: %@";
 "Apply" = "적용";
 "tray.profile.action.apply" = "적용하기";
+"Volume cannot be changed for this device right now. Choose another device or review available settings before applying." = "지금은 이 기기의 음량을 변경할 수 없습니다. 다른 기기를 선택하거나 적용 전에 사용 가능한 설정을 확인하세요.";
 "tray.profile.action.edit" = "수정하기";
 "tray.profile.action.apply.named" = "%@ 적용하기";
 "Normal apply requires every included setting and condition to be ready." = "일반 적용을 사용하려면 포함된 모든 설정과 조건이 준비되어야 합니다.";

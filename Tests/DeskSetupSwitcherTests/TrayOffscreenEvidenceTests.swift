@@ -633,7 +633,9 @@ import Testing
         #expect(rendered.png.count > 10_000)
         #expect(rendered.accessibility.contains("synthetic-settings-host=true"))
         if fixture.isProfileSurface {
-          for removedHeading in ["Display settings", "Sound settings"] {
+          for removedHeading in [
+            "Display settings", "Sound settings", "When applying", "Apply with profile",
+          ] {
             #expect(
               !rendered.accessibility.contains(
                 appLocalizedRuntime(removedHeading, languageCode: fixture.languageCode)
@@ -695,19 +697,13 @@ import Testing
             #expect(geometry.runs[1].upperBound - geometry.runs[1].lowerBound > 40)
           }
           #expect(rendered.accessibility.contains("dynamic-type=\(fixture.dynamicTypeName)"))
-          #expect(rendered.accessibility.contains("inclusion-header-layout=stacked"))
-          #expect(
-            rendered.accessibility.contains(
-              "inclusion-state-cues=label,switch;options=text,symbol,switch"
-            )
-          )
+          #expect(rendered.accessibility.contains("per-setting-inclusion-controls=none"))
           #expect(rendered.accessibility.contains("sidebar-primary-action="))
           #expect(rendered.accessibility.contains("sidebar-secondary-menu="))
         }
         if fixture.dynamicTypeSizeOverride == .accessibility5 {
           #expect(rendered.accessibility.contains("dynamic-type=accessibility5"))
-          #expect(rendered.accessibility.contains("inclusion-summary-line-limit=unlimited"))
-          #expect(rendered.accessibility.contains("inclusion-header-layout=stacked"))
+          #expect(rendered.accessibility.contains("per-setting-inclusion-controls=none"))
         }
         if fixture.variant == .validation {
           #expect(rendered.accessibility.contains("validation-summary-visible=true"))
@@ -731,7 +727,6 @@ import Testing
         }
         if !fixture.isProfileSurface {
           #expect(rendered.accessibility.contains("settings-tab=system"))
-          #expect(rendered.accessibility.contains("inclusion-header-layout=not-applicable"))
           #expect(rendered.accessibility.contains("sidebar-primary-action=not-applicable"))
         }
         switch fixture.state {
@@ -1450,22 +1445,6 @@ import Testing
           && color.redComponent - color.greenComponent > 0.08
           && color.redComponent - color.blueComponent > 0.08
       }
-      let inclusionLayout =
-        if fixture.isProfileSurface {
-          ProfileSettingInclusionLayoutPolicy.usesStackedHeader(
-            for: fixture.dynamicTypeSize
-          ) ? "stacked" : "inline"
-        } else {
-          "not-applicable"
-        }
-      let inclusionSummaryLineLimit =
-        if fixture.isProfileSurface {
-          ProfileSettingInclusionLayoutPolicy.visibleSummaryLineLimit(
-            for: fixture.dynamicTypeSize
-          ).map(String.init) ?? "unlimited"
-        } else {
-          "not-applicable"
-        }
       let sidebarRuns =
         sidebarActionGeometry?.runs.map {
           String(format: "%.1f...%.1f", $0.lowerBound, $0.upperBound)
@@ -1488,14 +1467,10 @@ import Testing
         "sidebar-primary-action=\(fixture.isProfileSurface ? appLocalizedRuntime("New Profile") : "not-applicable")",
         "sidebar-secondary-menu=\(fixture.isProfileSurface ? appLocalizedRuntime("More Profile Actions") : "not-applicable")",
         "sidebar-action-background-runs=\(sidebarRuns)",
-        "inclusion-header-layout=\(inclusionLayout)",
-        "inclusion-summary-line-limit=\(inclusionSummaryLineLimit)",
-        "inclusion-minimum-available-width=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.minimumAvailableHeaderWidth)) : "not-applicable")",
-        "inclusion-expected-control-width-limit=\(fixture.isProfileSurface ? String(Int(ProfileSettingInclusionLayoutPolicy.maximumExpectedControlWidth)) : "not-applicable")",
         "rail-selection-pixel-count=\(railSelectionPixelCount)",
+        "per-setting-inclusion-controls=none",
         "step-navigation=\(fixture.isProfileSurface ? "display,sound" : "not-applicable")",
         "step-state-cues=\(fixture.isProfileSurface ? "number,title,checkmark" : "not-applicable")",
-        "inclusion-state-cues=\(fixture.isProfileSurface ? "label,switch;options=text,symbol,switch" : "not-applicable")",
         "declared-dirty-export-notice=\(fixture.state == .dirtyDraft ? appLocalizedRuntime(ProfileExportScopePolicy.unsavedDraftNotice) : "none")",
         "export-source=persisted-document-only",
         "storage-error-card-visible=\(fixture.state == .storageError)",

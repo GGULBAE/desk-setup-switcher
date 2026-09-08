@@ -41,6 +41,7 @@ public actor MockSystemSettingsAdapter: SystemSettingsAdapter {
   private var rollbackResults: [UUID: OperationResult]
   private var diagnosticEntries: [DiagnosticEntry]
   private var invocationValues: [MockAdapterInvocation] = []
+  private var desiredPayloadValues: [SettingsPayload] = []
 
   public init(
     group: SettingGroup,
@@ -99,6 +100,7 @@ public actor MockSystemSettingsAdapter: SystemSettingsAdapter {
     against snapshot: AdapterSnapshot
   ) async -> [ValidationIssue] {
     invocationValues.append(.validate)
+    desiredPayloadValues.append(desired)
     return validationIssues
   }
 
@@ -167,5 +169,10 @@ public actor MockSystemSettingsAdapter: SystemSettingsAdapter {
 
   public func resetInvocations() {
     invocationValues.removeAll(keepingCapacity: true)
+    desiredPayloadValues.removeAll(keepingCapacity: true)
+  }
+
+  public func recordedDesiredPayloads() -> [SettingsPayload] {
+    desiredPayloadValues
   }
 }

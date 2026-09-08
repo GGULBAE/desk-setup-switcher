@@ -1,9 +1,9 @@
 import Foundation
 
-/// Applies the current adapter support policy without discarding snapshot data.
+/// Applies the six-setting product policy without discarding saved values.
 ///
-/// Unsupported values remain available for display and round-trip compatibility,
-/// but they are never treated as requested mutations. The transformation is
+/// Registered supported values participate; retired setting kinds remain dormant
+/// for round-trip compatibility and never request mutations. The transformation is
 /// intentionally idempotent so it can be used at every persistence and planning
 /// boundary.
 public struct ProfileApplicabilityNormalizer: Sendable {
@@ -30,6 +30,8 @@ public struct ProfileApplicabilityNormalizer: Sendable {
     normalizePrimaryDisplayApplicability(&normalized.display.value.displays)
 
     for index in normalized.display.value.displays.indices {
+      // Registered resolutions always participate; schema-v1 exclusion flags are retired.
+      normalized.display.value.displays[index].mode.isIncluded = true
       // Retired from profile capture/edit/apply. Keep legacy values dormant for JSON compatibility.
       normalized.display.value.displays[index].colorProfile.isIncluded = false
       normalized.display.value.displays[index].mirroring.isIncluded = false
@@ -38,6 +40,10 @@ public struct ProfileApplicabilityNormalizer: Sendable {
       normalized.display.value.displays[index].isActive.isIncluded = false
     }
 
+    includeRegisteredValue(&normalized.audio.value.defaultInputUID)
+    includeRegisteredValue(&normalized.audio.value.defaultOutputUID)
+    includeRegisteredValue(&normalized.audio.value.inputVolume)
+    includeRegisteredValue(&normalized.audio.value.outputVolume)
     normalized.audio.value.systemOutputUID.isIncluded = false
     normalized.audio.value.outputMuted.isIncluded = false
 
@@ -66,24 +72,26 @@ public struct ProfileApplicabilityNormalizer: Sendable {
   }
 
   /// Primary-display selection is one global setting represented on every display target.
-  /// A mixed inclusion state can otherwise look disabled in the editor while an included
-  /// target is still planned by an adapter. Invalid global states therefore fail closed:
-  /// values are preserved for repair, but every primary leaf becomes dormant.
+  /// Legacy exclusion flags no longer hide a valid selection. Ambiguous selections
+  /// still fail closed and retain their values for explicit repair in the picker.
   private func normalizePrimaryDisplayApplicability(
     _ displays: inout [DisplayTargetSettings]
   ) {
     guard !displays.isEmpty else { return }
 
     let primaryOptions = displays.map(\.isPrimary)
-    let allIncluded = primaryOptions.allSatisfy(\.isIncluded)
-    let allExcluded = primaryOptions.allSatisfy { !$0.isIncluded }
     let hasSingleSelection = primaryOptions.count(where: \.value) == 1
 
-    guard (allIncluded && hasSingleSelection) || allExcluded else {
-      for index in displays.indices {
-        displays[index].isPrimary.isIncluded = false
-      }
-      return
+    for index in displays.indices {
+      displays[index].isPrimary.isIncluded = hasSingleSelection
+    }
+  }
+
+  /// Never invent missing values or suppress validation of an explicitly requested
+  /// but missing value. Runtime availability remains an adapter/preflight concern.
+  private func includeRegisteredValue<Value>(_ option: inout SettingOption<Value?>) {
+    if option.value != nil {
+      option.isIncluded = true
     }
   }
 }

@@ -1,5 +1,9 @@
 # Completion criteria and evidence ledger
 
+## Registered profile values — 2026-09-08
+
+Implementation follow-up, not a newly checked gate: remove inclusion labels/toggles and prepare every registered supported value. Preserve absent values, retired-field dormancy, ambiguous-primary safety, untrusted-import validation, draft/revert/save semantics, and explicit preflight/rollback. See [scope and verification](REGISTERED-PROFILE-VALUES-2026-09-08.md). No hardware mutation evidence is implied.
+
 ## Compact tray profile actions — 2026-09-08
 
 Presentation follow-up, not a newly checked release gate: expose direct trash, align short Apply/Edit actions, and replace passive explanation text with a blank caption line. Preview/confirmation and storage safeguards remain unchanged. [The follow-up record](TRAY-ACTIONS-2026-09-08.md) distinguishes deterministic rendering/routing evidence from live settings or deletion.

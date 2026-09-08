@@ -5,6 +5,7 @@
 "Profile status: %@" = "Profile status: %@";
 "Apply" = "Apply";
 "tray.profile.action.apply" = "Apply";
+"Volume cannot be changed for this device right now. Choose another device or review available settings before applying." = "Volume cannot be changed for this device right now. Choose another device or review available settings before applying.";
 "tray.profile.action.edit" = "Edit";
 "tray.profile.action.apply.named" = "Apply %@";
 "Normal apply requires every included setting and condition to be ready." = "Normal apply requires every included setting and condition to be ready.";

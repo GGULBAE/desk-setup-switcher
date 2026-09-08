@@ -110,7 +110,8 @@ final class MigrationTests: XCTestCase {
     XCTAssertFalse(profile.settings.network.value.ipv4.isIncluded)
     XCTAssertEqual(profile.settings.network.value.dnsServers.value, ["192.0.2.53"])
     XCTAssertFalse(profile.settings.network.value.dnsServers.isIncluded)
-    XCTAssertFalse(profile.settings.display.isIncluded)
+    XCTAssertTrue(profile.settings.display.isIncluded)
+    XCTAssertTrue(display.mode.isIncluded)
     XCTAssertFalse(profile.settings.network.isIncluded)
 
     let decodedAgain = try codec.decode(codec.encode(decoded.document))

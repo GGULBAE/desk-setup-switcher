@@ -319,6 +319,14 @@ import Testing
           catalog: catalog
         ) == ProfileEditorAudioVolumeCapability(isWritable: false, suggestedValue: 0.8)
       )
+      #expect(
+        ProfileEditorAudioVolumeCapabilityResolver.resolve(
+          role: .output,
+          selectedDevice: SettingOption(isIncluded: false, value: "read-only-output"),
+          currentDeviceUID: "writable-output",
+          catalog: catalog
+        ) == ProfileEditorAudioVolumeCapability(isWritable: false, suggestedValue: 0.8)
+      )
     }
 
     @Test("audio mute capability follows the output device the profile will target")

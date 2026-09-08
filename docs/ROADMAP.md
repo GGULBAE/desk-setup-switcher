@@ -1,5 +1,9 @@
 # Roadmap
 
+## Registered profile values — 2026-09-08
+
+Remove per-setting inclusion copy and switches. All registered values in the six supported kinds participate across capture, edit/save, import, and preflight; missing values stay absent and retired settings stay dormant. Keep device-specific availability, explicit Apply Preview/confirmation, and rollback. See [scope and verification](REGISTERED-PROFILE-VALUES-2026-09-08.md).
+
 ## Compact tray profile actions — 2026-09-08
 
 Use one **Apply / Edit / trash** row on each profile card, with no one-item trash menu. Passive matched/unavailable copy becomes a reserved blank caption line. Keep status symbols/text, all mutation locks, read-only normal/available-items preview routing, and inline deletion confirmation. See [scope and verification](TRAY-ACTIONS-2026-09-08.md); no new feature scope or hardware mutation is implied.
@@ -10,11 +14,11 @@ Remove duplicate Display/Sound headings and explanations without removing sectio
 
 ## Current scope — six display/sound settings (2026-09-07)
 
-The current profile contract is limited to main display, resolution, output device/volume, and input device/volume. Display/Sound retain stable width-driven navigation; every option is direct, with no Network or Advanced section. Capture queries only the two relevant adapters and never gates on Location permission. Saved refresh rates are ignored; resolution changes preserve the current rate or are skipped. Legacy excluded values remain round-trip compatible but are never applied, even in Force. See [minimal profile scope](MINIMAL-PROFILE-SCOPE-2026-09-07.md). Older milestones below describe historical adapter primitives, not additional current profile options.
+The current profile contract is limited to main display, resolution, output device/volume, and input device/volume. Display/Sound retain stable width-driven navigation; every option is direct, with no Network or Advanced section. Capture queries only the two relevant adapters and never gates on Location permission. Saved refresh rates are ignored; resolution changes preserve the current rate or are skipped. Legacy retired setting kinds remain round-trip compatible but are never applied, even in Force. The 2026-09-08 registered-values policy supersedes per-setting exclusion for the six supported kinds. See [minimal profile scope](MINIMAL-PROFILE-SCOPE-2026-09-07.md). Older milestones below describe historical adapter primitives, not additional current profile options.
 
 The canonical non-live `make verify` gate and 19-fixture offscreen matrix passed. The app was reinstalled and launched from `/Applications`; both profile files passed the value-preservation audit after retired-field normalization. Installed keyboard/VoiceOver and hardware mutation remain unverified.
 
-Sound now groups device and volume controls inside **Output** and **Input** cards, preserving independent inclusion and target-device capability checks. This presentation-only follow-up does not change the six-setting capture/apply contract. Its full `make verify` retry, 19-fixture offscreen matrix, and local reinstall/startup passed; both profile files remained byte-identical. See [grouped Sound evidence](AUDIO-SECTIONS-2026-09-07.md).
+Sound now groups device and volume controls inside **Output** and **Input** cards, preserving target-device capability checks. Independent inclusion was subsequently removed by the 2026-09-08 registered-values policy. This presentation-only follow-up does not change the six-setting capture/apply contract. Its full `make verify` retry, 19-fixture offscreen matrix, and local reinstall/startup passed; both profile files remained byte-identical. See [grouped Sound evidence](AUDIO-SECTIONS-2026-09-07.md).
 
 The roadmap is evidence-based. “Implemented” means source exists; “verified” names the evidence boundary; “done” additionally requires current documentation and the commit or push evidence required by that milestone's explicit contract. Dates are intentionally omitted because safety gates determine sequence.
 

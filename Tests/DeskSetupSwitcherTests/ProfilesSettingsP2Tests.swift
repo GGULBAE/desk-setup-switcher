@@ -36,56 +36,10 @@ struct ProfilesSettingsP2Tests {
     #expect(ProfileExportScopePolicy.accessibilityHint.contains("unsaved draft"))
   }
 
-  @Test("include controls expose meaning and a non-color state")
-  func includedSettingPresentation() {
-    let included = ProfileSettingInclusionPresentation.make(
-      settingTitle: "Output volume",
-      isIncluded: true
-    )
-    let excluded = ProfileSettingInclusionPresentation.make(
-      settingTitle: "Output volume",
-      isIncluded: false
-    )
-
-    #expect(included.visibleTitle == "When applying")
-    #expect(included.visibleState == "Included")
-    #expect(included.visibleSummary == "When applying · Included")
-    #expect(included.systemImage == "checkmark.circle.fill")
-    #expect(included.accessibilityLabel.contains("Output volume"))
-    #expect(included.accessibilityLabel.contains("Apply with profile"))
-    #expect(included.accessibilityValue == "Included in profile application")
-    #expect(included.accessibilityHint.contains("changes when the profile is applied"))
-
-    #expect(excluded.visibleTitle == included.visibleTitle)
-    #expect(excluded.visibleState == "Not included")
-    #expect(excluded.visibleSummary == "When applying · Not included")
-    #expect(excluded.systemImage == "minus.circle")
-    #expect(excluded.accessibilityValue == "Not included in profile application")
-    #expect(excluded.accessibilityHint == included.accessibilityHint)
-
-    #expect(!ProfileSettingInclusionLayoutPolicy.usesStackedHeader(for: .large))
-    #expect(ProfileSettingInclusionLayoutPolicy.usesStackedHeader(for: .accessibility3))
-    #expect(ProfileSettingInclusionLayoutPolicy.minimumAvailableHeaderWidth == 318)
-    #expect(ProfileSettingInclusionLayoutPolicy.minimumExpectedControlWidth == 180)
-    #expect(
-      ProfileSettingInclusionLayoutPolicy.maximumExpectedControlWidth
-        < ProfileSettingInclusionLayoutPolicy.minimumAvailableHeaderWidth
-    )
-    #expect(ProfileSettingInclusionLayoutPolicy.visibleSummaryLineLimit(for: .large) == 2)
-    #expect(
-      ProfileSettingInclusionLayoutPolicy.visibleSummaryLineLimit(for: .accessibility3) == nil
-    )
-    #expect(
-      ProfileSettingInclusionLayoutPolicy.visibleSummaryLineLimit(for: .accessibility5) == nil
-    )
-    #expect(ProfileSettingInclusionLayoutPolicy.minimumControlWidth(for: .large) == 180)
-    #expect(
-      ProfileSettingInclusionLayoutPolicy.minimumControlWidth(for: .accessibility5) == nil
-    )
-    #expect(ProfileSettingInclusionLayoutPolicy.maximumControlWidth(for: .large) == 220)
-    #expect(
-      ProfileSettingInclusionLayoutPolicy.maximumControlWidth(for: .accessibility5) == .infinity
-    )
+  @Test("profile fields leave the full row width for their values")
+  func settingLayoutInsets() {
+    #expect(ProfileSettingLayoutPolicy.formHorizontalInset == 18)
+    #expect(ProfileSettingLayoutPolicy.optionContentInset == 10)
   }
 
   @Test("profile option rows stay flat while increased contrast strengthens their boundaries")

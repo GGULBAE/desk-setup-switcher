@@ -62,13 +62,13 @@ final class ProfileEditorModel: ObservableObject {
     if let selectedID = session.selectedProfileID,
       let latest = profiles.first(where: { $0.id == selectedID })
     {
-      mutateSession { $0.synchronizeProfile(latest) }
+      mutateSession { $0.synchronizeProfile(ProfileApplicabilityNormalizer().normalize(latest)) }
     }
 
     if case .profile(let pending)? = session.pendingSelection,
       let latest = profiles.first(where: { $0.id == pending.id })
     {
-      mutateSession { $0.synchronizeProfile(latest) }
+      mutateSession { $0.synchronizeProfile(ProfileApplicabilityNormalizer().normalize(latest)) }
     }
 
     let preferred = preferredProfile(in: profiles, id: preferredProfileID)
@@ -89,7 +89,8 @@ final class ProfileEditorModel: ObservableObject {
 
   @discardableResult
   func replaceDraft(_ draft: DeskProfile) -> Bool {
-    let replaced = mutateSession { $0.replaceDraft(draft) }
+    let normalized = ProfileApplicabilityNormalizer().normalize(draft)
+    let replaced = mutateSession { $0.replaceDraft(normalized) }
     if replaced {
       refreshIdleActivity(force: true)
     }
@@ -98,7 +99,12 @@ final class ProfileEditorModel: ObservableObject {
 
   @discardableResult
   func updateDraft(_ update: (inout DeskProfile) -> Void) -> Bool {
-    let updated = mutateSession { $0.updateDraft(update) }
+    let updated = mutateSession {
+      $0.updateDraft {
+        update(&$0)
+        $0 = ProfileApplicabilityNormalizer().normalize($0)
+      }
+    }
     if updated {
       refreshIdleActivity(force: true)
     }
@@ -111,7 +117,9 @@ final class ProfileEditorModel: ObservableObject {
     expectedProfileID: UUID
   ) -> Bool {
     let updated = mutateSession {
-      $0.replaceSettingsFromSnapshot(settings, expectedProfileID: expectedProfileID)
+      $0.replaceSettingsFromSnapshot(
+        ProfileApplicabilityNormalizer().normalize(settings), expectedProfileID: expectedProfileID
+      )
     }
     if updated {
       refreshIdleActivity(force: true)
@@ -121,7 +129,9 @@ final class ProfileEditorModel: ObservableObject {
 
   @discardableResult
   func requestSelection(_ profile: DeskProfile?) -> ProfileSelectionRequestResult {
-    let result = mutateSession { $0.requestSelection(profile) }
+    let result = mutateSession {
+      $0.requestSelection(profile.map { ProfileApplicabilityNormalizer().normalize($0) })
+    }
     refreshIdleActivity()
     return result
   }
@@ -137,7 +147,9 @@ final class ProfileEditorModel: ObservableObject {
 
   @discardableResult
   func completeSave(with profile: DeskProfile) -> ProfileDraftSaveCompletion {
-    let result = mutateSession { $0.completeSave(with: profile) }
+    let result = mutateSession {
+      $0.completeSave(with: ProfileApplicabilityNormalizer().normalize(profile))
+    }
     switch result {
     case .saved, .savedAndSelected:
       setActivity(.saved)
@@ -197,9 +209,9 @@ final class ProfileEditorModel: ObservableObject {
 
   private func preferredProfile(in profiles: [DeskProfile], id: UUID?) -> DeskProfile? {
     if let id, let profile = profiles.first(where: { $0.id == id }) {
-      return profile
+      return ProfileApplicabilityNormalizer().normalize(profile)
     }
-    return profiles.first
+    return profiles.first.map { ProfileApplicabilityNormalizer().normalize($0) }
   }
 
   @discardableResult

@@ -53,12 +53,12 @@ Choose **Edit** on a tray profile to open **Settings → Profiles**. The trash i
 
 - Give the profile a recognizable name and icon.
 - Work through the stable numbered **Display** and **Sound** steps. At the minimum window size or an accessibility text size, the same steps become a compact segmented selector.
-- **Display** has only **Main display** and per-display **Resolution**. **Sound** has two sections: **Output** and **Input**. Choose the device and volume together in each section; their inclusion switches remain independent. All options are shown directly; there is no Advanced or Network section. Inclusion switches determine what Apply changes. Resolution keeps the current refresh rate, or is skipped when that combination is unavailable. Capture reads only these settings and does not need Location access. Old mirroring, mute, color, and network values remain dormant and are never applied.
+- **Display** has only **Main display** and per-display **Resolution**. **Sound** has two sections: **Output** and **Input**. Choose the device and volume together in each section. All options are shown directly; there is no Advanced or Network section. All registered values participate in Apply; there are no per-setting inclusion switches, including for previously excluded saved values. Missing values are not filled automatically. Resolution keeps the current refresh rate, or is skipped when that combination is unavailable. Capture reads only these settings and does not need Location access. Old mirroring, mute, color, and network values remain dormant and are never applied.
 - If a value is invalid, Save selects the owning step before focusing it.
 - The editor contains profile settings only. Itemized application results remain available after Apply.
 - Save the profile. `⌘S` saves a valid dirty draft.
 
-An unavailable saved target remains visible with a warning when possible. Reconnect the device or turn **Apply with profile** off for that row before saving. Do not infer support from a value that is absent: the app hides choices that cannot complete its capture/apply/verify/rollback contract on the current snapshot.
+An unavailable saved target remains visible with a warning when possible. Reconnect the device, choose another available device, or review the available-settings plan before applying. Unsupported saved values stay visible when possible; they are not silently erased. Do not infer support from a value that is absent: the app hides choices that cannot complete its capture/apply/verify/rollback contract on the current snapshot.
 
 If you switch profiles, import, apply, or quit with unsaved changes, the app asks you to save, discard, or cancel. A failed save keeps the draft intact. Capture creates a separate profile and does not silently replace an open draft.
 

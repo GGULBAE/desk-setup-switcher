@@ -508,6 +508,7 @@ final class ApplicationModel: ObservableObject {
   }
 
   func updateProfile(_ saveCandidate: DeskProfile) async -> ProfileSaveResult {
+    let saveCandidate = ProfileApplicabilityNormalizer().normalize(saveCandidate)
     if suppressesLiveSystemAccess {
       return .rejected(
         message: appLocalized("System access is disabled for this synthetic review."))

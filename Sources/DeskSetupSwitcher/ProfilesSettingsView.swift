@@ -256,64 +256,9 @@ private struct ProfileStorageFailureOwnershipModifier: ViewModifier {
   }
 }
 
-struct ProfileSettingInclusionPresentation: Equatable, Sendable {
-  let visibleTitle: String
-  let visibleState: String
-  let visibleSummary: String
-  let systemImage: String
-  let accessibilityLabel: String
-  let accessibilityValue: String
-  let accessibilityHint: String
-
-  static func make(settingTitle: String, isIncluded: Bool) -> Self {
-    let visibleTitle = appLocalized("When applying")
-    let labelFormat = appLocalized("%@: Apply with profile")
-    let visibleState = isIncluded ? appLocalized("Included") : appLocalized("Not included")
-    let accessibilityValue =
-      isIncluded
-      ? appLocalized("Included in profile application")
-      : appLocalized("Not included in profile application")
-    return Self(
-      visibleTitle: visibleTitle,
-      visibleState: visibleState,
-      visibleSummary: "\(visibleTitle) · \(visibleState)",
-      systemImage: isIncluded ? "checkmark.circle.fill" : "minus.circle",
-      accessibilityLabel: String.localizedStringWithFormat(labelFormat, settingTitle),
-      accessibilityValue: accessibilityValue,
-      accessibilityHint: appLocalized(
-        "Controls whether this setting changes when the profile is applied"
-      )
-    )
-  }
-}
-
-enum ProfileSettingInclusionLayoutPolicy {
+enum ProfileSettingLayoutPolicy {
   static let formHorizontalInset: CGFloat = 18
-  static let groupContentInset: CGFloat = 8
   static let optionContentInset: CGFloat = 10
-  static let minimumExpectedControlWidth: CGFloat = 180
-  static let maximumExpectedControlWidth: CGFloat = 220
-
-  static var minimumAvailableHeaderWidth: CGFloat {
-    ProfileWorkspaceLayoutPolicy.minimumEditorWidth
-      - 2 * (formHorizontalInset + groupContentInset + optionContentInset)
-  }
-
-  static func usesStackedHeader(for dynamicTypeSize: DynamicTypeSize) -> Bool {
-    dynamicTypeSize.isAccessibilitySize
-  }
-
-  static func visibleSummaryLineLimit(for dynamicTypeSize: DynamicTypeSize) -> Int? {
-    dynamicTypeSize.isAccessibilitySize ? nil : 2
-  }
-
-  static func minimumControlWidth(for dynamicTypeSize: DynamicTypeSize) -> CGFloat? {
-    dynamicTypeSize.isAccessibilitySize ? nil : minimumExpectedControlWidth
-  }
-
-  static func maximumControlWidth(for dynamicTypeSize: DynamicTypeSize) -> CGFloat? {
-    dynamicTypeSize.isAccessibilitySize ? .infinity : maximumExpectedControlWidth
-  }
 }
 
 enum ProfileSettingRowStylePolicy {
@@ -377,10 +322,7 @@ enum ProfileEditorAudioVolumeCapabilityResolver {
     currentDeviceUID: String?,
     catalog: [AudioVolumeControlCatalogEntry]
   ) -> ProfileEditorAudioVolumeCapability {
-    let targetDeviceUID =
-      selectedDevice.isIncluded
-      ? selectedDevice.value
-      : currentDeviceUID
+    let targetDeviceUID = selectedDevice.value ?? currentDeviceUID
     guard
       let targetDeviceUID,
       let entry = catalog.first(where: {
@@ -1266,7 +1208,7 @@ private struct ProfileEditorForm: View {
     GeometryReader { geometry in
       editorScrollView(
         availableWidth: min(geometry.size.width, 860)
-          - 2 * ProfileSettingInclusionLayoutPolicy.formHorizontalInset
+          - 2 * ProfileSettingLayoutPolicy.formHorizontalInset
       )
     }
   }
@@ -1284,7 +1226,7 @@ private struct ProfileEditorForm: View {
           stepWorkspace(availableWidth: availableWidth)
         }
       }
-      .padding(.horizontal, ProfileSettingInclusionLayoutPolicy.formHorizontalInset)
+      .padding(.horizontal, ProfileSettingLayoutPolicy.formHorizontalInset)
       .padding(.top, 12)
       .padding(.bottom, ProfileWorkspaceLayoutPolicy.formBottomInset)
       .frame(maxWidth: 860)
@@ -1534,10 +1476,10 @@ private struct ProfileEditorForm: View {
     switch group {
     case .display:
       ProfileEditorSurfacePolicy.visibleGroups.contains(.display)
-        && hasVisibleDisplayFields
+        && (hasVisibleDisplayFields || !profile.settings.display.value.displays.isEmpty)
     case .audio:
       ProfileEditorSurfacePolicy.visibleGroups.contains(.audio)
-        && (hasVisibleAudioFields || hasIncludedUnavailableAudioFields)
+        && (hasVisibleAudioFields || profile.settings.audio.value.hasIncludedOption)
     case .network:
       ProfileEditorSurfacePolicy.visibleGroups.contains(.network)
         && (hasVisibleNetworkFields || hasIncludedUnavailableNetworkFields)
@@ -1632,10 +1574,9 @@ private struct ProfileEditorForm: View {
 
   private var displaySimpleOptions: some View {
     VStack(alignment: .leading, spacing: 14) {
-      if isVisible(.displayPrimary) {
+      if isVisible(.displayPrimary) || !profile.settings.display.value.displays.isEmpty {
         optionEditor(
           "Main display",
-          isOn: primaryDisplayIncludedBinding,
           validationFields: [.displayPrimary]
         ) {
           Picker(appLocalized("Main display"), selection: primaryDisplaySelectionBinding()) {
@@ -1668,13 +1609,12 @@ private struct ProfileEditorForm: View {
     if !profile.settings.display.value.displays.isEmpty {
       ForEach($profile.settings.display.value.displays) { $display in
         let supportedModes = supportedDisplayModes(for: display)
-        if !supportedModes.isEmpty {
+        if !supportedModes.isEmpty || display.mode.isIncluded {
           GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-              if !supportedModes.isEmpty {
+              if !supportedModes.isEmpty || display.mode.isIncluded {
                 optionEditor(
                   "Resolution",
-                  isOn: $display.mode.isIncluded,
                   validationFields: [
                     .display(display.id, .modeWidth),
                     .display(display.id, .modeHeight),
@@ -1828,9 +1768,8 @@ private struct ProfileEditorForm: View {
       ForEach(NetworkServiceKind.allCases, id: \.self) { kind in
         ForEach(unavailableIncludedNetworkServiceIndices(kind: kind), id: \.self) { index in
           let target = profile.settings.network.value.serviceIPv4[index]
-          unavailableIncludedOption(
+          unavailableSavedOption(
             "\(target.identity.serviceName) · \(appLocalized("IPv4 configuration"))",
-            isOn: $profile.settings.network.value.serviceIPv4[index].configuration.isIncluded,
             validationFields: networkValidationFields(for: target.identity),
             warning: appLocalized(
               "The included IPv4 setting for \(target.identity.serviceName) is unavailable in the current network configuration. Turn off Include to apply other available settings normally."
@@ -1851,13 +1790,7 @@ private struct ProfileEditorForm: View {
     let routerField = validationFields[3]
     optionEditor(
       "IPv4 configuration",
-      isOn: networkIncludedBinding,
-      validationFields: validationFields,
-      onIncludeChange: IncludeChangeAction { isIncluded in
-        if isIncluded, option.wrappedValue.value == nil {
-          option.wrappedValue.value = .dhcp
-        }
-      }
+      validationFields: validationFields
     ) {
       Picker(
         appLocalized("IPv4 mode"),
@@ -1960,76 +1893,6 @@ private struct ProfileEditorForm: View {
     }
   }
 
-  private func simpleAudioDeviceChoices(scope: AudioDeviceScope) -> [AudioDeviceChoice] {
-    let rawChoices = audioDeviceChoices.filter { $0.scopes.contains(scope) }
-    let labels = FriendlyNameDisambiguator().labels(
-      for: rawChoices.map { (id: $0.uid, name: $0.name) }
-    )
-    return rawChoices.map { choice in
-      AudioDeviceChoice(
-        uid: choice.uid,
-        name: labels[choice.uid] ?? choice.name,
-        scopes: choice.scopes
-      )
-    }
-  }
-
-  private var simpleAudioOutputDeviceBinding: Binding<String?> {
-    Binding(
-      get: { profile.settings.audio.value.defaultOutputUID.value },
-      set: { selectedUID in
-        profile.settings.audio.value.defaultOutputUID.value = selectedUID
-        profile.settings.audio.value.defaultOutputUID.isIncluded = selectedUID != nil
-      }
-    )
-  }
-
-  private var simpleAudioOutputVolumeBinding: Binding<Double> {
-    let capability = audioVolumeCapability(role: .output)
-    return Binding(
-      get: {
-        (profile.settings.audio.value.outputVolume.value
-          ?? capability.suggestedValue ?? 0.5) * 100
-      },
-      set: { percentage in
-        profile.settings.audio.value.outputVolume.value = min(max(percentage, 0), 100) / 100
-        profile.settings.audio.value.outputVolume.isIncluded = true
-      }
-    )
-  }
-
-  private var audioOutputIncludedBinding: Binding<Bool> {
-    let choices = simpleAudioDeviceChoices(scope: .output)
-    let outputCapability = audioVolumeCapability(role: .output)
-    return Binding(
-      get: {
-        let includesDevice =
-          choices.isEmpty
-          || profile.settings.audio.value.defaultOutputUID.isIncluded
-        let includesVolume =
-          !outputCapability.isWritable
-          || profile.settings.audio.value.outputVolume.isIncluded
-        return includesDevice && includesVolume
-      },
-      set: { isIncluded in
-        if !choices.isEmpty {
-          profile.settings.audio.value.defaultOutputUID.isIncluded = isIncluded
-          if isIncluded, profile.settings.audio.value.defaultOutputUID.value == nil {
-            profile.settings.audio.value.defaultOutputUID.value =
-              systemSnapshot?.profileSettings.audio.value.defaultOutputUID.value
-              ?? choices.first?.uid
-          }
-        }
-        if outputCapability.isWritable {
-          profile.settings.audio.value.outputVolume.isIncluded = isIncluded
-          if isIncluded, profile.settings.audio.value.outputVolume.value == nil {
-            profile.settings.audio.value.outputVolume.value = outputCapability.suggestedValue ?? 0.5
-          }
-        }
-      }
-    )
-  }
-
   private var simpleNetworkServiceChoices: [NetworkServiceIPv4Settings] {
     NetworkServiceKind.allCases.flatMap(availableNetworkServices(kind:))
   }
@@ -2083,21 +1946,16 @@ private struct ProfileEditorForm: View {
   @ViewBuilder
   private func optionEditor<Content: View>(
     _ title: String.LocalizationValue,
-    isOn: Binding<Bool>,
     embeddedTitle: String.LocalizationValue? = nil,
     validationFields: [DraftFieldIdentifier] = [],
-    onIncludeChange: IncludeChangeAction? = nil,
     @ViewBuilder content: () -> Content
   ) -> some View {
     let localizedTitle = appLocalized(title)
 
     VStack(alignment: .leading, spacing: 8) {
-      optionInclusionHeader(
-        title: localizedTitle,
-        visibleTitle: embeddedTitle.map { appLocalized($0) },
-        isOn: isOn,
-        validationFields: validationFields,
-        onIncludeChange: onIncludeChange
+      optionTitle(
+        embeddedTitle.map { appLocalized($0) } ?? localizedTitle,
+        validationFields: validationFields
       )
 
       VStack(alignment: .leading, spacing: 8) {
@@ -2112,7 +1970,7 @@ private struct ProfileEditorForm: View {
         )
       }
     }
-    .padding(embeddedTitle == nil ? ProfileSettingInclusionLayoutPolicy.optionContentInset : 0)
+    .padding(embeddedTitle == nil ? ProfileSettingLayoutPolicy.optionContentInset : 0)
     .background(
       Color(nsColor: .controlBackgroundColor).opacity(
         embeddedTitle == nil
@@ -2138,18 +1996,15 @@ private struct ProfileEditorForm: View {
     }
   }
 
-  private func unavailableIncludedOption(
+  private func unavailableSavedOption(
     _ title: String,
-    isOn: Binding<Bool>,
     embeddedTitle: String.LocalizationValue? = nil,
     validationFields: [DraftFieldIdentifier] = [],
     warning: String
   ) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      optionInclusionHeader(
-        title: title,
-        visibleTitle: embeddedTitle.map { appLocalized($0) },
-        isOn: isOn,
+      optionTitle(
+        embeddedTitle.map { appLocalized($0) } ?? title,
         validationFields: validationFields
       )
 
@@ -2166,7 +2021,7 @@ private struct ProfileEditorForm: View {
         )
       }
     }
-    .padding(embeddedTitle == nil ? ProfileSettingInclusionLayoutPolicy.optionContentInset : 0)
+    .padding(embeddedTitle == nil ? ProfileSettingLayoutPolicy.optionContentInset : 0)
     .background(
       Color(nsColor: .controlBackgroundColor).opacity(
         embeddedTitle == nil
@@ -2189,83 +2044,6 @@ private struct ProfileEditorForm: View {
             increasedContrast: colorSchemeContrast == .increased
           )
         )
-    }
-  }
-
-  private func compactIncludeToggle(
-    isOn: Binding<Bool>,
-    settingTitle: String
-  ) -> some View {
-    let presentation = ProfileSettingInclusionPresentation.make(
-      settingTitle: settingTitle,
-      isIncluded: isOn.wrappedValue
-    )
-
-    return HStack(spacing: 8) {
-      Label(presentation.visibleSummary, systemImage: presentation.systemImage)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(
-          ProfileSettingInclusionLayoutPolicy.visibleSummaryLineLimit(
-            for: dynamicTypeSize
-          )
-        )
-        .multilineTextAlignment(.trailing)
-        .fixedSize(horizontal: false, vertical: true)
-        .layoutPriority(1)
-        .accessibilityHidden(true)
-      Toggle(isOn: isOn) {
-        EmptyView()
-      }
-      .labelsHidden()
-      .toggleStyle(.switch)
-      .controlSize(.regular)
-      .fixedSize()
-      .accessibilityLabel(presentation.accessibilityLabel)
-      .accessibilityValue(presentation.accessibilityValue)
-      .accessibilityHint(presentation.accessibilityHint)
-    }
-    .frame(
-      minWidth: ProfileSettingInclusionLayoutPolicy.minimumControlWidth(
-        for: dynamicTypeSize
-      ),
-      maxWidth: ProfileSettingInclusionLayoutPolicy.maximumControlWidth(
-        for: dynamicTypeSize
-      ),
-      alignment: .trailing
-    )
-    .fixedSize(horizontal: false, vertical: true)
-  }
-
-  @ViewBuilder
-  private func optionInclusionHeader(
-    title: String,
-    visibleTitle: String? = nil,
-    isOn: Binding<Bool>,
-    validationFields: [DraftFieldIdentifier],
-    onIncludeChange: IncludeChangeAction? = nil
-  ) -> some View {
-    let toggleBinding = Binding(
-      get: { isOn.wrappedValue },
-      set: { newValue in
-        isOn.wrappedValue = newValue
-        onIncludeChange?.perform(newValue)
-      }
-    )
-
-    if ProfileSettingInclusionLayoutPolicy.usesStackedHeader(for: dynamicTypeSize) {
-      VStack(alignment: .leading, spacing: 8) {
-        optionTitle(visibleTitle ?? title, validationFields: validationFields)
-        HStack {
-          Spacer(minLength: 0)
-          compactIncludeToggle(isOn: toggleBinding, settingTitle: title)
-        }
-      }
-    } else {
-      HStack(spacing: 12) {
-        optionTitle(visibleTitle ?? title, validationFields: validationFields)
-        compactIncludeToggle(isOn: toggleBinding, settingTitle: title)
-      }
     }
   }
 
@@ -2301,25 +2079,11 @@ private struct ProfileEditorForm: View {
         scopes: choice.scopes
       )
     }
-    let currentValue: String? =
-      if fieldID == .audio(.defaultInputDevice) {
-        systemSnapshot?.profileSettings.audio.value.defaultInputUID.value
-      } else if fieldID == .audio(.defaultOutputDevice) {
-        systemSnapshot?.profileSettings.audio.value.defaultOutputUID.value
-      } else {
-        systemSnapshot?.profileSettings.audio.value.systemOutputUID.value
-      }
-    if !choices.isEmpty {
+    if !choices.isEmpty || option.wrappedValue.value != nil {
       optionEditor(
         title,
-        isOn: option.isIncluded,
         embeddedTitle: "Device",
-        validationFields: [fieldID],
-        onIncludeChange: IncludeChangeAction { isIncluded in
-          if isIncluded, option.wrappedValue.value == nil {
-            option.wrappedValue.value = currentValue ?? choices.first?.uid
-          }
-        }
+        validationFields: [fieldID]
       ) {
         Picker(appLocalized("Device"), selection: option.value) {
           Text(appLocalized("Choose a device")).tag(Optional<String>.none)
@@ -2362,18 +2126,12 @@ private struct ProfileEditorForm: View {
     if capability.isWritable {
       optionEditor(
         title,
-        isOn: option.isIncluded,
         embeddedTitle: "Volume",
-        validationFields: [fieldID],
-        onIncludeChange: IncludeChangeAction { isIncluded in
-          if isIncluded, option.wrappedValue.value == nil {
-            option.wrappedValue.value = capability.suggestedValue ?? 0.5
-          }
-        }
+        validationFields: [fieldID]
       ) {
         if option.wrappedValue.value == nil {
           chooseSuggestedValueButton(fieldID: fieldID) {
-            option.wrappedValue.value = capability.suggestedValue ?? 0.5
+            option.wrappedValue.value = capability.suggestedValue
           }
         } else {
           HStack(spacing: 10) {
@@ -2415,13 +2173,12 @@ private struct ProfileEditorForm: View {
       isRuntimeAvailable: capability.isWritable,
       hasRuntimeEvidence: systemSnapshot != nil
     ) {
-      unavailableIncludedOption(
+      unavailableSavedOption(
         appLocalized(title),
-        isOn: option.isIncluded,
         embeddedTitle: "Volume",
         validationFields: [fieldID],
         warning: appLocalized(
-          "This included volume setting is unavailable for the selected device. Turn off Include to apply other available settings normally."
+          "Volume cannot be changed for this device right now. Choose another device or review available settings before applying."
         )
       )
     }
@@ -2457,13 +2214,7 @@ private struct ProfileEditorForm: View {
     if capability.isWritable {
       optionEditor(
         "Output mute",
-        isOn: option.isIncluded,
-        validationFields: [fieldID],
-        onIncludeChange: IncludeChangeAction { isIncluded in
-          if isIncluded, option.wrappedValue.value == nil {
-            option.wrappedValue.value = capability.suggestedValue ?? false
-          }
-        }
+        validationFields: [fieldID]
       ) {
         if option.wrappedValue.value == nil {
           chooseSuggestedValueButton(fieldID: fieldID) {
@@ -2497,9 +2248,8 @@ private struct ProfileEditorForm: View {
       isRuntimeAvailable: capability.isWritable,
       hasRuntimeEvidence: systemSnapshot != nil
     ) {
-      unavailableIncludedOption(
+      unavailableSavedOption(
         appLocalized("Output mute"),
-        isOn: option.isIncluded,
         validationFields: [fieldID],
         warning: appLocalized(
           "This included mute setting is unavailable for the selected output device. Turn off Include to apply other available settings normally."
@@ -2652,28 +2402,6 @@ private struct ProfileEditorForm: View {
     return "\(base) · \(pixels)"
   }
 
-  private var primaryDisplayIncludedBinding: Binding<Bool> {
-    Binding(
-      get: {
-        let options = profile.settings.display.value.displays.map(\.isPrimary)
-        return !options.isEmpty && options.allSatisfy(\.isIncluded)
-      },
-      set: { isIncluded in
-        let selectedID =
-          profile.settings.display.value.displays.first(where: {
-            $0.isPrimary.value
-          })?.id ?? profile.settings.display.value.displays.first?.id
-        for index in profile.settings.display.value.displays.indices {
-          profile.settings.display.value.displays[index].isPrimary.isIncluded = isIncluded
-          if isIncluded {
-            profile.settings.display.value.displays[index].isPrimary.value =
-              profile.settings.display.value.displays[index].id == selectedID
-          }
-        }
-      }
-    )
-  }
-
   private func primaryDisplaySelectionBinding() -> Binding<UUID> {
     Binding(
       get: {
@@ -2726,21 +2454,6 @@ private struct ProfileEditorForm: View {
 
   private var hasVisibleNetworkFields: Bool {
     visibleSettingFields.contains { $0.contract.group == .network }
-  }
-
-  private var hasIncludedUnavailableAudioFields: Bool {
-    let audio = profile.settings.audio.value
-    return ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
-      isIncluded: audio.inputVolume.isIncluded,
-      isRuntimeAvailable: audioVolumeCapability(role: .input).isWritable,
-      hasRuntimeEvidence: systemSnapshot != nil
-    )
-      || ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
-        isIncluded: audio.outputVolume.isIncluded,
-        isRuntimeAvailable: audioVolumeCapability(role: .output).isWritable,
-        hasRuntimeEvidence: systemSnapshot != nil
-      )
-
   }
 
   private var hasIncludedUnavailableNetworkFields: Bool {
@@ -3055,14 +2768,6 @@ private struct AudioDeviceChoice: Identifiable {
   let scopes: Set<AudioDeviceScope>
 
   var id: String { uid }
-}
-
-private struct IncludeChangeAction {
-  let perform: (Bool) -> Void
-
-  init(_ perform: @escaping (Bool) -> Void) {
-    self.perform = perform
-  }
 }
 
 private struct EditorValidationItem {
