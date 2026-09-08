@@ -2,7 +2,7 @@
 
 ## Cross-version CI evidence — 2026-09-08
 
-Keep public-history approval bound to reviewed blob/path/category tuples, with changed-content and copied-path rejection tests. Measure actual synthetic SwiftUI bounds for tray actions, sidebar labels, and grouped sound fields while preserving pixel checks and clipping/spacing requirements. Debug-only, opt-in evidence hooks do not change release UI or call system adapters. See [scope and verification](CI-COMPATIBILITY-2026-09-08.md); remote macOS 15 results remain distinct from local evidence.
+Keep public-history approval bound to reviewed blob/path/category tuples, with changed-content and copied-path rejection tests. Measure actual synthetic SwiftUI bounds for tray actions, sidebar labels, and grouped sound fields while preserving label-relative pixel checks and clipping/spacing requirements. Debug-only, opt-in evidence hooks do not change release UI or call system adapters. See [scope and verification](CI-COMPATIBILITY-2026-09-08.md); remote macOS 15 results remain distinct from local evidence.
 
 ## Site dependency security refresh — 2026-09-08
 

@@ -344,13 +344,19 @@ import Testing
             #expect(actionFrames[0].maxX + 6 <= actionFrames[1].minX)
             #expect(actionFrames[1].maxX + 6 <= actionFrames[2].minX)
             #expect(actionFrames.allSatisfy { abs($0.midY - actionFrames[0].midY) <= 1 })
-            // Keep pixel evidence, but sample actual native button bounds;
-            // macOS versions have different intrinsic label/control widths.
-            let inkBounds = try actionFrames.map { region in
-              try #require(
-                logicalVerticalBounds(
-                  in: representation, viewport: rendered.viewport, logicalRegion: region
-                ) { perceivedBrightness($0) < 0.8 })
+            // Sample actual labels, excluding native borders/backgrounds.
+            // Disabled text need not fall below a fixed absolute gray value.
+            let inkBounds = try zip(["apply", "edit", "delete"], actionFrames).map {
+              action, button in
+              let label = try #require(rendered.layoutFrames[prefix + action + ".label"])
+              #expect(containsRenderedFrame(label, in: button))
+              let ink = renderedInkEvidence(
+                in: representation, viewport: rendered.viewport, region: label
+              )
+              return try #require(
+                ink.verticalBounds,
+                "Missing \(action) label in \(fixture.name); contrast=\(ink.brightnessRange), bounds=\(label)"
+              )
             }
             let centers = inkBounds.map { ($0.lowerBound + $0.upperBound) / 2 }
             #expect(
@@ -710,7 +716,8 @@ import Testing
             #expect(containsRenderedFrame(label, in: create), "The complete label must fit")
             #expect(containsRenderedFrame(create, in: actions))
             #expect(containsRenderedFrame(more, in: actions))
-            #expect(create.maxX + 20 < more.minX)
+            // CGRect.maxX is exclusive; exactly 20 points is a valid gap.
+            #expect(create.maxX + 20 <= more.minX)
             #expect(abs(create.midY - more.midY) <= 1)
             #expect(geometry.runs[1].upperBound - geometry.runs[1].lowerBound > 40)
           }

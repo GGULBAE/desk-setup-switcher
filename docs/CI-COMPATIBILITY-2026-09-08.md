@@ -34,6 +34,12 @@ Revised assertions retain:
 
 New tests prove opt-in isolation, real offset measurement, parent/child anchor preservation, and rejection of empty, clipped, or detached geometry. Virtual offscreen accessibility-tree limitations remain; this is not assistive-technology or live-hardware certification.
 
+### macOS 15 follow-up from the first pushed run
+
+[Run 34237761875](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/34237761875), for `56a7194`, passed the complete site job on Node 22.13.0, including zero registry advisories and all three 11-test build states. Sound grouping/viewport and label-containment assertions passed on macOS 15. Four app issues remained: one absolute-darkness label sample and three strict gap comparisons where the measured gap was exactly 20 points.
+
+The follow-up samples actual label bounds, excluding native button decoration, and detects both dark-on-light and light-on-dark ink against the label's dominant background. It retains nonempty pixel evidence and the six-point ink-center alignment tolerance; there is no OS-specific skip. Deterministic bitmap tests reject blank/nearly-flat regions and accept faint disabled or inverted text. The 20-point sidebar minimum now uses the exclusive `CGRect.maxX` boundary correctly; the existing pixel-run gap assertion remains unchanged. This is layout evidence, not a new disabled-text contrast certification.
+
 ## Verification status
 
 Local host: macOS 26.6.2. CI: macOS 15, with Node 22.13.0 for the site job. Local and remote evidence are not interchangeable.
@@ -44,6 +50,8 @@ Local host: macOS 26.6.2. CI: macOS 15, with Node 22.13.0 for the site job. Loca
 - Clean site install, `npm run audit:dependencies`, and `make verify-public-surface`: passed, with zero registry advisories and 11 tests for each holding/published/restored-current state.
 - Final lint, JavaScript syntax, and `git diff --check`: passed. Only the scoped changes are staged; existing unrelated edits remain in the working tree.
 - Remote macOS 15/Node 22.13.0 evidence is the [CI check attached to the resulting commit](https://github.com/GGULBAE/desk-setup-switcher/actions/workflows/ci.yml), checked after push. It is not inferred from local macOS 26 results.
+
+The above local counts describe the initial compatibility commit. The label-contrast/gap follow-up was reverified in an isolated intended-source checkout: `make verify` passed 358 tests in 40 suites, the separate native popover test, release-tooling mocks, dual-architecture builds/static analysis, and unsigned package/resource verification. `make audit-public-release` passed all 42 fixture assertions and the full scan. The dependency audit still reports zero registry advisories, and `make verify-public-surface` passed all three 11-test build states. These are local results; exact-commit macOS 15 CI must pass before the follow-up is closed.
 
 ## Next bounded task
 

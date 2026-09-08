@@ -2,7 +2,7 @@
 
 ## CI compatibility follow-up — 2026-09-08
 
-Verification maintenance, not a newly checked release gate: review synthetic fixture revisions without broad path exceptions, add content/path binding regressions, and measure real rendered controls for cross-version offscreen assertions. Clipping, spacing, grouping, visible content, opt-in isolation, and pixel evidence remain required. See [scope and verification](CI-COMPATIBILITY-2026-09-08.md); no live hardware or publication evidence is implied.
+Verification maintenance, not a newly checked release gate: review synthetic fixture revisions without broad path exceptions, add content/path binding regressions, and measure real rendered controls and label-relative ink for cross-version offscreen assertions. Clipping, spacing, grouping, visible content, opt-in isolation, and pixel evidence remain required. See [scope and verification](CI-COMPATIBILITY-2026-09-08.md); no live hardware or publication evidence is implied.
 
 ## Site dependency security refresh — 2026-09-08
 

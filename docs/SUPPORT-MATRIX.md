@@ -2,7 +2,7 @@
 
 ## CI evidence compatibility — 2026-09-08
 
-Opt-in debug layout anchors expose actual rendered bounds to detached synthetic test hosts; release builds retain their existing UI. Assertions preserve inline tray actions, a blank caption, grouped sound fields, and complete sidebar labels without hard-coding native macOS button widths. Reviewed synthetic audit exceptions remain exact-content/path/category only. [The compatibility record](CI-COMPATIBILITY-2026-09-08.md) separates local tests, macOS 15 CI, and unrun hardware mutation.
+Opt-in debug layout anchors expose actual rendered bounds to detached synthetic test hosts; release builds retain their existing UI. Assertions preserve inline tray actions, a blank caption, grouped sound fields, and complete sidebar labels without hard-coding native macOS button widths or disabled-text colors. Reviewed synthetic audit exceptions remain exact-content/path/category only. [The compatibility record](CI-COMPATIBILITY-2026-09-08.md) separates local tests, macOS 15 CI, and unrun hardware mutation.
 
 ## Site dependency follow-up — 2026-09-08
 

@@ -170,6 +170,7 @@ struct TrayProfileListView: View {
       Label(appLocalizedRuntime(TrayProfileCardPolicy.editLabelKey), systemImage: "pencil")
         .lineLimit(1)
         .fixedSize()
+        .uiAuditLayoutAnchor("tray.\(profile.id).edit.label")
     }
     .buttonStyle(.bordered)
     .disabled(model.isProfileMutationLocked || profileEditor.activity.isBusy)
@@ -185,6 +186,7 @@ struct TrayProfileListView: View {
         .labelStyle(.iconOnly)
         .frame(minWidth: 28, minHeight: 28)
         .contentShape(Rectangle())
+        .uiAuditLayoutAnchor("tray.\(profile.id).delete.label")
     }
     .buttonStyle(.borderless)
     .focused(focusedControl, equals: .delete(profile.id))
@@ -273,6 +275,7 @@ struct TrayProfileListView: View {
       Text(appLocalizedRuntime(TrayProfileCardPolicy.applyLabelKey))
         .lineLimit(1)
         .fixedSize()
+        .uiAuditLayoutAnchor("tray.\(profile.id).apply.label")
     }
     .disabled(!action.isEnabled)
     .focused(focusedControl, equals: .profile(profile.id))

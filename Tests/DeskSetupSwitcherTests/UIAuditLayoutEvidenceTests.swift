@@ -59,6 +59,40 @@ import Testing
       #expect(!containsRenderedFrame(.zero, in: parent))
     }
 
+    @Test("label evidence detects both contrast polarities but rejects blank or nearly flat pixels")
+    func relativeInkEvidence() throws {
+      let bitmap = try #require(
+        NSBitmapImageRep(
+          bitmapDataPlanes: nil, pixelsWide: 40, pixelsHigh: 20,
+          bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
+          isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 120, bitsPerPixel: 24
+        ))
+      for (background, glyph, expectedInk) in [
+        (CGFloat(0.96), CGFloat(0.96), false),
+        (0.96, 0.95, false),
+        (0.96, 0.86, true),
+        (0.2, 0.95, true),
+      ] {
+        for y in 0..<20 {
+          for x in 0..<40 {
+            let brightness = (10..<15).contains(x) && (6..<14).contains(y) ? glyph : background
+            bitmap.setColor(
+              NSColor(deviceRed: brightness, green: brightness, blue: brightness, alpha: 1),
+              atX: x, y: y
+            )
+          }
+        }
+        let evidence = renderedInkEvidence(
+          in: bitmap, viewport: CGSize(width: 40, height: 20),
+          region: CGRect(x: 0, y: 0, width: 40, height: 20)
+        )
+        let writtenGlyph = try #require(bitmap.colorAt(x: 12, y: 8)?.usingColorSpace(.deviceRGB))
+        #expect(abs(writtenGlyph.redComponent - glyph) < 0.01)
+        #expect((evidence.verticalBounds != nil) == expectedInk)
+        if expectedInk { #expect(evidence.verticalBounds == 6...14) }
+      }
+    }
+
     private func capture(enabled: Bool, offset: CGFloat) throws -> [String: CGRect] {
       let recorder = UIAuditLayoutRecorder()
       let configuration = UIAuditConfiguration(
