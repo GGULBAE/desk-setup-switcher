@@ -70,6 +70,7 @@ struct TrayProfileListView: View {
     }
     .padding(TrayGeometry.cardPadding)
     .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 9))
+    .uiAuditLayoutAnchor("tray.\(profile.id).card")
     .accessibilityElement(children: .contain)
   }
 
@@ -132,12 +133,16 @@ struct TrayProfileListView: View {
       }
       .font(.caption)
       .frame(maxWidth: .infinity, alignment: .leading)
+      .uiAuditLayoutAnchor("tray.\(profile.id).caption")
 
       HStack(spacing: 8) {
         styledApplyButton(profile, action: action)
+          .uiAuditLayoutAnchor("tray.\(profile.id).apply")
         editButton(profile)
+          .uiAuditLayoutAnchor("tray.\(profile.id).edit")
         Spacer(minLength: 8)
         deleteButton(profile)
+          .uiAuditLayoutAnchor("tray.\(profile.id).delete")
       }
       .fixedSize(horizontal: false, vertical: true)
       .accessibilityIdentifier("tray-profile-actions-\(profile.id)")

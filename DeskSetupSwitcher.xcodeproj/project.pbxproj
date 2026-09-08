@@ -51,6 +51,7 @@
 		9D39E3B1F9590E860DD3563A = { isa = PBXBuildFile; fileRef = DD912B8E8C7F8F5E69BC91E9; };
 		1D893666A1659C9EAF24E88E = { isa = PBXBuildFile; fileRef = 4833360ACF2156133CB599E9; };
 		C1711E8DA16B2493680F748E = { isa = PBXBuildFile; fileRef = 54C3C8A0074367253BD39F0F; };
+		D319C083DE2BE1468D6529A2 = { isa = PBXBuildFile; fileRef = 29CF6F2E425A2EA1F53705DB; };
 		CD23CC853FC6845468EBB916 = { isa = PBXBuildFile; fileRef = 6670F813CFF27985C55E019F; };
 		CD0B24822C9AADF7631DC23A = { isa = PBXBuildFile; fileRef = 83B41D173C639FB42F5E3D22; };
 		393A6F101B5D8F4111976BF4 = { isa = PBXBuildFile; fileRef = 80F3BD3E9EE188611E2C82FA; };
@@ -141,6 +142,7 @@
 		DD912B8E8C7F8F5E69BC91E9 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/Tray/TrayProfileListView.swift"; sourceTree = "<group>"; };
 		4833360ACF2156133CB599E9 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/Tray/TrayRootView.swift"; sourceTree = "<group>"; };
 		54C3C8A0074367253BD39F0F = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/UIAuditFixtures.swift"; sourceTree = "<group>"; };
+		29CF6F2E425A2EA1F53705DB = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/UIAuditLayoutEvidence.swift"; sourceTree = "<group>"; };
 		6670F813CFF27985C55E019F = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/UserFacingLocalization.swift"; sourceTree = "<group>"; };
 		83B41D173C639FB42F5E3D22 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSwitcher/Workflow/TrayWorkflowWindowController.swift"; sourceTree = "<group>"; };
 		80F3BD3E9EE188611E2C82FA = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeskSetupSystem/Audio/AudioSystemAPI.swift"; sourceTree = "<group>"; };
@@ -268,6 +270,7 @@
 				DD912B8E8C7F8F5E69BC91E9,
 				4833360ACF2156133CB599E9,
 				54C3C8A0074367253BD39F0F,
+				29CF6F2E425A2EA1F53705DB,
 				6670F813CFF27985C55E019F,
 				83B41D173C639FB42F5E3D22,
 				80F3BD3E9EE188611E2C82FA,
@@ -452,6 +455,7 @@
 				9D39E3B1F9590E860DD3563A,
 				1D893666A1659C9EAF24E88E,
 				C1711E8DA16B2493680F748E,
+				D319C083DE2BE1468D6529A2,
 				CD23CC853FC6845468EBB916,
 				CD0B24822C9AADF7631DC23A,
 				393A6F101B5D8F4111976BF4,

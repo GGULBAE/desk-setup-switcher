@@ -233,6 +233,32 @@ assert_identity_fails_without_value \
     "$private_nested_tag_repository" private-nested-tagger tagger-email \
     "$private_nested_tag_probe"
 
+# Reviewed app fixture exceptions bind content, path, and category. A harmless
+# edit or a copied path must not inherit the approval for the original bytes.
+reviewed_app_repository="$(new_repository reviewed-app-fixtures)"
+reviewed_app_paths=(
+    Sources/DeskSetupSwitcher/UIAuditFixtures.swift
+    Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift
+    Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift
+    Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift
+)
+for reviewed_app_path in "${reviewed_app_paths[@]}"; do
+    mkdir -p "$reviewed_app_repository/$(dirname "$reviewed_app_path")"
+    cp "$ROOT_DIR/$reviewed_app_path" "$reviewed_app_repository/$reviewed_app_path"
+done
+git -C "$reviewed_app_repository" add Sources Tests
+git -C "$reviewed_app_repository" commit -q -m "add reviewed app fixtures"
+assert_passes "$reviewed_app_repository" reviewed-app-fixtures
+reviewed_device_path=Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift
+printf '\n// Unreviewed content revision.\n' >>"$reviewed_app_repository/$reviewed_device_path"
+assert_fails_without_value \
+    "$reviewed_app_repository" reviewed-app-content-change device-identifier builtin
+cp "$ROOT_DIR/$reviewed_device_path" "$reviewed_app_repository/$reviewed_device_path"
+cp "$ROOT_DIR/$reviewed_device_path" "$reviewed_app_repository/Tests/CopiedFixture.swift"
+git -C "$reviewed_app_repository" add Tests/CopiedFixture.swift
+assert_fails_without_value \
+    "$reviewed_app_repository" reviewed-app-path-change device-identifier builtin
+
 # The repository audit test deliberately contains private-looking synthetic
 # probes. Only its exact reviewed blob is exempt; changing the same path must
 # immediately restore ordinary detection.

@@ -4,7 +4,7 @@ import { access, link, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile
 import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 const root = new URL("../", import.meta.url);
@@ -22,6 +22,53 @@ const expectedReleaseState = process.env.EXPECTED_RELEASE_STATE === "current"
   : process.env.EXPECTED_RELEASE_STATE;
 
 assert.match(expectedReleaseState ?? "", /^(holding|published)$/);
+
+// Inspect every emitted JavaScript chunk, independent of the bundler's layout.
+// Refuse links so this build-output audit cannot leave the selected directory.
+async function javaScriptChunks(directory) {
+  const chunks = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    assert.equal(entry.isSymbolicLink(), false, "build output must not contain symbolic links");
+    const entryURL = new URL(encodeURIComponent(entry.name) + (entry.isDirectory() ? "/" : ""), directory);
+    if (entry.isDirectory()) chunks.push(...await javaScriptChunks(entryURL));
+    else if (/\.[cm]?js$/.test(entry.name)) chunks.push(await readFile(entryURL, "utf8"));
+  }
+  return chunks;
+}
+
+test("build audit reads nested chunks and rejects linked output", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "desk-site-build-audit-"));
+  const directoryURL = pathToFileURL(`${directory}/`);
+  try {
+    await mkdir(new URL("_next/", directoryURL));
+    await writeFile(new URL("entry.js", directoryURL), "entry");
+    await writeFile(new URL("_next/nested.mjs", directoryURL), "nested");
+    await writeFile(new URL("_next/legacy.cjs", directoryURL), "legacy");
+    await writeFile(new URL("_next/ignored.json", directoryURL), "{}");
+    assert.deepEqual((await javaScriptChunks(directoryURL)).sort(), ["entry", "legacy", "nested"]);
+    await symlink(new URL("entry.js", directoryURL), new URL("linked.js", directoryURL));
+    await assert.rejects(javaScriptChunks(directoryURL), /must not contain symbolic links/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("build-time image parser is absent from deployable client and Worker chunks", async () => {
+  // Vinext vendors image-size in its build tools. A zero-advisory install graph
+  // is not proof that this unpatched parser was fixed or is safe at runtime.
+  const [client, server] = await Promise.all([
+    javaScriptChunks(new URL("dist/client/", root)),
+    javaScriptChunks(new URL("dist/server/", root)),
+  ]);
+  assert.ok(client.length > 0 && server.length > 0);
+  assert.doesNotMatch(
+    [...client, ...server].join("\n"),
+    /Invalid ICNS, no sizes found|Invalid HEIF, no (?:sizes|ipco box) found|Unsupported JPEG 2000 format/,
+    "the vendored build-time image parser must not ship in deployable JavaScript",
+  );
+  const lock = JSON.parse(await readFile(new URL("package-lock.json", root), "utf8"));
+  assert.equal(Object.keys(lock.packages).some((name) => /(?:^|\/)node_modules\/image-size$/.test(name)), false);
+});
 
 function runOriginGate(origin, { allowLocal = false, gatePath = originGatePath } = {}) {
   const env = { ...process.env };
@@ -71,8 +118,10 @@ test("renders the complete public-beta landing page without setting cookies", as
 
   const html = await response.text();
   assert.match(html, /<title>Desk Setup Switcher — Capture, review, and apply your desk settings<\/title>/i);
-  assert.match(html, /<link rel="canonical" href="http:\/\/localhost:3000\/"\/>/i);
-  assert.match(html, /<meta property="og:url" content="http:\/\/localhost:3000\/"\/>/i);
+  const canonical = html.match(/<link rel="canonical" href="([^"]+)"\/>/i)?.[1];
+  const openGraphURL = html.match(/<meta property="og:url" content="([^"]+)"\/>/i)?.[1];
+  assert.equal(new URL(canonical).href, "http://localhost:3000/");
+  assert.equal(new URL(openGraphURL).href, "http://localhost:3000/");
   assert.match(html, /Bring your desk back, deliberately\./);
   assert.match(html, /Capture/);
   assert.match(html, /Edit/);
@@ -135,14 +184,9 @@ test("keeps the site account-free, local-content-only, and free of starter capab
   ]);
   const browserSource = `${page}\n${landing}\n${layout}`;
   const runtimeSource = `${worker}\n${vite}\n${buildPlugin}`;
-  const clientAssetDirectory = new URL("dist/client/assets/", root);
-  const clientJavaScript = (
-    await Promise.all(
-      (await readdir(clientAssetDirectory))
-        .filter((name) => name.endsWith(".js"))
-        .map((name) => readFile(new URL(name, clientAssetDirectory), "utf8")),
-    )
-  ).join("\n");
+  const clientChunks = await javaScriptChunks(new URL("dist/client/", root));
+  assert.ok(clientChunks.length > 0, "the privacy audit requires actual client chunks");
+  const clientJavaScript = clientChunks.join("\n");
 
   assert.match(page, /force-static/);
   assert.deepEqual(JSON.parse(hosting), { d1: null, r2: null });

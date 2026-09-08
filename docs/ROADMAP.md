@@ -1,5 +1,13 @@
 # Roadmap
 
+## Cross-version CI evidence — 2026-09-08
+
+Keep public-history approval bound to reviewed blob/path/category tuples, with changed-content and copied-path rejection tests. Measure actual synthetic SwiftUI bounds for tray actions, sidebar labels, and grouped sound fields while preserving pixel checks and clipping/spacing requirements. Debug-only, opt-in evidence hooks do not change release UI or call system adapters. See [scope and verification](CI-COMPATIBILITY-2026-09-08.md); remote macOS 15 results remain distinct from local evidence.
+
+## Site dependency security refresh — 2026-09-08
+
+Refresh pinned Vinext/RSC tooling and vulnerable transitive packages while preserving app behavior, site content, privacy checks, and publication gates. Verify both holding and published builds against the new chunk layout, including absence of the bundled build-time image parser from deployable code. See [scope, limitations, and verification](SITE-DEPENDENCY-REFRESH-2026-09-08.md); local verification and remote CI remain separate evidence, and no deployment is implied.
+
 ## Output mute restored — 2026-09-08
 
 Show a **소리 끔 / Output mute** value switch inside Output, alongside its device and volume. Restore readable mute capture, registered-value normalization, summary, and explicit apply/rollback through the existing Core Audio adapter. Leave Input unchanged and do not restore per-setting inclusion controls or retired options. Unsupported/unreadable mute shows a warning without inventing a value. See [scope and verification](OUTPUT-MUTE-2026-09-08.md).

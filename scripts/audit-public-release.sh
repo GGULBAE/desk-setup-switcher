@@ -613,6 +613,29 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
   # their surrounding source against the repository synthetic-data policy. New
   # content at the same path, or a new finding category, inherits no exception.
   REVIEWED_SYNTHETIC_FINDINGS = Set.new([
+    # 2026-09-08: reviewed fixture revisions, still exact blob/path/category only.
+    # IP findings are subnet masks beside documentation-only address blocks.
+    ["ae02bec37bd44c6b9ff154b0a2b49e8b65ceaec0", "Sources/DeskSetupSwitcher/UIAuditFixtures.swift", "ip-host"],
+    ["0a283bfef4cef95fb0df6cccc3bdc2de9ef2faaa", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
+    ["2eff268a4095563162c34c830b490ec1a4f6f9bc", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
+    ["92548c1034b6d3f9089663882f4994df7c02e52a", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
+    ["a0eca7b3e65653775fc0b64057d757b0e240902e", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
+    ["33b82699ba78146da9daaacb12321a88f11e934a", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
+    ["60b7803775e625ebdc6f448e8171ae02bbe45d44", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
+    ["805fd63a4fb2d85019d9b3d400941e1957ffd152", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
+    # These injected catalogs use short fake audio roles; no hardware is queried.
+    # The final revision adds current/saved/unreadable role names for mute tests.
+    ["19e403486460f4882ec04bcb41473ca10d432359", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    ["2da5d47f8677e693ee14aee6b13e40a00643b410", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    ["3e9ceab2900d04f18a1e6c3a6c130b0ac983a72f", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    ["5a48eb71d772a8f362751e23ee5bfe7746ece6df", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    ["5bc5733bf5e8f53b3684fc509cf63dda59fc169f", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    ["70c1ccda0a5596f9626af91a671ec0e13764ea04", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    ["812aabda7a6087c7c4421a7c3c867c7116577cc8", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    # Audit regression suite: existing runtime-assembled negative probes plus
+    # exact-content and path binding regressions; no new literal data sources.
+    ["bac90a76e9cc019650f2e1b6492089d05d71dea3", "scripts/test-audit-public-release.sh", "ssid"],
+    ["bac90a76e9cc019650f2e1b6492089d05d71dea3", "scripts/test-audit-public-release.sh", "ip-host"],
     # Removed condition editor: one synthetic default region (coordinates).
     ["987c19ec4be9e7910fbec2a1a5b626864a08dae9", "Sources/DeskSetupSwitcher/ConditionEditorView.swift", "coordinates"],
     # UI audit host: one reviewed synthetic manual-network fixture (IP host).

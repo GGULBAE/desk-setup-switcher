@@ -1,5 +1,13 @@
 # Support matrix
 
+## CI evidence compatibility — 2026-09-08
+
+Opt-in debug layout anchors expose actual rendered bounds to detached synthetic test hosts; release builds retain their existing UI. Assertions preserve inline tray actions, a blank caption, grouped sound fields, and complete sidebar labels without hard-coding native macOS button widths. Reviewed synthetic audit exceptions remain exact-content/path/category only. [The compatibility record](CI-COMPATIBILITY-2026-09-08.md) separates local tests, macOS 15 CI, and unrun hardware mutation.
+
+## Site dependency follow-up — 2026-09-08
+
+The refreshed lockfile reports zero registry advisories after a clean install with lifecycle scripts disabled. Holding/published site verification covers recursive build chunks and unchanged privacy/publication constraints. Vinext still vendors unpatched `image-size` for build-time use; this is not a parser-patch claim. [The dependency record](SITE-DEPENDENCY-REFRESH-2026-09-08.md) separates deployment-output checks, local app verification, and remote CI. No site deployment, installed-app update, or hardware verification is implied.
+
 ## Current output-mute follow-up — 2026-09-08
 
 The profile allowlist now has seven kinds: main display, resolution, output device/volume/mute, and input device/volume. The Output card shows a mute-value switch when the target supports readable, writable mute, or an unavailable warning otherwise. Capture never guesses an unreadable value, and old profiles without saved mute do not automatically unmute anything. Existing saved mute values participate like other registered values. No inclusion switches, automatic application, input mute, or network options are added. [The follow-up record](OUTPUT-MUTE-2026-09-08.md) supersedes mute-retirement claims in earlier six-setting notes and separates mock/offscreen checks from unrun hardware checks.

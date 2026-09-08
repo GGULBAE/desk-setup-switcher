@@ -1,5 +1,13 @@
 # Completion criteria and evidence ledger
 
+## CI compatibility follow-up — 2026-09-08
+
+Verification maintenance, not a newly checked release gate: review synthetic fixture revisions without broad path exceptions, add content/path binding regressions, and measure real rendered controls for cross-version offscreen assertions. Clipping, spacing, grouping, visible content, opt-in isolation, and pixel evidence remain required. See [scope and verification](CI-COMPATIBILITY-2026-09-08.md); no live hardware or publication evidence is implied.
+
+## Site dependency security refresh — 2026-09-08
+
+Maintenance follow-up, not a newly checked release gate: refresh the site toolchain and vulnerable transitive dependencies, retain precise privacy assertions across the new output layout, and reject the bundled build-time image parser in deployment chunks. Zero registry advisories do not establish a parser fix. See [scope and verification](SITE-DEPENDENCY-REFRESH-2026-09-08.md) for local gates versus remote CI and the initial macOS-specific offscreen findings addressed by the compatibility follow-up. Publication and hardware gates remain unchanged.
+
 ## Output mute restored — 2026-09-08
 
 Implementation follow-up, not a newly checked release gate: restore **Output mute / 소리 끔** as a saved value in the Output card and in capture/summary/preflight. Preserve missing values, target-device capability checks, normal versus available-items planning, and read-back/rollback. Inclusion switches stay removed. See [scope and verification](OUTPUT-MUTE-2026-09-08.md); hardware mutation and installed UI remain separate, unverified evidence.

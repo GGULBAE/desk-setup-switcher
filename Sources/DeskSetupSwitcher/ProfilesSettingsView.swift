@@ -637,7 +637,9 @@ struct ProfilesSettingsView: View {
           requestDeferredAction(.create)
         } label: {
           Label(appLocalized("New Profile"), systemImage: "plus")
+            .uiAuditLayoutAnchor("sidebar.new.label")
         }
+        .uiAuditLayoutAnchor("sidebar.new.button")
         .accessibilityLabel(appLocalized("Create profile"))
         .help(appLocalized("Create profile"))
 
@@ -659,10 +661,12 @@ struct ProfilesSettingsView: View {
           Label(appLocalized("More Profile Actions"), systemImage: "ellipsis.circle")
         }
         .labelStyle(.iconOnly)
+        .uiAuditLayoutAnchor("sidebar.more.button")
         .accessibilityLabel(appLocalized("More Profile Actions"))
         .help(appLocalized("More Profile Actions"))
       }
       .padding(ProfileWorkspaceLayoutPolicy.sidebarActionInset)
+      .uiAuditLayoutAnchor("sidebar.actions")
       .accessibilityIdentifier("profile-sidebar-actions")
     }
   }
@@ -1237,6 +1241,7 @@ private struct ProfileEditorForm: View {
     )
     .defaultScrollAnchor(.top)
     .scrollBounceBehavior(.basedOnSize)
+    .uiAuditLayoutAnchor("profile.form.viewport")
     .background(Color(nsColor: .windowBackgroundColor))
     .onChange(of: profile.id) {
       focusedField = nil
@@ -1690,16 +1695,19 @@ private struct ProfileEditorForm: View {
           scope: .output,
           fieldID: .audio(.defaultOutputDevice)
         )
+        .uiAuditLayoutAnchor("audio-output.device")
         audioVolumeOption(
           "Output volume",
           role: .output,
           option: $profile.settings.audio.value.outputVolume,
           fieldID: .audio(.outputVolume)
         )
+        .uiAuditLayoutAnchor("audio-output.volume")
         audioMuteOption(
           option: $profile.settings.audio.value.outputMuted,
           fieldID: .audio(.outputMute)
         )
+        .uiAuditLayoutAnchor("audio-output.mute")
       }
       audioSection("Input", systemImage: "mic", identifier: "audio-input") {
         audioDeviceOption(
@@ -1708,12 +1716,14 @@ private struct ProfileEditorForm: View {
           scope: .input,
           fieldID: .audio(.defaultInputDevice)
         )
+        .uiAuditLayoutAnchor("audio-input.device")
         audioVolumeOption(
           "Input volume",
           role: .input,
           option: $profile.settings.audio.value.inputVolume,
           fieldID: .audio(.inputVolume)
         )
+        .uiAuditLayoutAnchor("audio-input.volume")
       }
     }
   }
@@ -1735,6 +1745,7 @@ private struct ProfileEditorForm: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(identifier)
+    .uiAuditLayoutAnchor(identifier)
   }
 
   @ViewBuilder

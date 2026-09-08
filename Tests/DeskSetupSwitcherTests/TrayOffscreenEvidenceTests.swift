@@ -128,6 +128,7 @@ import Testing
     struct SettingsRenderEvidence {
       let png: Data
       let accessibility: String
+      let layoutFrames: [String: CGRect]
       let railSelectionPixelCount: Int
       let sidebarActionGeometry: SidebarActionGeometry?
       let footerDarkPixelCount: Int
@@ -333,13 +334,19 @@ import Testing
             }
           }
           #expect(cardRuns.count == 3)
-          for card in cardRuns {
-            let bottom = CGFloat(card.upperBound + 1)
-            let inkBounds = try [
-              CGRect(x: 28, y: bottom - 40, width: 57, height: 28),
-              CGRect(x: 128, y: bottom - 40, width: 30, height: 28),
-              CGRect(x: 316, y: bottom - 40, width: 18, height: 28),
-            ].map { region in
+          for profile in UIAuditFixtures.fixture(.overview).profiles {
+            let prefix = "tray.\(profile.id)."
+            let card = try #require(rendered.layoutFrames[prefix + "card"])
+            let actionFrames = try ["apply", "edit", "delete"].map {
+              try #require(rendered.layoutFrames[prefix + $0])
+            }
+            #expect(actionFrames.allSatisfy { containsRenderedFrame($0, in: card) })
+            #expect(actionFrames[0].maxX + 6 <= actionFrames[1].minX)
+            #expect(actionFrames[1].maxX + 6 <= actionFrames[2].minX)
+            #expect(actionFrames.allSatisfy { abs($0.midY - actionFrames[0].midY) <= 1 })
+            // Keep pixel evidence, but sample actual native button bounds;
+            // macOS versions have different intrinsic label/control widths.
+            let inkBounds = try actionFrames.map { region in
               try #require(
                 logicalVerticalBounds(
                   in: representation, viewport: rendered.viewport, logicalRegion: region
@@ -349,10 +356,14 @@ import Testing
             #expect(
               (centers.max() ?? 0) - (centers.min() ?? 0) <= 6,
               "Apply, Edit, and trash must share one action row")
+            let caption = try #require(rendered.layoutFrames[prefix + "caption"])
+            #expect(caption.height >= 10)
+            #expect(containsRenderedFrame(caption, in: card))
+            #expect(caption.maxY < actionFrames.map(\.minY).min() ?? 0)
             #expect(
               pixelCount(
                 in: representation, viewport: rendered.viewport,
-                logicalRegion: CGRect(x: 28, y: bottom - 63, width: 295, height: 14)
+                logicalRegion: caption.insetBy(dx: 1, dy: 1)
               ) { perceivedBrightness($0) < 0.8 } == 0,
               "Passive status copy must leave a blank caption line")
           }
@@ -644,33 +655,32 @@ import Testing
         }
         if fixture.name == "19b-audio-grouped-sections-ko-light" {
           let representation = try #require(NSBitmapImageRep(data: rendered.png))
-          // Sample the inset before row labels in the full-height Sound view.
-          // Two continuous tall surfaces prove device and volume share each
-          // section, rather than merely declaring a two-section policy.
-          let scaleX = CGFloat(representation.pixelsWide) / fixture.size.width
-          let scaleY = CGFloat(representation.pixelsHigh) / fixture.size.height
-          var runs: [ClosedRange<Int>] = []
-          var runStart: Int?
-          for y in 140..<700 {
-            let color = representation.colorAt(
-              x: Int(448 * scaleX), y: Int(CGFloat(y) * scaleY)
-            )?.usingColorSpace(.deviceRGB)
-            let isSectionBackground =
-              color.map {
-                $0.redComponent > 0.93 && $0.redComponent < 0.99
-                  && abs($0.redComponent - $0.greenComponent) < 0.01
-                  && abs($0.redComponent - $0.blueComponent) < 0.01
-              } ?? false
-            if isSectionBackground, runStart == nil {
-              runStart = y
-            } else if !isSectionBackground, let start = runStart {
-              if y - start > 10 { runs.append(start...(y - 1)) }
-              runStart = nil
+          let output = try #require(rendered.layoutFrames["audio-output"])
+          let input = try #require(rendered.layoutFrames["audio-input"])
+          let formViewport = try #require(rendered.layoutFrames["profile.form.viewport"])
+          #expect(output.maxY < input.minY, "Output and Input must remain separate surfaces")
+          for (identifier, section, fields) in [
+            ("audio-output", output, ["device", "volume", "mute"]),
+            ("audio-input", input, ["device", "volume"]),
+          ] {
+            #expect(section.height > 120)
+            #expect(containsRenderedFrame(section, in: CGRect(origin: .zero, size: fixture.size)))
+            #expect(
+              containsRenderedFrame(section, in: formViewport), "Both sections must be visible")
+            let rows = try fields.map { field in
+              try #require(rendered.layoutFrames[identifier + "." + field])
+            }
+            #expect(rows.allSatisfy { containsRenderedFrame($0, in: section) })
+            for (upper, lower) in zip(rows, rows.dropFirst()) {
+              #expect(upper.maxY < lower.minY, "Fields must not overlap or become separate cards")
+            }
+            for row in rows {
+              #expect(
+                pixelCount(in: representation, viewport: fixture.size, logicalRegion: row) {
+                  perceivedBrightness($0) < 0.8
+                } > 20, "Each measured field must actually render visible content")
             }
           }
-          #expect(runStart == nil, "Both Sound sections must fit the tall fixture")
-          #expect(runs.count == 2, "Sound must have one Output and one Input surface")
-          #expect(runs.allSatisfy { $0.count > 120 }, "Device and volume must share a surface")
         }
         if fixture.isProfileSurface, fixture.size.width == 900,
           !fixture.dynamicTypeSize.isAccessibilitySize, fixture.state == .standard
@@ -693,7 +703,15 @@ import Testing
             let geometry = try #require(rendered.sidebarActionGeometry)
             #expect(geometry.runs.count == 2)
             #expect(geometry.runs[0].upperBound + 20 < geometry.runs[1].lowerBound)
-            #expect(geometry.runs[0].upperBound - geometry.runs[0].lowerBound >= 80)
+            let create = try #require(rendered.layoutFrames["sidebar.new.button"])
+            let label = try #require(rendered.layoutFrames["sidebar.new.label"])
+            let more = try #require(rendered.layoutFrames["sidebar.more.button"])
+            let actions = try #require(rendered.layoutFrames["sidebar.actions"])
+            #expect(containsRenderedFrame(label, in: create), "The complete label must fit")
+            #expect(containsRenderedFrame(create, in: actions))
+            #expect(containsRenderedFrame(more, in: actions))
+            #expect(create.maxX + 20 < more.minX)
+            #expect(abs(create.midY - more.midY) <= 1)
             #expect(geometry.runs[1].upperBound - geometry.runs[1].lowerBound > 40)
           }
           #expect(rendered.accessibility.contains("dynamic-type=\(fixture.dynamicTypeName)"))
@@ -1350,6 +1368,7 @@ import Testing
       let size = fixture.size
       let navigation = SettingsNavigationModel(selectedTab: fixture.selectedTab)
       navigation.beginPresentation()
+      let layoutRecorder = UIAuditLayoutRecorder()
       let root = ZStack {
         (fixture.colorScheme == .dark ? Color.black : Color.white)
           .ignoresSafeArea()
@@ -1366,6 +1385,7 @@ import Testing
       .dynamicTypeSize(fixture.dynamicTypeSize)
       .preferredColorScheme(fixture.colorScheme)
       .frame(width: size.width, height: size.height)
+      .modifier(UIAuditLayoutCaptureModifier(recorder: layoutRecorder))
 
       let host = NSHostingView(rootView: root)
       host.frame = NSRect(origin: .zero, size: size)
@@ -1493,6 +1513,7 @@ import Testing
       return SettingsRenderEvidence(
         png: png,
         accessibility: lines.joined(separator: "\n") + "\n",
+        layoutFrames: layoutRecorder.frames,
         railSelectionPixelCount: railSelectionPixelCount,
         sidebarActionGeometry: sidebarActionGeometry,
         footerDarkPixelCount: footerDarkPixelCount,
@@ -1634,7 +1655,8 @@ import Testing
     private func render(
       _ fixture: Fixture,
       actionCopy: TrayActionCopy
-    ) throws -> (png: Data, accessibility: String, viewport: CGSize) {
+    ) throws -> (png: Data, accessibility: String, viewport: CGSize, layoutFrames: [String: CGRect])
+    {
       let configuration = UIAuditConfiguration(
         isEnabled: true,
         variant: fixture.variant,
@@ -1760,6 +1782,7 @@ import Testing
         .environment(\.locale, Locale(identifier: fixture.languageCode))
         .dynamicTypeSize(fixture.dynamicTypeSize)
         .preferredColorScheme(fixture.colorScheme)
+        .environment(\.uiAuditConfiguration, configuration)
       var geometryContext = presentation.geometryContext
       if (1...3).contains(geometryContext.profileCount) {
         geometryContext.fittedContentHeight = TrayContentMeasurement.height(
@@ -1776,10 +1799,12 @@ import Testing
       presentation.trayDidOpen(sessionGeneration: 1, viewport: viewport)
       presentation.trayContentDidAttach(sessionGeneration: 1)
 
+      let layoutRecorder = UIAuditLayoutRecorder()
       let root =
         trayContent
         .frame(width: viewport.width, height: viewport.height)
         .background(fixture.colorScheme == .dark ? Color.black : Color.white)
+        .modifier(UIAuditLayoutCaptureModifier(recorder: layoutRecorder))
 
       let host = NSHostingView(rootView: root)
       host.frame = NSRect(origin: .zero, size: viewport)
@@ -1838,7 +1863,7 @@ import Testing
           hasHandoffError: presentation.handoffError != nil
         )
       )
-      return (png, accessibility, viewport)
+      return (png, accessibility, viewport, layoutRecorder.frames)
     }
 
     private func accessibilitySnapshot(
