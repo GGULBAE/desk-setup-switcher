@@ -16,4 +16,12 @@
 - Full repository `make verify` passed, including lint/localization checks, 359 Swift Testing tests, the native popover XCTest, release-policy checks, Debug/Release builds, static analysis, and universal `arm64`/`x86_64` unsigned DMG packaging verification.
 - Final `git diff --check` passed after this evidence record was updated.
 
-No Capture, Apply, login-item registration, permission, Keychain, display, audio, network, mouse, or keyboard mutation was run. The screenshots are deterministic synthetic/offscreen evidence, not installed interaction or hardware verification.
+## Authorized local reinstall
+
+- Behavior commit `f1af22a` was pushed to `origin/master`. A fresh package was built from that exact commit rather than from the remaining unrelated working-tree changes.
+- The verified unsigned development DMG SHA-256 is `21d7f15cd95c1e06accf84e4c554f392995ab22c9faf69fa16b73c64cca828b0`. Its mounted app passed strict/deep ad-hoc signature verification, reports version `0.0.9` / build `1`, and contains `arm64` and `x86_64` slices.
+- The mounted and installed executable SHA-256 is `a5988a1f4e41da44a6d7189e020acd593682fa3ed91ed4643c25420fd6e1168a`. The previous app was normally quit and moved out of `/Applications` into private recovery directory `.build/reinstall-current-profile.WXh000/`, mode `0700`, before the verified candidate replaced it.
+- `profiles.json` and `profiles.backup.json` remained byte-identical before replacement and after startup. Their contents and device identities are not recorded here. The existing consented launch-at-login preference and consent version remained `1`; no preference or registration change was requested.
+- The DMG was detached before launching the installed path. `/Applications/Desk Setup Switcher.app/Contents/MacOS/DeskSetupSwitcher` was then observed running with the installed executable hash above.
+
+No Capture, Apply, login-item registration, permission, Keychain, display, audio, network, mouse, or keyboard mutation was run. The screenshots are deterministic synthetic/offscreen evidence, and the local reinstall proves package replacement/startup only—not installed UI interaction, login-after-reboot, or hardware behavior.

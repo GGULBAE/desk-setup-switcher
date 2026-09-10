@@ -2,7 +2,7 @@
 
 ## Tray current-profile clarity and App Settings cleanup — 2026-09-10
 
-Presentation follow-up, not a newly checked release gate: remove the tray Apply-result footer, emphasize the fresh matching profile with both contrast and text/symbol cues, add an Apply icon, and remove the permanent login technical-details disclosure while preserving mismatch refresh/retry. Deterministic policy tests and focused Korean tray/App Settings renders pass; the final integrated gate is recorded in [the follow-up evidence](TRAY-CURRENT-PROFILE-2026-09-10.md). Installed interaction, login approval/reboot, and hardware mutation remain separate evidence.
+Presentation follow-up, not a newly checked release gate: remove the tray Apply-result footer, emphasize the fresh matching profile with both contrast and text/symbol cues, add an Apply icon, and remove the permanent login technical-details disclosure while preserving mismatch refresh/retry. Deterministic policy tests, focused Korean tray/App Settings renders, the exact staged-snapshot integrated gate, and commit `f1af22a` package replacement/startup pass as recorded in [the follow-up evidence](TRAY-CURRENT-PROFILE-2026-09-10.md). Installed interaction, login approval/reboot, and hardware mutation remain separate evidence.
 
 ## CI compatibility follow-up — 2026-09-08
 
