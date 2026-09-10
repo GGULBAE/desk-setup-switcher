@@ -50,6 +50,8 @@ The [2026-09-08 spacing and login-request follow-up](docs/SPACING-LOGIN-2026-09-
 
 The [2026-09-10 tray clarity follow-up](docs/TRAY-CURRENT-PROFILE-2026-09-10.md) moves the current-state signal onto the matching profile card, removes the separate tray result card, adds an Apply icon, and removes the always-visible login-registration disclosure while retaining mismatch recovery actions. Commit `f1af22a` was pushed, and its verified package was reinstalled and launched from `/Applications` with both profile files byte-identical.
 
+The [2026-09-10 site dependency advisory follow-up](docs/SITE-DEPENDENCY-REFRESH-2026-09-10.md) updates Next.js and its matching ESLint config to `16.3.4`, pins Sharp `0.35.4` across the tree, and restores a zero-advisory `npm audit` plus all three deterministic site builds after the registry began reporting new critical/high findings. No deployment was performed.
+
 The grouped Sound 2026-09-07 follow-up passed `make verify` on retry and the 19-fixture offscreen matrix, was reinstalled, and launched from `/Applications`. Both profile files remained byte-identical after startup; the old app and profile files are backed up. This is installation/startup evidence, not installed keyboard or hardware verification; see the [current verification and installation record](docs/AUDIO-SECTIONS-2026-09-07.md).
 
 The requested installed keyboard/scroll follow-up is still unverified: the app process and executable identity were confirmed, but the native screen connection timed out before a usable accessibility tree or screenshot was available. No keyboard, scrolling, Save, or Apply action was attempted. See the [follow-up verification boundary](docs/AUDIO-SECTIONS-2026-09-07.md#installed-interaction-follow-up).

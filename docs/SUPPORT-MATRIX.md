@@ -71,6 +71,8 @@ Current tray-action follow-up: cards show one **Apply / Edit / trash** row. Tras
 
 Current 2026-09-08 follow-up: Display/Sound detail headings are omitted while named section containers and validation targets remain; footer/sidebar controls gain insets. Short trays use a detached pre-open content fit, never live resize feedback. Existing ON login preferences do not request registration at startup; ON/Retry in App Settings remains explicit, and opt-out cleanup is unchanged. No `sfltool` invocation is part of the app or this verification pass. See [verification boundaries](SPACING-LOGIN-2026-09-08.md).
 
+Current 2026-09-10 site dependency follow-up: Next.js and its matching ESLint config are pinned to `16.3.4`, and Sharp is overridden to `0.35.4` for both Next.js and the Cloudflare toolchain. A clean locked install reports zero registry advisories and all deterministic site states pass. This is dependency/build evidence only; no site deployment occurred. See [scope and verification](SITE-DEPENDENCY-REFRESH-2026-09-10.md).
+
 Current 2026-09-10 follow-up: the fresh no-operation match is emphasized on its profile card with accent fill/border plus a filled checkmark and localized current-state text. Apply has a visible icon, and the separate tray Apply-result card is removed. App Settings refreshes login status on entry and shows mismatch refresh/retry directly instead of an always-present technical disclosure. Commit `f1af22a` was pushed; the exact-source universal package was reinstalled and launched with both profile files unchanged. See [scope, verification, and installation evidence](TRAY-CURRENT-PROFILE-2026-09-10.md).
 
 | Area | Capability | Status and evidence |

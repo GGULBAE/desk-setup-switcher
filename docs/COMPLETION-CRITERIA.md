@@ -1,5 +1,9 @@
 # Completion criteria and evidence ledger
 
+## Site dependency advisory follow-up — 2026-09-10
+
+Security maintenance, not a new product completion gate: pin patched Next.js/ESLint and Sharp versions, regenerate the lockfile, require a zero-advisory network audit, and preserve all deterministic site outputs. No deployment or runtime-service mutation is part of this evidence. See [the advisory follow-up](SITE-DEPENDENCY-REFRESH-2026-09-10.md).
+
 ## Tray current-profile clarity and App Settings cleanup — 2026-09-10
 
 Presentation follow-up, not a newly checked release gate: remove the tray Apply-result footer, emphasize the fresh matching profile with both contrast and text/symbol cues, add an Apply icon, and remove the permanent login technical-details disclosure while preserving mismatch refresh/retry. Deterministic policy tests, focused Korean tray/App Settings renders, the exact staged-snapshot integrated gate, and commit `f1af22a` package replacement/startup pass as recorded in [the follow-up evidence](TRAY-CURRENT-PROFILE-2026-09-10.md). Installed interaction, login approval/reboot, and hardware mutation remain separate evidence.

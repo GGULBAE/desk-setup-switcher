@@ -76,14 +76,17 @@ built client.
 `npm run audit:dependencies` is the networked dependency advisory gate. It is
 kept separate from the deterministic local build and test command. The
 2026-09-08 refresh updates the pinned Vinext/RSC pair and vulnerable transitive
-packages while retaining the existing Next/React, Cloudflare/Wrangler,
-PostCSS, and Undici pins. `npm ci --ignore-scripts && npm audit` reports zero
-registry advisories. Vinext still bundles unpatched `image-size` 2.0.2 in its
+packages. The 2026-09-10 advisory follow-up pins Next.js and its ESLint config
+to 16.3.4 and overrides every Sharp path to 0.35.4 while retaining the existing
+React, Cloudflare/Wrangler, PostCSS, and Undici pins. `npm ci --ignore-scripts &&
+npm audit` reports zero registry advisories. Vinext still bundles unpatched
+`image-size` 2.0.2 in its
 build tools; an empty audit report is not proof that the parser was fixed.
 This site has no upload or image-optimization endpoint. Deployment-output
 tests reject the parser in client/Worker chunks and inspect all nested
 JavaScript chunks, refusing symlinks and empty output. Keep build inputs
-reviewed. See [scope and verification](../docs/SITE-DEPENDENCY-REFRESH-2026-09-08.md).
+reviewed. See the [original refresh](../docs/SITE-DEPENDENCY-REFRESH-2026-09-08.md)
+and [current advisory follow-up](../docs/SITE-DEPENDENCY-REFRESH-2026-09-10.md).
 
 ## Content boundaries
 

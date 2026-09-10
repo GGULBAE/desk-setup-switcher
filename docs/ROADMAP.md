@@ -1,5 +1,9 @@
 # Roadmap
 
+## Site dependency advisory follow-up — 2026-09-10
+
+Refresh the pinned site dependency graph after the networked CI audit began reporting new Next.js and Sharp advisories. Keep the existing Cloudflare/Vinext architecture and deployment boundary, require zero registry advisories, and rerun all local published/holding/current site states plus the repository gate. See [scope and verification](SITE-DEPENDENCY-REFRESH-2026-09-10.md).
+
 ## Tray current-profile clarity and App Settings cleanup — 2026-09-10
 
 Emphasize a currently matching profile with a tinted card, border, filled checkmark, and localized text; add an Apply icon; and stop rendering the separate bottom Apply result card. Remove the permanent login technical-details disclosure, refresh status when App Settings opens, and show status refresh/retry only when the requested and effective states need attention. Keep Apply/rollback and `SMAppService` mutation semantics unchanged. Commit `f1af22a` was pushed; its exact-source package was reinstalled and launched with profile files and the existing login preference preserved. See [scope, verification, and installation evidence](TRAY-CURRENT-PROFILE-2026-09-10.md).
