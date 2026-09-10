@@ -94,12 +94,10 @@ enum TrayCaptureAffordancePolicy {
     profileCount: Int,
     capturePhase: TrayCapturePhase,
     hasCaptureSummary: Bool,
-    hasApplySummary: Bool,
     hasHandoffError: Bool
   ) -> TrayCaptureAffordancePlacement {
     guard profileCount == 0,
       !hasCaptureSummary,
-      !hasApplySummary,
       !hasHandoffError
     else { return .compactHeader }
 
@@ -130,14 +128,12 @@ enum TrayBodyPresentationPolicy {
   static func usesStaticEmptyBody(
     profileCount: Int,
     hasCaptureSummary: Bool,
-    hasApplySummary: Bool,
     hasHandoffError: Bool,
     capturePhase: TrayCapturePhase,
     usesAccessibilityTextSize: Bool
   ) -> Bool {
     guard profileCount == 0,
       !hasCaptureSummary,
-      !hasApplySummary,
       !hasHandoffError,
       !usesAccessibilityTextSize
     else { return false }
@@ -258,7 +254,6 @@ struct TrayRootView: View {
       profileCount: model.profiles.count,
       capturePhase: presentation.capturePhase,
       hasCaptureSummary: model.lastCaptureSummary != nil,
-      hasApplySummary: model.lastApplySummary != nil,
       hasHandoffError: presentation.handoffError != nil
     )
   }
@@ -272,7 +267,6 @@ struct TrayRootView: View {
     TrayBodyPresentationPolicy.usesStaticEmptyBody(
       profileCount: model.profiles.count,
       hasCaptureSummary: model.lastCaptureSummary != nil,
-      hasApplySummary: model.lastApplySummary != nil,
       hasHandoffError: presentation.handoffError != nil,
       capturePhase: presentation.capturePhase,
       usesAccessibilityTextSize: dynamicTypeSize.isAccessibilitySize
@@ -316,7 +310,6 @@ struct TrayRootView: View {
         .id(TrayScrollAnchor.top)
       captureStatus
       captureSummary
-      applySummary
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
     .padding(.bottom, 2)
@@ -438,58 +431,6 @@ struct TrayRootView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(TrayGeometry.cardPadding)
       .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
-      .accessibilityElement(children: .contain)
-    }
-  }
-
-  @ViewBuilder
-  private var applySummary: some View {
-    if let summary = model.lastApplySummary {
-      let countItems = ApplyResultCountPresentation.nonzeroItems(for: summary)
-      VStack(alignment: .leading, spacing: 7) {
-        HStack(alignment: .firstTextBaseline) {
-          Label(
-            appApplyResultStatusTitle(summary.status),
-            systemImage: applyResultStatusSymbol(summary.status)
-          )
-          .font(.caption.bold())
-          Spacer()
-          Button {
-            route(.dismissApplyBanner)
-          } label: {
-            Label(appLocalized("Dismiss Apply Result"), systemImage: "xmark")
-              .labelStyle(.iconOnly)
-          }
-          .buttonStyle(.plain)
-          .frame(minWidth: 28, minHeight: 28)
-          .accessibilityLabel(appLocalized("Dismiss Apply Result"))
-          .help(appLocalized("Dismiss Apply Result"))
-        }
-        Text(summary.profileName)
-          .font(.caption)
-          .lineLimit(2)
-        if !countItems.isEmpty {
-          Text(ApplyResultCountPresentation.compactText(for: countItems))
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .accessibilityLabel(
-              ApplyResultCountPresentation.accessibilityText(for: countItems)
-            )
-        }
-        HStack {
-          Text(summary.appliedAt.formatted(date: .omitted, time: .shortened))
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-          Spacer()
-          Button(appLocalized("Details")) {
-            route(.openResultDetails)
-          }
-          .font(.caption)
-          .accessibilityHint("Shows itemized apply and read-back results")
-        }
-      }
-      .padding(TrayGeometry.cardPadding)
-      .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 9))
       .accessibilityElement(children: .contain)
     }
   }

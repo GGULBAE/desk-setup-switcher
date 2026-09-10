@@ -29,7 +29,6 @@ struct TrayGeometryContext: Equatable, Sendable {
   var profileCount: Int
   var deletionConfirmationVisible: Bool
   var capturePhase: TrayCaptureGeometryPhase
-  var applyBannerVisible: Bool
   var usesLargeText: Bool
   var fittedContentHeight: CGFloat?
 
@@ -37,14 +36,12 @@ struct TrayGeometryContext: Equatable, Sendable {
     profileCount: Int,
     deletionConfirmationVisible: Bool = false,
     capturePhase: TrayCaptureGeometryPhase = .idle,
-    applyBannerVisible: Bool = false,
     usesLargeText: Bool = false,
     fittedContentHeight: CGFloat? = nil
   ) {
     self.profileCount = max(0, profileCount)
     self.deletionConfirmationVisible = deletionConfirmationVisible
     self.capturePhase = capturePhase
-    self.applyBannerVisible = applyBannerVisible
     self.usesLargeText = usesLargeText
     self.fittedContentHeight = fittedContentHeight
   }

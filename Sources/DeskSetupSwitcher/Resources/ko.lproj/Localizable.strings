@@ -8,6 +8,7 @@
 "Volume cannot be changed for this device right now. Choose another device or review available settings before applying." = "지금은 이 기기의 음량을 변경할 수 없습니다. 다른 기기를 선택하거나 적용 전에 사용 가능한 설정을 확인하세요.";
 "tray.profile.action.edit" = "수정하기";
 "tray.profile.action.apply.named" = "%@ 적용하기";
+"tray.profile.status.current" = "현재 설정";
 "Normal apply requires every included setting and condition to be ready." = "일반 적용을 사용하려면 포함된 모든 설정과 조건이 준비되어야 합니다.";
 "Force Apply…" = "강제 적용…";
 "Shows a current read-only plan and every availability explanation." = "현재 읽기 전용 계획과 모든 가용성 설명을 표시합니다.";
@@ -824,9 +825,7 @@
 "Current %@" = "현재 %@";
 "After apply %@" = "적용 후 %@";
 "%lld seconds remaining" = "%lld초 남음";
-"macOS registration" = "macOS 등록 상태";
 "Why can these states differ?" = "두 상태가 다른 이유";
-"macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration." = "macOS는 올바른 위치에 설치되고 코드 서명된 앱의 로그인 항목만 등록합니다. 앱 설정만으로 실제 등록이 보장되지는 않습니다.";
 "Debug" = "디버그";
 "Information" = "정보";
 "Warning" = "경고";
@@ -1285,7 +1284,6 @@
 "Choose screen arrangement, resolution, and color for this profile." = "이 프로필의 화면 배치, 해상도, 색상을 설정합니다.";
 "Choose output, input, and volume for this profile." = "이 프로필의 출력 기기, 입력 기기, 음량을 설정합니다.";
 "App behavior" = "앱 실행";
-"Login item details" = "로그인 실행 세부 정보";
 "Wi-Fi capture" = "Wi-Fi 캡처";
 "Open Diagnostics…" = "진단 열기…";
 "Start the menu-bar app when you sign in to your Mac" = "Mac에 로그인하면 메뉴 막대 앱을 실행합니다";

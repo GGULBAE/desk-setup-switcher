@@ -1,5 +1,9 @@
 # Roadmap
 
+## Tray current-profile clarity and App Settings cleanup — 2026-09-10
+
+Emphasize a currently matching profile with a tinted card, border, filled checkmark, and localized text; add an Apply icon; and stop rendering the separate bottom Apply result card. Remove the permanent login technical-details disclosure, refresh status when App Settings opens, and show status refresh/retry only when the requested and effective states need attention. Keep Apply/rollback and `SMAppService` mutation semantics unchanged. See [scope and verification](TRAY-CURRENT-PROFILE-2026-09-10.md).
+
 ## Cross-version CI evidence — 2026-09-08
 
 Keep public-history approval bound to reviewed blob/path/category tuples, with changed-content and copied-path rejection tests. Measure actual synthetic SwiftUI bounds for tray actions, sidebar labels, and grouped sound fields while preserving label-relative pixel checks and clipping/spacing requirements. Debug-only, opt-in evidence hooks do not change release UI or call system adapters. See [scope and verification](CI-COMPATIBILITY-2026-09-08.md); remote macOS 15 results remain distinct from local evidence.
@@ -296,7 +300,7 @@ A separately authorized reinstall copied the verified mounted package to `/Appli
 
 The first implementation flattened Advanced controls, but that exceeded the requested scope. The [profile UI correction](PROFILE-UI-CORRECTION-2026-09-07.md) restores Display/Sound basic cards and Advanced disclosures, retains Network's connection/IPv4 cards, and makes rail selection independent of content width. Color profiles are excluded from capture/edit/apply; legacy values remain dormant. Last application history is removed from profile editing. Network uses one transient connection selector and exposes DHCP/manual fields for that connection; validation selects the service that owns the invalid field without changing other included services.
 
-The former System tab is now **App Settings**: app behavior, Wi-Fi capture access, and an on-demand **Open Diagnostics…** action. Login registration status and refresh are available in **Login item details**; mismatches and retry actions remain visible next to the launch toggle.
+The former System tab is now **App Settings**: app behavior, Wi-Fi capture access, and an on-demand **Open Diagnostics…** action. The permanent login-registration disclosure is removed; status refresh and retry remain visible beside the launch toggle only when the requested and effective states need attention.
 
 Current implementation and verification are tracked in [the correction evidence](PROFILE-UI-CORRECTION-2026-09-07.md); the [initial follow-up](PROFILE-APP-SETTINGS-2026-09-07.md) remains historical. Hardware verification remains pending.
 

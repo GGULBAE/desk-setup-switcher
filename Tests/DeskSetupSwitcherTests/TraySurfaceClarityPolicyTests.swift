@@ -14,6 +14,29 @@ struct TraySurfaceClarityPolicyTests {
       #expect(
         appLocalizedRuntime(TrayProfileCardPolicy.editLabelKey, languageCode: language) == edit)
     }
+    #expect(TrayProfileCardPolicy.applySystemImage == "play.fill")
+  }
+
+  @Test("a matching profile gets a persistent non-color current-state cue")
+  func currentProfilePresentation() {
+    let current = PrimaryApplyActionState(
+      kind: .normal,
+      isEnabled: false,
+      disabledReason: .alreadyMatches
+    )
+    let available = PrimaryApplyActionState(kind: .normal, isEnabled: true)
+
+    #expect(TrayProfileCardPolicy.isCurrentProfile(current))
+    #expect(!TrayProfileCardPolicy.isCurrentProfile(available))
+    #expect(TrayProfileCardPolicy.currentStatusSystemImage == "checkmark.seal.fill")
+    #expect(
+      appLocalizedRuntime(TrayProfileCardPolicy.currentStatusLabelKey, languageCode: "en")
+        == "Current setup"
+    )
+    #expect(
+      appLocalizedRuntime(TrayProfileCardPolicy.currentStatusLabelKey, languageCode: "ko")
+        == "현재 설정"
+    )
   }
 
   @Test("passive profile explanations become blank while actionable reasons remain")
@@ -48,7 +71,6 @@ struct TraySurfaceClarityPolicyTests {
       profileCount: 0,
       capturePhase: .idle,
       hasCaptureSummary: false,
-      hasApplySummary: false,
       hasHandoffError: false
     )
 
@@ -66,56 +88,42 @@ struct TraySurfaceClarityPolicyTests {
         profileCount: 1,
         capturePhase: .idle,
         hasCaptureSummary: false,
-        hasApplySummary: false,
         hasHandoffError: false
       ),
       TrayCaptureAffordancePolicy.placement(
         profileCount: 0,
         capturePhase: .running,
         hasCaptureSummary: false,
-        hasApplySummary: false,
         hasHandoffError: false
       ),
       TrayCaptureAffordancePolicy.placement(
         profileCount: 0,
         capturePhase: .failure("Synthetic failure"),
         hasCaptureSummary: false,
-        hasApplySummary: false,
         hasHandoffError: false
       ),
       TrayCaptureAffordancePolicy.placement(
         profileCount: 0,
         capturePhase: .success("Synthetic success"),
         hasCaptureSummary: false,
-        hasApplySummary: false,
         hasHandoffError: false
       ),
       TrayCaptureAffordancePolicy.placement(
         profileCount: 0,
         capturePhase: .partial("Synthetic partial result"),
         hasCaptureSummary: false,
-        hasApplySummary: false,
         hasHandoffError: false
       ),
       TrayCaptureAffordancePolicy.placement(
         profileCount: 0,
         capturePhase: .idle,
         hasCaptureSummary: true,
-        hasApplySummary: false,
         hasHandoffError: false
       ),
       TrayCaptureAffordancePolicy.placement(
         profileCount: 0,
         capturePhase: .idle,
         hasCaptureSummary: false,
-        hasApplySummary: true,
-        hasHandoffError: false
-      ),
-      TrayCaptureAffordancePolicy.placement(
-        profileCount: 0,
-        capturePhase: .idle,
-        hasCaptureSummary: false,
-        hasApplySummary: false,
         hasHandoffError: true
       ),
     ]
@@ -194,7 +202,6 @@ struct TraySurfaceClarityPolicyTests {
     let standard = TrayBodyPresentationPolicy.usesStaticEmptyBody(
       profileCount: 0,
       hasCaptureSummary: false,
-      hasApplySummary: false,
       hasHandoffError: false,
       capturePhase: .idle,
       usesAccessibilityTextSize: false
@@ -202,7 +209,6 @@ struct TraySurfaceClarityPolicyTests {
     let accessibility = TrayBodyPresentationPolicy.usesStaticEmptyBody(
       profileCount: 0,
       hasCaptureSummary: false,
-      hasApplySummary: false,
       hasHandoffError: false,
       capturePhase: .idle,
       usesAccessibilityTextSize: true

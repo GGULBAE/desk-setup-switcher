@@ -40,7 +40,7 @@ The editor presents stable numbered **Display** and **Sound** steps. Minimum/acc
 
 ### App preferences
 
-**App Settings** contains launch-at-login preferences and an on-demand Diagnostics action. Login registration status and refresh are available inside **Login item details**; mismatches and retry actions stay visible beside the launch preference. These preferences apply to the app, independently of the selected profile.
+**App Settings** contains launch-at-login preferences and an on-demand Diagnostics action. It refreshes the effective macOS registration state when opened; mismatch status, refresh, and retry actions appear directly beside the launch preference only when needed. These preferences apply to the app, independently of the selected profile.
 
 ### Apply a profile
 

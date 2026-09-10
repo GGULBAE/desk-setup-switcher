@@ -15,7 +15,14 @@ enum TrayDeletionProgressCopy {
 
 enum TrayProfileCardPolicy {
   static let applyLabelKey = "tray.profile.action.apply"
+  static let applySystemImage = "play.fill"
   static let editLabelKey = "tray.profile.action.edit"
+  static let currentStatusLabelKey = "tray.profile.status.current"
+  static let currentStatusSystemImage = "checkmark.seal.fill"
+
+  static func isCurrentProfile(_ action: PrimaryApplyActionState) -> Bool {
+    action.disabledReason == .alreadyMatches
+  }
 
   static func visibleDisabledReason(
     _ reason: PrimaryApplyDisabledReason?
@@ -58,9 +65,10 @@ struct TrayProfileListView: View {
   private func profileCard(_ profile: DeskProfile) -> some View {
     let readiness = model.readiness(for: profile)
     let action = primaryApplyActionState(profile, readiness: readiness)
+    let isCurrentProfile = TrayProfileCardPolicy.isCurrentProfile(action)
 
     return VStack(alignment: .leading, spacing: 9) {
-      profileHeader(profile, readiness: readiness)
+      profileHeader(profile, readiness: readiness, isCurrentProfile: isCurrentProfile)
 
       if presentation.deletion.isPending(profileID: profile.id) {
         deletionConfirmation(profile)
@@ -69,35 +77,62 @@ struct TrayProfileListView: View {
       }
     }
     .padding(TrayGeometry.cardPadding)
-    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 9))
+    .background {
+      if isCurrentProfile {
+        RoundedRectangle(cornerRadius: 9)
+          .fill(Color.accentColor.opacity(0.18))
+      } else {
+        RoundedRectangle(cornerRadius: 9)
+          .fill(.quaternary.opacity(0.45))
+      }
+    }
+    .overlay {
+      if isCurrentProfile {
+        RoundedRectangle(cornerRadius: 9)
+          .stroke(Color.accentColor.opacity(0.9), lineWidth: 1.5)
+      }
+    }
     .uiAuditLayoutAnchor("tray.\(profile.id).card")
     .accessibilityElement(children: .contain)
   }
 
   @ViewBuilder
-  private func profileHeader(_ profile: DeskProfile, readiness: ProfileReadiness) -> some View {
+  private func profileHeader(
+    _ profile: DeskProfile,
+    readiness: ProfileReadiness,
+    isCurrentProfile: Bool
+  ) -> some View {
     if TrayAdaptiveLayoutPolicy.usesStackedProfileCard(for: dynamicTypeSize) {
-      stackedProfileHeader(profile, readiness: readiness)
+      stackedProfileHeader(
+        profile,
+        readiness: readiness,
+        isCurrentProfile: isCurrentProfile
+      )
     } else {
       ViewThatFits(in: .horizontal) {
         HStack(alignment: .firstTextBaseline) {
           profileTitle(profile)
           Spacer(minLength: 8)
-          readinessLabel(readiness)
+          readinessLabel(readiness, isCurrentProfile: isCurrentProfile)
             .fixedSize(horizontal: true, vertical: true)
         }
-        stackedProfileHeader(profile, readiness: readiness)
+        stackedProfileHeader(
+          profile,
+          readiness: readiness,
+          isCurrentProfile: isCurrentProfile
+        )
       }
     }
   }
 
   private func stackedProfileHeader(
     _ profile: DeskProfile,
-    readiness: ProfileReadiness
+    readiness: ProfileReadiness,
+    isCurrentProfile: Bool
   ) -> some View {
     VStack(alignment: .leading, spacing: 5) {
       profileTitle(profile)
-      readinessLabel(readiness)
+      readinessLabel(readiness, isCurrentProfile: isCurrentProfile)
     }
   }
 
@@ -108,14 +143,29 @@ struct TrayProfileListView: View {
       .layoutPriority(1)
   }
 
-  private func readinessLabel(_ readiness: ProfileReadiness) -> some View {
-    Label(appReadinessTitle(readiness), systemImage: readinessSymbol(readiness))
-      .font(.caption)
-      .foregroundStyle(.secondary)
+  private func readinessLabel(
+    _ readiness: ProfileReadiness,
+    isCurrentProfile: Bool
+  ) -> some View {
+    let title =
+      isCurrentProfile
+      ? appLocalizedRuntime(TrayProfileCardPolicy.currentStatusLabelKey)
+      : appReadinessTitle(readiness)
+    let systemImage =
+      isCurrentProfile
+      ? TrayProfileCardPolicy.currentStatusSystemImage
+      : readinessSymbol(readiness)
+
+    return Label(title, systemImage: systemImage)
+      .font(isCurrentProfile ? .caption.bold() : .caption)
+      .foregroundStyle(isCurrentProfile ? Color.accentColor : Color.secondary)
       .lineLimit(2)
       .fixedSize(horizontal: false, vertical: true)
       .accessibilityLabel(
-        appLocalized("Profile status: \(appReadinessTitle(readiness))"))
+        isCurrentProfile
+          ? appLocalized("Current Mac matches this profile")
+          : appLocalized("Profile status: \(appReadinessTitle(readiness))")
+      )
   }
 
   private func actionRow(_ profile: DeskProfile, action: PrimaryApplyActionState) -> some View {
@@ -272,10 +322,13 @@ struct TrayProfileListView: View {
     Button {
       route(TrayProfileCardPolicy.applyAction(profileID: profile.id, state: action))
     } label: {
-      Text(appLocalizedRuntime(TrayProfileCardPolicy.applyLabelKey))
-        .lineLimit(1)
-        .fixedSize()
-        .uiAuditLayoutAnchor("tray.\(profile.id).apply.label")
+      Label(
+        appLocalizedRuntime(TrayProfileCardPolicy.applyLabelKey),
+        systemImage: TrayProfileCardPolicy.applySystemImage
+      )
+      .lineLimit(1)
+      .fixedSize()
+      .uiAuditLayoutAnchor("tray.\(profile.id).apply.label")
     }
     .disabled(!action.isEnabled)
     .focused(focusedControl, equals: .profile(profile.id))

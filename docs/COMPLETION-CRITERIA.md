@@ -1,5 +1,9 @@
 # Completion criteria and evidence ledger
 
+## Tray current-profile clarity and App Settings cleanup — 2026-09-10
+
+Presentation follow-up, not a newly checked release gate: remove the tray Apply-result footer, emphasize the fresh matching profile with both contrast and text/symbol cues, add an Apply icon, and remove the permanent login technical-details disclosure while preserving mismatch refresh/retry. Deterministic policy tests and focused Korean tray/App Settings renders pass; the final integrated gate is recorded in [the follow-up evidence](TRAY-CURRENT-PROFILE-2026-09-10.md). Installed interaction, login approval/reboot, and hardware mutation remain separate evidence.
+
 ## CI compatibility follow-up — 2026-09-08
 
 Verification maintenance, not a newly checked release gate: review synthetic fixture revisions without broad path exceptions, add content/path binding regressions, and measure real rendered controls and label-relative ink for cross-version offscreen assertions. Clipping, spacing, grouping, visible content, opt-in isolation, and pixel evidence remain required. See [scope and verification](CI-COMPATIBILITY-2026-09-08.md); no live hardware or publication evidence is implied.

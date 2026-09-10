@@ -103,7 +103,6 @@ struct TrayGeometryTests {
       TrayGeometryContext(profileCount: 2, capturePhase: .pending),
       TrayGeometryContext(profileCount: 2, capturePhase: .result),
       TrayGeometryContext(profileCount: 2, capturePhase: .error),
-      TrayGeometryContext(profileCount: 2, applyBannerVisible: true),
       TrayGeometryContext(profileCount: 10, usesLargeText: true),
     ]
 

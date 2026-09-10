@@ -583,7 +583,6 @@ private struct AppSettingsView: View {
   @EnvironmentObject private var model: ApplicationModel
   @EnvironmentObject private var locationPermission: LocationPermissionController
   @State private var showsDiagnostics = false
-  @State private var isLoginExplanationExpanded = false
 
   var body: some View {
     Form {
@@ -602,6 +601,10 @@ private struct AppSettingsView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .accessibilityLabel(appLocalized("Login item status: \(model.loginItemStatus)"))
+
+          Button(appLocalized("Refresh Status")) {
+            model.refreshLoginItemStatusFromSystem()
+          }
         }
 
         if model.canRetryLoginItemRegistration {
@@ -610,26 +613,6 @@ private struct AppSettingsView: View {
           }
         }
 
-        AccessibleDisclosureGroup(
-          appLocalized("Login item details"),
-          accessibilityIdentifier: "settings.login-state-explanation",
-          isExpanded: $isLoginExplanationExpanded
-        ) {
-          LabeledContent(
-            appLocalized("macOS registration"),
-            value: model.loginItemEnabled ? appLocalized("Enabled") : appLocalized("Not enabled")
-          )
-          Text(
-            appLocalized(
-              "macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration."
-            )
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          Button(appLocalized("Refresh Status")) {
-            model.refreshLoginItemStatusFromSystem()
-          }
-        }
       }
 
       Section(appLocalized("Troubleshooting")) {
@@ -657,6 +640,7 @@ private struct AppSettingsView: View {
       if uiAuditConfiguration.isEnabled, uiAuditConfiguration.variant == .diagnostics {
         showsDiagnostics = true
       }
+      model.refreshLoginItemStatusFromSystem()
     }
   }
 

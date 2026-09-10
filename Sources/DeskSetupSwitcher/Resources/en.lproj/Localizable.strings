@@ -8,6 +8,7 @@
 "Volume cannot be changed for this device right now. Choose another device or review available settings before applying." = "Volume cannot be changed for this device right now. Choose another device or review available settings before applying.";
 "tray.profile.action.edit" = "Edit";
 "tray.profile.action.apply.named" = "Apply %@";
+"tray.profile.status.current" = "Current setup";
 "Normal apply requires every included setting and condition to be ready." = "Normal apply requires every included setting and condition to be ready.";
 "Force Apply…" = "Force Apply…";
 "Shows a current read-only plan and every availability explanation." = "Shows a current read-only plan and every availability explanation.";
@@ -824,9 +825,7 @@
 "Current %@" = "Current %@";
 "After apply %@" = "After apply %@";
 "%lld seconds remaining" = "%lld seconds remaining";
-"macOS registration" = "macOS registration";
 "Why can these states differ?" = "Why can these states differ?";
-"macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration." = "macOS accepts login-item registration only for an eligible installed and code-signed app. The app setting does not guarantee registration.";
 "Debug" = "Debug";
 "Information" = "Information";
 "Warning" = "Warning";
@@ -1285,7 +1284,6 @@
 "Choose screen arrangement, resolution, and color for this profile." = "Choose screen arrangement, resolution, and color for this profile.";
 "Choose output, input, and volume for this profile." = "Choose output, input, and volume for this profile.";
 "App behavior" = "App behavior";
-"Login item details" = "Login item details";
 "Wi-Fi capture" = "Wi-Fi capture";
 "Open Diagnostics…" = "Open Diagnostics…";
 "Start the menu-bar app when you sign in to your Mac" = "Start the menu-bar app when you sign in to your Mac";

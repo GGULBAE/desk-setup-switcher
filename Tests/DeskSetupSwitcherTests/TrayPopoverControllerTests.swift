@@ -312,7 +312,6 @@ struct TrayPopoverControllerTests {
       profileCount: 10,
       deletionConfirmationVisible: true,
       capturePhase: .error,
-      applyBannerVisible: true,
       usesLargeText: true
     )
 

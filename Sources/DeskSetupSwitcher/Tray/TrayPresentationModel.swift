@@ -285,8 +285,7 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
     TrayGeometryContext(
       profileCount: model.profiles.count,
       deletionConfirmationVisible: deletion.pendingProfileID != nil,
-      capturePhase: capturePhase.geometryPhase,
-      applyBannerVisible: model.lastApplySummary != nil
+      capturePhase: capturePhase.geometryPhase
     )
   }
 

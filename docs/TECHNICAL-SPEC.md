@@ -126,7 +126,7 @@ A failure is fatal only when continuing could create an inconsistent or unsafe c
 
 ## Capability and permission behavior
 
-Capabilities are values, not thrown control flow. Permission denial produces an unavailable item and leaves unrelated groups operational. The app explains location use before its explicit permission action; stored legacy location conditions remain decodable but do not participate in current manual readiness or Apply. A complete SSID-triggered permission UX matrix is still pending. Login-item UI presents the app's desired setting separately from macOS registration status and emphasizes only mismatch/approval/error states. This presentation does not alter TCC or `SMAppService` semantics. Listing or selecting a Core Audio input device does not start microphone capture and must not request microphone permission.
+Capabilities are values, not thrown control flow. Permission denial produces an unavailable item and leaves unrelated groups operational. The app explains location use before its explicit permission action; stored legacy location conditions remain decodable but do not participate in current manual readiness or Apply. A complete SSID-triggered permission UX matrix is still pending. Login-item UI refreshes the effective macOS status when App Settings opens and exposes status refresh/retry only for mismatch, approval, or error states; there is no permanent technical-details disclosure. This presentation does not alter TCC or `SMAppService` semantics. Listing or selecting a Core Audio input device does not start microphone capture and must not request microphone permission.
 
 ## Stable device identity
 

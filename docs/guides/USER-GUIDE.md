@@ -29,7 +29,7 @@ Keyboard behavior, accessibility names and values, and non-color state cues are 
 5. Recheck the release URL and SHA-256. Then open **System Settings → Privacy & Security**, choose **Open Anyway**, and confirm. Do not disable Gatekeeper globally, run a quarantine-removal command, or continue when the checksum differs.
 6. Look for the Desk Setup Switcher icon in the menu bar. The app is menu-bar-only, so it does not normally show a Dock icon or a main window at launch.
 
-**Launch at login is off by default.** Enable it only if wanted in **Settings → App Settings → App behavior**. The switch controls the requested setting. If macOS registration differs, a warning appears; **Login item details** shows the registration status and refresh action.
+**Launch at login is off by default.** Enable it only if wanted in **Settings → App Settings → App behavior**. The switch controls the requested setting. If macOS registration differs, the registration status and **Refresh Status** action appear directly below the switch; a failed registration also shows **Retry Registration**.
 
 Registration is requested only when you turn the switch on or choose **Retry Registration**. Opening the app or refreshing status does not retry a missing registration, even if the saved preference is ON. Existing enabled registration continues to work. The app does not run `sfltool`; you do not need to grant that diagnostic tool Keychain access to use the app.
 
@@ -150,7 +150,7 @@ Use [SUPPORT.md](../../SUPPORT.md) for public support and bug-report routes. For
 | A protected change is unusable | Choose **Revert Now** before the 15-second timer ends. Then confirm the original state in macOS System Settings and inspect the result. |
 | The unsigned official DMG is blocked on first launch | This is expected. Confirm the canonical Release URL and SHA-256, then use **System Settings → Privacy & Security → Open Anyway** once. Never disable Gatekeeper globally or remove quarantine from the command line. |
 | macOS reports that the app is damaged or the checksum differs | Stop. Delete the download and report the exact message without private data; do not create a security exception. |
-| Launch at login was requested but is not enabled | Open **Settings → App Settings → Login item details**, compare the requested setting with **macOS registration**, approve it in macOS Login Items if prompted, then choose **Refresh Status** or **Retry Registration**. |
+| Launch at login was requested but is not enabled | Open **Settings → App Settings**, read the status below the launch switch, approve it in macOS Login Items if prompted, then choose **Refresh Status** or **Retry Registration**. |
 
 ## Update
 
@@ -160,7 +160,7 @@ The app does not check the network for updates. After a public release exists, o
 
 Removing the app does not automatically delete profiles or diagnostics.
 
-1. If enabled, turn off **Settings → App Settings → Launch Desk Setup Switcher at login** and open **Login item details** to confirm **macOS registration** is not enabled.
+1. If enabled, turn off **Settings → App Settings → Launch Desk Setup Switcher at login**. If a mismatch warning remains, choose **Refresh Status** and confirm the app is disabled in macOS Login Items before continuing.
 2. From the menu-bar app, choose **Quit Desk Setup Switcher**.
 3. Move **Desk Setup Switcher.app** from **Applications** to the Trash.
 4. To delete profiles, backup/quarantine files, and diagnostics, open Finder's **Go → Go to Folder…** and remove `~/Library/Application Support/Desk Setup Switcher/`. Export anything you want to keep first.

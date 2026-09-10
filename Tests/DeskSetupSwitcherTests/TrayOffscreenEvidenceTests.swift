@@ -279,6 +279,14 @@ import Testing
         #expect(rendered.png.count > 10_000)
         #expect(rendered.accessibility.contains("AX"))
         #expect(rendered.accessibility.contains("declared-icon-labels="))
+        #expect(rendered.accessibility.contains("tray-apply-summary-visible=false"))
+        if fixture.variant == .trayApplyResult {
+          #expect(
+            !rendered.accessibility.contains(
+              appLocalizedRuntime("Dismiss Apply Result", languageCode: fixture.languageCode)
+            )
+          )
+        }
         if fixture.variant == .trayEmpty {
           #expect(rendered.accessibility.contains("capture-affordance=empty-state-primary"))
           #expect(rendered.accessibility.contains("capture-visible-action-count=1"))
@@ -299,6 +307,7 @@ import Testing
 
         let representation = try #require(NSBitmapImageRep(data: rendered.png))
         if fixture.name.contains("three-compact") {
+          #expect(rendered.accessibility.contains("current-profile-card-count=1"))
           let cardBounds = try #require(
             logicalVerticalBounds(
               in: representation,
@@ -334,7 +343,32 @@ import Testing
             }
           }
           #expect(cardRuns.count == 3)
-          for profile in UIAuditFixtures.fixture(.overview).profiles {
+          let compactProfiles = UIAuditFixtures.fixture(.overview).profiles
+          let currentCard = try #require(
+            rendered.layoutFrames["tray.\(compactProfiles[0].id).card"]
+          )
+          let ordinaryCard = try #require(
+            rendered.layoutFrames["tray.\(compactProfiles[1].id).card"]
+          )
+          let currentAccentPixelCount = pixelCount(
+            in: representation,
+            viewport: rendered.viewport,
+            logicalRegion: currentCard
+          ) { color in
+            color.blueComponent - color.redComponent > 0.05
+              && color.blueComponent - color.greenComponent > 0.02
+          }
+          let ordinaryAccentPixelCount = pixelCount(
+            in: representation,
+            viewport: rendered.viewport,
+            logicalRegion: ordinaryCard
+          ) { color in
+            color.blueComponent - color.redComponent > 0.05
+              && color.blueComponent - color.greenComponent > 0.02
+          }
+          #expect(currentAccentPixelCount > ordinaryAccentPixelCount + 500)
+
+          for profile in compactProfiles {
             let prefix = "tray.\(profile.id)."
             let card = try #require(rendered.layoutFrames[prefix + "card"])
             let actionFrames = try ["apply", "edit", "delete"].map {
@@ -753,6 +787,8 @@ import Testing
         if !fixture.isProfileSurface {
           #expect(rendered.accessibility.contains("settings-tab=system"))
           #expect(rendered.accessibility.contains("sidebar-primary-action=not-applicable"))
+          #expect(rendered.accessibility.contains("login-item-details-visible=false"))
+          #expect(rendered.accessibility.contains("login-status-refresh-placement=mismatch-only"))
         }
         switch fixture.state {
         case .standard:
@@ -1498,6 +1534,8 @@ import Testing
         "per-setting-inclusion-controls=none",
         "step-navigation=\(fixture.isProfileSurface ? "display,sound" : "not-applicable")",
         "step-state-cues=\(fixture.isProfileSurface ? "number,title,checkmark" : "not-applicable")",
+        "login-item-details-visible=false",
+        "login-status-refresh-placement=mismatch-only",
         "declared-dirty-export-notice=\(fixture.state == .dirtyDraft ? appLocalizedRuntime(ProfileExportScopePolicy.unsavedDraftNotice) : "none")",
         "export-source=persisted-document-only",
         "storage-error-card-visible=\(fixture.state == .storageError)",
@@ -1861,12 +1899,15 @@ import Testing
         fixture: fixture,
         viewport: viewport,
         profileCount: model.profiles.count,
+        currentProfileCardCount: model.profiles.filter { profile in
+          model.readiness(for: profile) == .ready
+            && model.operationCountByProfile[profile.id] == 0
+        }.count,
         actionCopy: actionCopy,
         captureAffordancePlacement: TrayCaptureAffordancePolicy.placement(
           profileCount: model.profiles.count,
           capturePhase: presentation.capturePhase,
           hasCaptureSummary: model.lastCaptureSummary != nil,
-          hasApplySummary: model.lastApplySummary != nil,
           hasHandoffError: presentation.handoffError != nil
         )
       )
@@ -1878,6 +1919,7 @@ import Testing
       fixture: Fixture,
       viewport: CGSize,
       profileCount: Int,
+      currentProfileCardCount: Int,
       actionCopy: TrayActionCopy,
       captureAffordancePlacement: TrayCaptureAffordancePlacement
     ) -> String {
@@ -1919,6 +1961,8 @@ import Testing
         "declared-primary-action=\(primaryAction)",
         "declared-icon-labels=\(iconLabels)",
         "profile-action-layout=\(profileActionLayout)",
+        "current-profile-card-count=\(currentProfileCardCount)",
+        "tray-apply-summary-visible=false",
         "declared-partial-profile-actions=\(partialProfileActions)",
         "handoff-error-visible=\(fixture.handoffErrorKey != nil)",
         "declared-handoff-error=\(fixture.handoffErrorKey.map { appLocalizedRuntime($0, languageCode: fixture.languageCode) } ?? "none")",
