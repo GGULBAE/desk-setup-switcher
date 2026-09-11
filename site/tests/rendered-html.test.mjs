@@ -441,7 +441,7 @@ test("site origin approval fails closed and narrowly allows explicit local build
     schemaVersion: "desk-setup-switcher.private-preview/v1",
     state: "approved",
     projectID: "appgprj_6aa3a8fc79788191bc6ae96ea278fc9f",
-    siteURL: "https://desk-setup-switcher.earthy-mink-0101.chatgpt.site",
+    siteURL: "https://desk-setup-switcher.hyeon661144.chatgpt.site",
   });
   assert.equal(
     runOriginGate(trackedPrivatePreview.siteURL, { allowPrivate: true }).status,
