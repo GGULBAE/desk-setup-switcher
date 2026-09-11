@@ -170,6 +170,7 @@ protocol TrayPopoverSurface: AnyObject {
     preferredEdge: NSRectEdge,
     presentationGeneration: UInt64
   )
+  func makeContentKey()
   func performClose(_ sender: Any?)
 }
 
@@ -188,11 +189,37 @@ protocol TraySurfaceFactory: AnyObject {
   func makeStatusItem() -> any TrayStatusItemSurface
   func makePopover() -> any TrayPopoverSurface
   func makeDismissalMonitor() -> any TrayDismissalMonitoring
+  func requestApplicationActivation(
+    onDidBecomeActive: @escaping @MainActor () -> Void
+  )
+  func cancelApplicationActivationObservation()
   func screenMetrics(for anchorView: NSView) -> TrayScreenMetrics
+}
+
+struct TrayApplicationActivationObservationState {
+  private var generation: UInt64 = 0
+
+  mutating func begin() -> UInt64 {
+    generation &+= 1
+    return generation
+  }
+
+  mutating func cancel() {
+    generation &+= 1
+  }
+
+  mutating func consume(_ candidate: UInt64) -> Bool {
+    guard candidate == generation else { return false }
+    generation &+= 1
+    return true
+  }
 }
 
 @MainActor
 final class AppKitTraySurfaceFactory: TraySurfaceFactory {
+  private var didBecomeActiveObserver: NSObjectProtocol?
+  private var activationObservationState = TrayApplicationActivationObservationState()
+
   func makeStatusItem() -> any TrayStatusItemSurface {
     AppKitTrayStatusItemSurface()
   }
@@ -203,6 +230,42 @@ final class AppKitTraySurfaceFactory: TraySurfaceFactory {
 
   func makeDismissalMonitor() -> any TrayDismissalMonitoring {
     AppKitTrayDismissalMonitor()
+  }
+
+  func requestApplicationActivation(
+    onDidBecomeActive: @escaping @MainActor () -> Void
+  ) {
+    cancelApplicationActivationObservation()
+    let application = NSApplication.shared
+    if !application.isActive {
+      let observationGeneration = activationObservationState.begin()
+      didBecomeActiveObserver = NotificationCenter.default.addObserver(
+        forName: NSApplication.didBecomeActiveNotification,
+        object: application,
+        queue: .main
+      ) { [weak self] _ in
+        Task { @MainActor in
+          guard let self,
+            self.activationObservationState.consume(observationGeneration)
+          else { return }
+          self.removeApplicationActivationObserver()
+          onDidBecomeActive()
+        }
+      }
+    }
+    application.activate()
+  }
+
+  func cancelApplicationActivationObservation() {
+    activationObservationState.cancel()
+    removeApplicationActivationObserver()
+  }
+
+  private func removeApplicationActivationObserver() {
+    if let didBecomeActiveObserver {
+      NotificationCenter.default.removeObserver(didBecomeActiveObserver)
+    }
+    didBecomeActiveObserver = nil
   }
 
   func screenMetrics(for anchorView: NSView) -> TrayScreenMetrics {
@@ -319,6 +382,10 @@ private final class AppKitTrayPopoverSurface: NSObject, TrayPopoverSurface, NSPo
 
   func performClose(_ sender: Any?) {
     popover.performClose(sender)
+  }
+
+  func makeContentKey() {
+    contentWindow?.makeKey()
   }
 
   func popoverDidClose(_ notification: Notification) {
@@ -604,12 +671,22 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
     synchronizeViewport(viewport)
     sessionState.trayDidOpen(sessionGeneration: generation, viewport: viewport)
     trace(stage: .beforeShow, generation: generation, viewport: viewport)
+    // A status-item click reaches accessory apps without necessarily activating
+    // them. Request activation while handling that user gesture, then repeat the
+    // key-window request if AppKit reports activation after show returns.
+    factory.requestApplicationActivation { [weak self, weak popover] in
+      guard let self, self.activeSessionGeneration == generation else { return }
+      popover?.makeContentKey()
+    }
     popover.show(
       relativeTo: currentAnchorRect,
       of: anchorView,
       preferredEdge: .minY,
       presentationGeneration: generation
     )
+    // The content window is attached by show. Ask it to become key immediately;
+    // the activation callback above repeats the request if activation is delayed.
+    popover.makeContentKey()
     dismissalMonitor.start(
       anchorView: anchorView,
       contentWindow: { [weak popover] in popover?.contentWindow },
@@ -634,6 +711,7 @@ final class TrayPopoverController: NSObject, TraySurfaceRouting {
 
   private func finishClosingCurrentSession() {
     guard let generation = activeSessionGeneration else { return }
+    factory.cancelApplicationActivationObservation()
     dismissalMonitor.stop()
     activeSessionGeneration = nil
     finalizedPresentationGeneration = nil

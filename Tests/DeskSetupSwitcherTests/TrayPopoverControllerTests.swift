@@ -68,6 +68,90 @@ struct TrayPopoverControllerTests {
     #expect(factory.monitor.startCount == 1)
   }
 
+  @Test("each accepted open activates before showing and makes the popover key")
+  func activatesPopoverOnOpen() {
+    let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 1))
+    let factory = SurfaceFactorySpy()
+    var events: [String] = []
+    factory.onApplicationActivationRequest = {
+      events.append("activate")
+    }
+    factory.popover.onShow = {
+      events.append("show")
+    }
+    factory.popover.onMakeContentKey = {
+      events.append("make-key")
+    }
+    let controller = TrayPopoverController(
+      rootView: Color.clear,
+      sessionState: state,
+      factory: factory
+    )
+
+    controller.show()
+    controller.show()
+
+    #expect(events == ["activate", "show", "make-key"])
+    #expect(factory.applicationActivationRequestCount == 1)
+    #expect(factory.popover.makeContentKeyCount == 1)
+
+    controller.requestClose(sessionGeneration: 1)
+    controller.show()
+
+    #expect(
+      events
+        == ["activate", "show", "make-key", "activate", "show", "make-key"]
+    )
+    #expect(factory.applicationActivationRequestCount == 2)
+    #expect(factory.popover.makeContentKeyCount == 2)
+  }
+
+  @Test("delayed application activation re-keys only the current open generation")
+  func rekeysAfterDelayedActivation() {
+    let state = SessionStateSpy(context: TrayGeometryContext(profileCount: 1))
+    let factory = SurfaceFactorySpy()
+    let controller = TrayPopoverController(
+      rootView: Color.clear,
+      sessionState: state,
+      factory: factory
+    )
+
+    controller.show()
+    #expect(factory.popover.makeContentKeyCount == 1)
+    #expect(factory.hasPendingApplicationActivation)
+
+    factory.completeApplicationActivation()
+    #expect(factory.popover.makeContentKeyCount == 2)
+    #expect(!factory.hasPendingApplicationActivation)
+
+    controller.requestClose(sessionGeneration: 1)
+    controller.show()
+    #expect(factory.popover.makeContentKeyCount == 3)
+    #expect(factory.hasPendingApplicationActivation)
+
+    controller.requestClose(sessionGeneration: 2)
+    #expect(!factory.hasPendingApplicationActivation)
+    factory.completeApplicationActivation()
+    #expect(factory.popover.makeContentKeyCount == 3)
+  }
+
+  @Test("stale activation callbacks cannot cancel a reopened observation")
+  func activationObservationGenerationRejectsStaleCallbacks() {
+    var state = TrayApplicationActivationObservationState()
+
+    let oldObservation = state.begin()
+    state.cancel()
+    let reopenedObservation = state.begin()
+
+    let acceptedOldObservation = state.consume(oldObservation)
+    let acceptedReopenedObservation = state.consume(reopenedObservation)
+    let acceptedDuplicateObservation = state.consume(reopenedObservation)
+
+    #expect(!acceptedOldObservation)
+    #expect(acceptedReopenedObservation)
+    #expect(!acceptedDuplicateObservation)
+  }
+
   @Test("status presentation uses fresh match, applying state, and safe fallbacks")
   func statusItemPresentationPolicy() {
     let builder = TrayStatusItemPresentationBuilder()
@@ -546,6 +630,9 @@ private final class SurfaceFactorySpy: TraySurfaceFactory {
   private(set) var statusItemCreations = 0
   private(set) var popoverCreations = 0
   private(set) var monitorCreations = 0
+  private(set) var applicationActivationRequestCount = 0
+  var onApplicationActivationRequest: (@MainActor () -> Void)?
+  private var pendingApplicationActivation: (@MainActor () -> Void)?
   let statusItem = StatusItemSurfaceSpy()
   let popover = PopoverSurfaceSpy()
   let monitor = DismissalMonitorSpy()
@@ -567,6 +654,28 @@ private final class SurfaceFactorySpy: TraySurfaceFactory {
   func makeDismissalMonitor() -> any TrayDismissalMonitoring {
     monitorCreations += 1
     return monitor
+  }
+
+  var hasPendingApplicationActivation: Bool {
+    pendingApplicationActivation != nil
+  }
+
+  func requestApplicationActivation(
+    onDidBecomeActive: @escaping @MainActor () -> Void
+  ) {
+    applicationActivationRequestCount += 1
+    onApplicationActivationRequest?()
+    pendingApplicationActivation = onDidBecomeActive
+  }
+
+  func cancelApplicationActivationObservation() {
+    pendingApplicationActivation = nil
+  }
+
+  func completeApplicationActivation() {
+    let completion = pendingApplicationActivation
+    pendingApplicationActivation = nil
+    completion?()
   }
 
   func screenMetrics(for anchorView: NSView) -> TrayScreenMetrics {
@@ -620,6 +729,9 @@ private final class PopoverSurfaceSpy: TrayPopoverSurface {
   var mutatesHostingOriginWhenShown = false
   var attachedContentFrameOriginWhenShown: CGPoint?
   var automaticallyCompletesPresentation = true
+  private(set) var makeContentKeyCount = 0
+  var onShow: (@MainActor () -> Void)?
+  var onMakeContentKey: (@MainActor () -> Void)?
 
   func setDidCloseHandler(_ handler: @escaping @MainActor () -> Void) {
     didClose = handler
@@ -637,6 +749,7 @@ private final class PopoverSurfaceSpy: TrayPopoverSurface {
     preferredEdge: NSRectEdge,
     presentationGeneration: UInt64
   ) {
+    onShow?()
     isShown = true
     attachContentControllerView()
     if mutatesHostingOriginWhenShown {
@@ -650,6 +763,11 @@ private final class PopoverSurfaceSpy: TrayPopoverSurface {
       presentationStage?(presentationGeneration, .contentWindowAttached)
       presentationStage?(presentationGeneration, .firstLayoutCompleted)
     }
+  }
+
+  func makeContentKey() {
+    makeContentKeyCount += 1
+    onMakeContentKey?()
   }
 
   func performClose(_ sender: Any?) {
@@ -730,6 +848,12 @@ private final class NativePopoverFactory: TraySurfaceFactory {
   func makePopover() -> any TrayPopoverSurface { popover }
 
   func makeDismissalMonitor() -> any TrayDismissalMonitoring { monitor }
+
+  func requestApplicationActivation(
+    onDidBecomeActive: @escaping @MainActor () -> Void
+  ) {}
+
+  func cancelApplicationActivationObservation() {}
 
   func screenMetrics(for anchorView: NSView) -> TrayScreenMetrics {
     TrayScreenMetrics(
@@ -819,6 +943,8 @@ private final class NativePopoverSurface: NSObject, TrayPopoverSurface, NSPopove
   func performClose(_ sender: Any?) {
     popover.performClose(sender)
   }
+
+  func makeContentKey() {}
 
   func popoverDidClose(_ notification: Notification) {
     didClose?()
