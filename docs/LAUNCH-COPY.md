@@ -1,19 +1,19 @@
 # Launch copy and repository metadata
 
-Last reviewed: 2026-07-20
+Last reviewed: 2026-09-11
 
 This document is a copy deck and approval checklist. It does not authorize a GitHub setting change, site deployment, release publication, or community post.
 
-Desk Setup Switcher currently has no supported download. The local/CI DMG is ad-hoc signed development evidence, not a Developer ID-signed, notarized, stapled, or Gatekeeper-verified public artifact. Keep every public-download sentence below unpublished until the complete [distribution gate](DISTRIBUTION.md) passes and the maintainer explicitly approves publication.
+Desk Setup Switcher currently has no supported download. Local and ordinary CI DMGs are ad-hoc-signed development evidence, not approved public artifacts. The planned first supported beta is also Developer ID-unsigned and not notarized, but it becomes supported only when the exact DMG and checksum pass the complete [distribution gate](DISTRIBUTION.md) and a maintainer publishes them on GitHub Releases. Keep every public-download sentence below unpublished until then.
 
 ## Current remote state
 
-Authenticated read-only GitHub queries on 2026-07-18 and 2026-07-20 returned the same public-surface state:
+An authenticated read-only GitHub query on 2026-09-11 returned this public-surface state:
 
 | Field | Current value | Required action |
 | --- | --- | --- |
 | Repository | Public at [GGULBAE/desk-setup-switcher](https://github.com/GGULBAE/desk-setup-switcher) | Keep public |
-| Description | Advertises display, audio, network, mouse, and keyboard profiles | Replace; mouse and keyboard are dormant compatibility data, not the current product surface |
+| Description | “A free and open-source macOS menu bar app for saving and switching display, audio, network, mouse, and keyboard profiles.” | Replace; the current product is manual-only and limited to Display and Sound |
 | Topics | None | Add the reviewed topics below |
 | Homepage | Blank | Keep blank until the approved site has its final HTTPS URL |
 | Discussions | Disabled | The public support issue form is the current deliberate alternative; do not advertise Discussions while disabled |
@@ -25,7 +25,7 @@ Authenticated read-only GitHub queries on 2026-07-18 and 2026-07-20 returned the
 
 Proposed description:
 
-> Local-only macOS menu bar app to capture, edit, review, and explicitly apply display, audio, and network profiles—with rollback.
+> Local-only macOS menu bar app for saving and explicitly applying Display and Sound profiles—with preview, verification, and rollback.
 
 This description is safe before or after release because it does not claim that a supported download exists. Capability and verification detail still belongs in the [support matrix](SUPPORT-MATRIX.md).
 
@@ -43,7 +43,6 @@ local-first
 privacy
 display-settings
 audio-settings
-network-settings
 apple-silicon
 open-source
 ```
@@ -74,19 +73,19 @@ Use these strings wherever the publishing surface supports alternative text, inc
 
 ### English short
 
-Capture a desk setup, choose what belongs in the profile, and review every change before applying it. Desk Setup Switcher is a local-only, open-source macOS menu bar app for display, audio, and network profiles.
+Save available values from seven Display and Sound setting kinds as a local profile, edit them, and review every change before applying it. Desk Setup Switcher is a local-only, open-source macOS menu bar app that never switches profiles automatically.
 
 ### English full
 
-Desk Setup Switcher is a free, open-source macOS menu bar app for people who move between desk setups. Capture readable display, audio, and network settings into a local profile, edit only what should be included, then review every planned change before explicitly applying it. Profiles and redacted diagnostics stay on the Mac: there is no account, cloud sync, telemetry, analytics, automatic switching, or in-app updater. The initial public beta targets Apple Silicon on macOS 14 or later. Capability claims follow the support matrix; physical Intel support is not claimed.
+Desk Setup Switcher is a free, open-source macOS menu bar app for people who move between desk setups. Save available values from seven setting kinds—main display, resolution, output device/volume/mute, and input device/volume—into a local profile, edit them, then review every planned change before explicitly applying it. There are no per-setting inclusion switches or editable refresh-rate setting; resolution keeps the current refresh rate or is skipped. Network and other legacy fields remain dormant compatibility data. Profiles and redacted diagnostics stay on the Mac: there is no account, cloud sync, telemetry, analytics, automatic switching, or in-app updater. Capture queries only Display and Audio and does not request Location permission. The initial public beta targets Apple Silicon with a macOS 14 deployment target, pending the exact-candidate Sonoma lifecycle gate. Capability claims follow the support matrix; physical Intel support is not claimed.
 
 ### 한국어 짧은 소개
 
-현재 책상 설정을 캡처하고, 프로필에 넣을 값만 고른 뒤, 모든 변경을 검토하고 적용하세요. Desk Setup Switcher는 디스플레이·오디오·네트워크 프로필을 위한 로컬 전용 오픈소스 macOS 메뉴 막대 앱입니다.
+Display와 Sound의 일곱 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 저장하고, 편집한 뒤, 모든 변경을 검토하고 적용하세요. Desk Setup Switcher는 프로필을 자동으로 전환하지 않는 로컬 전용 오픈소스 macOS 메뉴 막대 앱입니다.
 
 ### 한국어 전체 소개
 
-Desk Setup Switcher는 여러 책상 환경을 오가는 사용자를 위한 무료 오픈소스 macOS 메뉴 막대 앱입니다. 읽을 수 있는 디스플레이·오디오·네트워크 설정을 로컬 프로필로 Capture하고, 포함할 값만 Edit한 뒤, 예정된 변경을 모두 Review하고 명시적으로 Apply합니다. 프로필과 민감 정보를 제거한 진단은 Mac 안에만 남으며 계정, 클라우드 동기화, 텔레메트리, 분석, 자동 전환, 앱 내 업데이트가 없습니다. 초기 public beta는 Apple Silicon 기반 macOS 14 이상을 대상으로 합니다. 기능 주장은 지원표를 따르며 실제 Intel 지원은 주장하지 않습니다.
+Desk Setup Switcher는 여러 책상 환경을 오가는 사용자를 위한 무료 오픈소스 macOS 메뉴 막대 앱입니다. 주 디스플레이, 해상도, 출력 기기·음량·음소거, 입력 기기·음량의 일곱 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 Capture하고, Edit한 뒤, 예정된 변경을 모두 Review하고 명시적으로 Apply합니다. 설정별 포함 스위치와 편집 가능한 재생률 설정은 없으며, 해상도는 현재 재생률을 유지할 수 없으면 적용에서 제외됩니다. Network와 다른 과거 필드는 호환성을 위한 비활성 데이터로만 남습니다. Capture는 Display와 Audio만 조회하고 위치 권한을 요청하지 않습니다. 프로필과 민감 정보를 제거한 진단은 Mac 안에만 남으며 계정, 클라우드 동기화, 텔레메트리, 분석, 자동 전환, 앱 내 업데이트가 없습니다. 초기 public beta는 macOS 14 배포 타깃의 Apple Silicon을 대상으로 하며 정확한 후보의 Sonoma 수명주기 검증이 먼저 필요합니다. 기능 주장은 지원표를 따르며 실제 Intel 지원은 주장하지 않습니다.
 
 ## Pre-publication holding copy
 
@@ -94,17 +93,17 @@ Use this only when a status message is needed before the release gate passes:
 
 ### English
 
-> Desk Setup Switcher is preparing its first open-source public beta. The source is public, but there is no supported download yet. The current development DMG is not a signed or notarized release. Follow the repository for release evidence and the approved download announcement.
+> Desk Setup Switcher is preparing its first open-source public beta. The source is public, but there is no supported download yet. Local and CI DMGs are development evidence, not approved releases. The planned beta will be Developer ID-unsigned and not notarized; follow the repository for checksum evidence and the approved GitHub Release announcement.
 
 ### 한국어
 
-> Desk Setup Switcher의 첫 오픈소스 public beta를 준비하고 있습니다. 소스는 공개되어 있지만 아직 지원되는 다운로드는 없습니다. 현재 개발용 DMG는 서명·공증된 릴리스가 아닙니다. 출시 증거와 승인된 다운로드 공지는 저장소에서 확인해 주세요.
+> Desk Setup Switcher의 첫 오픈소스 public beta를 준비하고 있습니다. 소스는 공개되어 있지만 아직 지원되는 다운로드는 없습니다. 로컬·CI DMG는 개발 증거일 뿐 승인된 릴리스가 아닙니다. 계획된 beta는 Developer ID 미서명·미공증이며, checksum 증거와 승인된 GitHub Release 공지는 저장소에서 확인해 주세요.
 
 Never attach, link, or rename the current ad-hoc DMG in a holding post.
 
 ## Publish-only launch drafts
 
-The drafts in this section are locked until `APPROVED_RELEASE_URL`, `APPROVED_SITE_URL`, and `FINAL_DMG_SHA256` have been replaced from their separately approved release/site evidence. Never substitute the current unsigned-development hash. Remove all instruction lines and unused capability variants before posting. The workflow-ready version-specific English/Korean copy lives in the [`v0.1.0` Release notes](releases/v0.1.0.md); it contains no completion evidence and does not claim that signing or publication passed.
+The drafts in this section are locked until `APPROVED_RELEASE_URL`, `APPROVED_SITE_URL`, and `FINAL_DMG_SHA256` have been replaced from their separately approved release/site evidence. Never substitute the current unsigned-development hash. Remove all instruction lines and unused capability variants before posting. The workflow-ready version-specific English/Korean copy lives in the [`v0.1.0` Release notes](releases/v0.1.0.md); it contains no completion evidence and does not claim that publication gates passed.
 
 ### GitHub Release notes
 
@@ -118,26 +117,26 @@ Body:
 >
 > **Capture → Edit → Review & Apply**
 >
-> - Capture readable display, audio, and network settings without changing the Mac.
-> - Include only the values you want in each profile.
+> - Capture available values from seven Display and Sound setting kinds without changing the Mac or requesting Location permission: main display, resolution, output device/volume/mute, and input device/volume.
+> - Edit the available saved values; missing values remain absent, without per-setting inclusion switches.
 > - Review operations and omissions before an explicit Apply.
 > - Use protected confirmation and itemized rollback results for high-risk changes.
 > - Keep profiles and redacted diagnostics local—no account, cloud, telemetry, analytics, automatic switching, or updater.
 >
 > **Initial support:** Apple Silicon, macOS 14 Sonoma or later. Intel is not currently supported.
 >
-> Download the immutable Developer ID-signed, notarized, and stapled DMG from this release's Assets. Verify SHA-256: `FINAL_DMG_SHA256`.
+> Download the exact Developer ID-unsigned, ad-hoc integrity-signed DMG and checksum from this release's Assets. It is not notarized. Verify SHA-256: `FINAL_DMG_SHA256`, then follow the documented one-time **Open Anyway** procedure.
 >
 > Read the installation guide, support matrix, privacy policy, and security reporting instructions before applying a profile.
 
 Insert exactly one capability line from the final support matrix:
 
 - If physical apply and independent rollback evidence exists: describe only the exact hardware/OS/capability combinations that passed.
-- If it does not exist: `Display, Audio, and Network apply/rollback paths remain mock verified rather than hardware-mutation verified; use the beta within the published support-matrix boundary.`
+- If it does not exist: `Display and Sound apply/rollback paths remain mock verified rather than hardware-mutation verified; use the beta within the published support-matrix boundary. Network and other legacy fields remain dormant and never reach the current Apply path.`
 
 Suggested Korean summary beneath the English notes:
 
-> Desk Setup Switcher `v0.1.0` public beta는 현재 설정을 Capture하고, 프로필에 포함할 값을 Edit한 뒤, 모든 변경을 Review하고 명시적으로 Apply하는 로컬 전용 macOS 메뉴 막대 앱입니다. 초기 지원 환경은 Apple Silicon 기반 macOS 14 이상입니다. 계정·클라우드·텔레메트리·자동 전환은 없으며 Intel 실기 지원은 주장하지 않습니다. Assets의 서명·공증 DMG와 공개된 SHA-256을 사용하세요.
+> Desk Setup Switcher `v0.1.0` public beta는 Display와 Sound의 일곱 가지 설정 종류(주 디스플레이, 해상도, 출력 기기·음량·음소거, 입력 기기·음량)에서 사용할 수 있는 값을 Capture하고 Edit한 뒤, 모든 변경을 Review하고 명시적으로 Apply하는 로컬 전용 macOS 메뉴 막대 앱입니다. 초기 지원 환경은 Apple Silicon 기반 macOS 14 이상입니다. 계정·클라우드·텔레메트리·자동 전환은 없으며 Intel 실기 지원은 주장하지 않습니다. Assets의 Developer ID 미서명·미공증 DMG와 공개된 SHA-256을 확인한 뒤 안내된 일회성 **그래도 열기** 절차를 따르세요.
 
 ### English developer-community post
 
@@ -193,7 +192,7 @@ Record only aggregate values already visible on public GitHub surfaces. A manual
 
 | Signal | Definition | Limitation |
 | --- | --- | --- |
-| Release downloads | Public asset-download count for the canonical signed DMG, per version | A download is not an install or active user |
+| Release downloads | Public asset-download count for the canonical unsigned DMG, per version | A download is not an install or active user |
 | Stars | Public repository star count | Interest is not satisfaction or retention |
 | Issues | Public opened/closed counts, unresolved P0/P1 count, and support-question count from public issue forms | Reports are self-selected; never copy private security reports into this metric |
 | Discussions | Public thread/answer counts only if Discussions is deliberately enabled later | Currently disabled; do not invent or privately track an equivalent |
@@ -204,31 +203,31 @@ Do not add analytics, cookies, pixels, fingerprinting, campaign IDs, URL shorten
 
 Do not apply metadata or publish copy until every applicable box has recorded evidence.
 
-- [ ] The unsafe effective remote unsigned-publication workflow is gone; branch/tag protections, the protected `release-candidate` environment/reviewer, private vulnerability reporting, and immutable releases are configured and confirmed read-only.
-- [ ] The protected `v0.1.0` candidate is Developer ID signed, hardened, timestamped, notarized, stapled, Gatekeeper assessed, checksummed, and bound to its tag/commit/build/SBOM plus all three subject-specific attestation bundles without an app rebuild or identity/resource change.
-- [ ] Browser download and the extracted DMG preserve a real quarantine attribute; checksum and final-DMG provenance match, and Gatekeeper opens the official candidate without Open Anyway.
+- [ ] The active `unsigned-release.yml` path remains manual-only, any historical signed-publication route stays contained, and branch/tag protections plus private vulnerability reporting are configured and confirmed read-only.
+- [ ] The exact `v0.1.0` candidate is ad-hoc integrity-signed with no Developer ID identity or notarization ticket, checksummed, and bound to its tag, commit, version, build, architecture, minimum OS, SBOM, and final-DMG provenance without an app rebuild or byte substitution.
+- [ ] Browser download and the extracted DMG preserve a real quarantine attribute; checksum and final-DMG provenance match; the first launch receives the expected unidentified-developer block; and the documented one-time **Open Anyway** path opens that exact candidate without disabling Gatekeeper or removing quarantine.
 - [ ] Exact-candidate first launch and launch-at-login default-off, upgrade, schema 0→1 migration, backup recovery, import/export, diagnostics, uninstall, and optional app-owned data removal each have separate passing evidence.
 - [ ] Three external Apple Silicon reports use browser-downloaded protected workflow artifacts and the identical final DMG SHA-256/final-DMG provenance attestation.
 - [ ] At least one of those reports passes the full exact-candidate lifecycle on macOS 14 Sonoma before any launch copy states macOS 14 support.
 - [ ] A public read-only query and maintainer decision show zero unresolved P0/P1 issues, and the security responder records only a yes/no no-confidential-blocker sign-off.
-- [ ] The final support matrix states the exact Display/Audio/Network hardware-mutation evidence or preserves the explicit mock-verified limitation.
-- [ ] The canonical [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases) contains the approved immutable assets and curated English/Korean notes.
-- [ ] The immutable Release body is self-contained: it links no branch-lifecycle document and permits only the tag-pinned distribution procedure plus the exact public-support and private-advisory action routes.
+- [ ] The final support matrix states the exact evidence for all seven current Display/Sound setting kinds or preserves the explicit mock-verified limitation; Network and other legacy fields remain clearly dormant.
+- [ ] The canonical [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases) contains only the approved versioned unsigned DMG, matching checksum, and curated English/Korean notes.
+- [ ] The Release body is self-contained: it links no branch-lifecycle document and permits only the tag-pinned distribution procedure plus the exact public-support and private-advisory action routes.
 - [ ] The final HTTPS site origin and deployment configuration are separately approved. The tracked site-origin record remains `holding`/null before that approval, and a public build must reject any `NEXT_PUBLIC_SITE_URL` that is not the exact approved origin.
 - [ ] Before Release publication, prepare and review locally—but do not push or merge—a bounded public-copy finalization patch and record its base commit, tree digest, and file allowlist. It contains no component-code rewrite.
-- [ ] After the immutable `v0.1.0` Release and assets are visibly public and reverified, publish that prepared patch for review. It sets `site/release-publication.json` to the exact canonical Release URL, sets the separately approved site-origin record, and synchronizes README, the English/Korean guide index and user guides, PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and directly required status records. If `master` moved or the tree differs, stop and re-review instead of rebasing silently.
+- [ ] After the `v0.1.0` Release and assets are visibly public and reverified, publish that prepared patch for review. It sets `site/release-publication.json` to the exact canonical Release URL, sets the separately approved site-origin record, and synchronizes README, the English/Korean guide index and user guides, PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and directly required status records. If `master` moved or the tree differs, stop and re-review instead of rebasing silently.
 - [ ] Both required CI jobs pass on the finalization review head. Merge through the protected branch, read back the exact `master` SHA and tree digest, then require one `master`-push CI run on that exact SHA with exactly **Verify macOS app** and **Verify public site and release assets** successful.
 - [ ] Only after that exact `master` run passes is the bilingual site deployed. A clean session proves the approved canonical/`og:url` metadata, no-cookie/no-tracking boundary, current support/security routes, and that every download link points only to the canonical Release.
 - [ ] The screenshot, silent-captioned demo, social preview, captions, and provenance use synthetic or sanitized data and match actual behavior.
 - [ ] Private vulnerability reporting is enabled and tested; public support and security links resolve to the intended routes.
 - [ ] `APPROVED_RELEASE_URL`, `APPROVED_SITE_URL`, and `FINAL_DMG_SHA256` are replaced in the copies selected for publication. No instruction line or unused variant remains.
 - [ ] The maintainer explicitly approves the description, topics, Homepage URL, social preview, Release publication, site publication, and each external post.
-- [ ] After applying metadata, a read-only GitHub query confirms the exact description/topics/Homepage and shows no stale mouse/keyboard, Intel, Homebrew, accessibility-certification, hardware-verification, or unsigned-download claim.
+- [ ] After applying metadata, a read-only GitHub query confirms the exact description/topics/Homepage and shows no stale current-scope claim for Network/mouse/keyboard, no Intel/Homebrew/accessibility-certification/hardware-verification overclaim, and no claim that the beta is Developer ID-signed or notarized.
 - [ ] After publication, every release/site/download link is opened from a clean browser session and the downloaded asset identity is reverified.
 - [ ] Homebrew remains “not offered” at publication; after the canonical Release exists, the project-owned tap passes `install`, `upgrade`, `uninstall`, and `zap` against the exact final SHA-256 before it is advertised.
 - [ ] Only the public aggregate signals above are recorded; no analytics or telemetry is introduced.
 
-Actual remote mutation, deployment, Release publication, and promotional posting remain separate maintainer-approved actions.
+Actual remote metadata mutation, public site deployment, Release publication, and promotional posting remain separate maintainer-approved actions. An owner-only internal preview does not authorize any of them.
 
 ## Stable references
 

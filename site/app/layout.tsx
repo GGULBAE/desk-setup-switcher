@@ -9,6 +9,7 @@ if (!siteURL) {
 
 const metadataBase = new URL(siteURL);
 const canonicalURL = new URL("/", metadataBase).toString();
+const isPrivatePreview = process.env.NEXT_PUBLIC_SITE_AUDIENCE === "private";
 
 export const metadata: Metadata = {
   metadataBase,
@@ -20,18 +21,28 @@ export const metadata: Metadata = {
     template: "%s · Desk Setup Switcher",
   },
   description:
-    "A local-only open-source macOS menu-bar app for deliberately capturing, editing, reviewing, and applying display, audio, and network profiles.",
+    "A local-only open-source macOS menu-bar app for saving, reviewing, and explicitly applying display and sound profiles.",
   applicationName: "Desk Setup Switcher",
   keywords: [
     "macOS",
     "menu bar app",
     "display profiles",
-    "audio profiles",
-    "network profiles",
+    "sound profiles",
     "open source",
   ],
   authors: [{ name: "GGULBAE", url: "https://github.com/GGULBAE" }],
   creator: "GGULBAE",
+  robots: isPrivatePreview
+    ? {
+        index: false,
+        follow: false,
+        googleBot: {
+          index: false,
+          follow: false,
+          noimageindex: true,
+        },
+      }
+    : undefined,
   icons: {
     icon: "/app-icon.svg",
     shortcut: "/app-icon.svg",

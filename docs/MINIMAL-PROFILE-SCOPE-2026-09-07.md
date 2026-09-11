@@ -1,5 +1,8 @@
 # Minimal profile scope — 2026-09-07
 
+> [!NOTE]
+> This is the historical six-setting milestone. The [2026-09-08 output-mute follow-up](OUTPUT-MUTE-2026-09-08.md) supersedes its mute-retirement statements; the current profile surface has seven Display/Sound settings and no per-setting inclusion switches.
+
 ## Contract
 
 Capture, profile editing, and Apply share exactly six setting kinds: main display, per-display resolution, output device, output volume, input device, and input volume. Normal width retains the existing numbered Display/Sound rail; minimum/accessibility layouts retain the segmented fallback. Every option is direct. There is no Network or Advanced section, and App Settings no longer shows Wi-Fi capture permission controls.

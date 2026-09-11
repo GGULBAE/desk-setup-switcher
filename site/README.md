@@ -4,6 +4,8 @@ This directory contains the account-free, bilingual, single-page public site for
 
 The site is release-preparation source. Do not deploy it publicly until the exact unsigned `v0.1.0` release candidate, canonical download URL and SHA-256, clean-install/Open-Anyway evidence, and maintainer publication approval are complete.
 
+An owner-only internal preview is a separate path. `private-preview.json` binds it to one registered Sites project and clean HTTPS origin while the public records remain in `holding`. `npm run build:private-preview` emits `noindex`, `nofollow`, and `noimageindex` metadata and does not enable download copy or authorize public access.
+
 ## Local development
 
 Requires Node.js 22.13 or later.
@@ -36,7 +38,7 @@ reserved/placeholder, arbitrary, and mismatched origins all fail closed.
 for explicit HTTP loopback origins used by local metadata checks; they still
 strictly parse and validate the tracked record on every build.
 
-`npm run verify` builds the Cloudflare Worker-compatible Sites output, lints the source, renders the page, checks the honest release/support copy and security headers, verifies that no cookie is set, scans application source and the built client for tracking/storage boundaries, and requires all public screenshots, video, and bilingual captions.
+`npm run verify` builds the Cloudflare Worker-compatible Sites output, lints the source, renders the page, checks the honest release/support copy and security headers, verifies that no cookie is set, scans application source and the built client for tracking/storage boundaries, and verifies the retained public-media inventory.
 
 [`release-publication.json`](release-publication.json) is the site's only
 rendering-state switch. It is schema-checked during every build. `holding` requires a null URL;
@@ -90,23 +92,25 @@ and [current advisory follow-up](../docs/SITE-DEPENDENCY-REFRESH-2026-09-10.md).
 
 ## Content boundaries
 
-- The three product screens use synthetic fixture data and sanitized public derivatives.
-- The silent demo stops at the Apply Preview. It does not simulate an Apply result or claim live hardware mutation.
+- The page presents the current seven-setting Display/Sound scope: main display, resolution, output device/volume/mute, and input device/volume. Network and other legacy values remain dormant compatibility data, not current site capabilities.
+- The rendered page uses the neutral synthetic Capture screen. Older Edit, Review, demo, caption, and social-preview assets remain in the verified provenance inventory but are not presented as current product UI; refresh them before any publication that intends to surface them.
 - Download remains unavailable until the unsigned distribution gate passes and the maintainer-approved canonical GitHub Release exists. Published copy identifies the DMG as Developer ID-unsigned and not notarized, requires SHA-256 verification, and permits only the one-time macOS **Open Anyway** path without disabling Gatekeeper or removing quarantine.
 - Apple Silicon with a macOS 14 deployment target is the planned `v0.1.0` platform. At least one external exact-candidate lifecycle report must pass on Sonoma before that minimum-OS support claim is used; the `x86_64` slice is not advertised as physically verified.
-- On 2026-07-20, current-source opt-in read-only tests passed Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. They did not itemize actual ColorSync-profile, input-volume, or service-IPv4 field presence/read on this host, so those item-level claims and every apply/rollback path remain mock-only.
+- On 2026-07-20, current-source opt-in read-only tests passed relevant source-group paths on Apple Silicon/macOS 26.5.2. This is read evidence, not proof of every individual field or any live Apply/rollback path; those mutation paths remain mock-only.
 - Comprehensive assistive-technology certification is outside the initial beta gate. Keyboard behavior, accessibility names and values, and non-color state cues remain required.
 
 Asset sources and sanitization are recorded in [release asset provenance](../docs/RELEASE-ASSET-PROVENANCE.md).
 
 ## Hosting
 
-`.openai/hosting.json` deliberately declares no D1 or R2 capability, and the
-built Worker disables request logs/traces with `observability.enabled: false`.
+`.openai/hosting.json` binds the owner-only preview project and deliberately
+declares no D1 or R2 capability. The built Worker disables request logs/traces
+with `observability.enabled: false`.
 Cloudflare nevertheless provides built-in aggregate Worker request metrics as
 hosting-platform behavior; those are not project product analytics. The public
 site discloses this boundary. See Cloudflare's
 [Workers metrics documentation](https://developers.cloudflare.com/workers/observability/metrics-and-analytics/)
 and [privacy policy](https://www.cloudflare.com/privacypolicy/). Public
 deployment, domain configuration, final Open Graph URL, and release-link
-activation occur only after the user approves publication.
+activation occur only after the user approves publication. An authenticated,
+owner-only preview does not satisfy or bypass those public-release gates.

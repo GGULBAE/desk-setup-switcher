@@ -16,12 +16,17 @@ const releaseCopyModule = await import(new URL("lib/release-copy.mjs", root));
 const trackedPublication = await publicationFileModule.validateReleasePublicationFile(
   fileURLToPath(new URL("release-publication.json", root)),
 );
+const trackedPrivatePreview = await originGateModule.validatePrivatePreviewFile(
+  fileURLToPath(new URL("private-preview.json", root)),
+);
 const trackedState = trackedPublication.state;
 const expectedReleaseState = process.env.EXPECTED_RELEASE_STATE === "current"
   ? trackedState
   : process.env.EXPECTED_RELEASE_STATE;
+const expectedSiteAudience = process.env.EXPECTED_SITE_AUDIENCE ?? "local";
 
 assert.match(expectedReleaseState ?? "", /^(holding|published)$/);
+assert.match(expectedSiteAudience, /^(local|private)$/);
 
 // Inspect every emitted JavaScript chunk, independent of the bundler's layout.
 // Refuse links so this build-output audit cannot leave the selected directory.
@@ -70,12 +75,21 @@ test("build-time image parser is absent from deployable client and Worker chunks
   assert.equal(Object.keys(lock.packages).some((name) => /(?:^|\/)node_modules\/image-size$/.test(name)), false);
 });
 
-function runOriginGate(origin, { allowLocal = false, gatePath = originGatePath } = {}) {
+function runOriginGate(
+  origin,
+  { allowLocal = false, allowPrivate = false, gatePath = originGatePath } = {},
+) {
   const env = { ...process.env };
   delete env.NEXT_PUBLIC_SITE_URL;
+  delete env.NEXT_PUBLIC_SITE_AUDIENCE;
   delete env.ALLOW_LOCAL_SITE_ORIGIN;
+  delete env.ALLOW_PRIVATE_SITE_ORIGIN;
   if (origin !== undefined) env.NEXT_PUBLIC_SITE_URL = origin;
   if (allowLocal) env.ALLOW_LOCAL_SITE_ORIGIN = "1";
+  if (allowPrivate) {
+    env.ALLOW_PRIVATE_SITE_ORIGIN = "1";
+    env.NEXT_PUBLIC_SITE_AUDIENCE = "private";
+  }
   return spawnSync(process.execPath, [gatePath], {
     cwd: fileURLToPath(root),
     env,
@@ -120,15 +134,24 @@ test("renders the complete public-beta landing page without setting cookies", as
   assert.match(html, /<title>Desk Setup Switcher — Capture, review, and apply your desk settings<\/title>/i);
   const canonical = html.match(/<link rel="canonical" href="([^"]+)"\/>/i)?.[1];
   const openGraphURL = html.match(/<meta property="og:url" content="([^"]+)"\/>/i)?.[1];
-  assert.equal(new URL(canonical).href, "http://localhost:3000/");
-  assert.equal(new URL(openGraphURL).href, "http://localhost:3000/");
+  const expectedOrigin = expectedSiteAudience === "private"
+    ? `${trackedPrivatePreview.siteURL}/`
+    : "http://localhost:3000/";
+  assert.equal(new URL(canonical).href, expectedOrigin);
+  assert.equal(new URL(openGraphURL).href, expectedOrigin);
+  if (expectedSiteAudience === "private") {
+    assert.match(html, /<meta name="robots" content="noindex, nofollow"\/>/i);
+    assert.match(html, /<meta name="googlebot" content="noindex, nofollow, noimageindex"\/>/i);
+  } else {
+    assert.doesNotMatch(html, /<meta name="robots" content="noindex/i);
+  }
   assert.match(html, /Bring your desk back, deliberately\./);
   assert.match(html, /Capture/);
   assert.match(html, /Edit/);
   assert.match(html, /Review &amp; Apply/);
   assert.match(html, /No account/);
   assert.match(html, /No cloud/);
-  assert.match(html, /No telemetry/);
+  assert.match(html, /No auto-switching/);
   if (expectedReleaseState === "holding") {
     assert.match(html, /Open-source macOS public beta candidate/);
     assert.match(html, /There is no supported public download today\./);
@@ -137,6 +160,7 @@ test("renders the complete public-beta landing page without setting cookies", as
     assert.match(html, /private vulnerability reporting must be enabled and tested before release/);
     assert.doesNotMatch(html, /releases\/tag\/v0\.1\.0/);
     assert.doesNotMatch(html, /v0\.1\.0 support: Apple Silicon on macOS 14 or later/);
+    assert.doesNotMatch(html, /Download the unsigned DMG and checksum/);
   } else {
     assert.match(html, /Open-source macOS public beta<\/p>/);
     assert.doesNotMatch(html, /Open-source macOS public beta candidate/);
@@ -149,31 +173,34 @@ test("renders the complete public-beta landing page without setting cookies", as
     assert.doesNotMatch(html, /There is no supported public download today\./);
     assert.doesNotMatch(html, /Exact-candidate lifecycle testing on Sonoma remains a release gate/);
     assert.doesNotMatch(html, /private vulnerability reporting must be enabled and tested before release/);
+    assert.match(html, /Download the unsigned DMG and checksum/);
   }
-  assert.match(html, /Current-source group\/base live-read/);
-  assert.match(html, /item-level read unclaimed/);
+  assert.match(html, /Main display and resolution/);
+  assert.match(html, /Output device, volume, and mute/);
+  assert.match(html, /Input device and volume/);
+  assert.match(html, /Current-source group live-read/);
   assert.match(html, /apply\/rollback mock-only/);
-  assert.match(html, /No live setting mutation has been hardware verified\./);
+  assert.match(html, /no live setting mutation has been hardware verified\./i);
   assert.match(html, /Apply Available Settings/);
   assert.match(html, /Keep Changes/);
   assert.match(html, /Revert Now/);
   assert.match(html, /hosting provider still processes requests and may retain aggregate operational metrics/);
   assert.doesNotMatch(html, /VoiceOver/i);
   assert.match(html, /\/screenshots\/capture\.png/);
-  assert.match(html, /\/screenshots\/edit\.png/);
-  assert.match(html, /\/screenshots\/review\.png/);
+  assert.doesNotMatch(html, /\/screenshots\/edit\.png/);
+  assert.doesNotMatch(html, /\/screenshots\/review\.png/);
   assert.match(html, /\/og\.png/);
-  assert.match(html, /\/demo\/desk-setup-switcher\.mp4/);
-  assert.match(html, /\/demo\/captions\.en\.vtt/);
-  assert.match(html, /\/demo\/captions\.ko\.vtt/);
+  assert.doesNotMatch(html, /\/demo\/desk-setup-switcher\.mp4/);
+  assert.doesNotMatch(html, /Exact Ethernet\/Wi-Fi|ColorSync ICC profile|display, audio, and network profiles/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
 test("keeps the site account-free, local-content-only, and free of starter capabilities", async () => {
-  const [page, landing, layout, worker, vite, buildPlugin, originGate, packageJson, hosting, builtWrangler] = await Promise.all([
+  const [page, landing, layout, styles, worker, vite, buildPlugin, originGate, packageJson, hosting, builtWrangler] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/landing-page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
     readFile(new URL("worker/index.ts", root), "utf8"),
     readFile(new URL("vite.config.ts", root), "utf8"),
     readFile(new URL("build/sites-vite-plugin.ts", root), "utf8"),
@@ -189,7 +216,11 @@ test("keeps the site account-free, local-content-only, and free of starter capab
   const clientJavaScript = clientChunks.join("\n");
 
   assert.match(page, /force-static/);
-  assert.deepEqual(JSON.parse(hosting), { d1: null, r2: null });
+  assert.deepEqual(JSON.parse(hosting), {
+    project_id: trackedPrivatePreview.projectID,
+    d1: null,
+    r2: null,
+  });
   const wrangler = JSON.parse(builtWrangler);
   assert.equal(wrangler.observability?.enabled, false);
   assert.deepEqual(wrangler.assets, { directory: "../client" });
@@ -266,14 +297,19 @@ test("keeps the site account-free, local-content-only, and free of starter capab
     /\bfetch\s*\(|XMLHttpRequest|sendBeacon|document\.cookie|localStorage|sessionStorage|gtag\s*\(|mixpanel|segment\.io/i,
   );
   assert.doesNotMatch(browserSource, /<script[^>]+src=["']https?:\/\//i);
-  assert.match(landing, /내 책상 설정을, 내가 확인하고 되돌립니다/);
-  assert.match(landing, /텔레메트리 없음/);
+  assert.match(landing, /책상 설정을 바꾸기 전에, 먼저 확인하세요/);
+  assert.match(landing, /자동 전환 없음/);
   assert.match(landing, /homeLabel: "Desk Setup Switcher 홈"/);
   assert.match(landing, /aria-label=\{text\.homeLabel\}/);
+  assert.match(landing, /className="skip-link" href="#main-content"/);
+  assert.match(landing, /className="language-switch" role="group"/);
+  assert.match(landing, /document\.documentElement\.lang = language/);
+  assert.match(styles, /\.language-switch button \{[\s\S]*?min-width: 44px;[\s\S]*?min-height: 44px;/);
   assert.match(landing, /userGuidePath: "docs\/guides\/USER-GUIDE\.md"/);
   assert.match(landing, /userGuidePath: "docs\/guides\/USER-GUIDE\.ko\.md"/);
   assert.match(landing, /href=\{`\$\{repositoryURL\}\/blob\/master\/\$\{text\.userGuidePath\}`\}/);
   assert.doesNotMatch(landing, /VoiceOver/i);
+  assert.doesNotMatch(layout, /network profiles/i);
   assert.doesNotMatch(
     runtimeSource,
     /D1Database|r2_buckets|d1_databases|handleImageOptimization|\bIMAGES\b|drizzle/i,
@@ -328,7 +364,7 @@ test("keeps the site account-free, local-content-only, and free of starter capab
   ]);
 });
 
-test("ships three sanitized screens and bilingual caption files", async () => {
+test("retains the sanitized media inventory and bilingual caption files", async () => {
   const assets = [
     "public/screenshots/capture.png",
     "public/screenshots/edit.png",
@@ -401,6 +437,31 @@ test("site origin approval fails closed and narrowly allows explicit local build
     state: "holding",
     siteURL: null,
   });
+  assert.deepEqual(trackedPrivatePreview, {
+    schemaVersion: "desk-setup-switcher.private-preview/v1",
+    state: "approved",
+    projectID: "appgprj_6aa3a8fc79788191bc6ae96ea278fc9f",
+    siteURL: "https://desk-setup-switcher.earthy-mink-0101.chatgpt.site",
+  });
+  assert.equal(
+    runOriginGate(trackedPrivatePreview.siteURL, { allowPrivate: true }).status,
+    0,
+  );
+  assert.notEqual(runOriginGate(trackedPrivatePreview.siteURL).status, 0);
+  assert.notEqual(runOriginGate("https://other-preview.chatgpt.site", { allowPrivate: true }).status, 0);
+  assert.notEqual(runOriginGate("http://localhost:3000", { allowPrivate: true }).status, 0);
+  assert.notEqual(
+    runOriginGate("http://localhost:3000", { allowLocal: true, allowPrivate: true }).status,
+    0,
+  );
+  for (const record of [
+    { ...trackedPrivatePreview, state: "holding" },
+    { ...trackedPrivatePreview, projectID: "" },
+    { ...trackedPrivatePreview, siteURL: `${trackedPrivatePreview.siteURL}/` },
+    { ...trackedPrivatePreview, unexpected: true },
+  ]) {
+    assert.throws(() => originGateModule.validatePrivatePreview(record));
+  }
   assert.notEqual(runOriginGate("https://desksetup.app").status, 0);
   const buildScript = JSON.parse(await readFile(new URL("package.json", root), "utf8")).scripts.build;
   assert.ok(
@@ -544,9 +605,9 @@ test("release holding and published copy stays bilingual", () => {
 
   assert.equal(englishHolding.eyebrow, "Open-source macOS public beta candidate");
   assert.equal(englishPublished.eyebrow, "Open-source macOS public beta");
-  assert.match(englishHolding.actionLabel, /complete release gate passes/);
+  assert.equal(englishHolding.actionLabel, "Public beta in preparation · no supported download yet");
   assert.equal(englishPublished.actionLabel, "Download v0.1.0");
-  assert.equal(englishHolding.installTitle, "A checksum-verified download, once the gate passes.");
+  assert.equal(englishHolding.installTitle, "Public beta in preparation.");
   assert.equal(englishPublished.installTitle, "Download the unsigned public beta.");
   assert.match(englishHolding.installBody, /There is no supported public download today\./);
   assert.match(englishPublished.installBody, /canonical GitHub Release/);
@@ -560,12 +621,12 @@ test("release holding and published copy stays bilingual", () => {
   assert.doesNotMatch(englishPublished.contributeBody, /must be enabled|before release/i);
   assert.equal(koreanHolding.eyebrow, "오픈소스 macOS 공개 베타 후보");
   assert.equal(koreanPublished.eyebrow, "오픈소스 macOS 공개 베타");
-  assert.match(koreanHolding.actionLabel, /릴리스 관문을 통과한 뒤/);
+  assert.equal(koreanHolding.actionLabel, "공개 베타 준비 중 · 아직 지원되는 다운로드 없음");
   assert.equal(koreanPublished.actionLabel, "v0.1.0 다운로드");
-  assert.equal(koreanHolding.installTitle, "checksum 검증 관문을 통과한 다운로드만 제공합니다.");
-  assert.equal(koreanPublished.installTitle, "unsigned public beta를 다운로드하세요.");
+  assert.equal(koreanHolding.installTitle, "공개 베타를 준비하고 있습니다.");
+  assert.equal(koreanPublished.installTitle, "미서명 공개 베타를 다운로드하세요.");
   assert.match(koreanHolding.installBody, /현재 지원되는 공개 다운로드는 없습니다\./);
-  assert.match(koreanPublished.installBody, /공식 GitHub Release에서만 제공합니다\./);
+  assert.match(koreanPublished.installBody, /공식 GitHub 릴리스에서만 제공합니다\./);
   assert.match(koreanPublished.installBody, /Developer ID 미서명·미공증/);
   assert.match(koreanPublished.installBody, /그래도 열기/);
   assert.match(koreanHolding.supportNote, /수명주기 검증을 통과해야 출시/);
@@ -629,6 +690,35 @@ async function withTimeout(promise, milliseconds) {
     clearTimeout(timer);
   }
 }
+
+test("site verifier covers the private preview before restoring current output", async () => {
+  const fixture = await makeVerifierFixture("success");
+  try {
+    const result = spawnSync(process.execPath, [fixture.verifier], {
+      cwd: fixture.siteDirectory,
+      env: fixture.env,
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0);
+    assert.deepEqual(
+      (await readFile(join(fixture.siteDirectory, "calls.txt"), "utf8")).trim().split("\n"),
+      [
+        "lint",
+        "build:test-published",
+        "test:published",
+        "build:test-holding",
+        "test:holding",
+        "build:private-preview",
+        "test:private-preview",
+        "build:local",
+        "test",
+      ],
+    );
+    assert.equal(await readFile(join(fixture.siteDirectory, "dist/state.txt"), "utf8"), "current\n");
+  } finally {
+    await rm(fixture.temporaryDirectory, { force: true, recursive: true });
+  }
+});
 
 test("site verifier restores current output after a synthetic-state failure", async () => {
   const fixture = await makeVerifierFixture("test-failure");

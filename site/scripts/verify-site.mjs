@@ -51,6 +51,8 @@ try {
     "test:published",
     "build:test-holding",
     "test:holding",
+    "build:private-preview",
+    "test:private-preview",
   ]) {
     if (interruptedSignal) throw new Error("Site verification was interrupted");
     await runScript(name);

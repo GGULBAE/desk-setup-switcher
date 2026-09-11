@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { releasePresentation } from "../lib/release-copy.mjs";
 
@@ -10,6 +10,7 @@ const content = {
   en: {
     languageName: "English",
     switchLabel: "Language",
+    skipLabel: "Skip to content",
     homeLabel: "Desk Setup Switcher home",
     nav: [
       ["How it works", "flow"],
@@ -19,15 +20,19 @@ const content = {
     ],
     title: "Bring your desk back, deliberately.",
     summary:
-      "Capture display, audio, and network settings. Edit only what matters. Review every proposed change before anything happens.",
-    badges: ["Local only", "No account", "No cloud", "No telemetry"],
+      "Save available values from seven display and sound setting kinds as a local profile. Review the exact plan before you apply anything.",
+    badges: ["Local only", "No account", "No cloud", "No auto-switching"],
     github: "View source on GitHub",
-    heroAlt: {
-      edit: "Synthetic Desk Setup Switcher profile editor showing display settings",
-      capture: "Synthetic empty tray with the Capture Current Settings action",
-      review: "Synthetic Apply Preview listing planned display and audio changes",
-    },
-    proof: "Synthetic product data · no personal devices or networks",
+    heroAlt: "Synthetic empty tray with the Capture Current Settings action",
+    scopeLabel: "Current profile scope",
+    scopeTitle: "Display + Sound",
+    scopeItems: [
+      "Main display and resolution",
+      "Output device, volume, and mute",
+      "Input device and volume",
+    ],
+    scopeNote: "Seven settings · no Network or automatic switching",
+    proof: "Synthetic product data · no personal device identifiers",
     flowEyebrow: "One decision at a time",
     flowTitle: "Capture → Edit → Review & Apply",
     flowSummary:
@@ -36,56 +41,39 @@ const content = {
       {
         number: "01",
         title: "Capture",
-        body: "Read the Mac’s current readable snapshot into a new profile. Only values that can complete apply, verification, and rollback appear as runnable. Capture itself changes nothing.",
-        image: "/screenshots/capture.png",
-        width: 368,
-        height: 260,
-        alt: "Empty tray with Capture Current Settings",
+        body: "Read the Mac’s current Display and Sound values into a local profile. Capture itself changes nothing.",
       },
       {
         number: "02",
         title: "Edit",
-        body: "Choose which Display, Audio, and Network values belong to the profile. Excluded values stay untouched.",
-        image: "/screenshots/edit.png",
-        width: 900,
-        height: 568,
-        alt: "Profile editor with display settings",
+        body: "Name the profile and set any available values across the seven current settings. Missing values stay absent.",
       },
       {
         number: "03",
         title: "Review & Apply",
         body: "Inspect planned changes, omissions, and risk. The Mac changes only after the separate Apply Profile or Apply Available Settings confirmation.",
-        image: "/screenshots/review.png",
-        width: 620,
-        height: 500,
-        alt: "Apply Preview with planned changes",
       },
     ],
     supportEyebrow: "Honest support boundary",
-    supportTitle: "Three areas. Evidence shown plainly.",
+    supportTitle: "Two areas. Evidence shown plainly.",
     supportSummary:
-      "Current-source read-only group/base paths passed on Apple Silicon. Individual ColorSync-profile, input-volume, and service-IPv4 field presence/read was not itemized; every listed apply and rollback path remains deterministic mock evidence. No live setting mutation has been hardware verified.",
+      "Current-source read-only group paths passed on Apple Silicon. Apply and rollback paths remain deterministic mock evidence; no live setting mutation has been hardware verified.",
     capabilities: [
       {
-        name: "Displays",
-        items: "Output mode, primary display, resolution, refresh rate, ColorSync ICC profile",
-        evidence: "Current-source group/base live-read · item-level read unclaimed · apply/rollback mock-only",
+        name: "Display",
+        items: "Main display and resolution. Resolution keeps the current refresh rate; an unavailable combination is skipped.",
+        evidence: "Current-source group live-read · apply/rollback mock-only",
       },
       {
-        name: "Audio",
-        items: "Default input/output and settable device volume",
-        evidence: "Current-source group/base live-read · item-level read unclaimed · apply/rollback mock-only",
-      },
-      {
-        name: "Network",
-        items: "Exact Ethernet/Wi-Fi service DHCP or manual IPv4",
-        evidence: "Current-source group/base live-read · service-IPv4 item read unclaimed · apply/rollback mock-only",
+        name: "Sound",
+        items: "Output device, volume, and mute; input device and volume. Selecting an input device does not record audio.",
+        evidence: "Current-source group live-read · apply/rollback mock-only",
       },
     ],
     safetyEyebrow: "Safety before speed",
     safetyTitle: "High-risk changes get a recovery step.",
     safetyBody:
-      "Display and network changes remain temporary during a 15-second review. Keeping them requires explicit confirmation; timeout, window close, or confirmation failure asks the adapters to restore the preflight snapshot. Rollback is best-effort, and hardware mutation remains labelled unverified until independently tested.",
+      "Protected display changes remain temporary during a 15-second review. Keeping them requires explicit confirmation; timeout, window close, or confirmation failure requests restoration of the preflight snapshot. Rollback is best-effort, and hardware mutation remains labelled unverified until independently tested.",
     safetyPoints: [
       "Fresh snapshot before execution",
       "15-second Keep / Revert window",
@@ -96,8 +84,8 @@ const content = {
     privacyTitle: "Your desk profile stays on your Mac.",
     privacyCards: [
       ["No outbound app service", "No account, sync server, updater, product analytics, ads, or telemetry path."],
-      ["Permission at the boundary", "Location authorization is requested only when macOS requires it to reveal the current Wi-Fi name. The app never requests coordinates, and you can capture without Wi-Fi."],
-      ["Review before sharing", "Exports never contain Wi-Fi passwords, but labels, SSIDs, network ranges, and legacy location conditions can be sensitive. Dormant or snapshot-only values can remain in JSON with inclusion off."],
+      ["No capture permission prompt", "Current Capture reads Display and Sound only. It does not request Location or microphone access."],
+      ["Review before sharing", "Exports can contain device labels, stable identifiers, and dormant legacy data. Review and redact them before sharing."],
     ],
     hostingNote:
       "This project code sets no cookies and contains no project analytics or client-side tracking. Its hosting provider still processes requests and may retain aggregate operational metrics.",
@@ -107,15 +95,12 @@ const content = {
       "Verify SHA-256, open the DMG, and drag Desk Setup Switcher to Applications.",
       "After the first blocked launch, use Privacy & Security → Open Anyway once. Never disable Gatekeeper.",
     ],
-    demoTitle: "37-second silent walkthrough",
-    demoBody: "Synthetic screens, captions on, no live system changes.",
-    demoLabel: "Desk Setup Switcher silent product walkthrough",
     faqEyebrow: "FAQ",
     faqTitle: "Know the boundary before you install.",
     faqs: [
       ["Does it switch profiles automatically?", "No. Capture reads, Edit changes a draft, Review explains, and only Apply can start a system change."],
-      ["Why can Wi-Fi capture ask for Location?", "macOS can require Location authorization to reveal the current Wi-Fi name. The app explains this first and offers a Wi-Fi-free capture path."],
-      ["What happens if a risky change is wrong?", "Protected display and network changes offer Keep or Revert and attempt rollback on timeout, close, or confirmation failure."],
+      ["Which settings can a profile save?", "Main display, resolution, output device, output volume, output mute, input device, and input volume. Network is not a current profile feature."],
+      ["What happens if a risky display change is wrong?", "Protected display changes offer Keep or Revert and request rollback on timeout, close, or confirmation failure."],
       ["Is Intel supported?", "Not in the initial beta. The build contains an x86_64 slice, but physical Intel install and runtime verification are still missing."],
     ],
     contributeTitle: "Small product. Public evidence.",
@@ -133,6 +118,7 @@ const content = {
   ko: {
     languageName: "한국어",
     switchLabel: "언어",
+    skipLabel: "본문으로 건너뛰기",
     homeLabel: "Desk Setup Switcher 홈",
     nav: [
       ["사용 흐름", "flow"],
@@ -140,75 +126,62 @@ const content = {
       ["개인정보", "privacy"],
       ["자주 묻는 질문", "faq"],
     ],
-    title: "내 책상 설정을, 내가 확인하고 되돌립니다.",
+    title: "책상 설정을 바꾸기 전에, 먼저 확인하세요.",
     summary:
-      "디스플레이·오디오·네트워크 설정을 캡처하고 필요한 값만 편집하세요. 실제 변경 전에는 항상 모든 변경 내용을 검토합니다.",
-    badges: ["로컬 전용", "계정 없음", "클라우드 없음", "텔레메트리 없음"],
+      "디스플레이와 사운드의 일곱 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 저장하고, 실제 적용 전에 정확한 변경 계획을 확인하세요.",
+    badges: ["로컬 전용", "계정 없음", "클라우드 없음", "자동 전환 없음"],
     github: "GitHub에서 소스 보기",
-    heroAlt: {
-      edit: "합성 데이터로 만든 Desk Setup Switcher 디스플레이 프로필 편집 화면",
-      capture: "현재 설정 캡처 버튼이 있는 합성 빈 트레이 화면",
-      review: "디스플레이와 오디오 변경 계획이 표시된 합성 적용 미리보기",
-    },
-    proof: "합성 제품 데이터 · 개인 기기 및 네트워크 정보 없음",
+    heroAlt: "현재 설정 캡처 버튼이 있는 합성 빈 트레이 화면",
+    scopeLabel: "현재 프로필 범위",
+    scopeTitle: "디스플레이 + 사운드",
+    scopeItems: [
+      "주 디스플레이와 해상도",
+      "출력 기기, 음량, 소리 끔",
+      "입력 기기와 음량",
+    ],
+    scopeNote: "일곱 가지 설정 종류 · 네트워크 및 자동 전환 없음",
+    proof: "합성 제품 데이터 · 개인 기기 식별자 없음",
     flowEyebrow: "한 번에 하나의 결정",
-    flowTitle: "Capture → Edit → Review & Apply",
+    flowTitle: "캡처 → 편집 → 검토 후 적용",
     flowSummary:
       "어떤 프로필도 자동으로 전환되지 않습니다. 단계마다 목적은 하나이며, 실제 적용은 별도의 확인입니다.",
     steps: [
       {
         number: "01",
-        title: "Capture",
-        body: "현재 Mac에서 읽을 수 있는 snapshot을 새 프로필로 기록합니다. 적용·확인·rollback까지 수행 가능한 값만 실행 가능한 항목으로 표시됩니다. Capture 자체는 아무 설정도 바꾸지 않습니다.",
-        image: "/screenshots/capture.png",
-        width: 368,
-        height: 260,
-        alt: "현재 설정 캡처 버튼이 있는 빈 트레이",
+        title: "캡처",
+        body: "현재 Mac의 디스플레이와 사운드 값을 로컬 프로필로 읽습니다. 캡처 자체는 어떤 설정도 바꾸지 않습니다.",
       },
       {
         number: "02",
-        title: "Edit",
-        body: "프로필에 포함할 디스플레이·오디오·네트워크 값을 고릅니다. 제외한 값은 건드리지 않습니다.",
-        image: "/screenshots/edit.png",
-        width: 900,
-        height: 568,
-        alt: "디스플레이 설정을 보여주는 프로필 편집 화면",
+        title: "편집",
+        body: "프로필 이름과 일곱 가지 현재 설정 중 사용할 수 있는 값을 정합니다. 없는 값은 임의로 만들지 않습니다.",
       },
       {
         number: "03",
-        title: "Review & Apply",
-        body: "변경 계획·제외 항목·위험을 먼저 확인합니다. 별도의 프로필 적용 또는 사용 가능한 설정 적용 확인을 눌러야 Mac이 바뀝니다.",
-        image: "/screenshots/review.png",
-        width: 620,
-        height: 500,
-        alt: "변경 계획이 표시된 적용 미리보기",
+        title: "검토 후 적용",
+        body: "변경 계획, 제외 항목, 위험을 먼저 확인합니다. 별도의 프로필 적용 또는 사용 가능한 설정 적용을 눌러야 Mac이 바뀝니다.",
       },
     ],
     supportEyebrow: "정직한 지원 경계",
-    supportTitle: "세 가지 영역, 검증 수준까지 그대로.",
+    supportTitle: "두 가지 영역, 검증 수준까지 그대로.",
     supportSummary:
-      "현재 소스의 읽기 전용 그룹/기본 경로는 Apple Silicon에서 통과했습니다. ColorSync 프로필·입력 볼륨·서비스 IPv4 개별 필드의 실제 존재/읽기는 항목별로 확인하지 않았고, 나열한 모든 적용·롤백 경로는 결정론적 mock 증거입니다. 실제 설정 변경은 하드웨어에서 검증되지 않았습니다.",
+      "현재 소스의 읽기 전용 그룹 경로는 Apple Silicon에서 통과했습니다. 적용과 되돌리기 경로는 결정론적 모의 검증 상태이며, 실제 설정 변경은 하드웨어에서 검증되지 않았습니다.",
     capabilities: [
       {
         name: "디스플레이",
-        items: "출력 방식, 주 디스플레이, 해상도, 주사율, ColorSync ICC 프로필",
-        evidence: "현재 소스 그룹/기본 실기 읽기 · 개별 필드 읽기 미주장 · 적용/롤백 mock 전용",
+        items: "주 디스플레이와 해상도. 해상도는 현재 주사율을 유지하며 사용할 수 없는 조합은 건너뜁니다.",
+        evidence: "현재 소스 그룹 실기 읽기 · 적용/되돌리기 모의 검증",
       },
       {
-        name: "오디오",
-        items: "기본 입력/출력과 설정 가능한 기기 볼륨",
-        evidence: "현재 소스 그룹/기본 실기 읽기 · 개별 필드 읽기 미주장 · 적용/롤백 mock 전용",
-      },
-      {
-        name: "네트워크",
-        items: "정확한 Ethernet/Wi-Fi 서비스의 DHCP 또는 수동 IPv4",
-        evidence: "현재 소스 그룹/기본 실기 읽기 · 서비스 IPv4 개별 읽기 미주장 · 적용/롤백 mock 전용",
+        name: "사운드",
+        items: "출력 기기, 음량, 소리 끔과 입력 기기, 음량. 입력 기기 선택은 소리를 녹음하지 않습니다.",
+        evidence: "현재 소스 그룹 실기 읽기 · 적용/되돌리기 모의 검증",
       },
     ],
     safetyEyebrow: "속도보다 안전",
     safetyTitle: "위험한 변경에는 복구 단계를 둡니다.",
     safetyBody:
-      "디스플레이와 네트워크 변경은 15초 검토 중 임시 상태로 유지됩니다. 명시적으로 확인해야 유지되며, 시간 초과·창 닫기·확인 실패 시 어댑터에 사전 스냅샷 복원을 요청합니다. 롤백은 최선의 시도이며 하드웨어 변경은 독립 검증 전까지 미검증으로 표시합니다.",
+      "보호 대상 디스플레이 변경은 15초 동안 임시 상태로 유지됩니다. 명시적으로 확인해야 유지되며, 시간 초과·창 닫기·확인 실패 시 변경 전 상태 복원을 요청합니다. 복구는 최선을 다해 시도하며, 실제 하드웨어 변경은 독립 검증 전까지 미검증으로 표시합니다.",
     safetyPoints: [
       "실행 직전 새 스냅샷",
       "15초 유지 / 되돌리기 창",
@@ -219,27 +192,24 @@ const content = {
     privacyTitle: "책상 프로필은 내 Mac에만 남습니다.",
     privacyCards: [
       ["앱의 외부 서비스 없음", "계정, 동기화 서버, 업데이터, 제품 분석, 광고, 텔레메트리 경로가 없습니다."],
-      ["필요한 순간에만 권한", "macOS가 현재 Wi-Fi 이름을 제공할 때 요구하는 경우에만 위치 접근 권한을 요청합니다. 앱은 좌표를 요청하지 않으며 Wi-Fi 없이 캡처할 수도 있습니다."],
-      ["공유 전 직접 검토", "내보내기에 Wi-Fi 비밀번호는 없지만 이름, SSID, 네트워크 범위, 과거 위치 조건은 민감할 수 있습니다. Dormant 또는 snapshot 전용 값은 포함이 꺼진 채 JSON에 남을 수 있습니다."],
+      ["캡처 권한 요청 없음", "현재 캡처는 디스플레이와 사운드만 읽으며 위치 또는 마이크 접근 권한을 요청하지 않습니다."],
+      ["공유 전 직접 검토", "내보내기에는 기기 이름, 안정 식별자, 사용하지 않는 과거 데이터가 남을 수 있습니다. 공유 전에 확인하고 가리세요."],
     ],
     hostingNote:
       "이 프로젝트 코드는 쿠키, 프로젝트 분석, 클라이언트 추적을 넣지 않습니다. 다만 호스팅 제공자는 요청을 처리하고 집계된 운영 지표를 보관할 수 있습니다.",
     installEyebrow: "설치",
     installSteps: [
-      "공식 GitHub Release에서 unsigned DMG와 checksum을 다운로드합니다.",
-      "SHA-256을 확인하고 DMG를 연 뒤 앱을 Applications로 옮깁니다.",
-      "최초 실행 차단 뒤 개인정보 보호 및 보안 → 그래도 열기를 한 번 사용합니다. Gatekeeper는 끄지 마세요.",
+      "공식 GitHub 릴리스에서 미서명 DMG와 체크섬을 내려받습니다.",
+      "SHA-256을 확인하고 DMG를 연 뒤 앱을 응용 프로그램으로 옮깁니다.",
+      "최초 실행이 차단되면 개인정보 보호 및 보안 → 그래도 열기를 한 번 사용합니다. Gatekeeper는 끄지 마세요.",
     ],
-    demoTitle: "37초 무음 둘러보기",
-    demoBody: "합성 화면과 자막만 사용하며 실제 시스템 설정은 바꾸지 않습니다.",
-    demoLabel: "Desk Setup Switcher 무음 제품 둘러보기",
     faqEyebrow: "자주 묻는 질문",
     faqTitle: "설치 전에 경계를 확인하세요.",
     faqs: [
       ["프로필이 자동으로 전환되나요?", "아니요. Capture는 읽고, Edit은 초안을 바꾸고, Review는 설명합니다. 시스템 변경은 Apply에서만 시작할 수 있습니다."],
-      ["Wi-Fi 캡처에 왜 위치 권한이 필요한가요?", "macOS가 현재 Wi-Fi 이름 공개에 위치 권한을 요구할 수 있습니다. 앱은 먼저 이유를 설명하고 Wi-Fi 없이 캡처하는 선택지도 제공합니다."],
-      ["위험한 변경이 잘못되면 어떻게 되나요?", "보호된 디스플레이·네트워크 변경은 유지 또는 되돌리기를 제공하며, 시간 초과·닫기·확인 실패 시 롤백을 시도합니다."],
-      ["Intel Mac도 지원하나요?", "초기 베타에서는 지원하지 않습니다. x86_64 slice는 있지만 실제 Intel 설치·실행 검증이 없습니다."],
+      ["프로필에 어떤 설정을 저장하나요?", "주 디스플레이, 해상도, 출력 기기, 출력 음량, 출력 소리 끔, 입력 기기, 입력 음량입니다. 네트워크는 현재 프로필 기능이 아닙니다."],
+      ["위험한 디스플레이 변경이 잘못되면 어떻게 되나요?", "보호 대상 디스플레이 변경은 유지 또는 되돌리기를 제공하며, 시간 초과·닫기·확인 실패 시 복구를 요청합니다."],
+      ["Intel Mac도 지원하나요?", "초기 베타에서는 지원하지 않습니다. x86_64 빌드는 포함하지만 실제 Intel 설치·실행 검증이 없습니다."],
     ],
     contributeTitle: "작은 제품, 공개된 검증.",
     contribute: "기여 가이드",
@@ -262,8 +232,15 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
   const text = content[language];
   const release = releasePresentation(language, releaseURL !== null);
 
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+
   return (
     <div className="site-shell" lang={language}>
+      <a className="skip-link" href="#main-content">
+        {text.skipLabel}
+      </a>
       <header className="site-header">
         <a className="brand" href="#top" aria-label={text.homeLabel}>
           <Image src="/app-icon.svg" alt="" width={30} height={30} unoptimized />
@@ -276,7 +253,7 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
             </a>
           ))}
         </nav>
-        <div className="language-switch" aria-label={text.switchLabel}>
+        <div className="language-switch" role="group" aria-label={text.switchLabel}>
           {(["en", "ko"] as const).map((key) => (
             <button
               key={key}
@@ -290,8 +267,8 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
         </div>
       </header>
 
-      <main id="top">
-        <section className="hero section-wrap">
+      <main id="main-content" tabIndex={-1}>
+        <section className="hero section-wrap" id="top">
           <div className="hero-copy">
             <p className="eyebrow">{release.eyebrow}</p>
             <h1>{text.title}</h1>
@@ -316,17 +293,21 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
               </a>
             </div>
           </div>
-          <div className="product-stage" aria-label={language === "en" ? "Product screens" : "제품 화면"}>
+          <div className="product-stage" aria-label={language === "en" ? "Current product scope" : "현재 제품 범위"}>
             <div className="stage-glow" />
-            <figure className="stage-window stage-edit">
-              <Image src="/screenshots/edit.png" alt={text.heroAlt.edit} width={900} height={568} priority unoptimized />
+            <figure className="stage-window current-capture">
+              <Image src="/screenshots/capture.png" alt={text.heroAlt} width={368} height={260} priority unoptimized />
             </figure>
-            <figure className="stage-window stage-capture">
-              <Image src="/screenshots/capture.png" alt={text.heroAlt.capture} width={368} height={260} priority unoptimized />
-            </figure>
-            <figure className="stage-window stage-review">
-              <Image src="/screenshots/review.png" alt={text.heroAlt.review} width={620} height={500} priority unoptimized />
-            </figure>
+            <article className="scope-card">
+              <p className="scope-label">{text.scopeLabel}</p>
+              <h2>{text.scopeTitle}</h2>
+              <ul>
+                {text.scopeItems.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <p className="scope-note">{text.scopeNote}</p>
+            </article>
             <p className="proof-note">{text.proof}</p>
           </div>
         </section>
@@ -340,21 +321,9 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
           <div className="flow-grid">
             {text.steps.map((step) => (
               <article className="flow-card" key={step.number}>
-                <div className="flow-card-copy">
-                  <span className="step-number">{step.number}</span>
-                  <h3>{step.title}</h3>
-                  <p>{step.body}</p>
-                </div>
-                <div className="flow-image-wrap">
-                  <Image
-                    src={step.image}
-                    alt={step.alt}
-                    width={step.width}
-                    height={step.height}
-                    loading="lazy"
-                    unoptimized
-                  />
-                </div>
+                <span className="step-number">{step.number}</span>
+                <h3>{step.title}</h3>
+                <p>{step.body}</p>
               </article>
             ))}
           </div>
@@ -426,23 +395,13 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
             <p className="eyebrow">{text.installEyebrow}</p>
             <h2>{release.installTitle}</h2>
             <p>{release.installBody}</p>
-            <ol>
-              {text.installSteps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-          </div>
-          <div className="demo-card">
-            <div>
-              <p className="eyebrow">Demo</p>
-              <h3>{text.demoTitle}</h3>
-              <p>{text.demoBody}</p>
-            </div>
-            <video controls muted preload="metadata" poster="/screenshots/edit.png" aria-label={text.demoLabel}>
-              <source src="/demo/desk-setup-switcher.mp4" type="video/mp4" />
-              <track kind="captions" src="/demo/captions.en.vtt" srcLang="en" label="English" default={language === "en"} />
-              <track kind="captions" src="/demo/captions.ko.vtt" srcLang="ko" label="한국어" default={language === "ko"} />
-            </video>
+            {releaseURL ? (
+              <ol>
+                {text.installSteps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            ) : null}
           </div>
         </section>
 

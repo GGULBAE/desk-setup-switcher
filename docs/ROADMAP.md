@@ -1,5 +1,13 @@
 # Roadmap
 
+## Public surface scope alignment — 2026-09-11
+
+Make the GitHub first impression and bilingual site describe one current product: seven Display/Sound settings, local profiles, preview-first explicit Apply, and no automatic switching. Remove stale current-facing Network, ColorSync, editable-refresh, and inclusion-toggle claims; keep the public release in `holding`; and render only the still-current synthetic Capture screen until the older Edit/Review/demo/social assets are refreshed. Improve site contrast, skip navigation, language-switch semantics, language metadata, touch targets, and mobile navigation without adding tracking or publishing the site publicly. The registered owner-only Sites preview is a separate `noindex` path bound to one exact project and origin; it cannot enable download copy or satisfy a public-release gate. `make verify-public-surface`, the full non-live `make verify`, and `git diff --check` pass locally. Remote GitHub metadata, public publication, and social-preview replacement remain separate maintainer-approved actions.
+
+## Tray activation and first-click focus — 2026-09-11
+
+For every accepted menu-bar open generation, request foreground activation before showing the existing app-owned `.applicationDefined` popover, then ask only its attached content window to become key. If activation completes later, repeat the key request only for the still-current generation and cancel the observation on close. Preserve the accessory-app lifecycle, popover ownership, dismissal behavior, and non-live test isolation. Focused deterministic coverage and the full local `make verify` gate pass; a user-authorized installed check from another foreground app is still required before claiming first-click active appearance or keyboard focus. See [scope and verification](TRAY-ACTIVATION-2026-09-11.md).
+
 ## Site dependency advisory follow-up — 2026-09-10
 
 Refresh the pinned site dependency graph after the networked CI audit began reporting new Next.js and Sharp advisories. Keep the existing Cloudflare/Vinext architecture and deployment boundary, require zero registry advisories, and rerun all local published/holding/current site states plus the repository gate. See [scope and verification](SITE-DEPENDENCY-REFRESH-2026-09-10.md).
