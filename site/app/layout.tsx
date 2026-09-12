@@ -61,7 +61,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1280,
         height: 640,
-        alt: "Desk Setup Switcher icon and synthetic Display profile editor beside the Capture, Edit, Review & Apply flow.",
+        alt: "Desk Setup Switcher icon and synthetic Capture screen beside the tagline Bring your desk back, deliberately.",
       },
     ],
   },

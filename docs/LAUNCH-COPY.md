@@ -1,6 +1,6 @@
 # Launch copy and repository metadata
 
-Last reviewed: 2026-09-11
+Last reviewed: 2026-09-12
 
 This document is a copy deck and approval checklist. It does not authorize a GitHub setting change, site deployment, release publication, or community post.
 
@@ -8,42 +8,59 @@ Desk Setup Switcher currently has no supported download. Local and ordinary CI D
 
 ## Current remote state
 
-An authenticated read-only GitHub query on 2026-09-11 returned this public-surface state:
+An authenticated read-only GitHub query on 2026-09-12 confirmed this public-surface state after the approved metadata refresh:
 
 | Field | Current value | Required action |
 | --- | --- | --- |
 | Repository | Public at [GGULBAE/desk-setup-switcher](https://github.com/GGULBAE/desk-setup-switcher) | Keep public |
-| Description | “A free and open-source macOS menu bar app for saving and switching display, audio, network, mouse, and keyboard profiles.” | Replace; the current product is manual-only and limited to Display and Sound |
-| Topics | None | Add the reviewed topics below |
+| Description | “A local-first macOS menu bar app for saving, reviewing, and deliberately applying display and sound profiles.” | Keep synchronized with the current product boundary |
+| Topics | `appkit`, `audio`, `display-management`, `local-first`, `macos`, `macos-app`, `menu-bar-app`, `open-source`, `privacy-first`, `productivity`, `swift`, `swiftui` | Keep this focused discovery set unless product scope changes |
 | Homepage | Blank | Keep blank until the approved site has its final HTTPS URL |
+| Social preview | Custom `1280×640` current-scope Capture composition | Keep synchronized with the verified `site/public/og.png` asset |
 | Discussions | Disabled | The public support issue form is the current deliberate alternative; do not advertise Discussions while disabled |
 | Public release | None | Do not link a download until the complete distribution gate passes and the maintainer-approved canonical release exists |
+
+## Promotion sequence
+
+The repository is the current acquisition surface. No external launch post or directory submission is authorized by this plan, and Threads is deliberately deferred.
+
+| Stage | Channel | Evidence-based rule |
+| --- | --- | --- |
+| Now | GitHub README, About, Topics, and social preview | Keep the product purpose, supported scope, and first visual consistent. GitHub uses Topics for repository classification and recommends a custom `1280×640` social image for link previews. |
+| Supported beta | GitHub Release and existing followers | Make one canonical, checksummed download the source of truth. Keep a Developer ID-unsigned beta bounded to users who can follow the documented Gatekeeper path; Apple recommends Developer ID signing and notarization for software distributed outside the App Store. |
+| Runnable public build | Show HN and a rule-compliant macOS community post | Show HN requires something people can actually try, not a landing page or signup. Community posts must follow each community's current self-promotion and disclosure rules. |
+| Polished public launch | Product Hunt | Prepare the direct product URL, square thumbnail, gallery images, pricing/status, description, and maker context as a draft; do not ask for votes or launch an unavailable download. |
+| Post-launch discovery | AlternativeTo and MacUpdate | Submit only after a public beta/download and accurate platform, license, version, support, and pricing information exist. |
+| Signed, notarized, and demanded | Homebrew Cask | Treat Homebrew as an installation channel, not discovery. The official cask policy requires Gatekeeper-compatible software and popularity evidence for self-submissions. |
+
+Primary references: [GitHub Topics](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/classifying-your-repository-with-topics), [GitHub social preview](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview), [Apple notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution), [Show HN](https://news.ycombinator.com/showhn.html), [Product Hunt launch preparation](https://www.producthunt.com/launch/preparing-for-launch), [AlternativeTo FAQ](https://alternativeto.net/faq/), [MacUpdate submission guide](https://www.macupdate.com/help/submit-app), and [Homebrew cask policy](https://docs.brew.sh/Acceptable-Casks).
 
 ## GitHub repository metadata
 
 ### Description
 
-Proposed description:
+Applied description:
 
-> Local-only macOS menu bar app for saving and explicitly applying Display and Sound profiles—with preview, verification, and rollback.
+> A local-first macOS menu bar app for saving, reviewing, and deliberately applying display and sound profiles.
 
 This description is safe before or after release because it does not claim that a supported download exists. Capability and verification detail still belongs in the [support matrix](SUPPORT-MATRIX.md).
 
 ### Topics
 
-Apply this exact reviewed set unless GitHub rejects a topic:
+Applied exact set:
 
 ```text
 macos
+macos-app
 swift
 swiftui
 appkit
 menu-bar-app
+productivity
+display-management
+audio
 local-first
-privacy
-display-settings
-audio-settings
-apple-silicon
+privacy-first
 open-source
 ```
 
@@ -61,11 +78,11 @@ Upload only the final sanitized social-preview asset recorded in the release-ass
 
 English alternative text:
 
-> Desk Setup Switcher icon and synthetic Display profile editor beside the Capture, Edit, Review & Apply flow.
+> Desk Setup Switcher icon and synthetic Capture screen beside the tagline Bring your desk back, deliberately.
 
 한국어 대체 텍스트:
 
-> Desk Setup Switcher 아이콘과 합성 디스플레이 프로필 편집 화면 옆에 Capture, Edit, Review & Apply 흐름이 표시된 이미지.
+> Desk Setup Switcher 아이콘과 합성 Capture 화면 옆에 “Bring your desk back, deliberately.” 문구가 표시된 이미지.
 
 Use these strings wherever the publishing surface supports alternative text, including the site and announcement images.
 

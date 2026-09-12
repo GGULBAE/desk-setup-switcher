@@ -1,5 +1,9 @@
 # Roadmap
 
+## GitHub discovery surface refresh — 2026-09-12
+
+Align the remote repository description, discovery topics, and custom social preview with the current seven-setting Display/Sound product and manual-only workflow. The new deterministic `1280×640` preview uses the still-current synthetic Capture screen rather than the stale legacy editor. Keep Homepage blank while the only site is owner-only, keep Discussions disabled, and publish no Release, site, directory listing, or community post. The researched promotion sequence in [launch copy](LAUNCH-COPY.md) deliberately defers Threads and broad acquisition until a runnable public build exists; signing and notarization precede high-volume installation channels. `make verify-public-surface` and the full non-live `make verify` pass locally.
+
 ## Public surface scope alignment — 2026-09-11
 
 Make the GitHub first impression and bilingual site describe one current product: seven Display/Sound settings, local profiles, preview-first explicit Apply, and no automatic switching. Remove stale current-facing Network, ColorSync, editable-refresh, and inclusion-toggle claims; keep the public release in `holding`; and render only the still-current synthetic Capture screen until the older Edit/Review/demo/social assets are refreshed. Improve site contrast, skip navigation, language-switch semantics, language metadata, touch targets, and mobile navigation without adding tracking or publishing the site publicly. The registered owner-only Sites preview is a separate `noindex` path bound to one exact project and origin; it cannot enable download copy or satisfy a public-release gate. `make verify-public-surface`, the full non-live `make verify`, and `git diff --check` pass locally. Remote GitHub metadata, public publication, and social-preview replacement remain separate maintainer-approved actions.

@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKGROUND="${ROOT_DIR}/docs/evidence/public-release-assets/og-background-imagegen.png"
 ICON_SVG="${ROOT_DIR}/site/public/app-icon.svg"
-SCREENSHOT="${ROOT_DIR}/site/public/screenshots/edit.png"
+SCREENSHOT="${ROOT_DIR}/site/public/screenshots/capture.png"
 OUTPUT="${ROOT_DIR}/site/public/og.png"
 
 for command_name in ffmpeg sips swift; do

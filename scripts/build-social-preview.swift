@@ -42,13 +42,13 @@ let canvas = NSImage(size: canvasSize, flipped: true) { bounds in
     shadow.set()
     NSColor.black.withAlphaComponent(0.20).setFill()
     NSBezierPath(
-        roundedRect: NSRect(x: 602, y: 114, width: 616, height: 397),
+        roundedRect: NSRect(x: 676, y: 137, width: 520, height: 374),
         xRadius: 18,
         yRadius: 18
     ).fill()
     NSGraphicsContext.restoreGraphicsState()
 
-    let screenshotRect = NSRect(x: 610, y: 123, width: 600, height: 379)
+    let screenshotRect = NSRect(x: 688, y: 149, width: 496, height: 350)
     NSGraphicsContext.saveGraphicsState()
     NSBezierPath(roundedRect: screenshotRect, xRadius: 12, yRadius: 12).addClip()
     screenshot.draw(
@@ -84,7 +84,7 @@ let canvas = NSImage(size: canvasSize, flipped: true) { bounds in
         .foregroundColor: NSColor.white,
         .kern: -1.2,
     ]
-    let flowAttributes: [NSAttributedString.Key: Any] = [
+    let taglineAttributes: [NSAttributedString.Key: Any] = [
         .font: NSFont.systemFont(ofSize: 23, weight: .medium),
         .foregroundColor: NSColor(
             calibratedRed: 220 / 255,
@@ -94,7 +94,7 @@ let canvas = NSImage(size: canvasSize, flipped: true) { bounds in
         ),
     ]
     let subtitleAttributes: [NSAttributedString.Key: Any] = [
-        .font: NSFont.systemFont(ofSize: 21, weight: .regular),
+        .font: NSFont.systemFont(ofSize: 18, weight: .regular),
         .foregroundColor: NSColor(
             calibratedRed: 175 / 255,
             green: 200 / 255,
@@ -108,11 +108,11 @@ let canvas = NSImage(size: canvasSize, flipped: true) { bounds in
     NSAttributedString(string: "Switcher", attributes: headlineAttributes)
         .draw(at: NSPoint(x: 78, y: 266))
     NSAttributedString(
-        string: "Capture  →  Edit  →  Review & Apply",
-        attributes: flowAttributes
+        string: "Bring your desk back, deliberately.",
+        attributes: taglineAttributes
     ).draw(at: NSPoint(x: 81, y: 365))
     NSAttributedString(
-        string: "Local-only macOS setup profiles",
+        string: "Display + Sound  ·  Local only  ·  No auto-switching",
         attributes: subtitleAttributes
     ).draw(at: NSPoint(x: 81, y: 415))
 

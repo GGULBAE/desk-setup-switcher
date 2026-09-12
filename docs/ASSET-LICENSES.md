@@ -15,7 +15,7 @@
 | `site/public/demo/captions.en.vtt` | Original English caption copy by project contributors | 2026-07-18 | MIT | Five cues aligned to the 37-second synthetic tour |
 | `site/public/demo/captions.ko.vtt` | Original Korean caption copy by project contributors | 2026-07-18 | MIT | Five cues aligned to the same 37-second synthetic tour |
 | `docs/evidence/public-release-assets/og-background-imagegen.png` | Abstract background commissioned by project contributors using OpenAI image generation | 2026-07-18 | Project rights distributed under MIT to the extent permitted by applicable law and OpenAI terms | Source evidence retained with SHA-256 `ee29d142b55020ca65fd7196ed3bb2c8a861111bab94ffe30fd3b2a330b6f543`; no person, place, logo, device, or factual scene |
-| `site/public/og.png` | AppKit composition of the generated abstract background, exact public icon, regenerated Edit screenshot, and project copy; final FFmpeg RGB24/metadata normalization | 2026-07-20 | MIT project content and generated-background rights; Apple platform terms for in-context SF Symbols | Opaque, profile-free `1280×640`, 556,664-byte social preview with only critical PNG chunks; source and derivative hashes are recorded in `RELEASE-ASSET-PROVENANCE.md` |
+| `site/public/og.png` | AppKit composition of the generated abstract background, exact public icon, current synthetic Capture screenshot, and project copy; final FFmpeg RGB24/metadata normalization | 2026-09-12 | MIT project content and generated-background rights; Apple platform terms for in-context SF Symbols | Opaque, profile-free `1280×640`, 578,992-byte social preview with only critical PNG chunks; source and derivative hashes are recorded in `RELEASE-ASSET-PROVENANCE.md` |
 
 ## Policy
 

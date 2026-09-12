@@ -1,5 +1,9 @@
 # Support matrix
 
+## GitHub discovery surface — 2026-09-12
+
+The public repository description and 12 discovery topics now use the current Display/Sound, local-first, manual-only boundary. A custom `1280×640` social preview uses the current synthetic Capture screen and exact project icon; its deterministic source, checksum, dimensions, opacity, metadata stripping, and provenance pass the public-asset gate. Authenticated read-back confirms the description, topics, blank Homepage, and custom preview. Discussions remains disabled, no public Release or site was published, and no external promotional post was made. `make verify-public-surface` and the full non-live `make verify` pass locally.
+
 ## Public surface alignment — 2026-09-11
 
 README, repository metadata copy, issue forms, curated release notes, product/support documentation, and the bilingual site now use the same current seven-setting Display/Sound boundary. The site stays in `holding`, renders no download instructions, and surfaces only the still-current synthetic Capture screen; older Edit/Review/demo/social assets remain provenance-checked but are not presented as current UI. A registered owner-only Sites preview is separately bound to one exact project and HTTPS origin, emits `noindex` metadata, and does not authorize public access. Deterministic published/holding/current/private-preview builds, rendered copy/privacy checks, asset verification, the full non-live `make verify`, and `git diff --check` pass locally. No remote metadata, Release, public site deployment, installed app, or hardware setting changed.
