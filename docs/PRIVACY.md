@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 2026-07-18
+Last updated: 2026-09-12
 
 Desk Setup Switcher is designed to operate entirely on the Mac where it is installed.
 
@@ -36,7 +36,22 @@ No network setting is part of current profile Capture, Edit, or Apply, including
 
 The public project site is separate from the app. The project code sets no cookie and includes no project analytics, advertising, fingerprinting, or client-side tracking. It does not persist product or visitor data in browser storage. The bundled vinext router has two technical, tab-scoped `sessionStorage` guards that may briefly store only the current path or hard-navigation target to prevent navigation/reload loops and then remove it. Their exact key names and calls are pinned by the built-client test.
 
-The planned Cloudflare Worker disables Worker logs/traces and has no Analytics Engine, database, object-storage, or external-service binding. Cloudflare still processes site requests and provides aggregate request metrics as hosting-platform behavior. Those provider metrics are not app telemetry or project product analytics. Review Cloudflare's [Workers metrics documentation](https://developers.cloudflare.com/workers/observability/metrics-and-analytics/) and [privacy policy](https://www.cloudflare.com/privacypolicy/) before using the future public site. No site has been deployed or approved yet.
+The public holding page is hosted as static files on GitHub Pages at
+<https://ggulbae.github.io/desk-setup-switcher/>. GitHub handles each request
+and states that it logs a visitor's IP address for security. GitHub may process
+other service-usage information under its own terms. Those provider operations
+are not app telemetry or project product analytics, and the project does not
+receive or maintain a per-visitor analytics database. Review GitHub's
+[Pages data-collection notice](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages)
+and [General Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+
+The separate owner-only preview uses a Worker-compatible Sites build with no
+Analytics Engine, database, object-storage, or external-service binding and
+disables Worker logs/traces. Its hosting provider may still process requests
+and retain aggregate platform metrics. The public GitHub Pages branch deployment
+neither uses that preview configuration nor deploys through the user's
+Cloudflare account. See the [GitHub Pages publication contract](GITHUB-PAGES-PUBLICATION.md)
+for the complete hosting boundary.
 
 ## Open-source review
 

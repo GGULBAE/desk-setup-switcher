@@ -12,11 +12,13 @@
     "build:test-holding": "ALLOW_LOCAL_SITE_ORIGIN=1 NEXT_PUBLIC_SITE_URL=http://localhost:3000 NEXT_PUBLIC_RELEASE_FIXTURE=holding npm run build",
     "build:test-published": "ALLOW_LOCAL_SITE_ORIGIN=1 NEXT_PUBLIC_SITE_URL=http://localhost:3000 NEXT_PUBLIC_RELEASE_FIXTURE=published npm run build",
     "build:private-preview": "node scripts/build-private-preview.mjs",
+    "build:pages": "node scripts/build-github-pages.mjs",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "EXPECTED_RELEASE_STATE=current node --test tests/rendered-html.test.mjs",
     "test:holding": "EXPECTED_RELEASE_STATE=holding node --test tests/rendered-html.test.mjs",
     "test:published": "EXPECTED_RELEASE_STATE=published node --test tests/rendered-html.test.mjs",
     "test:private-preview": "EXPECTED_RELEASE_STATE=current EXPECTED_SITE_AUDIENCE=private node --test tests/rendered-html.test.mjs",
+    "test:pages": "node --test tests/github-pages-export.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "audit:dependencies": "npm audit",
     "verify": "node scripts/verify-site.mjs"

@@ -467,8 +467,8 @@ test("site origin approval fails closed and narrowly allows explicit local build
   );
   assert.deepEqual(trackedApproval, {
     schemaVersion: "desk-setup-switcher.site-origin/v1",
-    state: "holding",
-    siteURL: null,
+    state: "approved",
+    siteURL: "https://ggulbae.github.io",
   });
   assert.deepEqual(trackedPrivatePreview, {
     schemaVersion: "desk-setup-switcher.private-preview/v1",
@@ -480,6 +480,7 @@ test("site origin approval fails closed and narrowly allows explicit local build
     runOriginGate(trackedPrivatePreview.siteURL, { allowPrivate: true }).status,
     0,
   );
+  assert.equal(runOriginGate(trackedApproval.siteURL).status, 0);
   assert.notEqual(runOriginGate(trackedPrivatePreview.siteURL).status, 0);
   assert.notEqual(runOriginGate("https://other-preview.chatgpt.site", { allowPrivate: true }).status, 0);
   assert.notEqual(runOriginGate("http://localhost:3000", { allowPrivate: true }).status, 0);
@@ -724,7 +725,7 @@ async function withTimeout(promise, milliseconds) {
   }
 }
 
-test("site verifier covers the private preview before restoring current output", async () => {
+test("site verifier covers private preview and Pages output before restoring current output", async () => {
   const fixture = await makeVerifierFixture("success");
   try {
     const result = spawnSync(process.execPath, [fixture.verifier], {
@@ -743,6 +744,8 @@ test("site verifier covers the private preview before restoring current output",
         "test:holding",
         "build:private-preview",
         "test:private-preview",
+        "build:pages",
+        "test:pages",
         "build:local",
         "test",
       ],

@@ -48,13 +48,11 @@ module PublicCopyState
       [/아직 지원되는 공개 다운로드가 없습니다/, "the Korean no-supported-public-download notice"]
     ],
     "docs/PRIVACY.md" => [
-      [/No site has been deployed or approved yet/i, "the no-deployed-site notice"],
       [/Private vulnerability reporting is currently disabled/i, "the disabled-private-reporting notice"],
       [/no public release exists/i, "the no-public-release notice"]
     ],
     "docs/SUPPORT-MATRIX.md" => [
-      [/tracked closed-schema launch state remains `holding` with no download URL/i, "the tracked holding-state notice"],
-      [/canonical site\/release publication.{0,160}remain pending/im, "the pending canonical-publication notice"]
+      [/tracked closed-schema launch state remains `holding` with no download URL/i, "the tracked holding-state notice"]
     ],
     "SECURITY.md" => [
       [/there is no public release yet/i, "the no-public-release notice"],
@@ -253,14 +251,16 @@ module PublicCopyState
     end
 
     def verify_manifest_pair(release_manifest, site_manifest)
-      case release_manifest.fetch("state")
+      case site_manifest.fetch("state")
       when "holding"
-        check(site_manifest["state"] == "holding", "holding release publication requires holding site-origin approval")
         check(site_manifest["siteURL"].nil?, "holding site-origin approval requires siteURL to be null")
-      when "published"
-        check(site_manifest["state"] == "approved", "published release publication requires approved site-origin approval")
+      when "approved"
         check(site_manifest["siteURL"].instance_of?(String) && !site_manifest["siteURL"].empty?, "approved site-origin approval requires a nonempty siteURL")
       end
+
+      return unless release_manifest.fetch("state") == "published"
+
+      check(site_manifest["state"] == "approved", "published release publication requires approved site-origin approval")
     end
 
     def verify_holding(manifest, documents)

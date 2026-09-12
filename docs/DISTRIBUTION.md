@@ -122,8 +122,9 @@ All of the following are required before the draft becomes public:
 - [ ] GitHub private vulnerability reporting is enabled and the documented
       private route works before public announcement.
 - [ ] A maintainer gives explicit final approval, publishes the draft, verifies
-      the public DMG and checksum by fresh download, and only then switches the
-      tracked site/public-copy state from `holding` to `published`.
+      the public DMG and checksum by fresh download, and only then switches
+      `site/release-publication.json` from `holding` to `published`. The public
+      GitHub Pages holding site does not satisfy or bypass this release gate.
 
 Hardware mutation is not required for the initial beta and must not be inferred
 from mock verification. Any optional live mutation evidence remains separately

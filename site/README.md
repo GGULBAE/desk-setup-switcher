@@ -2,9 +2,19 @@
 
 This directory contains the account-free, bilingual, single-page public site for Desk Setup Switcher. It has no account, database, object storage, project-set cookies, project analytics, telemetry, advertising, or remotely loaded third-party runtime content.
 
-The site is release-preparation source. Do not deploy it publicly until the exact unsigned `v0.1.0` release candidate, canonical download URL and SHA-256, clean-install/Open-Anyway evidence, and maintainer publication approval are complete.
+The maintainer approved the informational **holding** page for public GitHub
+Pages hosting at <https://ggulbae.github.io/desk-setup-switcher/>. That approval
+does not publish the app: `release-publication.json` remains `holding`, so the
+page exposes no supported download or installation instructions. The exact
+unsigned `v0.1.0` release candidate, canonical download URL and SHA-256,
+clean-install/Open-Anyway evidence, and separate release-publication approval
+are still required before download copy can appear.
 
-An owner-only internal preview is a separate path. `private-preview.json` binds it to one registered Sites project and clean HTTPS origin while the public records remain in `holding`. `npm run build:private-preview` emits `noindex`, `nofollow`, and `noimageindex` metadata and does not enable download copy or authorize public access.
+The earlier owner-only internal preview is a separate path.
+`private-preview.json` binds it to one registered Sites project and clean HTTPS
+origin. `npm run build:private-preview` emits `noindex`, `nofollow`, and
+`noimageindex` metadata and does not enable download copy or authorize an app
+release. It is not the GitHub Pages deployment source.
 
 ## Local development
 
@@ -14,6 +24,7 @@ Requires Node.js 22.13 or later.
 npm ci --ignore-scripts
 npm run dev
 npm run verify
+npm run build:pages
 ```
 
 From the repository root, `make verify-public-surface` runs the site build,
@@ -27,18 +38,26 @@ graph with lifecycle scripts disabled, checks the registry advisory feed, and
 runs that same command in a dedicated public-surface job. Neither Homebrew nor
 FFmpeg is an application or site runtime dependency.
 
-Copy `.env.example` to the gitignored `.env.local` and replace its placeholder
-`NEXT_PUBLIC_SITE_URL` only after the final HTTPS origin has been approved in
-[`site-publication.json`](site-publication.json). The build loads that file
-without evaluating it as shell code. `npm run build` fails unless the record is
-`approved` and `NEXT_PUBLIC_SITE_URL` is byte-for-byte equal to its exact clean
-origin; missing, local, IP-literal, non-HTTPS, non-canonical,
-reserved/placeholder, arbitrary, and mismatched origins all fail closed.
-`npm run build:local` and `npm run verify` bypass the publication approval only
-for explicit HTTP loopback origins used by local metadata checks; they still
-strictly parse and validate the tracked record on every build.
+Copy `.env.example` to the gitignored `.env.local` only for an explicitly
+approved non-Pages production build. The general build loads
+[`site-publication.json`](site-publication.json) without evaluating it as shell
+code and fails closed on missing, local, IP-literal, non-HTTPS, non-canonical,
+reserved/placeholder, arbitrary, or mismatched origins. `npm run build:local`
+and `npm run verify` permit only explicit HTTP loopback origins for local
+metadata checks; they still strictly parse the tracked publication record.
 
-`npm run verify` builds the Cloudflare Worker-compatible Sites output, lints the source, renders the page, checks the honest release/support copy and security headers, verifies that no cookie is set, scans application source and the built client for tracking/storage boundaries, and verifies the retained public-media inventory.
+`npm run build:pages` is the dedicated public-hosting path. It fixes the clean
+origin to `https://ggulbae.github.io`, the project base path to
+`/desk-setup-switcher`, and emits a static artifact under `out/` with a
+top-level `index.html` and `.nojekyll`. Assets, canonical/Open Graph metadata,
+and internal navigation must retain that project path. The command must not
+accept an arbitrary deployment URL from an untrusted workflow input.
+
+`npm run verify` builds the Worker-compatible owner-preview output and the
+GitHub Pages static output, lints the source, renders the page, checks the honest
+release/support copy and applicable hosting boundaries, verifies that project
+code sets no cookie, scans application source and built clients for
+tracking/storage boundaries, and verifies the retained public-media inventory.
 
 [`release-publication.json`](release-publication.json) is the site's only
 rendering-state switch. It is schema-checked during every build. `holding` requires a null URL;
@@ -47,24 +66,24 @@ verification command renders and checks both states before rebuilding the
 currently tracked state. If an intermediate state check fails, it still attempts
 that restoration and removes `dist` if restoration cannot complete.
 
-The overall public launch is deliberately broader than that one site-data
-switch. The same public-surface gate cross-binds the release and site-origin
-records and checks README, the English/Korean guide index and user guides,
-PRIVACY, SUPPORT-MATRIX, `SECURITY.md`, `SUPPORT.md`, and lifecycle-neutral
-support-form copy. The immutable Release body is self-contained and never
-depends on a mutable branch document. After that Release is visibly public, the
-locally pre-reviewed public-copy patch may be published for protected review;
-its review tree and merged `master` tree must match, and both required CI jobs
-must pass on the review head and exact final `master` SHA before deployment.
-Component code is not rewritten during that transition.
+Public hosting of the holding page is deliberately independent from the app
+release switch. The same public-surface gate checks README, the English/Korean
+guide index and user guides, PRIVACY, SUPPORT-MATRIX, `SECURITY.md`,
+`SUPPORT.md`, and lifecycle-neutral support-form copy so a public page cannot
+imply that a download exists. The later immutable Release body remains
+self-contained and never depends on a mutable branch document. When the app is
+actually approved, a separately reviewed public-copy patch changes
+`release-publication.json` and the bounded release documents without treating
+this earlier Pages publication as release evidence.
 
-[`site-publication.json`](site-publication.json) is a separate canonical-origin
-approval record; it does not change release copy. Its exact three-key
-`desk-setup-switcher.site-origin/v1` schema permits only `holding` with a null
-`siteURL`, or `approved` with one exact clean public HTTPS origin. The strict
-reader rejects duplicate or extra keys, malformed JSON, non-canonical UTF-8,
-and linked files. Because the origin gate runs before the site build, only the
-approved value can become the production canonical and Open Graph URL.
+[`site-publication.json`](site-publication.json) is the strict canonical-origin
+record used by general production builds; it does not change release copy. Its
+exact three-key `desk-setup-switcher.site-origin/v1` schema permits only
+`holding` with a null `siteURL`, or `approved` with one exact clean public HTTPS
+origin. The strict reader rejects duplicate or extra keys, malformed JSON,
+non-canonical UTF-8, and linked files. The Pages builder additionally fixes and
+validates the `/desk-setup-switcher` project base path before composing the
+canonical and Open Graph URL.
 
 The application-authored site code does not persist product or visitor data in
 browser storage. The bundled vinext router contains two framework-owned,
@@ -103,14 +122,20 @@ Asset sources and sanitization are recorded in [release asset provenance](../doc
 
 ## Hosting
 
-`.openai/hosting.json` binds the owner-only preview project and deliberately
-declares no D1 or R2 capability. The built Worker disables request logs/traces
-with `observability.enabled: false`.
-Cloudflare nevertheless provides built-in aggregate Worker request metrics as
-hosting-platform behavior; those are not project product analytics. The public
-site discloses this boundary. See Cloudflare's
-[Workers metrics documentation](https://developers.cloudflare.com/workers/observability/metrics-and-analytics/)
-and [privacy policy](https://www.cloudflare.com/privacypolicy/). Public
-deployment, domain configuration, final Open Graph URL, and release-link
-activation occur only after the user approves publication. An authenticated,
-owner-only preview does not satisfy or bypass those public-release gates.
+The public site is generated with `npm run build:pages` and published from the
+root of the dedicated `gh-pages` branch. The branch contains only the reviewed
+static output and `.nojekyll`; no repository or Cloudflare secret is used.
+Publication is manual rather than coupled to every `master` push. See the
+complete [GitHub Pages publication contract](../docs/GITHUB-PAGES-PUBLICATION.md).
+
+GitHub handles Pages requests and states that it logs visitor IP addresses for
+security. That provider processing is not project telemetry or analytics. See
+GitHub's [Pages data-collection notice](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages)
+and [privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+
+`.openai/hosting.json` remains scoped to the owner-only preview project and
+declares no D1 or R2 capability. Its Worker output disables request logs/traces
+with `observability.enabled: false`; Cloudflare may still provide aggregate
+platform request metrics for that preview. The public Pages branch deployment
+does not use that configuration or deploy to the user's Cloudflare account.
+Neither hosting path authorizes a GitHub Release or download link.

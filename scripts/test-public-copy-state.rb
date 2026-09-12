@@ -11,7 +11,7 @@ VERIFIER = File.expand_path("verify-public-copy-state.rb", __dir__)
 SCHEMA = "desk-setup-switcher.site-release/v1"
 CANONICAL_RELEASE = "https://github.com/GGULBAE/desk-setup-switcher/releases/tag/v0.1.0"
 PRIVATE_ADVISORY = "https://github.com/GGULBAE/desk-setup-switcher/security/advisories/new"
-APPROVED_SITE = "https://desksetup.app"
+APPROVED_SITE = "https://ggulbae.github.io"
 
 DOCUMENT_PATHS = [
   "README.md",
@@ -79,6 +79,22 @@ HOLDING_DOCUMENTS = {
     version_help: Supported downloads come only from versioned GitHub Releases; local and CI artifacts are unsupported.
   TEXT
 }.freeze
+
+HOLDING_APPROVED_SITE_DOCUMENTS = HOLDING_DOCUMENTS.merge(
+  "docs/PRIVACY.md" => <<~TEXT,
+    # Privacy
+
+    The public project site is informational and does not publish an app release.
+    Private vulnerability reporting is currently disabled.
+    The current package is development evidence and no public release exists.
+  TEXT
+  "docs/SUPPORT-MATRIX.md" => <<~TEXT
+    # Support matrix
+
+    The tracked closed-schema launch state remains `holding` with no download URL.
+    The informational project site is approved independently of the app release.
+  TEXT
+).freeze
 
 PUBLISHED_DOCUMENTS = {
   "README.md" => <<~TEXT,
@@ -199,15 +215,40 @@ def expect_failure(label, expected:, state: "published", documents: PUBLISHED_DO
 end
 
 expect_success("valid holding state", state: "holding", documents: HOLDING_DOCUMENTS)
+expect_success(
+  "holding release with independently approved site origin",
+  state: "holding",
+  documents: HOLDING_APPROVED_SITE_DOCUMENTS,
+  site_state: "approved",
+  site_url: APPROVED_SITE
+)
 expect_success("valid published state", state: "published", documents: PUBLISHED_DOCUMENTS)
 
 expect_failure(
-  "holding release with approved site origin",
-  expected: "holding release publication requires holding site-origin approval",
+  "holding site origin with non-null URL",
+  expected: "holding site-origin approval requires siteURL to be null",
   state: "holding",
   documents: HOLDING_DOCUMENTS,
-  site_state: "approved",
+  site_state: "holding",
   site_url: APPROVED_SITE
+)
+
+expect_failure(
+  "approved site origin with null URL",
+  expected: "approved site-origin approval requires a nonempty siteURL",
+  state: "holding",
+  documents: HOLDING_APPROVED_SITE_DOCUMENTS,
+  site_state: "approved",
+  site_url: nil
+)
+
+expect_failure(
+  "approved site origin with empty URL",
+  expected: "approved site-origin approval requires a nonempty siteURL",
+  state: "holding",
+  documents: HOLDING_APPROVED_SITE_DOCUMENTS,
+  site_state: "approved",
+  site_url: ""
 )
 
 expect_failure(
@@ -227,6 +268,15 @@ expect_failure(
   state: "holding",
   documents: HOLDING_DOCUMENTS,
   raw_site_manifest: duplicate_site_manifest
+)
+
+expect_failure(
+  "unknown site-origin publication state",
+  expected: "site publication state must be exactly holding or approved",
+  state: "holding",
+  documents: HOLDING_DOCUMENTS,
+  site_state: "launching",
+  site_url: nil
 )
 
 expect_failure(
@@ -447,4 +497,4 @@ expect_failure(
   documents: support_without_security_route
 )
 
-puts "OK test-public-copy-state assertions=#{@assertions} scenarios=27"
+puts "OK test-public-copy-state assertions=#{@assertions} scenarios=31"

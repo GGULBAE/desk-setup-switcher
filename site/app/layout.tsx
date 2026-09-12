@@ -8,7 +8,10 @@ if (!siteURL) {
 }
 
 const metadataBase = new URL(siteURL);
-const canonicalURL = new URL("/", metadataBase).toString();
+const siteBasePath = process.env.NEXT_PUBLIC_SITE_BASE_PATH ?? "";
+const canonicalURL = new URL(`${siteBasePath}/`, metadataBase).toString();
+const publicAssetURL = (path: string) =>
+  new URL(`${siteBasePath}${path}`, metadataBase).toString();
 const isPrivatePreview = process.env.NEXT_PUBLIC_SITE_AUDIENCE === "private";
 
 export const metadata: Metadata = {
@@ -44,8 +47,8 @@ export const metadata: Metadata = {
       }
     : undefined,
   icons: {
-    icon: "/app-icon.svg",
-    shortcut: "/app-icon.svg",
+    icon: publicAssetURL("/app-icon.svg"),
+    shortcut: publicAssetURL("/app-icon.svg"),
   },
   openGraph: {
     type: "website",
@@ -58,7 +61,7 @@ export const metadata: Metadata = {
     siteName: "Desk Setup Switcher",
     images: [
       {
-        url: "/og.png",
+        url: publicAssetURL("/og.png"),
         width: 1280,
         height: 640,
         alt: "Desk Setup Switcher icon and synthetic Capture screen beside the tagline Bring your desk back, deliberately.",
@@ -70,7 +73,7 @@ export const metadata: Metadata = {
     title: "Desk Setup Switcher — Bring your desk back, deliberately.",
     description:
       "Capture → Edit → Review & Apply. Local-only macOS profiles with explicit change and rollback boundaries.",
-    images: ["/og.png"],
+    images: [publicAssetURL("/og.png")],
   },
 };
 

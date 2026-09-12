@@ -53,6 +53,8 @@ try {
     "test:holding",
     "build:private-preview",
     "test:private-preview",
+    "build:pages",
+    "test:pages",
   ]) {
     if (interruptedSignal) throw new Error("Site verification was interrupted");
     await runScript(name);
@@ -71,6 +73,7 @@ try {
   failed = true;
 }
 restoring = false;
+rmSync(new URL("../out", import.meta.url), { force: true, recursive: true });
 
 if (!failed && !interruptedSignal) {
   try {

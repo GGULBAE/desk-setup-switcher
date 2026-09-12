@@ -15,7 +15,7 @@ An authenticated read-only GitHub query on 2026-09-12 confirmed this public-surf
 | Repository | Public at [GGULBAE/desk-setup-switcher](https://github.com/GGULBAE/desk-setup-switcher) | Keep public |
 | Description | “A local-first macOS menu bar app for saving, reviewing, and deliberately applying display and sound profiles.” | Keep synchronized with the current product boundary |
 | Topics | `appkit`, `audio`, `display-management`, `local-first`, `macos`, `macos-app`, `menu-bar-app`, `open-source`, `privacy-first`, `productivity`, `swift`, `swiftui` | Keep this focused discovery set unless product scope changes |
-| Homepage | Blank | Keep blank until the approved site has its final HTTPS URL |
+| Homepage | Blank | Set to the approved GitHub Pages project URL only after the holding deployment passes the clean-session checks |
 | Social preview | Custom `1280×640` current-scope Capture composition | Keep synchronized with the verified `site/public/og.png` asset |
 | Discussions | Disabled | The public support issue form is the current deliberate alternative; do not advertise Discussions while disabled |
 | Public release | None | Do not link a download until the complete distribution gate passes and the maintainer-approved canonical release exists |
@@ -68,9 +68,9 @@ Do not add `intel`, `homebrew`, `app-store`, `automatic-switching`, `accessibili
 
 ### Homepage
 
-- **Before approval:** leave Homepage blank. Do not use a local URL, preview deployment, Actions artifact, unsigned DMG, or direct object-storage URL.
-- **Approval placeholder:** record the final HTTPS origin as `APPROVED_SITE_URL` in the separately reviewed tracked site-origin record. The release approval record deliberately grants no site authority. This token is an instruction, not a URL to publish.
-- **After approval:** replace the blank Homepage field with that exact origin only after the bilingual site, canonical release link, privacy/security links, and no-tracking checks pass on the deployed site.
+- **Before the public holding deployment passes:** leave Homepage blank. Do not use a local URL, owner-only preview, Actions artifact, unsigned DMG, or direct object-storage URL.
+- **Approved site URL:** `https://ggulbae.github.io/desk-setup-switcher/`. The tracked site-origin record contains `https://ggulbae.github.io`; the Pages builder fixes `/desk-setup-switcher` and composes the canonical project URL. The release approval record deliberately grants no site authority.
+- **After the holding deployment passes:** replace the blank Homepage field with the exact approved project URL only after the bilingual page, canonical/Open Graph metadata, privacy/security links, project-code no-cookie/no-tracking boundary, and no-download release state pass from a clean session.
 
 ### Social preview
 
@@ -88,7 +88,7 @@ Use these strings wherever the publishing surface supports alternative text, inc
 
 ## Launch gallery kit
 
-The repository and owner-only site may show this exact-commit synthetic kit before a supported download exists. Keep the holding-state notice adjacent to it; the screenshots demonstrate the workflow, not release availability or hardware verification.
+The repository, public holding site, and owner-only preview may show this exact-commit synthetic kit before a supported download exists. Keep the holding-state notice adjacent to it; the screenshots demonstrate the workflow, not release availability or hardware verification.
 
 | Order | Asset | Public-facing message | Boundary |
 | --- | --- | --- | --- |
@@ -117,9 +117,10 @@ Display와 Sound의 일곱 가지 설정 종류에서 사용할 수 있는 값�
 
 Desk Setup Switcher는 여러 책상 환경을 오가는 사용자를 위한 무료 오픈소스 macOS 메뉴 막대 앱입니다. 주 디스플레이, 해상도, 출력 기기·음량·음소거, 입력 기기·음량의 일곱 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 Capture하고, Edit한 뒤, 예정된 변경을 모두 Review하고 명시적으로 Apply합니다. 설정별 포함 스위치와 편집 가능한 재생률 설정은 없으며, 해상도는 현재 재생률을 유지할 수 없으면 적용에서 제외됩니다. Network와 다른 과거 필드는 호환성을 위한 비활성 데이터로만 남습니다. Capture는 Display와 Audio만 조회하고 위치 권한을 요청하지 않습니다. 프로필과 민감 정보를 제거한 진단은 Mac 안에만 남으며 계정, 클라우드 동기화, 텔레메트리, 분석, 자동 전환, 앱 내 업데이트가 없습니다. 초기 public beta는 macOS 14 배포 타깃의 Apple Silicon을 대상으로 하며 정확한 후보의 Sonoma 수명주기 검증이 먼저 필요합니다. 기능 주장은 지원표를 따르며 실제 Intel 지원은 주장하지 않습니다.
 
-## Pre-publication holding copy
+## Pre-release holding copy
 
-Use this only when a status message is needed before the release gate passes:
+Use this on the public GitHub Pages holding site or in a status message before
+the app-release gate passes:
 
 ### English
 
@@ -231,7 +232,11 @@ Do not add analytics, cookies, pixels, fingerprinting, campaign IDs, URL shorten
 
 ## Approval and application checklist
 
-Do not apply metadata or publish copy until every applicable box has recorded evidence.
+Do not publish app-release metadata, download copy, or promotional copy until
+every applicable box has recorded evidence. The separately approved public
+holding page is governed by
+[GITHUB-PAGES-PUBLICATION.md](GITHUB-PAGES-PUBLICATION.md) and must continue to
+show the pre-release copy above.
 
 - [ ] The active `unsigned-release.yml` path remains manual-only, any historical signed-publication route stays contained, and branch/tag protections plus private vulnerability reporting are configured and confirmed read-only.
 - [ ] The exact `v0.1.0` candidate is ad-hoc integrity-signed with no Developer ID identity or notarization ticket, checksummed, and bound to its tag, commit, version, build, architecture, minimum OS, SBOM, and final-DMG provenance without an app rebuild or byte substitution.
@@ -243,21 +248,25 @@ Do not apply metadata or publish copy until every applicable box has recorded ev
 - [ ] The final support matrix states the exact evidence for all seven current Display/Sound setting kinds or preserves the explicit mock-verified limitation; Network and other legacy fields remain clearly dormant.
 - [ ] The canonical [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases) contains only the approved versioned unsigned DMG, matching checksum, and curated English/Korean notes.
 - [ ] The Release body is self-contained: it links no branch-lifecycle document and permits only the tag-pinned distribution procedure plus the exact public-support and private-advisory action routes.
-- [ ] The final HTTPS site origin and deployment configuration are separately approved. The tracked site-origin record remains `holding`/null before that approval, and a public build must reject any `NEXT_PUBLIC_SITE_URL` that is not the exact approved origin.
+- [ ] The GitHub Pages holding-site origin, `/desk-setup-switcher` base path, and branch-source configuration remain the exact separately approved values. The static builder rejects any other origin/base-path pair and any release state other than `holding` with a null release URL.
 - [ ] Before Release publication, prepare and review locally—but do not push or merge—a bounded public-copy finalization patch and record its base commit, tree digest, and file allowlist. It contains no component-code rewrite.
-- [ ] After the `v0.1.0` Release and assets are visibly public and reverified, publish that prepared patch for review. It sets `site/release-publication.json` to the exact canonical Release URL, sets the separately approved site-origin record, and synchronizes README, the English/Korean guide index and user guides, PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and directly required status records. If `master` moved or the tree differs, stop and re-review instead of rebasing silently.
+- [ ] After the `v0.1.0` Release and assets are visibly public and reverified, publish that prepared patch for review. It sets `site/release-publication.json` to the exact canonical Release URL while preserving the approved GitHub Pages origin/base path, and synchronizes README, the English/Korean guide index and user guides, PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and directly required status records. If `master` moved or the tree differs, stop and re-review instead of rebasing silently.
 - [ ] Both required CI jobs pass on the finalization review head. Merge through the protected branch, read back the exact `master` SHA and tree digest, then require one `master`-push CI run on that exact SHA with exactly **Verify macOS app** and **Verify public site and release assets** successful.
-- [ ] Only after that exact `master` run passes is the bilingual site deployed. A clean session proves the approved canonical/`og:url` metadata, no-cookie/no-tracking boundary, current support/security routes, and that every download link points only to the canonical Release.
+- [ ] Only after that exact `master` run passes may a separately reviewed builder change remove the Pages deployment's holding-only guard and publish release/download copy. A clean session then proves the approved canonical/`og:url` metadata, project-code no-cookie/no-tracking boundary, current support/security routes, and that every download link points only to the canonical Release.
 - [ ] The screenshot, silent-captioned demo, social preview, captions, and provenance use synthetic or sanitized data and match actual behavior.
 - [ ] Private vulnerability reporting is enabled and tested; public support and security links resolve to the intended routes.
 - [ ] `APPROVED_RELEASE_URL`, `APPROVED_SITE_URL`, and `FINAL_DMG_SHA256` are replaced in the copies selected for publication. No instruction line or unused variant remains.
-- [ ] The maintainer explicitly approves the description, topics, Homepage URL, social preview, Release publication, site publication, and each external post.
+- [ ] The maintainer explicitly approves the description, topics, Homepage URL, social preview, Release publication, the later release/download site transition, and each external post. The earlier holding-site approval is not release approval.
 - [ ] After applying metadata, a read-only GitHub query confirms the exact description/topics/Homepage and shows no stale current-scope claim for Network/mouse/keyboard, no Intel/Homebrew/accessibility-certification/hardware-verification overclaim, and no claim that the beta is Developer ID-signed or notarized.
 - [ ] After publication, every release/site/download link is opened from a clean browser session and the downloaded asset identity is reverified.
 - [ ] Homebrew remains “not offered” at publication; after the canonical Release exists, the project-owned tap passes `install`, `upgrade`, `uninstall`, and `zap` against the exact final SHA-256 before it is advertised.
 - [ ] Only the public aggregate signals above are recorded; no analytics or telemetry is introduced.
 
-Actual remote metadata mutation, public site deployment, Release publication, and promotional posting remain separate maintainer-approved actions. An owner-only internal preview does not authorize any of them.
+Initial publication of the no-download GitHub Pages holding site is separately
+approved under [GITHUB-PAGES-PUBLICATION.md](GITHUB-PAGES-PUBLICATION.md).
+Remote repository metadata mutation, Release publication, enabling download
+copy, and promotional posting remain separate maintainer-approved actions. An
+owner-only internal preview does not authorize any of them.
 
 ## Stable references
 

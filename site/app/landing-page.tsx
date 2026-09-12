@@ -5,6 +5,8 @@ import Image from "next/image";
 import { releasePresentation } from "../lib/release-copy.mjs";
 
 const repositoryURL = "https://github.com/GGULBAE/desk-setup-switcher";
+const siteBasePath = process.env.NEXT_PUBLIC_SITE_BASE_PATH ?? "";
+const publicAssetPath = (path: string) => `${siteBasePath}${path}`;
 
 const content = {
   en: {
@@ -339,7 +341,7 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
       </a>
       <header className="site-header">
         <a className="brand" href="#top" aria-label={text.homeLabel}>
-          <Image src="/app-icon.svg" alt="" width={30} height={30} unoptimized />
+          <Image src={publicAssetPath("/app-icon.svg")} alt="" width={30} height={30} unoptimized />
           <span>Desk Setup Switcher</span>
         </a>
         <nav className="primary-nav" aria-label={language === "en" ? "Primary" : "주요 메뉴"}>
@@ -392,7 +394,14 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
           <div className="product-stage" aria-label={language === "en" ? "Current product scope" : "현재 제품 범위"}>
             <div className="stage-glow" />
             <figure className="stage-window current-capture">
-              <Image src="/screenshots/capture.png" alt={text.heroAlt} width={368} height={260} priority unoptimized />
+              <Image
+                src={publicAssetPath("/screenshots/capture.png")}
+                alt={text.heroAlt}
+                width={368}
+                height={260}
+                priority
+                unoptimized
+              />
             </figure>
             <article className="scope-card">
               <p className="scope-label">{text.scopeLabel}</p>
@@ -441,7 +450,7 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
                 <figure className="gallery-card" key={item.number}>
                   <div className="gallery-frame">
                     <Image
-                      src={item.image}
+                      src={publicAssetPath(item.image)}
                       alt={item.alt}
                       width={1270}
                       height={760}
@@ -468,26 +477,26 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
                   controls
                   preload="metadata"
                   playsInline
-                  poster="/gallery/04-review.png"
+                  poster={publicAssetPath("/gallery/04-review.png")}
                   aria-label={text.demoLabel}
                   aria-describedby="demo-description"
                 >
-                  <source src="/demo/desk-setup-switcher.mp4" type="video/mp4" />
+                  <source src={publicAssetPath("/demo/desk-setup-switcher.mp4")} type="video/mp4" />
                   <track
                     kind="captions"
-                    src="/demo/captions.en.vtt"
+                    src={publicAssetPath("/demo/captions.en.vtt")}
                     srcLang="en"
                     label="English"
                     default={language === "en"}
                   />
                   <track
                     kind="captions"
-                    src="/demo/captions.ko.vtt"
+                    src={publicAssetPath("/demo/captions.ko.vtt")}
                     srcLang="ko"
                     label="한국어"
                     default={language === "ko"}
                   />
-                  <a href="/demo/desk-setup-switcher.mp4">{text.demoFallback}</a>
+                  <a href={publicAssetPath("/demo/desk-setup-switcher.mp4")}>{text.demoFallback}</a>
                 </video>
               </div>
               <div className="demo-copy">
@@ -619,7 +628,7 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
 
       <footer className="site-footer section-wrap">
         <div className="brand footer-brand">
-          <Image src="/app-icon.svg" alt="" width={26} height={26} unoptimized />
+          <Image src={publicAssetPath("/app-icon.svg")} alt="" width={26} height={26} unoptimized />
           <span>Desk Setup Switcher</span>
         </div>
         <p>{text.footer}</p>

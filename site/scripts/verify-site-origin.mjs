@@ -245,9 +245,6 @@ export async function verifyConfiguredSiteOrigin(
 
   const cleanOrigin = parseCleanPublicOrigin(configuredOrigin);
   if (allowPrivate) {
-    if (approval.state !== "holding") {
-      throw new Error("Private previews are allowed only while public site publication is holding");
-    }
     const privatePreview = await validatePrivatePreviewFile(privatePreviewPath);
     await validateHostingProject(hostingPath, privatePreview.projectID);
     if (privatePreview.siteURL !== cleanOrigin) {

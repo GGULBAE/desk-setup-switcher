@@ -1,5 +1,12 @@
 # Release evidence template
 
+> [!IMPORTANT]
+> The GitHub Pages holding-site deployment introduces GitHub's managed
+> `dynamic/pages/pages-build-deployment` workflow. The historical exact-four
+> remote-controls schema has not yet been extended for it, so completing this
+> template cannot authorize an app Release until that gate is revised and
+> reverified.
+
 Complete one protected approval record from this template for each public release. A sanitized copy may be committed under `docs/evidence/releases/<version>/` once a real candidate exists; files under `docs/releases/` are curated Release notes, not proof. A checked box is a claim backed by the linked evidence for the exact final candidate; intent, a command transcript from another build, historical ad-hoc evidence, or an empty search is not enough.
 
 Follow [Distribution](DISTRIBUTION.md), [Governance](../GOVERNANCE.md), the [support matrix](SUPPORT-MATRIX.md), and the [incident runbook](RELEASE-INCIDENT-RUNBOOK.md). Never record credentials, real SSIDs, exact locations, IP host addresses, home paths, serial numbers, personal device identifiers, raw profiles, or unredacted diagnostics.
@@ -188,12 +195,12 @@ Every report must follow [the external beta template](EXTERNAL-BETA-REPORT-TEMPL
 
 - [ ] The final support matrix preserves exact verification levels and Apple Silicon-only support.
 - [ ] Before publication, the immutable Release body is self-contained and contains no branch-lifecycle document link; only the tag-pinned distribution procedure and exact support/advisory action routes are allowed.
-- [ ] Before publication, the bounded public-copy finalization patch is reviewed locally but unpushed/unmerged, with its exact `master` base, resulting tree digest, and file allowlist recorded. After the immutable Release is visibly public, the unchanged patch synchronizes both publication records, README, the English/Korean guide index and guides, PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and directly required status records.
+- [ ] Before Release publication, the bounded public-copy finalization patch is reviewed locally but unpushed/unmerged, with its exact `master` base, resulting tree digest, and file allowlist recorded. After the immutable Release is visibly public, the unchanged patch moves `site/release-publication.json` from holding to the exact Release URL, preserves the separately approved GitHub Pages origin/base path, and synchronizes README, the English/Korean guide index and guides, PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and directly required status records.
 - [ ] The finalization review head passes both exact CI jobs. Its protected merge is read back from `master`, has the reviewed tree digest, and one `master`-push run on that exact SHA passes exactly **Verify macOS app** and **Verify public site and release assets** before deployment.
 - [ ] README, English/Korean guides, SECURITY, SUPPORT, PRIVACY, SUPPORT-MATRIX, checksums, both site publication records, the rendered site, and release notes agree, with no stale holding or disabled-private-reporting claim.
 - [ ] The bilingual site passes deployed no-tracking/no-cookie and clean-session link checks.
 - [ ] Repository description, topics, Homepage, and social preview match the approved copy.
-- [ ] The release approver explicitly approves the final artifact, tag, notes, and Release publication. The synchronized public-copy finalization patch, exact HTTPS site-origin record, site deployment, and promotion remain separate final user approvals.
+- [ ] The release approver explicitly approves the final artifact, tag, notes, and Release publication. The synchronized public-copy finalization patch, removal of the Pages builder's holding-only guard, release/download site transition, and promotion remain separate final user approvals; the already public holding page grants none of them.
 - [ ] Protected commit P, external E0, annotated `v0.0.9`, and direct-child E0 commit satisfy the exact add-only history and digest-message contract before the separately authorized predecessor tag push/build.
 - [ ] Final commit F, external E1, annotated `v0.1.0`, and direct-child E1 commit satisfy the exact add-only history and digest-message contract before the separately authorized final tag push/build; critical workflow/script trees match P.
 - [ ] After the exact draft exists, both manual records are replaced in a reviewed docs-only master commit with new `pre-publication` phase/tag-object/peeled-commit/Release-ID challenges, canonical UTC observations no older than 24 hours, and two new source-artifact digests distinct from each other and both final-pre-tag baselines; exact-commit CI passes.

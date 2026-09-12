@@ -18,6 +18,7 @@
 </p>
 
 <p align="center">
+  <a href="https://ggulbae.github.io/desk-setup-switcher/">Project site</a> ·
   <a href="docs/guides/USER-GUIDE.md">English guide</a> ·
   <a href="docs/guides/USER-GUIDE.ko.md">한국어 가이드</a> ·
   <a href="docs/SUPPORT-MATRIX.md">Support matrix</a>
@@ -26,7 +27,7 @@
 Desk Setup Switcher is a macOS menu-bar app for people who use the same Mac at different desks. Capture the setup that works at home, the office, or a studio, then return to it without hunting through System Settings each time.
 
 > [!IMPORTANT]
-> **Public beta is being prepared. There is no supported public download yet.** The first supported build is planned as a free, Developer ID-unsigned DMG on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after the [public-beta completion gates](docs/COMPLETION-CRITERIA.md) pass. Local builds and ordinary CI artifacts are unsupported.
+> **The project site is public, but there is no supported public download yet.** The [GitHub Pages site](https://ggulbae.github.io/desk-setup-switcher/) is an informational holding page, not an app release. The first supported build is planned as a free, Developer ID-unsigned DMG on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after the [public-beta completion gates](docs/COMPLETION-CRITERIA.md) pass. Local builds and ordinary CI artifacts are unsupported.
 
 ## See the whole flow
 
@@ -92,15 +93,16 @@ Profiles, backups, and diagnostics stay on the Mac. Exports can contain device l
 
 ## Current beta status
 
+- The bilingual project site is approved for public GitHub Pages hosting while its release state remains `holding`; it provides no app download or installation instructions.
 - The initial public-beta target is Apple Silicon on macOS 14 Sonoma. Exact release-candidate lifecycle evidence is still required before that becomes a supported public claim.
 - Current-source Capture and device discovery have read-only hardware evidence. Apply and rollback have deterministic mock evidence only; no live hardware mutation is claimed as verified.
-- Public release remains on hold until the documented lifecycle, external-beta, and publication gates pass.
+- The app release remains on hold until the documented lifecycle, external-beta, and release-publication gates pass.
 
 For the evidence behind each statement, see the [support matrix](docs/SUPPORT-MATRIX.md) and [completion ledger](docs/COMPLETION-CRITERIA.md).
 
 ## Follow the public beta
 
-- Follow the [repository](https://github.com/GGULBAE/desk-setup-switcher) and check [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) for launch updates.
+- Visit the [project site](https://ggulbae.github.io/desk-setup-switcher/), follow the [repository](https://github.com/GGULBAE/desk-setup-switcher), and check [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) for launch updates.
 - Read the [distribution guide](docs/DISTRIBUTION.md) before installing an unsigned beta.
 - Use [GitHub Issues](https://github.com/GGULBAE/desk-setup-switcher/issues) for non-sensitive feedback and [SECURITY.md](SECURITY.md) for security reports.
 
@@ -121,7 +123,7 @@ make verify
 - **Use the app:** [English guide](docs/guides/USER-GUIDE.md) · [한국어 가이드](docs/guides/USER-GUIDE.ko.md) · [Support](SUPPORT.md)
 - **Understand the boundaries:** [Privacy](docs/PRIVACY.md) · [Support matrix](docs/SUPPORT-MATRIX.md) · [Product scope](docs/PRODUCT.md)
 - **Build or integrate:** [Profile JSON schema](docs/PROFILE-SCHEMA.md) · [Architecture](docs/ARCHITECTURE.md) · [Adapter contract](docs/ADAPTER-CONTRACT.md)
-- **Track the release:** [Distribution gates](docs/DISTRIBUTION.md) · [External-beta report contract](docs/EXTERNAL-BETA-REPORT-TEMPLATE.md) · [Completion ledger](docs/COMPLETION-CRITERIA.md)
+- **Track publication:** [GitHub Pages policy](docs/GITHUB-PAGES-PUBLICATION.md) · [Distribution gates](docs/DISTRIBUTION.md) · [External-beta report contract](docs/EXTERNAL-BETA-REPORT-TEMPLATE.md) · [Completion ledger](docs/COMPLETION-CRITERIA.md)
 
 ## Open source
 

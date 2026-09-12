@@ -1,5 +1,12 @@
 # Public release approval contract
 
+> [!IMPORTANT]
+> Publishing the holding site from `gh-pages` adds GitHub's provider-managed
+> `dynamic/pages/pages-build-deployment` workflow to the remote inventory. The
+> exact-four-workflow v3 model below does not yet represent it. No app-release
+> approval may rely on this contract until that inventory, its collection, and
+> all dependent fixtures are deliberately updated and reverified.
+
 Desk Setup Switcher publishes `v0.1.0` only from the manual
 `Publish approved signed release` workflow. That workflow does not build, sign,
 notarize, create a tag, prepare a draft, or deploy the site. It can perform one
@@ -321,12 +328,14 @@ has exactly these keys and no duplicates or extensions:
 `independent-review` requires different approver and publisher logins.
 `one-maintainer` requires the same login and is an explicit governance
 limitation, not a two-person review claim. `releasePublication` must be true.
-This record grants no site-publication authority. The final HTTPS origin lives
-in a separate tracked site-origin record and requires separate user approval.
-Site activation remains a later public-copy finalization change after the
-immutable Release is visibly public; it changes the two tracked publication
-records and the bounded public-document/status set together, changes no
-component code, and still requires the user's final approval.
+This record grants no site-publication authority. The no-download GitHub Pages
+holding site has its own explicit approval and deployment contract in
+[GITHUB-PAGES-PUBLICATION.md](GITHUB-PAGES-PUBLICATION.md); that approval grants
+no release authority. A later transition from holding copy to the exact
+immutable Release URL remains a separate public-copy finalization change. It
+updates the release-publication record and bounded public-document/status set,
+deliberately revises the Pages builder's holding-only guard, changes no app
+component code, and still requires the user's final release-site approval.
 
 The approval validator proves the record's exact shape, identifiers, actual
 trusted digests, booleans, actors, ordered report set, Sonoma lifecycle binding,
@@ -444,11 +453,12 @@ the underlying Settings screenshots or token-scope record.
 21. Before dispatching publication, prepare and review a bounded public-copy
     finalization patch locally, but do not push or merge it. Record its exact
     `master` base, resulting Git tree digest, and closed file allowlist. The
-    patch must include the release/site publication records, README, both guide
-    indexes/guides, PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and only the
-    directly required roadmap/completion/status records. It changes no site
-    component code, and the immutable Release body must already be
-    self-contained with no branch-lifecycle document link.
+    patch must include the release-publication record, the deliberate
+    holding-only Pages builder transition, README, both guide indexes/guides,
+    PRIVACY, SUPPORT-MATRIX, SECURITY, SUPPORT, and only the directly required
+    roadmap/completion/status records. It preserves the approved Pages origin
+    and base path, changes no site component code, and the immutable Release
+    body must already be self-contained with no branch-lifecycle document link.
 22. Keep the freeze through the workflow's final public download verification.
     After success, revoke the release-specific fine-grained PAT and remove or
     rotate `RELEASE_ADMIN_READ_TOKEN`. Record only a read-only Settings
@@ -465,10 +475,11 @@ the underlying Settings screenshots or token-scope record.
     `master`-push CI run bound to that exact SHA whose only required jobs are
     successful **Verify macOS app** and **Verify public site and release
     assets**. A pull-request run on a different SHA is not master evidence.
-25. Only after that exact master run passes may the separately approved site deploy.
-    Verify canonical and Open Graph URLs, support/security routes, download
-    identity, language switching, captions, and the no-cookie/no-tracking
-    boundary from a clean session. Deployment and every announcement retain
+25. Only after that exact master run passes may the public holding site
+    transition to separately approved release/download copy. Verify canonical
+    and Open Graph URLs, support/security routes, download identity, language
+    switching, captions, and the project-code no-cookie/no-tracking boundary
+    from a clean session. The transition and every announcement retain
     separate final user approval.
 
 Any ambiguity observed before the PATCH prevents the mutation. GitHub provides
