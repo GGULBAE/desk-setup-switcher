@@ -245,7 +245,7 @@ extension View {
     private static func readyProfile() -> DeskProfile {
       DeskProfile(
         id: readyProfileID,
-        name: "Focus Workspace — Display, Audio & Network",
+        name: "Focus Workspace — Display & Sound",
         profileDescription:
           "A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata.",
         symbolName: "display.2",
