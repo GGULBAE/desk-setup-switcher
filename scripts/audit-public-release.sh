@@ -613,9 +613,12 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
   # their surrounding source against the repository synthetic-data policy. New
   # content at the same path, or a new finding category, inherits no exception.
   REVIEWED_SYNTHETIC_FINDINGS = Set.new([
-    # 2026-09-08: reviewed fixture revisions, still exact blob/path/category only.
-    # IP findings are subnet masks beside documentation-only address blocks.
+    # 2026-09-08 and 2026-09-12: reviewed fixture revisions, still exact
+    # blob/path/category only. The latest UI-audit revision changes only the
+    # synthetic profile name to the current Display/Sound scope. IP findings
+    # are subnet masks beside documentation-only address blocks.
     ["ae02bec37bd44c6b9ff154b0a2b49e8b65ceaec0", "Sources/DeskSetupSwitcher/UIAuditFixtures.swift", "ip-host"],
+    ["d4ceb30cb440619b701945a23a8ae86c51bd77dc", "Sources/DeskSetupSwitcher/UIAuditFixtures.swift", "ip-host"],
     ["0a283bfef4cef95fb0df6cccc3bdc2de9ef2faaa", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
     ["2eff268a4095563162c34c830b490ec1a4f6f9bc", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
     ["92548c1034b6d3f9089663882f4994df7c02e52a", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
