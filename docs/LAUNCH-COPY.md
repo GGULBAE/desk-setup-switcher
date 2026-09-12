@@ -1,6 +1,6 @@
 # Launch copy and repository metadata
 
-Last reviewed: 2026-09-12
+Last reviewed: 2026-09-13
 
 This document is a copy deck and approval checklist. It does not authorize a GitHub setting change, site deployment, release publication, or community post.
 
@@ -8,14 +8,14 @@ Desk Setup Switcher currently has no supported download. Local and ordinary CI D
 
 ## Current remote state
 
-An authenticated read-only GitHub query on 2026-09-12 confirmed this public-surface state after the approved metadata refresh:
+Authenticated GitHub and deployed-site read-back on 2026-09-13 confirmed this public-surface state after the approved Pages publication:
 
 | Field | Current value | Required action |
 | --- | --- | --- |
 | Repository | Public at [GGULBAE/desk-setup-switcher](https://github.com/GGULBAE/desk-setup-switcher) | Keep public |
 | Description | “A local-first macOS menu bar app for saving, reviewing, and deliberately applying display and sound profiles.” | Keep synchronized with the current product boundary |
 | Topics | `appkit`, `audio`, `display-management`, `local-first`, `macos`, `macos-app`, `menu-bar-app`, `open-source`, `privacy-first`, `productivity`, `swift`, `swiftui` | Keep this focused discovery set unless product scope changes |
-| Homepage | Blank | Set to the approved GitHub Pages project URL only after the holding deployment passes the clean-session checks |
+| Homepage | `https://ggulbae.github.io/desk-setup-switcher/` | Keep synchronized with the approved holding-site origin and project base path |
 | Social preview | Custom `1280×640` current-scope Capture composition | Keep synchronized with the verified `site/public/og.png` asset |
 | Discussions | Disabled | The public support issue form is the current deliberate alternative; do not advertise Discussions while disabled |
 | Public release | None | Do not link a download until the complete distribution gate passes and the maintainer-approved canonical release exists |
@@ -71,6 +71,7 @@ Do not add `intel`, `homebrew`, `app-store`, `automatic-switching`, `accessibili
 - **Before the public holding deployment passes:** leave Homepage blank. Do not use a local URL, owner-only preview, Actions artifact, unsigned DMG, or direct object-storage URL.
 - **Approved site URL:** `https://ggulbae.github.io/desk-setup-switcher/`. The tracked site-origin record contains `https://ggulbae.github.io`; the Pages builder fixes `/desk-setup-switcher` and composes the canonical project URL. The release approval record deliberately grants no site authority.
 - **After the holding deployment passes:** replace the blank Homepage field with the exact approved project URL only after the bilingual page, canonical/Open Graph metadata, privacy/security links, project-code no-cookie/no-tracking boundary, and no-download release state pass from a clean session.
+- **Current read-back:** the exact approved URL is deployed over enforced HTTPS and is set as the repository Homepage. The release record remains `holding`/null, so this does not advertise or authorize an app download.
 
 ### Social preview
 

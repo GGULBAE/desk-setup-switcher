@@ -1,6 +1,6 @@
 # GitHub Pages publication
 
-Last updated: 2026-09-12
+Last updated: 2026-09-13
 
 The maintainer has approved publishing the bilingual project landing page at
 <https://ggulbae.github.io/desk-setup-switcher/>. This approval covers the
@@ -76,6 +76,29 @@ is a deliberate maintainer action after the source commit and generated output
 are reviewed. Publishing future download copy requires a separate authorization
 that deliberately changes both the release record and the static builder's
 holding-only guard; a release-record edit by itself cannot make that copy live.
+
+## Current publication evidence — 2026-09-13 KST
+
+- Source commit `fed2b051ea2951c8a15cc24864379e8ab96dc2f3` passed both
+  jobs in [CI run
+  34700713290](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/34700713290)
+  and was rebuilt from a detached exact-commit worktree with zero dependency
+  advisories and all three Pages export tests passing.
+- Generated commit `3da2b91ffee7ab0ad53c5734193e9a0043e5ac34` is the root of
+  the public `gh-pages` branch and contains only the static artifact.
+- GitHub's managed [Pages build and deployment run
+  34702502028](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/34702502028)
+  completed successfully. Pages build `1210879891` reports `built`, HTTPS is
+  enforced, and the configured source is the root of `gh-pages`.
+- A fresh HTTPS request returned `200`; canonical and indexability metadata,
+  eight generated CSS/JavaScript resources, the app icon, Open Graph image,
+  gallery images, silent demo, and both caption tracks resolved successfully.
+  A separate clean browser load exposed the full English page, Korean language
+  control, gallery, video controls, support/privacy links, and the explicit
+  no-supported-download state.
+- Authenticated repository read-back reports the exact public URL as Homepage.
+  `site/release-publication.json` remains `holding` with a null release URL, and
+  no tag, GitHub Release, app package, or promotional post was published.
 
 ## Rollback and unpublish
 
