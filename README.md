@@ -1,60 +1,93 @@
-# Desk Setup Switcher
+<p align="center">
+  <img src="site/public/app-icon.svg" width="112" height="112" alt="Desk Setup Switcher app icon">
+</p>
 
-A local-only macOS menu-bar app for saving desk setups and applying them deliberately.
+<h1 align="center">Desk Setup Switcher</h1>
 
-Save available values from seven display and sound setting kinds as a profile, review the exact plan, then choose what to apply. Desk Setup Switcher does not switch profiles automatically.
+<p align="center"><strong>Bring your desk back, deliberately.</strong></p>
+
+<p align="center">
+  Move between desks without rebuilding your Mac setup.<br>
+  Save display and sound settings as local profiles, preview every proposed change, and apply only when you are ready.
+</p>
+
+<p align="center">
+  <a href="https://github.com/GGULBAE/desk-setup-switcher/actions/workflows/ci.yml"><img src="https://github.com/GGULBAE/desk-setup-switcher/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2f6feb" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/data-local%20only-1f883d" alt="Data stays local">
+</p>
+
+<p align="center">
+  <a href="docs/guides/USER-GUIDE.md">English guide</a> ·
+  <a href="docs/guides/USER-GUIDE.ko.md">한국어 가이드</a> ·
+  <a href="docs/SUPPORT-MATRIX.md">Support matrix</a>
+</p>
+
+Desk Setup Switcher is a macOS menu-bar app for people who use the same Mac at different desks. Capture the setup that works at home, the office, or a studio, then return to it without hunting through System Settings each time.
 
 > [!IMPORTANT]
-> **Public beta in preparation:** there is no supported public download yet. The first supported build is planned as a free, Developer ID-unsigned DMG on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after the [public-beta completion gates](docs/COMPLETION-CRITERIA.md) pass. It will require a one-time **Open Anyway** decision on macOS. Local builds and ordinary CI artifacts are unsupported.
+> **Public beta is being prepared. There is no supported public download yet.** The first supported build is planned as a free, Developer ID-unsigned DMG on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after the [public-beta completion gates](docs/COMPLETION-CRITERIA.md) pass. Local builds and ordinary CI artifacts are unsupported.
 
-[English user guide](docs/guides/USER-GUIDE.md) · [한국어 사용자 가이드](docs/guides/USER-GUIDE.ko.md) · [Support matrix](docs/SUPPORT-MATRIX.md)
+<p align="center">
+  <img src="site/public/screenshots/capture.png" width="368" alt="Desk Setup Switcher tray showing the Capture Current Settings action">
+</p>
 
-## Current profile scope
+<p align="center"><sub>Synthetic product data. No personal device identifiers or live hardware changes.</sub></p>
 
-| Area | Saved values |
+## One Mac, more than one desk
+
+Changing desks often means repeating the same small decisions: choose the main display, restore a resolution, select the right speakers or microphone, and reset their levels.
+
+Desk Setup Switcher keeps those choices together in a named profile, so every change begins with a clear plan instead of guesswork.
+
+## Why Desk Setup Switcher?
+
+| Product value | What you get |
 | --- | --- |
-| Display | Main display, resolution |
-| Sound output | Device, volume, mute |
-| Sound input | Device, volume |
+| **Less setup repetition** | Keep the display and sound choices for each desk together in one named profile. |
+| **Control before convenience** | See the exact plan, unavailable items, and risks before anything changes. Profiles never switch automatically. |
+| **A safer display workflow** | Protected display changes use a 15-second **Keep Changes / Revert Now** window. |
+| **Privacy by architecture** | No account, cloud sync, app-owned server, telemetry, analytics, advertising, or automatic/background profile switching. |
 
-That is the complete current scope: seven setting kinds across **Display** and **Sound**. Network, automatic switching, per-setting inclusion switches, editable refresh rate, mirroring, and ColorSync profiles are not current features. Dormant legacy fields can round-trip for compatibility but never reach Apply.
-
-## How it works
+## Capture. Review. Get back to work.
 
 1. **Capture** reads the current Display and Sound values into a local profile. It changes nothing.
-2. **Edit** names the profile and changes any available values in the seven-setting scope. Missing values remain absent.
-3. **Review & Apply** shows proposed changes and omissions. Nothing changes until you explicitly choose **Apply Profile** or **Apply Available Settings**.
+2. **Edit** gives the setup a useful name and lets you choose from the values available on that Mac.
+3. **Review & Apply** shows proposed changes and omissions. Only a separate confirmation starts the change.
 
-![Synthetic empty state with Capture Current Settings as the primary action](site/public/screenshots/capture.png)
+## One profile, seven setting types
 
-The screenshot uses synthetic data and is not evidence of live hardware mutation. See the [asset provenance record](docs/RELEASE-ASSET-PROVENANCE.md).
+| Display | Sound output | Sound input |
+| --- | --- | --- |
+| Main display | Output device | Input device |
+| Resolution | Output volume | Input volume |
+|  | Output mute |  |
 
-## Safety and privacy
+That is the complete current product scope. Network settings, editable refresh rate, mirroring, ColorSync profiles, per-setting inclusion switches, and automatic switching are not current features.
 
-- Profiles, backups, and diagnostics stay on the Mac. There is no account, cloud sync, app-owned server, telemetry, analytics, advertising, or automatic profile switching.
-- Capture is read-only. Apply always starts with an explicit review and confirmation.
-- The app reads current state again immediately before execution. If the plan has changed, it applies nothing and returns to an updated review.
-- Protected display changes use a 15-second **Keep Changes / Revert Now** window. Rollback is attempted when required, but is not presented as a guarantee.
+## Designed to earn trust
+
+- Capture is read-only, and Apply always starts with a visible plan and explicit confirmation.
+- The app reads current state again immediately before execution. If the plan changed, it applies nothing and returns to review.
+- Protected display changes remain temporary until you keep them. Rollback is attempted when required, but is not presented as a guarantee.
 - Results distinguish applied, skipped, failed, rolled-back, rollback-failed, and unverified outcomes.
-- Selecting an audio input device does not record audio and does not require microphone access.
+- Selecting an audio input device does not record audio or require microphone access.
 
-Exports may contain device labels and stable identifiers. Review them before sharing. Read the [privacy policy](docs/PRIVACY.md) for the complete data boundary.
+Profiles, backups, and diagnostics stay on the Mac. Exports can contain device labels and stable identifiers, so review them before sharing. See the [privacy policy](docs/PRIVACY.md) for the complete boundary.
 
-## Project status
+## Current beta status
 
-- Target: Apple Silicon on macOS 14 Sonoma. Exact release-candidate lifecycle evidence is still required before this becomes a supported public claim.
-- Capture and source-group discovery have read-only hardware evidence. Apply and rollback currently have deterministic mock evidence only; no live hardware mutation is claimed as verified.
-- The latest tray-activation change has deterministic coverage and passed the full non-live gate. Installed inactive-to-active appearance, focus timing, and keyboard behavior still need manual verification. See the [tray activation record](docs/TRAY-ACTIVATION-2026-09-11.md).
-- The repository remains in a public-release holding state. See the [completion ledger](docs/COMPLETION-CRITERIA.md) and [distribution guide](docs/DISTRIBUTION.md).
+- The initial public-beta target is Apple Silicon on macOS 14 Sonoma. Exact release-candidate lifecycle evidence is still required before that becomes a supported public claim.
+- Current-source Capture and device discovery have read-only hardware evidence. Apply and rollback have deterministic mock evidence only; no live hardware mutation is claimed as verified.
+- Public release remains on hold until the documented lifecycle, external-beta, and publication gates pass.
 
-## Installation
+For the evidence behind each statement, see the [support matrix](docs/SUPPORT-MATRIX.md) and [completion ledger](docs/COMPLETION-CRITERIA.md).
 
-There is no supported release to install today. When this README links a supported versioned release:
+## Follow the public beta
 
-1. Download its `-unsigned.dmg` and checksum from [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases).
-2. Verify the SHA-256 checksum, open the DMG, and move the app to **Applications**.
-3. Try to open it once, then use **System Settings → Privacy & Security → Open Anyway** after verifying the source and checksum. Do not disable Gatekeeper globally.
-4. Start with a small profile and inspect both the preview and itemized result.
+- Follow the [repository](https://github.com/GGULBAE/desk-setup-switcher) and check [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) for launch updates.
+- Read the [distribution guide](docs/DISTRIBUTION.md) before installing an unsigned beta.
+- Use [GitHub Issues](https://github.com/GGULBAE/desk-setup-switcher/issues) for non-sensitive feedback and [SECURITY.md](SECURITY.md) for security reports.
 
 ## Build from source
 
@@ -73,12 +106,8 @@ make verify
 - **Use the app:** [English guide](docs/guides/USER-GUIDE.md) · [한국어 가이드](docs/guides/USER-GUIDE.ko.md) · [Support](SUPPORT.md)
 - **Understand the boundaries:** [Privacy](docs/PRIVACY.md) · [Support matrix](docs/SUPPORT-MATRIX.md) · [Product scope](docs/PRODUCT.md)
 - **Build or integrate:** [Profile JSON schema](docs/PROFILE-SCHEMA.md) · [Architecture](docs/ARCHITECTURE.md) · [Adapter contract](docs/ADAPTER-CONTRACT.md)
-- **Prepare a release:** [Distribution gates](docs/DISTRIBUTION.md) · [External-beta report contract](docs/EXTERNAL-BETA-REPORT-TEMPLATE.md) · [Completion ledger](docs/COMPLETION-CRITERIA.md)
+- **Track the release:** [Distribution gates](docs/DISTRIBUTION.md) · [External-beta report contract](docs/EXTERNAL-BETA-REPORT-TEMPLATE.md) · [Completion ledger](docs/COMPLETION-CRITERIA.md)
 
-## Contributing, support, and security
+## Open source
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
-
-Use [SUPPORT.md](SUPPORT.md) for questions and ordinary bug reports. For vulnerabilities, unsafe mutations, privacy leaks, exposed secrets, or rollback failures, follow [SECURITY.md](SECURITY.md). Do not put sensitive details in a public issue.
-
-Desk Setup Switcher is available under the [MIT License](LICENSE).
+Desk Setup Switcher is available under the [MIT License](LICENSE). Contributions are welcome—start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
