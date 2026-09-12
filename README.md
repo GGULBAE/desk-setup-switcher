@@ -28,11 +28,26 @@ Desk Setup Switcher is a macOS menu-bar app for people who use the same Mac at d
 > [!IMPORTANT]
 > **Public beta is being prepared. There is no supported public download yet.** The first supported build is planned as a free, Developer ID-unsigned DMG on [GitHub Releases](https://github.com/GGULBAE/desk-setup-switcher/releases) after the [public-beta completion gates](docs/COMPLETION-CRITERIA.md) pass. Local builds and ordinary CI artifacts are unsupported.
 
+## See the whole flow
+
+<table>
+  <tr>
+    <td width="50%"><img src="site/public/gallery/01-capture.png" alt="Step 1: capture the current Display and Sound setup without changing the Mac"></td>
+    <td width="50%"><img src="site/public/gallery/02-edit-display.png" alt="Step 2: edit the main display and resolution in a local profile"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="site/public/gallery/03-edit-sound.png" alt="Step 3: edit output and input devices, volume, and output mute"></td>
+    <td width="50%"><img src="site/public/gallery/04-review.png" alt="Step 4: review two planned sound changes before the separate Apply action"></td>
+  </tr>
+</table>
+
 <p align="center">
-  <img src="site/public/screenshots/capture.png" width="368" alt="Desk Setup Switcher tray showing the Capture Current Settings action">
+  <a href="site/public/demo/desk-setup-switcher.mp4">Watch the 40-second silent product tour</a> ·
+  <a href="site/public/demo/captions.en.vtt">English captions</a> ·
+  <a href="site/public/demo/captions.ko.vtt">한국어 자막</a>
 </p>
 
-<p align="center"><sub>Synthetic product data. No personal device identifiers or live hardware changes.</sub></p>
+<p align="center"><sub>Exact-commit synthetic product data. No personal device identifiers, live Capture, Apply, or hardware changes.</sub></p>
 
 ## One Mac, more than one desk
 

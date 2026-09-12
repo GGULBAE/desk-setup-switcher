@@ -74,7 +74,7 @@ Do not add `intel`, `homebrew`, `app-store`, `automatic-switching`, `accessibili
 
 ### Social preview
 
-Upload only the final sanitized social-preview asset recorded in the release-asset provenance document. It must use synthetic profile/device/network data, contain no real identifier, avoid an “applied successfully” claim, and remain legible when cropped.
+Upload only the final sanitized social-preview asset recorded in the release-asset provenance document. It must use synthetic Display/Sound profile data, contain no real identifier, avoid an “applied successfully” claim, and remain legible when cropped.
 
 English alternative text:
 
@@ -85,6 +85,19 @@ English alternative text:
 > Desk Setup Switcher 아이콘과 합성 Capture 화면 옆에 “Bring your desk back, deliberately.” 문구가 표시된 이미지.
 
 Use these strings wherever the publishing surface supports alternative text, including the site and announcement images.
+
+## Launch gallery kit
+
+The repository and owner-only site may show this exact-commit synthetic kit before a supported download exists. Keep the holding-state notice adjacent to it; the screenshots demonstrate the workflow, not release availability or hardware verification.
+
+| Order | Asset | Public-facing message | Boundary |
+| --- | --- | --- | --- |
+| 1 | `site/public/gallery/01-capture.png` | Capture current settings | Reads the synthetic Display/Sound state; no live Capture was run |
+| 2 | `site/public/gallery/02-edit-display.png` | Shape the display profile | Shows main-display and supported-resolution editing; no Save or hardware operation occurred |
+| 3 | `site/public/gallery/03-edit-sound.png` | Set the sound profile | Shows output/input, volume, and output mute with synthetic devices |
+| 4 | `site/public/gallery/04-review.png` | Review before Apply | Ends at the review decision; no Apply click, success state, or hardware effect is shown |
+
+The companion `site/public/demo/desk-setup-switcher.mp4` is a silent 40-second Capture → Display → Sound → Review tour with English and Korean WebVTT captions. Site playback must expose controls, must not autoplay or loop, and should use the Review gallery card as its poster. The durable transcript summary is: capture available Display/Sound values locally, edit the display and sound steps, inspect the proposed changes, then choose separately whether to Apply. Profiles remain local and never switch automatically.
 
 ## Project introduction
 

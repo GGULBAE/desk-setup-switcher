@@ -6,7 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PUBLIC_DIR="$ROOT_DIR/site/public"
 CHECKSUM_FILE="$PUBLIC_DIR/assets.sha256"
 SOURCE_CHECKSUM_FILE="$ROOT_DIR/docs/evidence/public-release-assets/sources.sha256"
-SOURCE_FIXTURE_SLUG="bc3ec58"
+SOURCE_FIXTURE_SLUG="4ecdf48"
 
 fail() {
     echo "Public asset verification failed: $*" >&2
@@ -26,9 +26,14 @@ expected_assets=(
     "demo/captions.en.vtt"
     "demo/captions.ko.vtt"
     "demo/desk-setup-switcher.mp4"
+    "gallery/01-capture.png"
+    "gallery/02-edit-display.png"
+    "gallery/03-edit-sound.png"
+    "gallery/04-review.png"
     "og.png"
     "screenshots/capture.png"
     "screenshots/edit.png"
+    "screenshots/sound.png"
     "screenshots/review.png"
 )
 
@@ -37,12 +42,10 @@ expected_sources=(
     "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/capture/01-empty-en-light.png"
     "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/edit/13-display-en-light.ax.txt"
     "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/edit/13-display-en-light.png"
-    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/23-apply-preview-en-initial.ax.txt"
-    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/23-apply-preview-en-initial.png"
-    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/24-apply-preview-ko-refreshed.ax.txt"
-    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/24-apply-preview-ko-refreshed.png"
-    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/25-apply-preview-ko-minimum-large-text.ax.txt"
-    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/25-apply-preview-ko-minimum-large-text.png"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/sound/15-audio-en-dark.ax.txt"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/sound/15-audio-en-dark.png"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/27-launch-review-en-light.ax.txt"
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/27-launch-review-en-light.png"
     "docs/evidence/public-release-assets/og-background-imagegen.png"
 )
 
@@ -58,12 +61,62 @@ actual_source_tree="$(
 [[ "$actual_source_tree" == "$expected_source_tree" ]] ||
     fail "source evidence tree contains missing or unexpected files"
 
+expected_public_tree="$({
+    printf '%s\n' "${expected_assets[@]}"
+    printf '%s\n' "assets.sha256"
+} | LC_ALL=C sort)"
+actual_public_tree="$(
+    find "$PUBLIC_DIR" -type f -print |
+        sed "s|^$PUBLIC_DIR/||" |
+        LC_ALL=C sort
+)"
+[[ "$actual_public_tree" == "$expected_public_tree" ]] ||
+    fail "site/public contains missing or unexpected files"
+
 for relative_path in "${expected_assets[@]}"; do
     [[ -f "$PUBLIC_DIR/$relative_path" ]] || fail "missing required asset: site/public/$relative_path"
 done
 
 cmp -s "$ROOT_DIR/Assets/AppIcon.svg" "$PUBLIC_DIR/app-icon.svg" ||
     fail "site/public/app-icon.svg is not an exact copy of Assets/AppIcon.svg"
+
+require_evidence_line() {
+    local relative_path="$1"
+    local expected_line="$2"
+    LC_ALL=C grep -Fqx -- "$expected_line" "$ROOT_DIR/$relative_path" ||
+        fail "$relative_path is missing evidence boundary: $expected_line"
+}
+
+require_evidence_line \
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/capture/01-empty-en-light.ax.txt" \
+    "fixture=01-empty-en-light"
+require_evidence_line \
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/capture/01-empty-en-light.ax.txt" \
+    "profile-count=0"
+require_evidence_line \
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/edit/13-display-en-light.ax.txt" \
+    "variant=editor-display"
+require_evidence_line \
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/edit/13-display-en-light.ax.txt" \
+    "step-navigation=display,sound"
+require_evidence_line \
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/sound/15-audio-en-dark.ax.txt" \
+    "variant=editor-audio"
+require_evidence_line \
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/sound/15-audio-en-dark.ax.txt" \
+    "step-navigation=display,sound"
+require_evidence_line \
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/27-launch-review-en-light.ax.txt" \
+    "synthetic-launch-gallery=true"
+require_evidence_line \
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/27-launch-review-en-light.ax.txt" \
+    "declared-groups=audio"
+require_evidence_line \
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/27-launch-review-en-light.ax.txt" \
+    "confirmation-closure=records-test-failure-only"
+require_evidence_line \
+    "docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG/review/27-launch-review-en-light.ax.txt" \
+    "live-system-mutations=false"
 
 image_property() {
     local image_path="$1"
@@ -97,36 +150,42 @@ verify_png_properties() {
 
 verify_png_properties "$PUBLIC_DIR/screenshots/capture.png" "screenshots/capture.png" 368 260 no
 verify_png_properties "$PUBLIC_DIR/screenshots/edit.png" "screenshots/edit.png" 900 568 no
-verify_png_properties "$PUBLIC_DIR/screenshots/review.png" "screenshots/review.png" 620 500 no
+verify_png_properties "$PUBLIC_DIR/screenshots/sound.png" "screenshots/sound.png" 900 568 no
+verify_png_properties "$PUBLIC_DIR/screenshots/review.png" "screenshots/review.png" 620 440 no
+verify_png_properties "$PUBLIC_DIR/gallery/01-capture.png" "gallery/01-capture.png" 1270 760 no
+verify_png_properties "$PUBLIC_DIR/gallery/02-edit-display.png" "gallery/02-edit-display.png" 1270 760 no
+verify_png_properties "$PUBLIC_DIR/gallery/03-edit-sound.png" "gallery/03-edit-sound.png" 1270 760 no
+verify_png_properties "$PUBLIC_DIR/gallery/04-review.png" "gallery/04-review.png" 1270 760 no
 verify_png_properties "$PUBLIC_DIR/og.png" "og.png" 1280 640 no
 
 SOURCE_FIXTURE_ROOT="$ROOT_DIR/docs/evidence/public-release-assets/$SOURCE_FIXTURE_SLUG"
 verify_png_properties \
     "$SOURCE_FIXTURE_ROOT/capture/01-empty-en-light.png" \
-    "$SOURCE_FIXTURE_SLUG/capture/01-empty-en-light.png" 368 260 yes
+    "$SOURCE_FIXTURE_SLUG/capture/01-empty-en-light.png" 368 260 no
 verify_png_properties \
     "$SOURCE_FIXTURE_ROOT/edit/13-display-en-light.png" \
     "$SOURCE_FIXTURE_SLUG/edit/13-display-en-light.png" 900 568 no
 verify_png_properties \
-    "$SOURCE_FIXTURE_ROOT/review/23-apply-preview-en-initial.png" \
-    "$SOURCE_FIXTURE_SLUG/review/23-apply-preview-en-initial.png" 620 500 yes
+    "$SOURCE_FIXTURE_ROOT/sound/15-audio-en-dark.png" \
+    "$SOURCE_FIXTURE_SLUG/sound/15-audio-en-dark.png" 900 568 no
 verify_png_properties \
-    "$SOURCE_FIXTURE_ROOT/review/24-apply-preview-ko-refreshed.png" \
-    "$SOURCE_FIXTURE_SLUG/review/24-apply-preview-ko-refreshed.png" 620 500 yes
-verify_png_properties \
-    "$SOURCE_FIXTURE_ROOT/review/25-apply-preview-ko-minimum-large-text.png" \
-    "$SOURCE_FIXTURE_SLUG/review/25-apply-preview-ko-minimum-large-text.png" 520 360 yes
+    "$SOURCE_FIXTURE_ROOT/review/27-launch-review-en-light.png" \
+    "$SOURCE_FIXTURE_SLUG/review/27-launch-review-en-light.png" 620 440 no
 
 metadata_stripped_pngs=(
     "$PUBLIC_DIR/screenshots/capture.png"
     "$PUBLIC_DIR/screenshots/edit.png"
+    "$PUBLIC_DIR/screenshots/sound.png"
     "$PUBLIC_DIR/screenshots/review.png"
+    "$PUBLIC_DIR/gallery/01-capture.png"
+    "$PUBLIC_DIR/gallery/02-edit-display.png"
+    "$PUBLIC_DIR/gallery/03-edit-sound.png"
+    "$PUBLIC_DIR/gallery/04-review.png"
     "$PUBLIC_DIR/og.png"
     "$SOURCE_FIXTURE_ROOT/capture/01-empty-en-light.png"
     "$SOURCE_FIXTURE_ROOT/edit/13-display-en-light.png"
-    "$SOURCE_FIXTURE_ROOT/review/23-apply-preview-en-initial.png"
-    "$SOURCE_FIXTURE_ROOT/review/24-apply-preview-ko-refreshed.png"
-    "$SOURCE_FIXTURE_ROOT/review/25-apply-preview-ko-minimum-large-text.png"
+    "$SOURCE_FIXTURE_ROOT/sound/15-audio-en-dark.png"
+    "$SOURCE_FIXTURE_ROOT/review/27-launch-review-en-light.png"
 )
 if ! ruby - "${metadata_stripped_pngs[@]}" <<'RUBY'
 signature = "\x89PNG\r\n\x1a\n".b
@@ -183,6 +242,46 @@ for relative_path in "${expected_sources[@]}"; do
     fi
 done
 
+# Reject previously published scope language that represented Network as a
+# profile feature, plus the obsolete six-setting count. Network can still be
+# named when copy explicitly says that it is dormant or unsupported.
+public_copy_files=(
+    "$ROOT_DIR/README.md"
+    "$ROOT_DIR/site/README.md"
+    "$ROOT_DIR/site/app/landing-page.tsx"
+    "$ROOT_DIR/site/app/layout.tsx"
+    "$ROOT_DIR/docs/LAUNCH-COPY.md"
+    "$ROOT_DIR/docs/guides/USER-GUIDE.md"
+    "$ROOT_DIR/docs/guides/USER-GUIDE.ko.md"
+    "$PUBLIC_DIR/demo/captions.en.vtt"
+    "$PUBLIC_DIR/demo/captions.ko.vtt"
+    "$SOURCE_FIXTURE_ROOT/capture/01-empty-en-light.ax.txt"
+    "$SOURCE_FIXTURE_ROOT/edit/13-display-en-light.ax.txt"
+    "$SOURCE_FIXTURE_ROOT/sound/15-audio-en-dark.ax.txt"
+    "$SOURCE_FIXTURE_ROOT/review/27-launch-review-en-light.ax.txt"
+)
+for copy_path in "${public_copy_files[@]}"; do
+    [[ -f "$copy_path" ]] || fail "missing public copy source: ${copy_path#"$ROOT_DIR/"}"
+done
+
+stale_public_copy_phrases=(
+    "Choose the Display, Audio, and Network values in the profile."
+    "Display, Audio & Network"
+    "Display, Audio, and Network profiles"
+    "프로필에 포함할 디스플레이·오디오·네트워크 값을 고릅니다."
+    "디스플레이·오디오·네트워크 프로필"
+)
+for stale_phrase in "${stale_public_copy_phrases[@]}"; do
+    if LC_ALL=C grep -Fiq -- "$stale_phrase" "${public_copy_files[@]}"; then
+        fail "stale public profile-scope copy remains: $stale_phrase"
+    fi
+done
+
+stale_profile_count_pattern='(^|[^[:alnum:]_])six[[:space:]]+((Display|display)[-/[:space:]]*(Sound|sound)[[:space:]]+)?setting([[:space:]]+type)?s?([^[:alnum:]_]|$)|여섯[[:space:]]*가지[[:space:]]*(설정[[:space:]]*종류|항목)'
+if LC_ALL=C grep -Eiq -- "$stale_profile_count_pattern" "${public_copy_files[@]}"; then
+    fail "stale six-setting public profile scope remains"
+fi
+
 video_path="$PUBLIC_DIR/demo/desk-setup-switcher.mp4"
 video_stream_count="$(
     ffprobe -v error -select_streams v -show_entries stream=index -of csv=p=0 "$video_path" |
@@ -196,6 +295,10 @@ video_codec="$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_n
 video_width="$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$video_path")"
 video_height="$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$video_path")"
 video_pixel_format="$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of csv=p=0 "$video_path")"
+video_frame_rate="$(ffprobe -v error -select_streams v:0 -show_entries stream=avg_frame_rate -of csv=p=0 "$video_path")"
+video_color_space="$(ffprobe -v error -select_streams v:0 -show_entries stream=color_space -of csv=p=0 "$video_path")"
+video_color_transfer="$(ffprobe -v error -select_streams v:0 -show_entries stream=color_transfer -of csv=p=0 "$video_path")"
+video_color_primaries="$(ffprobe -v error -select_streams v:0 -show_entries stream=color_primaries -of csv=p=0 "$video_path")"
 video_duration="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$video_path")"
 
 [[ "$video_stream_count" == 1 ]] || fail "demo MP4 must contain exactly one video stream"
@@ -205,11 +308,19 @@ video_duration="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$v
     fail "demo MP4 is ${video_width}x${video_height}; expected 1280x720"
 [[ "$video_pixel_format" == "yuv420p" ]] ||
     fail "demo MP4 pixel format is $video_pixel_format; expected yuv420p"
+[[ "$video_frame_rate" == "30/1" ]] ||
+    fail "demo MP4 frame rate is ${video_frame_rate:-unknown}; expected 30/1"
+[[ "$video_color_space" == "bt709" ]] ||
+    fail "demo MP4 color space is ${video_color_space:-unknown}; expected bt709"
+[[ "$video_color_transfer" == "bt709" ]] ||
+    fail "demo MP4 color transfer is ${video_color_transfer:-unknown}; expected bt709"
+[[ "$video_color_primaries" == "bt709" ]] ||
+    fail "demo MP4 color primaries are ${video_color_primaries:-unknown}; expected bt709"
 awk -v duration="$video_duration" 'BEGIN {
-    difference = duration - 37.0
+    difference = duration - 40.0
     if (difference < 0) difference = -difference
     exit difference <= 0.01 ? 0 : 1
-}' || fail "demo MP4 duration is $video_duration seconds; expected 37 seconds"
+}' || fail "demo MP4 duration is $video_duration seconds; expected 40 seconds"
 
 timestamp_to_milliseconds() {
     local timestamp="$1"
@@ -225,6 +336,7 @@ verify_vtt() {
     local relative_path="$1"
     local vtt_path="$PUBLIC_DIR/$relative_path"
     local timing_count first_start last_end previous_end line start end start_ms end_ms
+    local expected_timeline actual_timeline
 
     [[ "$(sed -n '1p' "$vtt_path")" == "WEBVTT" ]] ||
         fail "$relative_path must begin with WEBVTT"
@@ -235,7 +347,7 @@ verify_vtt() {
     timing_count="$(
         LC_ALL=C grep -Ec '^[0-9][0-9]:[0-9][0-9]\.[0-9][0-9][0-9] --> [0-9][0-9]:[0-9][0-9]\.[0-9][0-9][0-9]$' "$vtt_path"
     )"
-    [[ "$timing_count" == 5 ]] || fail "$relative_path must contain exactly five valid cues"
+    [[ "$timing_count" == 6 ]] || fail "$relative_path must contain exactly six valid cues"
 
     awk '
         NR == 1 { if ($0 != "WEBVTT") exit 1; next }
@@ -250,7 +362,7 @@ verify_vtt() {
             waiting_for_text = 0
         }
         END {
-            if (cue_count != 5 || text_count != cue_count || waiting_for_text) exit 3
+            if (cue_count != 6 || text_count != cue_count || waiting_for_text) exit 3
         }
     ' "$vtt_path" || fail "$relative_path has a cue without caption text"
 
@@ -270,7 +382,18 @@ verify_vtt() {
     done < <(LC_ALL=C grep ' --> ' "$vtt_path")
 
     [[ "$first_start" == "00:00.000" ]] || fail "$relative_path must start at 00:00.000"
-    [[ "$last_end" == "00:37.000" ]] || fail "$relative_path must end at 00:37.000"
+    [[ "$last_end" == "00:40.000" ]] || fail "$relative_path must end at 00:40.000"
+
+    expected_timeline="$(printf '%s\n' \
+        '00:00.000 --> 00:04.000' \
+        '00:04.000 --> 00:10.000' \
+        '00:10.000 --> 00:18.000' \
+        '00:18.000 --> 00:26.000' \
+        '00:26.000 --> 00:36.000' \
+        '00:36.000 --> 00:40.000')"
+    actual_timeline="$(LC_ALL=C grep ' --> ' "$vtt_path")"
+    [[ "$actual_timeline" == "$expected_timeline" ]] ||
+        fail "$relative_path must use the exact six-cue 40-second demo timeline"
 }
 
 verify_vtt "demo/captions.en.vtt"

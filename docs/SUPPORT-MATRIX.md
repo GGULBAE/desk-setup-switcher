@@ -1,5 +1,9 @@
 # Support matrix
 
+## Current launch media — 2026-09-12
+
+The repository README and bilingual holding site now present four exact-source synthetic stages—Capture, Edit Display, Edit Sound, and Review—plus an explicit-play, silent 40-second tour with English/Korean captions and a visible transcript summary. The cards preserve non-color labels and state cues, and the site video has controls, a Review poster, keyboard focus styling, no autoplay, and no loop. Source commit `4ecdf48a712fe1bee1142d00dc56403adc5caf0a`, four PNG/AX pairs, 13 public derivatives, exact manifests, current-scope copy, critical-only PNG metadata, and H.264/30 fps/BT.709/no-audio properties pass deterministic verification. These are offscreen synthetic marketing assets, not installed-window, accessibility-certification, Apply, rollback, hardware, supported-download, or public-deployment evidence.
+
 ## GitHub discovery surface — 2026-09-12
 
 The public repository description and 12 discovery topics now use the current Display/Sound, local-first, manual-only boundary. A custom `1280×640` social preview uses the current synthetic Capture screen and exact project icon; its deterministic source, checksum, dimensions, opacity, metadata stripping, and provenance pass the public-asset gate. Authenticated read-back confirms the description, topics, blank Homepage, and custom preview. Discussions remains disabled, no public Release or site was published, and no external promotional post was made. `make verify-public-surface` and the full non-live `make verify` pass locally.

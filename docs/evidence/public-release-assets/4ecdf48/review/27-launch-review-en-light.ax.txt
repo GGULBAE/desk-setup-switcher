@@ -1,0 +1,13 @@
+source=ApplyPreviewView in attached offscreen NSWindow
+synthetic-launch-gallery=true
+fixture=27-launch-review-en-light
+language=en
+viewport=620x440
+declared-profile=Studio Desk
+declared-groups=audio
+declared-change-count=2
+confirmation-closure=records-test-failure-only
+live-system-mutations=false
+window-ordered-front=false
+offscreen-ax-limit=SwiftUI descendants may remain collapsed into AXGroup
+role=AXGroup

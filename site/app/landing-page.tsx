@@ -14,6 +14,7 @@ const content = {
     homeLabel: "Desk Setup Switcher home",
     nav: [
       ["How it works", "flow"],
+      ["Gallery", "gallery"],
       ["Support", "support"],
       ["Privacy", "privacy"],
       ["FAQ", "faq"],
@@ -53,6 +54,53 @@ const content = {
         title: "Review & Apply",
         body: "Inspect planned changes, omissions, and risk. The Mac changes only after the separate Apply Profile or Apply Available Settings confirmation.",
       },
+    ],
+    galleryEyebrow: "Current interface",
+    galleryTitle: "Four screens. One deliberate flow.",
+    gallerySummary:
+      "These current-interface screens use synthetic product data. They show the Display and Sound workflow without performing or claiming a hardware change.",
+    galleryProof: "Synthetic data · No Apply performed · No automatic switching",
+    galleryItems: [
+      {
+        number: "01",
+        title: "Capture",
+        body: "Read the Mac’s available Display and Sound values into a local profile. Capture itself changes nothing.",
+        image: "/gallery/01-capture.png",
+        alt: "Synthetic Desk Setup Switcher tray showing the Capture Current Settings action",
+      },
+      {
+        number: "02",
+        title: "Edit Display",
+        body: "Choose the saved main display and resolution from values available to the profile.",
+        image: "/gallery/02-edit-display.png",
+        alt: "Synthetic profile editor showing main display and resolution controls",
+      },
+      {
+        number: "03",
+        title: "Edit Sound",
+        body: "Review output device, volume, and mute alongside input device and volume.",
+        image: "/gallery/03-edit-sound.png",
+        alt: "Synthetic profile editor showing output and input sound controls",
+      },
+      {
+        number: "04",
+        title: "Review",
+        body: "Inspect every planned change and omission before a separate Apply decision.",
+        image: "/gallery/04-review.png",
+        alt: "Synthetic Apply Preview listing planned changes before the separate Apply action",
+      },
+    ],
+    demoTitle: "Watch the workflow",
+    demoSummary:
+      "This short, silent walkthrough moves through Capture, Display editing, Sound editing, and Review. It never simulates pressing Apply or a successful hardware change.",
+    demoLabel: "Desk Setup Switcher Capture, Display, Sound, and Review walkthrough",
+    demoFallback: "Download the MP4 walkthrough",
+    transcriptTitle: "Transcript summary",
+    transcriptItems: [
+      "Capture reads available Display and Sound values into a local profile without changing the Mac.",
+      "Edit Display sets the saved main display and resolution.",
+      "Edit Sound sets available output and input values.",
+      "Review lists planned changes and omissions; only a separate explicit Apply can begin a system change.",
     ],
     supportEyebrow: "Honest support boundary",
     supportTitle: "Two areas. Evidence shown plainly.",
@@ -122,6 +170,7 @@ const content = {
     homeLabel: "Desk Setup Switcher 홈",
     nav: [
       ["사용 흐름", "flow"],
+      ["화면 보기", "gallery"],
       ["지원 범위", "support"],
       ["개인정보", "privacy"],
       ["자주 묻는 질문", "faq"],
@@ -161,6 +210,53 @@ const content = {
         title: "검토 후 적용",
         body: "변경 계획, 제외 항목, 위험을 먼저 확인합니다. 별도의 프로필 적용 또는 사용 가능한 설정 적용을 눌러야 Mac이 바뀝니다.",
       },
+    ],
+    galleryEyebrow: "현재 인터페이스",
+    galleryTitle: "네 화면으로 보는 명확한 흐름.",
+    gallerySummary:
+      "현재 인터페이스를 합성 제품 데이터로 구성한 화면입니다. 실제 하드웨어 설정을 바꾸거나 변경 성공을 주장하지 않고 디스플레이와 사운드 흐름을 보여줍니다.",
+    galleryProof: "합성 데이터 · Apply 실행 없음 · 자동 전환 없음",
+    galleryItems: [
+      {
+        number: "01",
+        title: "캡처",
+        body: "Mac에서 사용할 수 있는 디스플레이와 사운드 값을 로컬 프로필로 읽습니다. 캡처 자체는 아무 설정도 바꾸지 않습니다.",
+        image: "/gallery/01-capture.png",
+        alt: "현재 설정 캡처 동작을 보여주는 Desk Setup Switcher 합성 트레이 화면",
+      },
+      {
+        number: "02",
+        title: "디스플레이 편집",
+        body: "프로필에서 사용할 수 있는 값 중 저장할 주 디스플레이와 해상도를 정합니다.",
+        image: "/gallery/02-edit-display.png",
+        alt: "주 디스플레이와 해상도 조절 항목을 보여주는 합성 프로필 편집 화면",
+      },
+      {
+        number: "03",
+        title: "사운드 편집",
+        body: "출력 기기·음량·소리 끔과 입력 기기·음량을 한곳에서 확인합니다.",
+        image: "/gallery/03-edit-sound.png",
+        alt: "출력과 입력 사운드 조절 항목을 보여주는 합성 프로필 편집 화면",
+      },
+      {
+        number: "04",
+        title: "검토",
+        body: "별도의 적용 결정을 내리기 전에 모든 예정 변경과 제외 항목을 확인합니다.",
+        image: "/gallery/04-review.png",
+        alt: "별도의 적용 동작 전에 예정된 변경을 나열하는 합성 설정 미리보기 화면",
+      },
+    ],
+    demoTitle: "전체 흐름 보기",
+    demoSummary:
+      "이 짧은 무음 영상은 캡처, 디스플레이 편집, 사운드 편집, 검토로 이어집니다. Apply를 누르거나 하드웨어 변경이 성공한 것처럼 연출하지 않습니다.",
+    demoLabel: "Desk Setup Switcher 캡처, 디스플레이, 사운드, 검토 흐름 영상",
+    demoFallback: "MP4 흐름 영상 내려받기",
+    transcriptTitle: "영상 내용 요약",
+    transcriptItems: [
+      "캡처는 Mac을 바꾸지 않고 사용할 수 있는 디스플레이와 사운드 값을 로컬 프로필로 읽습니다.",
+      "디스플레이 편집에서 저장할 주 디스플레이와 해상도를 정합니다.",
+      "사운드 편집에서 사용할 수 있는 출력과 입력 값을 정합니다.",
+      "검토에서 예정 변경과 제외 항목을 확인하며, 별도의 명시적인 Apply에서만 시스템 변경을 시작할 수 있습니다.",
     ],
     supportEyebrow: "정직한 지원 경계",
     supportTitle: "두 가지 영역, 검증 수준까지 그대로.",
@@ -326,6 +422,88 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
                 <p>{step.body}</p>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section className="gallery-section" id="gallery" aria-labelledby="gallery-title">
+          <div className="section-wrap">
+            <div className="gallery-heading">
+              <div className="section-heading">
+                <p className="eyebrow">{text.galleryEyebrow}</p>
+                <h2 id="gallery-title">{text.galleryTitle}</h2>
+                <p>{text.gallerySummary}</p>
+              </div>
+              <p className="gallery-proof">{text.galleryProof}</p>
+            </div>
+
+            <div className="gallery-grid">
+              {text.galleryItems.map((item) => (
+                <figure className="gallery-card" key={item.number}>
+                  <div className="gallery-frame">
+                    <Image
+                      src={item.image}
+                      alt={item.alt}
+                      width={1270}
+                      height={760}
+                      unoptimized
+                    />
+                  </div>
+                  <figcaption>
+                    <span className="gallery-number" aria-hidden="true">
+                      {item.number}
+                    </span>
+                    <div>
+                      <h3>{item.title}</h3>
+                      <p>{item.body}</p>
+                    </div>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+
+            <div className="demo-panel">
+              <div className="demo-media">
+                <video
+                  key={language}
+                  controls
+                  preload="metadata"
+                  playsInline
+                  poster="/gallery/04-review.png"
+                  aria-label={text.demoLabel}
+                  aria-describedby="demo-description"
+                >
+                  <source src="/demo/desk-setup-switcher.mp4" type="video/mp4" />
+                  <track
+                    kind="captions"
+                    src="/demo/captions.en.vtt"
+                    srcLang="en"
+                    label="English"
+                    default={language === "en"}
+                  />
+                  <track
+                    kind="captions"
+                    src="/demo/captions.ko.vtt"
+                    srcLang="ko"
+                    label="한국어"
+                    default={language === "ko"}
+                  />
+                  <a href="/demo/desk-setup-switcher.mp4">{text.demoFallback}</a>
+                </video>
+              </div>
+              <div className="demo-copy">
+                <p className="eyebrow">Demo</p>
+                <h3>{text.demoTitle}</h3>
+                <p id="demo-description">{text.demoSummary}</p>
+                <div className="demo-transcript" aria-labelledby="transcript-title">
+                  <h4 id="transcript-title">{text.transcriptTitle}</h4>
+                  <ol>
+                    {text.transcriptItems.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ol>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

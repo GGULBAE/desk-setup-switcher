@@ -1,5 +1,9 @@
 # Roadmap
 
+## Current launch gallery and demo — 2026-09-12
+
+Replace the stale three-screen media lineage with exact-source Capture, Edit Display, Edit Sound, and Review evidence from commit `4ecdf48`. Build four reusable `1270×760` launch cards and a silent, bilingual-captioned 40-second tour; expose them in the GitHub README and owner-only bilingual holding site with explicit playback, a readable transcript, and no autoplay. Keep the product boundary local-only and manual: no Apply success simulation, public download, site publication, directory submission, Threads campaign, or hardware mutation. Deterministic double-build hashes, strict source/public manifests, media/privacy checks, the public-surface gate, full non-live `make verify`, and `git diff --check` pass locally.
+
 ## GitHub discovery surface refresh — 2026-09-12
 
 Align the remote repository description, discovery topics, and custom social preview with the current seven-setting Display/Sound product and manual-only workflow. The new deterministic `1280×640` preview uses the still-current synthetic Capture screen rather than the stale legacy editor. Keep Homepage blank while the only site is owner-only, keep Discussions disabled, and publish no Release, site, directory listing, or community post. The researched promotion sequence in [launch copy](LAUNCH-COPY.md) deliberately defers Threads and broad acquisition until a runnable public build exists; signing and notarization precede high-volume installation channels. `make verify-public-surface` and the full non-live `make verify` pass locally.

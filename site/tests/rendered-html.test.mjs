@@ -187,10 +187,30 @@ test("renders the complete public-beta landing page without setting cookies", as
   assert.match(html, /hosting provider still processes requests and may retain aggregate operational metrics/);
   assert.doesNotMatch(html, /VoiceOver/i);
   assert.match(html, /\/screenshots\/capture\.png/);
-  assert.doesNotMatch(html, /\/screenshots\/edit\.png/);
-  assert.doesNotMatch(html, /\/screenshots\/review\.png/);
+  for (const galleryImage of [
+    "/gallery/01-capture.png",
+    "/gallery/02-edit-display.png",
+    "/gallery/03-edit-sound.png",
+    "/gallery/04-review.png",
+  ]) {
+    assert.match(html, new RegExp(galleryImage.replaceAll("/", "\\/")));
+  }
+  assert.doesNotMatch(html, /\/screenshots\/(?:edit|review)\.png/);
   assert.match(html, /\/og\.png/);
-  assert.doesNotMatch(html, /\/demo\/desk-setup-switcher\.mp4/);
+  assert.match(html, /Four screens\. One deliberate flow\./);
+  assert.match(html, /Synthetic data · No Apply performed · No automatic switching/);
+  assert.match(html, /Transcript summary/);
+  assert.match(html, /only a separate explicit Apply can begin a system change/);
+  const videoTag = html.match(/<video\b[^>]*>/i)?.[0];
+  assert.ok(videoTag, "the gallery must render its product walkthrough video");
+  assert.match(videoTag, /\bcontrols=""/i);
+  assert.match(videoTag, /\bpreload="metadata"/i);
+  assert.match(videoTag, /\bplaysinline=""/i);
+  assert.match(videoTag, /\bposter="\/gallery\/04-review\.png"/i);
+  assert.doesNotMatch(videoTag, /\b(?:autoplay|loop)(?:=|\s|>)/i);
+  assert.match(html, /<source[^>]+src="\/demo\/desk-setup-switcher\.mp4"[^>]+type="video\/mp4"/i);
+  assert.match(html, /<track[^>]+kind="captions"[^>]+src="\/demo\/captions\.en\.vtt"[^>]+srclang="en"/i);
+  assert.match(html, /<track[^>]+kind="captions"[^>]+src="\/demo\/captions\.ko\.vtt"[^>]+srclang="ko"/i);
   assert.doesNotMatch(html, /Exact Ethernet\/Wi-Fi|ColorSync ICC profile|display, audio, and network profiles/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
@@ -299,6 +319,14 @@ test("keeps the site account-free, local-content-only, and free of starter capab
   assert.doesNotMatch(browserSource, /<script[^>]+src=["']https?:\/\//i);
   assert.match(landing, /책상 설정을 바꾸기 전에, 먼저 확인하세요/);
   assert.match(landing, /자동 전환 없음/);
+  assert.match(landing, /네 화면으로 보는 명확한 흐름/);
+  assert.match(landing, /합성 데이터 · Apply 실행 없음 · 자동 전환 없음/);
+  assert.match(landing, /영상 내용 요약/);
+  assert.match(landing, /aria-describedby="demo-description"/);
+  assert.match(landing, /kind="captions"/);
+  assert.match(landing, /srcLang="en"/);
+  assert.match(landing, /srcLang="ko"/);
+  assert.doesNotMatch(landing, /\bautoPlay\b|\bloop\b/);
   assert.match(landing, /homeLabel: "Desk Setup Switcher 홈"/);
   assert.match(landing, /aria-label=\{text\.homeLabel\}/);
   assert.match(landing, /className="skip-link" href="#main-content"/);
@@ -368,7 +396,12 @@ test("retains the sanitized media inventory and bilingual caption files", async 
   const assets = [
     "public/screenshots/capture.png",
     "public/screenshots/edit.png",
+    "public/screenshots/sound.png",
     "public/screenshots/review.png",
+    "public/gallery/01-capture.png",
+    "public/gallery/02-edit-display.png",
+    "public/gallery/03-edit-sound.png",
+    "public/gallery/04-review.png",
     "public/og.png",
     "public/demo/desk-setup-switcher.mp4",
     "public/demo/captions.en.vtt",
@@ -380,10 +413,10 @@ test("retains the sanitized media inventory and bilingual caption files", async 
     readFile(new URL("public/demo/captions.en.vtt", root), "utf8"),
     readFile(new URL("public/demo/captions.ko.vtt", root), "utf8"),
   ]);
-  assert.match(english, /Capture — Read current settings/);
-  assert.match(english, /Review & Apply/);
-  assert.match(korean, /Capture — 현재 설정을 읽습니다/);
-  assert.match(korean, /Review & Apply/);
+  assert.match(english, /Capture — Read available Display and Sound values\. Nothing changes\./);
+  assert.match(english, /Review — Check every planned change before the separate Apply confirmation/);
+  assert.match(korean, /Capture — 사용할 수 있는 Display와 Sound 값을 읽습니다\. 아무것도 변경하지 않습니다\./);
+  assert.match(korean, /Review — 별도 적용 확인 전에 예정된 변경을 모두 검토합니다/);
 });
 
 test("site origin approval fails closed and narrowly allows explicit local builds", async () => {
