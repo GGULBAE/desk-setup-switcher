@@ -4,6 +4,8 @@
 
 Reduce the current profile allowlist from ten to nine kinds by making keyboard brightness schema-compatible dormant data: preserve its legacy JSON value, force inclusion off at every normalization boundary, and remove its live snapshot, permission, capture, visible-registry, plan, Apply, verification, rollback, and UI paths. Keyboard now exposes exactly **Key repeat speed** and **Repeat delay**. Replace the profile editor's internal rail/segmented navigation with one vertically scrolling **Display**, **Sound**, and **Keyboard** page, and raise the initial Settings height to 700 points while preserving its resizable 680×480 minimum. Deterministic tests must prove that legacy brightness values round-trip but never become operations and that only the nine editable kinds cross Capture and Apply boundaries. No live setting mutation is part of this milestone.
 
+Commit `ce58e61` records the implementation. Exact-commit fallback verification passed 373 Swift Testing cases in 41 suites with two opt-in live skips, the isolated native-popover XCTest, SwiftPM Release with warnings as errors, and every public-surface variant. The user-authorized [local reinstall](KEYBOARD-BRIGHTNESS-RETIREMENT-REINSTALL-2026-09-17.md) launched that exact source from `/Applications`, preserved both profile files byte-for-byte, and showed zero visible app-owned windows after startup. The unaccepted Xcode license still blocks canonical `make verify` and the universal package path; no Capture, Apply, permission request, or live setting mutation was run.
+
 The 2026-09-15 milestone below remains exact historical evidence for the superseded three-control build.
 
 ## Historical Keyboard profile settings — 2026-09-15

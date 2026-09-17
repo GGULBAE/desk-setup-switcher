@@ -4,6 +4,8 @@
 
 The current profile allowlist has nine kinds across **Display**, **Sound**, and **Keyboard**. Keyboard exposes exactly key repeat speed and repeat delay through read-only Capture, direct editing, explicit preview, Apply, immediate read-back, and rollback. The editor maps the nonlinear enabled steps exposed by macOS to discrete **Slow → Fast** and **Long → Short** sliders and shows Display, Sound, and Keyboard in one vertical scroll view without an internal rail or segmented selector. Native repeat Off remains a separate unsupported runtime state. Repeat settings use public CFPreferences access with undocumented keys and therefore remain experimental. Keyboard brightness is preserved only as dormant legacy JSON: normalization forces its inclusion off, no runtime catalog exposes it, and the live adapter never snapshots or writes it. Pointer speed, natural scrolling, and standard-function-key behavior are likewise dormant compatibility data. No live Keyboard mutation or hardware verification is claimed.
 
+Commit `ce58e61` passed the exact-source deterministic fallback and public-surface matrix. Its user-authorized [local reinstall](KEYBOARD-BRIGHTNESS-RETIREMENT-REINSTALL-2026-09-17.md) preserved both profile files byte-for-byte and launched with zero visible app-owned windows. This is local `arm64` build/install/startup evidence only; the unaccepted Xcode license still blocks the canonical universal-package gate, and no installed control or hardware mutation was exercised.
+
 The 2026-09-15 section below remains historical evidence for the superseded brightness-capable build.
 
 ## Historical Keyboard profile surface — 2026-09-15

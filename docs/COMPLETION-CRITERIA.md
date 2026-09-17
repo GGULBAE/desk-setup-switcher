@@ -7,8 +7,8 @@ Current target: nine setting kinds across Display, Sound, and Keyboard. Keyboard
 - [x] Production capture, permission, presentation, editor, adapter, Apply, and rollback paths contain no keyboard-brightness behavior; the CoreHID implementation was removed.
 - [x] The allowlist contains nine visible kinds, and dormant pointer, scrolling, function-key, Network, and keyboard-brightness values cannot become hidden profile mutations.
 - [x] Deterministic regressions cover legacy brightness round-trip with forced exclusion, two-item Input snapshots, no brightness operation or catalog projection, and a crafted legacy operation failing without a preference write.
-- [ ] The repository's primary integrated `make verify` remains unavailable until the installed Xcode license is accepted; the exact local fallback verification performed for this change is recorded with the resulting commit.
-- [ ] No live Keyboard mutation is authorized or claimed. A local reinstall proves only build/install/startup and profile-file preservation unless a separate explicit hardware procedure is approved.
+- [x] Commit `ce58e61` passed exact-source formatting, project generation, localization, 373 Swift Testing cases in 41 suites with two opt-in live skips, the isolated native-popover XCTest, SwiftPM Release with warnings as errors, public assets, and every public-surface variant. The canonical `make verify` remains unavailable until the installed Xcode license is accepted.
+- [x] The user-authorized [local reinstall](KEYBOARD-BRIGHTNESS-RETIREMENT-REINSTALL-2026-09-17.md) launched the exact commit from `/Applications`, preserved both profile files byte-for-byte, and showed zero visible app-owned windows after startup. No Capture, Apply, permission request, or live setting mutation was run or claimed.
 
 The 2026-09-15 section below is retained as historical evidence for the superseded three-control build and its exact verification counts.
 
