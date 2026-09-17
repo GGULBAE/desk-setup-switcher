@@ -9,28 +9,19 @@ private struct InputPreferenceWrite: Codable, Sendable {
   let value: InputPreferenceValue
 }
 
-private struct KeyboardBrightnessWrite: Codable, Sendable {
-  let value: Double
-}
-
 public struct InputPreferencesAdapter: SystemSettingsAdapter {
-  public static let keyboardBrightnessKey = "KeyboardBrightness"
-
   public let group = SettingGroup.input
 
   private let api: any InputPreferencesAPI
-  private let keyboardBacklightAPI: any KeyboardBacklightAPI
   private let now: @Sendable () -> Date
   private let encoder = JSONEncoder()
   private let decoder = JSONDecoder()
 
   public init(
     api: any InputPreferencesAPI = CFPreferencesInputPreferencesAPI(),
-    keyboardBacklightAPI: any KeyboardBacklightAPI = CoreHIDKeyboardBacklightAPI(),
     now: @escaping @Sendable () -> Date = { Date() }
   ) {
     self.api = api
-    self.keyboardBacklightAPI = keyboardBacklightAPI
     self.now = now
   }
 
@@ -38,8 +29,7 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
     AdapterCapability(
       group: group,
       state: .experimental,
-      reason:
-        "Key-repeat preferences use undocumented global keys. Keyboard brightness uses public CoreHID only when permission and a compatible writable element are already available."
+      reason: "Key-repeat preferences use undocumented global keys."
     )
   }
 
@@ -52,14 +42,9 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
       api.value(for: .initialKeyRepeatDelay)?.numberValue,
       range: 1...300
     )
-    let backlight = normalizedBacklightResult(await keyboardBacklightAPI.readBrightness())
-    let brightnessMeasurement = backlight.availableMeasurement
-    let brightness = brightnessMeasurement?.value
-
     let settings = InputProfileSettings(
       keyRepeatInterval: .init(isIncluded: repeatInterval != nil, value: repeatInterval),
-      initialKeyRepeatDelay: .init(isIncluded: initialDelay != nil, value: initialDelay),
-      keyboardBrightness: .init(isIncluded: brightness != nil, value: brightness)
+      initialKeyRepeatDelay: .init(isIncluded: initialDelay != nil, value: initialDelay)
     )
 
     return AdapterSnapshot(
@@ -77,7 +62,6 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
           valuePresent: initialDelay != nil,
           label: "Repeat delay"
         ),
-        keyboardBrightnessSnapshotItem(backlight),
       ],
       keyboardControlCatalog: [
         .init(
@@ -89,12 +73,6 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
           kind: .initialKeyRepeatDelay,
           currentValue: initialDelay,
           canApply: initialDelay != nil
-        ),
-        .init(
-          kind: .keyboardBrightness,
-          currentValue: brightness,
-          canApply: brightness != nil,
-          quantizationTolerance: brightnessMeasurement?.quantizationTolerance
         ),
       ]
     )
@@ -127,12 +105,6 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
       settings.initialKeyRepeatDelay,
       key: InputPreferenceKey.initialKeyRepeatDelay.rawValue,
       range: 1...300,
-      issues: &issues
-    )
-    validateNumber(
-      settings.keyboardBrightness,
-      key: Self.keyboardBrightnessKey,
-      range: 0...1,
       issues: &issues
     )
     return issues
@@ -189,14 +161,6 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
       operations: &operations,
       omissions: &omissions
     )
-    try appendBrightnessOperation(
-      desired: desiredSettings.keyboardBrightness,
-      current: currentSettings.keyboardBrightness.value,
-      snapshot: snapshot,
-      operations: &operations,
-      omissions: &omissions
-    )
-
     return AdapterPlan(
       group: group,
       operations: operations,
@@ -206,10 +170,6 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
   }
 
   public func apply(_ operation: PlannedOperation) async -> OperationResult {
-    if operation.key == Self.keyboardBrightnessKey {
-      return await applyKeyboardBrightness(operation)
-    }
-
     do {
       let write = try decoder.decode(InputPreferenceWrite.self, from: operation.payload)
       guard isValidPreferenceWrite(write, for: operation) else {
@@ -239,10 +199,6 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
   }
 
   public func rollback(_ operation: PlannedOperation) async -> OperationResult {
-    if operation.key == Self.keyboardBrightnessKey {
-      return await rollbackKeyboardBrightness(operation)
-    }
-
     do {
       guard let rollbackPayload = operation.rollbackPayload else {
         throw CocoaError(.coderReadCorrupt)
@@ -280,14 +236,7 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
         component: "adapter.input",
         code: "input.experimental-preferences",
         message: "Key-repeat preferences are isolated behind an experimental capability."
-      ),
-      DiagnosticEntry(
-        severity: .info,
-        component: "adapter.input.keyboard-backlight",
-        code: "keyboard-backlight.public-corehid",
-        message:
-          "Keyboard brightness requires macOS 15 or later, prior Input Monitoring approval, and a compatible public CoreHID element."
-      ),
+      )
     ]
   }
 
@@ -304,47 +253,12 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
     )
   }
 
-  private func keyboardBrightnessSnapshotItem(
-    _ result: KeyboardBacklightReadResult
-  ) -> SnapshotItem {
-    let state: SnapshotItemState
-    let detail: String
-    switch result {
-    case .available:
-      state = .storable
-      detail = "Public CoreHID keyboard-backlight control"
-    case .permissionRequired:
-      state = .permissionRequired
-      detail = "Input Monitoring access must be granted in System Settings"
-    case .temporarilyUnavailable:
-      state = .unreadable
-      detail = "The compatible keyboard-backlight control could not be read"
-    case .unsupported:
-      state = .unsupported
-      detail = "No compatible public CoreHID keyboard-backlight control was found"
-    }
-    return SnapshotItem(
-      key: Self.keyboardBrightnessKey,
-      label: "Keyboard brightness",
-      state: state,
-      detail: detail
-    )
-  }
-
   private func validSnapshotNumber(
     _ value: Double?,
     range: ClosedRange<Double>
   ) -> Double? {
     guard let value, value.isFinite, range.contains(value) else { return nil }
     return value
-  }
-
-  private func normalizedBacklightResult(
-    _ result: KeyboardBacklightReadResult
-  ) -> KeyboardBacklightReadResult {
-    guard case .available(let measurement) = result else { return result }
-    guard validBacklightMeasurement(measurement) else { return .temporarilyUnavailable }
-    return result
   }
 
   private func validateNumber(
@@ -400,46 +314,6 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
     )
   }
 
-  private func appendBrightnessOperation(
-    desired: SettingOption<Double?>,
-    current: Double?,
-    snapshot: AdapterSnapshot,
-    operations: inout [PlannedOperation],
-    omissions: inout [PlanOmission]
-  ) throws {
-    guard desired.isIncluded else { return }
-    guard let value = desired.value else {
-      omissions.append(missingValueOmission(key: Self.keyboardBrightnessKey))
-      return
-    }
-    guard value.isFinite, (0...1).contains(value) else { return }
-    guard
-      let control = availableControl(.keyboardBrightness, in: snapshot),
-      let current
-    else {
-      omissions.append(
-        unavailableOmission(key: Self.keyboardBrightnessKey, snapshot: snapshot)
-      )
-      return
-    }
-    if abs(current - value) <= (control.quantizationTolerance ?? 0) { return }
-    operations.append(
-      PlannedOperation(
-        group: group,
-        key: Self.keyboardBrightnessKey,
-        summary: "Change keyboard brightness",
-        risk: .moderate,
-        isFatalOnFailure: false,
-        preview: OperationPreview(
-          previousValue: percentagePreview(current),
-          desiredValue: percentagePreview(value)
-        ),
-        payload: try encoder.encode(KeyboardBrightnessWrite(value: value)),
-        rollbackPayload: try encoder.encode(KeyboardBrightnessWrite(value: current))
-      )
-    )
-  }
-
   private func preferenceOperation(
     key: InputPreferenceKey,
     label: String,
@@ -461,75 +335,6 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
     )
   }
 
-  private func applyKeyboardBrightness(_ operation: PlannedOperation) async -> OperationResult {
-    do {
-      let write = try decoder.decode(KeyboardBrightnessWrite.self, from: operation.payload)
-      guard operation.group == group,
-        write.value.isFinite,
-        (0...1).contains(write.value)
-      else {
-        throw CocoaError(.coderReadCorrupt)
-      }
-      let measurement = try await keyboardBacklightAPI.setBrightness(write.value)
-      guard validBacklightMeasurement(measurement),
-        abs(measurement.value - write.value) <= measurement.quantizationTolerance
-      else {
-        return OperationResult(
-          operationID: operation.id,
-          status: .failed,
-          message: "Keyboard brightness read-back did not confirm the requested value."
-        )
-      }
-      return OperationResult(
-        operationID: operation.id,
-        status: .succeeded,
-        message: "Updated keyboard brightness and confirmed it with public CoreHID."
-      )
-    } catch {
-      return OperationResult(
-        operationID: operation.id,
-        status: .failed,
-        message: "Keyboard brightness could not be updated."
-      )
-    }
-  }
-
-  private func rollbackKeyboardBrightness(_ operation: PlannedOperation) async -> OperationResult {
-    do {
-      guard let payload = operation.rollbackPayload else {
-        throw CocoaError(.coderReadCorrupt)
-      }
-      let write = try decoder.decode(KeyboardBrightnessWrite.self, from: payload)
-      guard operation.group == group,
-        write.value.isFinite,
-        (0...1).contains(write.value)
-      else {
-        throw CocoaError(.coderReadCorrupt)
-      }
-      let measurement = try await keyboardBacklightAPI.setBrightness(write.value)
-      guard validBacklightMeasurement(measurement),
-        abs(measurement.value - write.value) <= measurement.quantizationTolerance
-      else {
-        return OperationResult(
-          operationID: operation.id,
-          status: .rollbackFailed,
-          message: "The previous keyboard brightness could not be confirmed after rollback."
-        )
-      }
-      return OperationResult(
-        operationID: operation.id,
-        status: .rolledBack,
-        message: "Restored the previous keyboard brightness."
-      )
-    } catch {
-      return OperationResult(
-        operationID: operation.id,
-        status: .rollbackFailed,
-        message: "The previous keyboard brightness could not be restored."
-      )
-    }
-  }
-
   private func controlIsAvailable(
     _ kind: KeyboardControlKind,
     in snapshot: AdapterSnapshot
@@ -548,13 +353,6 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
       guard let tolerance = $0.quantizationTolerance else { return true }
       return tolerance.isFinite && (0...0.5).contains(tolerance)
     }
-  }
-
-  private func validBacklightMeasurement(_ measurement: KeyboardBacklightMeasurement) -> Bool {
-    measurement.value.isFinite
-      && (0...1).contains(measurement.value)
-      && measurement.quantizationTolerance.isFinite
-      && (0...0.5).contains(measurement.quantizationTolerance)
   }
 
   private func isValidPreferenceWrite(
@@ -599,10 +397,6 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
     }
   }
 
-  private func percentagePreview(_ value: Double) -> String {
-    String(format: "%.0f%%", locale: Locale(identifier: "en_US_POSIX"), value * 100)
-  }
-
   private func missingValueOmission(key: String) -> PlanOmission {
     PlanOmission(
       group: group,
@@ -610,12 +404,5 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
       status: .skipped,
       reason: "The saved keyboard setting has no value."
     )
-  }
-}
-
-extension KeyboardBacklightReadResult {
-  fileprivate var availableMeasurement: KeyboardBacklightMeasurement? {
-    guard case .available(let measurement) = self else { return nil }
-    return measurement
   }
 }

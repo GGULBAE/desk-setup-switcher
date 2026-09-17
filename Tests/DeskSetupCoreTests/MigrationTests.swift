@@ -142,6 +142,32 @@ final class MigrationTests: XCTestCase {
     )
   }
 
+  func testLegacyKeyboardBrightnessValueRoundTripsDormantWithoutActivatingInput() throws {
+    let codec = ProfileJSONCodec()
+    let profile = DeskProfile(
+      name: "Legacy keyboard profile",
+      settings: ProfileSettings(
+        input: .init(
+          isIncluded: true,
+          value: .init(
+            keyboardBrightness: .init(isIncluded: true, value: 0.65)
+          )
+        )
+      )
+    )
+
+    let decoded = try codec.decode(codec.encode(ProfileDocument(profiles: [profile])))
+    let input = try XCTUnwrap(decoded.document.profiles.first).settings.input
+
+    XCTAssertFalse(input.isIncluded)
+    XCTAssertFalse(input.value.keyboardBrightness.isIncluded)
+    XCTAssertEqual(input.value.keyboardBrightness.value, 0.65)
+    XCTAssertEqual(
+      try codec.decode(codec.encode(decoded.document)).document,
+      decoded.document
+    )
+  }
+
   func testCurrentSchemaApplicabilityNormalizationPreservesValuesAndIsIdempotent() throws {
     let document = unsupportedSnapshotDocument()
     let codec = ProfileJSONCodec()

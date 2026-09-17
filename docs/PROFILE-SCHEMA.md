@@ -138,7 +138,7 @@ Each `serviceIPv4` entry contains a portable `identity` and a `configuration` op
 | `keyboardBrightness` | `SettingOption<Double?>` |
 | `useStandardFunctionKeys` | `SettingOption<Bool?>` |
 
-`keyRepeatInterval`, `initialKeyRepeatDelay`, and `keyboardBrightness` are the three current Keyboard values. Their existing `isIncluded` flags are preserved when an older document is decoded: normalization does not turn a formerly dormant excluded value on. A new Capture includes a readable current value, and an explicit editor change opts that leaf in. The first two remain experimental because their CFPreferences keys are undocumented. Brightness is experimental, available only on macOS 15 or later, and actionable only when Input Monitoring access has already been granted and runtime public-CoreHID discovery resolves exactly one compatible readable/writable backlight element from a built-in HID device. Background snapshot work checks access without requesting it. No permission state, CoreHID device, or element handle is serialized. `pointerSpeed`, `naturalScrolling`, and `useStandardFunctionKeys` remain round-trip-compatible dormant values.
+`keyRepeatInterval` and `initialKeyRepeatDelay` are the two current Keyboard values. Their existing `isIncluded` flags are preserved when an older document is decoded: normalization does not turn a formerly dormant excluded value on. A new Capture includes a readable current value, and an explicit editor change opts that leaf in. Both remain experimental because their CFPreferences keys are undocumented. `keyboardBrightness` is retained only for schema-v1 round-trip compatibility; normalization always forces its inclusion off and no live adapter captures or applies it. `pointerSpeed`, `naturalScrolling`, and `useStandardFunctionKeys` are likewise round-trip-compatible dormant values.
 
 ## Current applicability policy
 
@@ -149,7 +149,7 @@ Each `serviceIPv4` entry contains a portable `identity` and a `configuration` op
 | Display | primary display, mode | mirroring, ColorSync profile, origin, rotation, active state |
 | Audio | default input, default output, input volume, output volume, output mute | system output |
 | Network | none | per-service IPv4, Wi-Fi power/SSID, legacy global IPv4, DNS, web proxy, secure web proxy |
-| Input | key repeat interval, initial key repeat delay, keyboard brightness when present | pointer speed, natural scrolling, standard-function-key behavior |
+| Input | key repeat interval, initial key repeat delay | keyboard brightness, pointer speed, natural scrolling, standard-function-key behavior |
 
 Primary-display selection is one global choice represented on all display targets. It remains included only when every target's `isPrimary` option is included and exactly one value is `true`, or when every target excludes it. A mixed or ambiguous state preserves values but disables all primary-display inclusion flags.
 

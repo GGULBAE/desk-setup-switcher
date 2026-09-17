@@ -65,13 +65,10 @@ final class UserFacingLocalizationTests: XCTestCase {
       ("Keyboard", "키보드"),
       ("Key repeat speed", "키 반복 속도"),
       ("Repeat delay", "반복 지연 시간"),
-      ("Keyboard brightness", "키보드 밝기"),
       ("Fast", "빠르게"),
       ("Slow", "느리게"),
       ("Short", "짧게"),
       ("Long", "길게"),
-      ("Dim", "어둡게"),
-      ("Bright", "밝게"),
       ("Slow to fast, level %lld of %lld", "느리게에서 빠르게, %2$lld단계 중 %1$lld단계"),
       ("Long to short, level %lld of %lld", "길게에서 짧게, %2$lld단계 중 %1$lld단계"),
       ("Set key repeat speed from slow to fast", "키 반복 속도를 느리게에서 빠르게까지 설정합니다"),
@@ -79,35 +76,13 @@ final class UserFacingLocalizationTests: XCTestCase {
         "Set the delay before a held key begins repeating",
         "키를 길게 눌렀을 때 반복이 시작될 때까지의 시간을 설정합니다"
       ),
-      (
-        "Set keyboard brightness from 0 to 100 percent",
-        "키보드 밝기를 0~100퍼센트로 설정합니다"
-      ),
       ("Change key repeat speed", "키 반복 속도 변경"),
       ("Change repeat delay", "반복 지연 시간 변경"),
-      ("Change keyboard brightness", "키보드 밝기 변경"),
       (
         "The keyboard control requires permission before it can be changed.",
         "키보드 제어를 변경하려면 먼저 권한이 필요합니다."
       ),
-      (
-        "Input Monitoring access must be granted in System Settings",
-        "시스템 설정에서 입력 모니터링 접근을 허용해야 합니다"
-      ),
-      (
-        "Updated keyboard brightness and confirmed it with public CoreHID.",
-        "키보드 밝기를 업데이트하고 공개 CoreHID로 확인했습니다."
-      ),
-      ("Input Monitoring Needed", "입력 모니터링 필요"),
       ("Capture Incomplete", "캡처 미완료"),
-      (
-        "Input Monitoring access is needed to include keyboard brightness. Keyboard brightness was omitted.",
-        "키보드 밝기를 포함하려면 입력 모니터링 접근이 필요합니다. 키보드 밝기는 제외했습니다."
-      ),
-      (
-        "Keyboard brightness is unavailable right now and was omitted.",
-        "현재 키보드 밝기를 사용할 수 없어 제외했습니다."
-      ),
       ("Review Location Permission", "위치 권한 검토"),
     ]
 
@@ -115,14 +90,6 @@ final class UserFacingLocalizationTests: XCTestCase {
       XCTAssertEqual(appLocalizedRuntime(english, languageCode: "en"), english)
       XCTAssertEqual(appLocalizedRuntime(english, languageCode: "ko"), korean)
     }
-
-    XCTAssertEqual(
-      appLocalizedRuntime(
-        "Updated the experimental KeyboardBrightness preference.",
-        languageCode: "ko"
-      ),
-      "실험적 키보드 밝기 환경설정을 업데이트했습니다."
-    )
   }
 
   func testNumericRuntimeTemplatePreservesItsFormatArgument() {

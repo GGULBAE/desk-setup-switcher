@@ -11,24 +11,8 @@ import Testing
   @Suite("Workflow state and action policy", .serialized)
   @MainActor
   struct WorkflowStateActionPolicyTests {
-    @Test("keyboard permission never exposes the Location permission route")
-    func keyboardPermissionPresentationIsSpecific() {
-      let keyboardOnly = ProfileCaptureSummary(items: [
-        .init(
-          group: .input,
-          key: "KeyboardBrightness",
-          disposition: .permissionRequired
-        )
-      ])
-      let keyboardPresentation =
-        TrayCapturePermissionPresentationPolicy.presentation(for: keyboardOnly)
-
-      #expect(keyboardPresentation.title == .inputMonitoring)
-      #expect(keyboardPresentation.showsInputMonitoringMessage)
-      #expect(!keyboardPresentation.showsUnavailableKeyboardBrightnessMessage)
-      #expect(!keyboardPresentation.showsLocationReviewAction)
-      #expect(keyboardPresentation.systemImage == "lock.trianglebadge.exclamationmark")
-
+    @Test("capture permission presentation exposes only actionable routes")
+    func capturePermissionPresentationIsSpecific() {
       let locationOnly = ProfileCaptureSummary(items: [
         .init(group: .network, key: "wifi.ssid", disposition: .permissionRequired)
       ])
@@ -36,23 +20,18 @@ import Testing
         TrayCapturePermissionPresentationPolicy.presentation(for: locationOnly)
 
       #expect(locationPresentation.title == .locationAccess)
-      #expect(!locationPresentation.showsInputMonitoringMessage)
-      #expect(!locationPresentation.showsUnavailableKeyboardBrightnessMessage)
       #expect(locationPresentation.showsLocationReviewAction)
       #expect(locationPresentation.systemImage == "location.slash")
 
-      let unavailableBrightness = ProfileCaptureSummary(items: [
-        .init(group: .audio, key: "outputVolume", disposition: .savedApplicable),
-        .init(group: .input, key: "KeyboardBrightness", disposition: .unsupported),
+      let genericPermission = ProfileCaptureSummary(items: [
+        .init(group: .audio, key: "synthetic", disposition: .permissionRequired)
       ])
-      let unavailablePresentation =
-        TrayCapturePermissionPresentationPolicy.presentation(for: unavailableBrightness)
+      let genericPresentation =
+        TrayCapturePermissionPresentationPolicy.presentation(for: genericPermission)
 
-      #expect(unavailablePresentation.title == .captureIncomplete)
-      #expect(!unavailablePresentation.showsInputMonitoringMessage)
-      #expect(unavailablePresentation.showsUnavailableKeyboardBrightnessMessage)
-      #expect(!unavailablePresentation.showsLocationReviewAction)
-      #expect(unavailablePresentation.systemImage == "exclamationmark.triangle")
+      #expect(genericPresentation.title == .multiplePermissions)
+      #expect(!genericPresentation.showsLocationReviewAction)
+      #expect(genericPresentation.systemImage == "lock.trianglebadge.exclamationmark")
     }
 
     @Test("capture running and terminal phases expose one truthful non-execution action")

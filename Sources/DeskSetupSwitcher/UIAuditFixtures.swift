@@ -404,7 +404,6 @@ extension View {
             naturalScrolling: .init(value: true),
             keyRepeatInterval: .init(value: 60),
             initialKeyRepeatDelay: .init(value: 150),
-            keyboardBrightness: .init(value: 0.7),
             useStandardFunctionKeys: .init(value: false)
           )
         )
@@ -528,12 +527,6 @@ extension View {
           state: .storable,
           detail: "Readable and writable"
         ),
-        SnapshotItem(
-          key: "KeyboardBrightness",
-          label: "Keyboard brightness",
-          state: .storable,
-          detail: "Readable and writable"
-        ),
       ]
       let inputSnapshot = AdapterSnapshot(
         group: .input,
@@ -549,11 +542,6 @@ extension View {
           .init(
             kind: .initialKeyRepeatDelay,
             currentValue: inputSettings.initialKeyRepeatDelay.value,
-            canApply: true
-          ),
-          .init(
-            kind: .keyboardBrightness,
-            currentValue: inputSettings.keyboardBrightness.value,
             canApply: true
           ),
         ]
@@ -666,7 +654,6 @@ extension View {
         .init(group: .audio, key: "outputVolume", disposition: .savedApplicable),
         .init(group: .input, key: "KeyRepeat", disposition: .savedApplicable),
         .init(group: .input, key: "InitialKeyRepeat", disposition: .savedApplicable),
-        .init(group: .input, key: "KeyboardBrightness", disposition: .savedApplicable),
         .init(
           group: .network, key: "network.serviceIPv4.ethernet.0", disposition: .savedApplicable),
         .init(group: .network, key: "network.serviceIPv4.wifi.1", disposition: .savedApplicable),

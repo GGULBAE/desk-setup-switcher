@@ -67,7 +67,6 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
       keyboardControlCatalog: [
         .init(kind: .keyRepeatInterval, currentValue: 2, canApply: true),
         .init(kind: .initialKeyRepeatDelay, currentValue: 15, canApply: true),
-        .init(kind: .keyboardBrightness, currentValue: 0.4, canApply: true),
       ]
     )
     let adapters: [MockSystemSettingsAdapter] = [input, network, audio, display]
@@ -105,10 +104,17 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     XCTAssertEqual(result.settings.input.value.naturalScrolling.value, true)
     XCTAssertEqual(result.settings.input.value.keyRepeatInterval, .init(value: 2))
     XCTAssertEqual(result.settings.input.value.initialKeyRepeatDelay, .init(value: 15))
-    XCTAssertEqual(result.settings.input.value.keyboardBrightness, .init(value: 0.4))
+    XCTAssertEqual(
+      result.settings.input.value.keyboardBrightness,
+      .init(isIncluded: false, value: 0.4)
+    )
     XCTAssertEqual(
       result.keyboardControlCatalog.map(\.kind),
-      [.keyRepeatInterval, .initialKeyRepeatDelay, .keyboardBrightness]
+      [.keyRepeatInterval, .initialKeyRepeatDelay]
+    )
+    XCTAssertFalse(
+      VisibleSettingRegistry().fields(snapshots: result.groups.compactMap(\.snapshot))
+        .contains { $0.contract.snapshotKey == "KeyboardBrightness" }
     )
 
     let displayResult = try XCTUnwrap(result.result(for: .display))

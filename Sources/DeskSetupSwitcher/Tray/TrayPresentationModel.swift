@@ -109,15 +109,12 @@ enum TrayCapturePermissionTitle: Equatable, Sendable {
   case captureFailed
   case captureIncomplete
   case locationAccess
-  case inputMonitoring
   case multiplePermissions
 }
 
 struct TrayCapturePermissionPresentation: Equatable, Sendable {
   let title: TrayCapturePermissionTitle
   let systemImage: String
-  let showsInputMonitoringMessage: Bool
-  let showsUnavailableKeyboardBrightnessMessage: Bool
   let showsLocationReviewAction: Bool
 }
 
@@ -127,23 +124,9 @@ enum TrayCapturePermissionPresentationPolicy {
   ) -> TrayCapturePermissionPresentation {
     let requirements = summary.permissionRequirements
     let needsLocation = requirements.contains(.locationForCurrentWiFiNetwork)
-    let needsInputMonitoring = requirements.contains(
-      .inputMonitoringForKeyboardBrightness
-    )
-    let hasUnavailableKeyboardBrightness = summary.items.contains { item in
-      item.group == .input
-        && item.key == "KeyboardBrightness"
-        && item.disposition != .savedApplicable
-        && item.disposition != .savedSnapshotOnly
-        && item.disposition != .permissionRequired
-    }
 
     let title: TrayCapturePermissionTitle
-    if needsLocation && needsInputMonitoring {
-      title = .multiplePermissions
-    } else if needsInputMonitoring {
-      title = .inputMonitoring
-    } else if needsLocation {
+    if needsLocation {
       title = .locationAccess
     } else if summary.permissionRequiredCount > 0 {
       title = .multiplePermissions
@@ -159,8 +142,6 @@ enum TrayCapturePermissionPresentationPolicy {
         : summary.permissionRequiredCount > 0
           ? "lock.trianglebadge.exclamationmark"
           : summary.status == .partial ? "exclamationmark.triangle" : "xmark.octagon",
-      showsInputMonitoringMessage: needsInputMonitoring,
-      showsUnavailableKeyboardBrightnessMessage: hasUnavailableKeyboardBrightness,
       showsLocationReviewAction: needsLocation
     )
   }
@@ -981,20 +962,6 @@ final class TrayPresentationModel: ObservableObject, TrayActionExecuting,
   private func partialCaptureMessage(for summary: ProfileCaptureSummary) -> String {
     let requirements = summary.permissionRequirements
     let needsLocation = requirements.contains(.locationForCurrentWiFiNetwork)
-    let needsInputMonitoring = requirements.contains(
-      .inputMonitoringForKeyboardBrightness
-    )
-
-    if needsLocation && needsInputMonitoring {
-      return appLocalized(
-        "Captured \(summary.applicableCount) applicable settings. Location access is needed for the current Wi-Fi network. Input Monitoring access is needed to include keyboard brightness; keyboard brightness was omitted."
-      )
-    }
-    if needsInputMonitoring {
-      return appLocalized(
-        "Captured \(summary.applicableCount) applicable settings. Input Monitoring access is needed to include keyboard brightness; keyboard brightness was omitted."
-      )
-    }
     if needsLocation {
       return appLocalized(
         "Captured \(summary.applicableCount) applicable settings. Location access is needed to include the current Wi-Fi network."

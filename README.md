@@ -52,7 +52,7 @@ Desk Setup Switcher is a macOS menu-bar app for people who use the same Mac at d
 
 ## One Mac, more than one desk
 
-Changing desks often means repeating the same small decisions: choose the main display, restore a resolution, select the right speakers or microphone, reset their levels, and restore keyboard repeat and backlight preferences.
+Changing desks often means repeating the same small decisions: choose the main display, restore a resolution, select the right speakers or microphone, reset their levels, and restore keyboard repeat preferences.
 
 Desk Setup Switcher keeps those choices together in a named profile, so every change begins with a clear plan instead of guesswork.
 
@@ -71,13 +71,13 @@ Desk Setup Switcher keeps those choices together in a named profile, so every ch
 2. **Edit** gives the setup a useful name and lets you choose from the values available on that Mac.
 3. **Review & Apply** shows proposed changes and omissions. Only a separate confirmation starts the change.
 
-## One profile, ten setting types
+## One profile, nine setting types
 
 | Display | Sound output | Sound input | Keyboard |
 | --- | --- | --- | --- |
 | Main display | Output device | Input device | Key repeat speed |
 | Resolution | Output volume | Input volume | Repeat delay |
-|  | Output mute |  | Keyboard brightness |
+|  | Output mute |  |  |
 
 That is the complete current product scope. Pointer speed, natural scrolling, standard-function-key behavior, Network settings, editable refresh rate, mirroring, ColorSync profiles, per-setting inclusion switches, and automatic switching are not current features.
 
@@ -96,7 +96,7 @@ Profiles, backups, and diagnostics stay on the Mac. Exports can contain device l
 
 - The bilingual project site is approved for public GitHub Pages hosting while its release state remains `holding`; it provides no app download or installation instructions.
 - The initial public-beta target is Apple Silicon on macOS 14 Sonoma. Exact release-candidate lifecycle evidence is still required before that becomes a supported public claim.
-- Current-source Display and Sound Capture and device discovery have read-only hardware evidence. Keyboard Capture, Apply, and rollback have deterministic mock evidence only; no live keyboard mutation or hardware verification is claimed. The Keyboard editor uses macOS-aligned discrete **Slow → Fast**, **Long → Short**, and **Dim → Bright** axes instead of raw preference numbers. Native key-repeat **Off** is a separate runtime threshold state and is not exposed until it can be captured, persisted, read back, and rolled back safely; the slowest enabled value is never mislabeled as Off. Key repeat speed and repeat delay use experimental undocumented preference keys. Keyboard brightness is experimental on macOS 15 or later and is available only when Input Monitoring access has already been granted and public CoreHID discovers exactly one compatible backlight element from a built-in HID device that is both readable and writable. Background Capture checks access without prompting; denial, unsupported hardware, and ambiguous discovery omit only brightness.
+- Current-source Display and Sound Capture and device discovery have read-only hardware evidence. Keyboard Capture, Apply, and rollback have deterministic mock evidence only; no live keyboard mutation or hardware verification is claimed. The Keyboard editor uses macOS-aligned discrete **Slow → Fast** and **Long → Short** axes instead of raw preference numbers. Native key-repeat **Off** is a separate runtime threshold state and is not exposed until it can be captured, persisted, read back, and rolled back safely; the slowest enabled value is never mislabeled as Off. Key repeat speed and repeat delay use experimental undocumented preference keys. Keyboard brightness is legacy profile data only: it is preserved for format compatibility but is never captured, edited, or applied.
 - A user-authorized 2026-09-15 local Apple Silicon build of the current Keyboard source was reinstalled and launched with both profile files unchanged. This is startup evidence for an `arm64` development bundle, not universal-package, supported-release, or Keyboard hardware evidence; see the [reinstall record](docs/KEYBOARD-REINSTALL-2026-09-15.md).
 - The app release remains on hold until the documented lifecycle, external-beta, and release-publication gates pass.
 

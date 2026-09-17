@@ -118,19 +118,7 @@ enum ProfileEditorSurfacePolicy {
   static let showsCurrentSettingsDraftRefresh = false
 }
 
-enum ProfileEditorWorkspaceLayoutPolicy {
-  static let railWidth: CGFloat = 160
-  static let spacing: CGFloat = 14
-  static let minimumDetailWidth: CGFloat = 360
-  static let minimumRailWorkspaceWidth = railWidth + spacing * 2 + 1 + minimumDetailWidth
-
-  static func usesRail(availableWidth: CGFloat, dynamicTypeSize: DynamicTypeSize) -> Bool {
-    !dynamicTypeSize.isAccessibilitySize && availableWidth >= minimumRailWorkspaceWidth
-  }
-}
-
 enum ProfileEditorStepPolicy {
-  static let defaultGroup: SettingGroup = .display
   static let orderedGroups: [SettingGroup] = [.display, .audio, .input]
 
   static func group(for fieldID: DraftFieldIdentifier) -> SettingGroup? {
@@ -391,7 +379,6 @@ enum ProfileEditorKeyboardOptionPolicy {
   enum Scale: Equatable, Sendable {
     case keyRepeatSpeed
     case repeatDelay
-    case brightness
   }
 
   // These are the enabled steps exposed by macOS, ordered in the same
@@ -424,8 +411,6 @@ enum ProfileEditorKeyboardOptionPolicy {
       1...Double(keyRepeatSteps.count)
     case .repeatDelay:
       1...Double(repeatDelaySteps.count)
-    case .brightness:
-      0...100
     }
   }
 
@@ -435,8 +420,6 @@ enum ProfileEditorKeyboardOptionPolicy {
       nearestSliderStep(for: value, values: keyRepeatSteps)
     case .repeatDelay:
       nearestSliderStep(for: value, values: repeatDelaySteps)
-    case .brightness:
-      min(max(value * 100, 0), 100)
     }
   }
 
@@ -446,8 +429,6 @@ enum ProfileEditorKeyboardOptionPolicy {
       storedStepValue(at: value, values: keyRepeatSteps)
     case .repeatDelay:
       storedStepValue(at: value, values: repeatDelaySteps)
-    case .brightness:
-      min(max(value, 0), 100) / 100
     }
   }
 
@@ -1284,76 +1265,91 @@ private struct ProfileEditorForm: View {
   @FocusState private var focusedField: DraftFieldIdentifier?
   @State private var showsValidationSummary = false
   @State private var showsImportedIconTechnicalInformation = false
-  @State private var selectedGroup = ProfileEditorStepPolicy.defaultGroup
+  @State private var requestedGroupScroll: SettingGroup?
   @State private var selectedNetworkIdentity: NetworkServiceIdentity?
 
   var body: some View {
-    GeometryReader { geometry in
-      editorScrollView(
-        availableWidth: min(geometry.size.width, 860)
-          - 2 * ProfileSettingLayoutPolicy.formHorizontalInset
+    editorScrollView
+  }
+
+  private var editorScrollView: some View {
+    ScrollViewReader { proxy in
+      ScrollView {
+        VStack(alignment: .leading, spacing: 12) {
+          profileDetailsCard
+
+          if showsValidationSummary, !validation.isValid {
+            validationSummary
+          }
+
+          if !availableGroups.isEmpty {
+            settingsSections
+          }
+        }
+        .padding(.horizontal, ProfileSettingLayoutPolicy.formHorizontalInset)
+        .padding(.top, 12)
+        .padding(.bottom, ProfileWorkspaceLayoutPolicy.formBottomInset)
+        .frame(maxWidth: 860)
+        .frame(maxWidth: .infinity, alignment: .top)
+      }
+      .id(
+        ProfileEditorScrollIdentity(
+          profileID: profile.id,
+          presentationGeneration: presentationGeneration
+        )
       )
+      .defaultScrollAnchor(initialScrollAnchor)
+      .scrollBounceBehavior(.basedOnSize)
+      .uiAuditLayoutAnchor("profile.form.viewport")
+      .background(Color(nsColor: .windowBackgroundColor))
+      .onChange(of: profile.id) {
+        focusedField = nil
+        requestedValidationFocus = nil
+        requestedGroupScroll = nil
+        showsValidationSummary = false
+        showsImportedIconTechnicalInformation = false
+        selectedNetworkIdentity = nil
+      }
+      .onChange(of: presentationGeneration) {
+        focusedField = nil
+        requestedValidationFocus = nil
+        requestedGroupScroll = nil
+        showsValidationSummary = false
+        showsImportedIconTechnicalInformation = false
+        selectedNetworkIdentity = nil
+      }
+      .onChange(of: requestedValidationFocus) {
+        guard let fieldID = requestedValidationFocus else { return }
+        showsValidationSummary = true
+        revealAndFocus(fieldID)
+      }
+      .onChange(of: requestedGroupScroll) { _, group in
+        guard let group else { return }
+        withAnimation {
+          proxy.scrollTo(group, anchor: .top)
+        }
+        Task { @MainActor in
+          await Task.yield()
+          if requestedGroupScroll == group {
+            requestedGroupScroll = nil
+          }
+        }
+      }
+      .onAppear {
+        configureSyntheticAuditState()
+      }
     }
   }
 
-  private func editorScrollView(availableWidth: CGFloat) -> some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 12) {
-        profileDetailsCard
-
-        if showsValidationSummary, !validation.isValid {
-          validationSummary
-        }
-
-        if !availableGroups.isEmpty {
-          stepWorkspace(availableWidth: availableWidth)
-        }
-      }
-      .padding(.horizontal, ProfileSettingLayoutPolicy.formHorizontalInset)
-      .padding(.top, 12)
-      .padding(.bottom, ProfileWorkspaceLayoutPolicy.formBottomInset)
-      .frame(maxWidth: 860)
-      .frame(maxWidth: .infinity, alignment: .top)
-    }
-    .id(
-      ProfileEditorScrollIdentity(
-        profileID: profile.id,
-        presentationGeneration: presentationGeneration
-      )
-    )
-    .defaultScrollAnchor(.top)
-    .scrollBounceBehavior(.basedOnSize)
-    .uiAuditLayoutAnchor("profile.form.viewport")
-    .background(Color(nsColor: .windowBackgroundColor))
-    .onChange(of: profile.id) {
-      focusedField = nil
-      requestedValidationFocus = nil
-      showsValidationSummary = false
-      showsImportedIconTechnicalInformation = false
-      selectedGroup = initialSelectedGroup
-      selectedNetworkIdentity = nil
-    }
-    .onChange(of: presentationGeneration) {
-      focusedField = nil
-      requestedValidationFocus = nil
-      showsValidationSummary = false
-      showsImportedIconTechnicalInformation = false
-      selectedGroup = initialSelectedGroup
-      selectedNetworkIdentity = nil
-    }
-    .onChange(of: requestedValidationFocus) {
-      guard let fieldID = requestedValidationFocus else { return }
-      showsValidationSummary = true
-      revealAndFocus(fieldID)
-    }
-    .onChange(of: availableGroups) {
-      if !availableGroups.contains(selectedGroup) {
-        selectedGroup = availableGroups.first ?? ProfileEditorStepPolicy.defaultGroup
-      }
-    }
-    .onAppear {
-      selectedGroup = initialSelectedGroup
-      configureSyntheticAuditFocus()
+  private var initialScrollAnchor: UnitPoint {
+    guard uiAuditConfiguration.isEnabled else { return .top }
+    switch uiAuditConfiguration.variant {
+    case .editorAudio, .editorAudioUnsupported:
+      return .center
+    case .editorKeyboard:
+      return .bottom
+    default:
+      return .top
     }
   }
 
@@ -1425,120 +1421,43 @@ private struct ProfileEditorForm: View {
     .frame(width: 190)
   }
 
-  @ViewBuilder
-  private func stepWorkspace(availableWidth: CGFloat) -> some View {
-    // Navigation depends only on the viewport, never on a section's intrinsic
-    // content width or the number of visible option cards.
-    if ProfileEditorWorkspaceLayoutPolicy.usesRail(
-      availableWidth: availableWidth, dynamicTypeSize: dynamicTypeSize
-    ) {
-      HStack(alignment: .top, spacing: ProfileEditorWorkspaceLayoutPolicy.spacing) {
-        stepRail
-          .frame(width: ProfileEditorWorkspaceLayoutPolicy.railWidth)
-        Divider()
-        selectedStepContent
-          .frame(
-            width: availableWidth - ProfileEditorWorkspaceLayoutPolicy.railWidth
-              - ProfileEditorWorkspaceLayoutPolicy.spacing * 2 - 1,
-            alignment: .topLeading
-          )
-      }
-      .accessibilityIdentifier("profile-workspace-rail")
-    } else {
-      compactStepWorkspace
-        .accessibilityIdentifier("profile-workspace-compact")
-    }
-  }
-
-  private var compactStepWorkspace: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      Picker(appLocalized("Profile section"), selection: $selectedGroup) {
-        ForEach(availableGroups, id: \.self) { group in
-          Label(stepTitle(group), systemImage: stepSystemImage(group))
-            .tag(group)
-        }
-      }
-      .pickerStyle(.segmented)
-      .accessibilityLabel(appLocalized("Profile section"))
-
-      selectedStepContent
-    }
-  }
-
-  private var stepRail: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      ForEach(Array(availableGroups.enumerated()), id: \.element) { index, group in
-        Button {
-          selectedGroup = group
-        } label: {
-          HStack(alignment: .top, spacing: 10) {
-            Text("\(index + 1)")
-              .font(.caption.bold())
-              .foregroundStyle(selectedGroup == group ? Color.white : Color.secondary)
-              .frame(width: 24, height: 24)
-              .background(
-                selectedGroup == group ? Color.accentColor : Color.secondary.opacity(0.14),
-                in: Circle()
-              )
-              .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-              Label(stepTitle(group), systemImage: stepSystemImage(group))
-                .fontWeight(.semibold)
-              Text(stepSubtitle(group))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if groupHasIncludedOptions(group) {
-              Image(systemName: "checkmark.circle")
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(appLocalized("Included in this profile"))
-            }
-          }
-          .contentShape(Rectangle())
-          .padding(.horizontal, 8)
-          .padding(.vertical, 10)
-          .background(
-            selectedGroup == group ? Color.accentColor.opacity(0.09) : Color.clear,
-            in: RoundedRectangle(cornerRadius: 8)
-          )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(stepTitle(group))
-        .accessibilityValue(
-          selectedGroup == group ? appLocalized("Selected") : stepSubtitle(group)
-        )
-        .accessibilityHint(appLocalized("Shows this profile section"))
-        .accessibilityIdentifier("profile-step-\(group.rawValue)")
+  private var settingsSections: some View {
+    VStack(alignment: .leading, spacing: 28) {
+      ForEach(availableGroups, id: \.self) { group in
+        settingsSection(group)
       }
     }
+    .accessibilityIdentifier("profile-workspace-sections")
   }
 
-  private var selectedStepContent: some View {
+  private func settingsSection(_ group: SettingGroup) -> some View {
     VStack(alignment: .leading, spacing: 14) {
-      if let issue = validation.issue(for: .group(selectedGroup)) {
+      Label(stepTitle(group), systemImage: stepSystemImage(group))
+        .font(.title3.weight(.semibold))
+        .accessibilityAddTraits(.isHeader)
+        .uiAuditLayoutAnchor("profile-section-\(group.rawValue).heading")
+
+      if let issue = validation.issue(for: .group(group)) {
         inlineValidationMessage(
           validationMessage(for: issue),
           fieldID: issue.fieldID
         )
       }
 
-      selectedStepOptions
+      settingsOptions(group)
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
+    .id(group)
     .accessibilityElement(children: .contain)
-    .accessibilityLabel(stepTitle(selectedGroup))
-    .accessibilityIdentifier("profile-group-\(selectedGroup.rawValue)")
-    .accessibilityInvalid(firstValidationIssue(in: selectedGroup) != nil)
-    .focused($focusedField, equals: .group(selectedGroup))
+    .accessibilityLabel(stepTitle(group))
+    .accessibilityIdentifier("profile-group-\(group.rawValue)")
+    .accessibilityInvalid(firstValidationIssue(in: group) != nil)
+    .focused($focusedField, equals: .group(group))
   }
 
   @ViewBuilder
-  private var selectedStepOptions: some View {
-    switch selectedGroup {
+  private func settingsOptions(_ group: SettingGroup) -> some View {
+    switch group {
     case .display:
       displaySimpleOptions
     case .audio:
@@ -1552,10 +1471,6 @@ private struct ProfileEditorForm: View {
 
   private var availableGroups: [SettingGroup] {
     orderedVisibleGroups.filter(groupIsAvailable)
-  }
-
-  private var initialSelectedGroup: SettingGroup {
-    availableGroups.first ?? ProfileEditorStepPolicy.defaultGroup
   }
 
   private func groupIsAvailable(_ group: SettingGroup) -> Bool {
@@ -1584,30 +1499,12 @@ private struct ProfileEditorForm: View {
     }
   }
 
-  private func stepSubtitle(_ group: SettingGroup) -> String {
-    switch group {
-    case .display: appLocalized("Main display and resolution")
-    case .audio: appLocalized("Input, output, and volume")
-    case .network: appLocalized("Your internet connection")
-    case .input: appLocalized("Key repeat, repeat delay, and brightness")
-    }
-  }
-
   private func stepSystemImage(_ group: SettingGroup) -> String {
     switch group {
     case .display: "display"
     case .audio: "speaker.wave.2"
     case .network: "network"
     case .input: "keyboard"
-    }
-  }
-
-  private func groupHasIncludedOptions(_ group: SettingGroup) -> Bool {
-    switch group {
-    case .display: profile.settings.display.value.hasIncludedOption
-    case .audio: profile.settings.audio.value.hasIncludedOption
-    case .network: profile.settings.network.value.hasIncludedOption
-    case .input: profile.settings.input.value.hasIncludedOption
     }
   }
 
@@ -1835,55 +1732,35 @@ private struct ProfileEditorForm: View {
 
   @ViewBuilder
   private var inputSimpleOptions: some View {
-    GroupBox {
-      VStack(alignment: .leading, spacing: 16) {
-        keyboardSliderOption(
-          "Key repeat speed",
-          option: $profile.settings.input.value.keyRepeatInterval,
-          suggestedValue: systemSnapshot?.profileSettings.input.value.keyRepeatInterval.value,
-          visibleKind: .keyboardKeyRepeatSpeed,
-          fallback: 60,
-          scale: .keyRepeatSpeed,
-          leadingLabel: "Slow",
-          trailingLabel: "Fast",
-          accessibilityHint: "Set key repeat speed from slow to fast",
-          fieldID: .input(.keyRepeatInterval),
-          identifier: "keyboard.key-repeat-speed"
-        )
-        keyboardSliderOption(
-          "Repeat delay",
-          option: $profile.settings.input.value.initialKeyRepeatDelay,
-          suggestedValue: systemSnapshot?.profileSettings.input.value.initialKeyRepeatDelay.value,
-          visibleKind: .keyboardRepeatDelay,
-          fallback: 68,
-          scale: .repeatDelay,
-          leadingLabel: "Long",
-          trailingLabel: "Short",
-          accessibilityHint: "Set the delay before a held key begins repeating",
-          fieldID: .input(.initialKeyRepeatDelay),
-          identifier: "keyboard.repeat-delay"
-        )
-        keyboardSliderOption(
-          "Keyboard brightness",
-          option: $profile.settings.input.value.keyboardBrightness,
-          suggestedValue: systemSnapshot?.profileSettings.input.value.keyboardBrightness.value,
-          visibleKind: .keyboardBrightness,
-          fallback: 0.5,
-          scale: .brightness,
-          leadingLabel: "Dim",
-          trailingLabel: "Bright",
-          accessibilityHint: "Set keyboard brightness from 0 to 100 percent",
-          fieldID: .input(.keyboardBrightness),
-          identifier: "keyboard.brightness"
-        )
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(10)
-    } label: {
-      Label(appLocalized("Keyboard"), systemImage: "keyboard")
-        .font(.headline)
-        .accessibilityAddTraits(.isHeader)
+    VStack(alignment: .leading, spacing: 14) {
+      keyboardSliderOption(
+        "Key repeat speed",
+        option: $profile.settings.input.value.keyRepeatInterval,
+        suggestedValue: systemSnapshot?.profileSettings.input.value.keyRepeatInterval.value,
+        visibleKind: .keyboardKeyRepeatSpeed,
+        fallback: 60,
+        scale: .keyRepeatSpeed,
+        leadingLabel: "Slow",
+        trailingLabel: "Fast",
+        accessibilityHint: "Set key repeat speed from slow to fast",
+        fieldID: .input(.keyRepeatInterval),
+        identifier: "keyboard.key-repeat-speed"
+      )
+      keyboardSliderOption(
+        "Repeat delay",
+        option: $profile.settings.input.value.initialKeyRepeatDelay,
+        suggestedValue: systemSnapshot?.profileSettings.input.value.initialKeyRepeatDelay.value,
+        visibleKind: .keyboardRepeatDelay,
+        fallback: 68,
+        scale: .repeatDelay,
+        leadingLabel: "Long",
+        trailingLabel: "Short",
+        accessibilityHint: "Set the delay before a held key begins repeating",
+        fieldID: .input(.initialKeyRepeatDelay),
+        identifier: "keyboard.repeat-delay"
+      )
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("keyboard-settings")
     .uiAuditLayoutAnchor("keyboard-settings")
@@ -1911,7 +1788,6 @@ private struct ProfileEditorForm: View {
       )
       optionEditor(
         title,
-        embeddedTitle: title,
         validationFields: [fieldID]
       ) {
         if effectiveValue == nil {
@@ -1924,31 +1800,17 @@ private struct ProfileEditorForm: View {
         } else {
           VStack(spacing: 4) {
             VStack(spacing: 0) {
-              if scale == .brightness {
-                Slider(
-                  value: keyboardSliderBinding(
-                    option,
-                    suggestedValue: suggestedValue,
-                    fallback: fallback,
-                    scale: scale
-                  ),
-                  in: ProfileEditorKeyboardOptionPolicy.sliderRange(for: scale)
-                ) {
-                  Text(appLocalized(title))
-                }
-              } else {
-                Slider(
-                  value: keyboardSliderBinding(
-                    option,
-                    suggestedValue: suggestedValue,
-                    fallback: fallback,
-                    scale: scale
-                  ),
-                  in: ProfileEditorKeyboardOptionPolicy.sliderRange(for: scale),
-                  step: 1
-                ) {
-                  Text(appLocalized(title))
-                }
+              Slider(
+                value: keyboardSliderBinding(
+                  option,
+                  suggestedValue: suggestedValue,
+                  fallback: fallback,
+                  scale: scale
+                ),
+                in: ProfileEditorKeyboardOptionPolicy.sliderRange(for: scale),
+                step: 1
+              ) {
+                Text(appLocalized(title))
               }
             }
             .labelsHidden()
@@ -1990,7 +1852,6 @@ private struct ProfileEditorForm: View {
     ) {
       unavailableSavedOption(
         appLocalized(title),
-        embeddedTitle: title,
         validationFields: [fieldID],
         warning: appLocalized(
           "This saved keyboard setting cannot be changed on this Mac right now. Review available settings before applying."
@@ -2593,7 +2454,7 @@ private struct ProfileEditorForm: View {
 
   private func revealAndFocus(_ fieldID: DraftFieldIdentifier) {
     if let group = ProfileEditorStepPolicy.group(for: fieldID) {
-      selectedGroup = group
+      requestedGroupScroll = group
       if group == .network,
         let identity = ProfileEditorNetworkSelectionPolicy.identity(
           for: fieldID, in: profile.settings.network.value.serviceIPv4
@@ -2611,33 +2472,12 @@ private struct ProfileEditorForm: View {
     }
   }
 
-  private func configureSyntheticAuditFocus() {
-    guard uiAuditConfiguration.isEnabled else { return }
-    switch uiAuditConfiguration.variant {
-    case .validation:
-      if let firstValidationItem {
-        showsValidationSummary = true
-        revealAndFocus(firstValidationItem.fieldID)
-      }
-    case .editorAudio:
-      selectedGroup = .audio
-    case .editorAudioUnsupported:
-      selectedGroup = .audio
-    case .editorKeyboard:
-      selectedGroup = .input
-    case .editorNetwork:
-      selectedGroup = .display
-    case .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
-      .editorNetworkWiFiDHCP, .editorNetworkWiFiManual:
-      selectedGroup = .display
-    case .editorDisplayColor:
-      selectedGroup = .display
-    case .editor, .editorPolish, .editorDisplay,
-      .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
-      .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
-      .permissions, .diagnostics:
-      selectedGroup = .display
-    }
+  private func configureSyntheticAuditState() {
+    guard uiAuditConfiguration.isEnabled,
+      uiAuditConfiguration.variant == .validation,
+      firstValidationItem != nil
+    else { return }
+    showsValidationSummary = true
   }
 
   private func focusTarget(
@@ -3058,8 +2898,6 @@ private struct ProfileEditorForm: View {
         Int64(sliderValue),
         Int64(ProfileEditorKeyboardOptionPolicy.repeatDelaySteps.count)
       )
-    case .brightness:
-      return FriendlyValueFormatter.percentage(value)
     }
   }
 

@@ -197,15 +197,12 @@ import Testing
       #expect(!ProfileEditorSurfacePolicy.showsDescription)
       #expect(!ProfileEditorSurfacePolicy.showsConditions)
       #expect(!ProfileEditorSurfacePolicy.showsCurrentSettingsDraftRefresh)
-      #expect(ProfileEditorStepPolicy.defaultGroup == .display)
       #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio, .input])
       #expect(ProfileEditorStepPolicy.group(for: .displayPrimary) == .display)
       #expect(
         ProfileEditorStepPolicy.group(for: .audio(.defaultOutputDevice)) == .audio
       )
-      #expect(
-        ProfileEditorStepPolicy.group(for: .input(.keyboardBrightness)) == .input
-      )
+      #expect(ProfileEditorStepPolicy.group(for: .input(.keyRepeatInterval)) == .input)
       #expect(
         ProfileEditorStepPolicy.group(for: .networkService(at: 0, .ipv4Address))
           == nil
@@ -239,21 +236,8 @@ import Testing
       #expect(handoff.presentationChanged(isPresented: false) == .none)
     }
 
-    @Test("section navigation uses viewport width and keeps basic-field validation collapsed")
-    func stableProfileSectionNavigation() {
-      let minimum = ProfileEditorWorkspaceLayoutPolicy.minimumRailWorkspaceWidth
-      #expect(
-        ProfileEditorWorkspaceLayoutPolicy.usesRail(
-          availableWidth: minimum, dynamicTypeSize: .large
-        ))
-      #expect(
-        !ProfileEditorWorkspaceLayoutPolicy.usesRail(
-          availableWidth: minimum - 1, dynamicTypeSize: .large
-        ))
-      #expect(
-        !ProfileEditorWorkspaceLayoutPolicy.usesRail(
-          availableWidth: 1_200, dynamicTypeSize: .accessibility3
-        ))
+    @Test("profile sections remain in one stable vertical order")
+    func stableProfileSectionOrder() {
       #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio, .input])
       #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio, .input])
       #expect(ProfileEditorStepPolicy.group(for: .audio(.defaultInputDevice)) == .audio)
@@ -316,19 +300,6 @@ import Testing
           ) == rawValue
         )
       }
-
-      #expect(
-        ProfileEditorKeyboardOptionPolicy.sliderValue(
-          fromStoredValue: 0.75,
-          scale: .brightness
-        ) == 75
-      )
-      #expect(
-        ProfileEditorKeyboardOptionPolicy.storedValue(
-          fromSliderValue: 75,
-          scale: .brightness
-        ) == 0.75
-      )
 
       // 120 is the slowest enabled step, never the native Off state.
       #expect(
@@ -701,7 +672,7 @@ import Testing
       #expect(window.styleMask.contains(.resizable))
       #expect(window.contentMinSize == CGSize(width: 680, height: 480))
       #expect(window.contentView?.bounds.width == 900)
-      #expect(window.contentView?.bounds.height == 568)
+      #expect(window.contentView?.bounds.height == 700)
       let minimumFrameSize = window.frameRect(
         forContentRect: NSRect(origin: .zero, size: window.contentMinSize)
       ).size
@@ -982,13 +953,13 @@ import Testing
       #expect(hostingController.sizingOptions.isEmpty)
       #expect(
         window.contentRect(forFrameRect: initialFrame).size
-          == CGSize(width: 900, height: 568)
+          == CGSize(width: 900, height: 700)
       )
 
       probe.phase = .workflow
       settleDynamicHostingLayout(window)
       #expect(window.frame == initialFrame)
-      #expect(window.contentView?.bounds.size == CGSize(width: 900, height: 568))
+      #expect(window.contentView?.bounds.size == CGSize(width: 900, height: 700))
 
       let userContentSize = CGSize(width: 760, height: 520)
       window.setContentSize(userContentSize)

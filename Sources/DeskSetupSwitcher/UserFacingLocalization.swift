@@ -246,7 +246,6 @@ private func appLocalizedRuntime(_ value: String, bundle: Bundle) -> String {
     ("com.apple.swipescrolldirection", "Natural scrolling"),
     ("KeyRepeat", "Key repeat speed"),
     ("InitialKeyRepeat", "Repeat delay"),
-    ("KeyboardBrightness", "Keyboard brightness"),
     ("com.apple.keyboard.fnState", "Function-key behavior"),
   ]
   for (key, titleKey) in inputKeys {
@@ -368,7 +367,7 @@ func appProfileSummaryValue(_ item: ProfileSummaryItem) -> String {
   case .displayMode, .displayRole, .displayActivity, .displayRotation,
     .displayPosition, .inputVolume, .outputVolume, .outputMute, .wifiPower,
     .pointerSpeed, .naturalScrolling, .keyRepeatInterval, .initialKeyRepeatDelay,
-    .keyboardBrightness, .standardFunctionKeys:
+    .standardFunctionKeys:
     primary = appLocalizedPresentationText(item.value.primaryText)
     secondary = item.value.secondaryText.map(appLocalizedPresentationText)
   }

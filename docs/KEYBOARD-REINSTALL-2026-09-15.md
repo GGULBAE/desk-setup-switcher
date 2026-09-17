@@ -1,5 +1,7 @@
 # Keyboard settings local reinstall — 2026-09-15 / blank-window follow-up — 2026-09-17
 
+> Historical evidence: this record describes the superseded three-control Keyboard build. Current source preserves keyboard brightness only as dormant legacy profile data and does not capture, edit, or apply it; Display, Sound, and the two repeat controls now share one vertically scrolling editor.
+
 ## Scope
 
 The user authorized replacing the local app with the current Keyboard-settings source and launching it. On 2026-09-17 they also reported a recurring empty system-owned Settings window and asked to continue. The follow-up removes the empty SwiftUI `Settings` scene while preserving the app-owned AppKit Settings window and `⌘,` command route. This operation did not authorize Capture, Apply, an Input Monitoring request, login-item changes, UI automation, or any display, audio, network, mouse, or keyboard mutation.

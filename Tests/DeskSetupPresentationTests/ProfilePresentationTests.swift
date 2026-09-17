@@ -184,7 +184,7 @@ struct ProfilePresentationTests {
     #expect(network == nil)
   }
 
-  @Test("keyboard summary exposes only the three supported values")
+  @Test("keyboard summary exposes only repeat speed and delay")
   func keyboardSummaryFormatting() {
     let settings = ProfileSettings(
       network: .init(
@@ -231,16 +231,16 @@ struct ProfilePresentationTests {
     #expect(network == nil)
     #expect(
       input?.items.map(\.kind) == [
-        .keyRepeatInterval, .initialKeyRepeatDelay, .keyboardBrightness,
+        .keyRepeatInterval, .initialKeyRepeatDelay,
       ]
     )
     #expect(
       input?.items.map(\.label) == [
-        "Key repeat speed", "Repeat delay", "Keyboard brightness",
+        "Key repeat speed", "Repeat delay",
       ]
     )
-    #expect(input?.items.map(\.value.primaryText) == ["24", "90", "64%"])
-    #expect(input?.summaryText == "24 · 90 · 64%")
+    #expect(input?.items.map(\.value.primaryText) == ["24", "90"])
+    #expect(input?.summaryText == "24 · 90")
   }
 
   @Test("legacy Wi-Fi formatter preserves target whitespace but its summary is dormant")

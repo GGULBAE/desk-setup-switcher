@@ -95,7 +95,7 @@ struct ProfileCaptureSummaryBuilderTests {
     #expect(summary.canCreateProfile)
   }
 
-  @Test("keyboard capture reports exactly the three supported settings")
+  @Test("keyboard capture reports only repeat speed and delay")
   func keyboardCaptureIsApplicable() {
     let settings = ProfileSettings(
       input: .init(
@@ -116,13 +116,12 @@ struct ProfileCaptureSummaryBuilderTests {
     )
 
     #expect(summary.status == .complete)
-    #expect(summary.applicableCount == 3)
+    #expect(summary.applicableCount == 2)
     #expect(summary.canCreateProfile)
     #expect(
       summary.items == [
         .init(group: .input, key: "KeyRepeat", disposition: .savedApplicable),
         .init(group: .input, key: "InitialKeyRepeat", disposition: .savedApplicable),
-        .init(group: .input, key: "KeyboardBrightness", disposition: .savedApplicable),
       ]
     )
   }
@@ -144,18 +143,10 @@ struct ProfileCaptureSummaryBuilderTests {
     #expect(summary.status == .partial)
     #expect(summary.applicableCount == 1)
     #expect(summary.unreadableCount == 1)
-    #expect(summary.permissionRequiredCount == 1)
+    #expect(summary.permissionRequiredCount == 0)
     #expect(summary.unsupportedCount == 0)
-    #expect(
-      summary.permissionRequirements == [.inputMonitoringForKeyboardBrightness]
-    )
-    #expect(
-      summary.items.contains {
-        $0.group == .input
-          && $0.key == "KeyboardBrightness"
-          && $0.disposition == .permissionRequired
-      }
-    )
+    #expect(summary.permissionRequirements.isEmpty)
+    #expect(!summary.items.contains { $0.key == "KeyboardBrightness" })
   }
 
   @Test("unreadable and unsupported evidence is omitted from the user-facing result")

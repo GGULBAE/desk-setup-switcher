@@ -220,7 +220,6 @@
 "Your speakers and volume" = "Your speakers and volume";
 "Your internet connection" = "Your internet connection";
 "Your keyboard and pointer" = "Your keyboard and pointer";
-"Key repeat, repeat delay, and brightness" = "Key repeat, repeat delay, and brightness";
 "Your network settings" = "Your network settings";
 "Your input settings" = "Your input settings";
 "Choose how your screens work together." = "Choose how your screens work together.";
@@ -293,18 +292,14 @@
 "Initial key repeat delay" = "Initial key repeat delay";
 "Key repeat speed" = "Key repeat speed";
 "Repeat delay" = "Repeat delay";
-"Keyboard brightness" = "Keyboard brightness";
 "Fast" = "Fast";
 "Slow" = "Slow";
 "Short" = "Short";
 "Long" = "Long";
-"Dim" = "Dim";
-"Bright" = "Bright";
 "Slow to fast, level %lld of %lld" = "Slow to fast, level %lld of %lld";
 "Long to short, level %lld of %lld" = "Long to short, level %lld of %lld";
 "Set key repeat speed from slow to fast" = "Set key repeat speed from slow to fast";
 "Set the delay before a held key begins repeating" = "Set the delay before a held key begins repeating";
-"Set keyboard brightness from 0 to 100 percent" = "Set keyboard brightness from 0 to 100 percent";
 "This saved keyboard setting cannot be changed on this Mac right now. Review available settings before applying." = "This saved keyboard setting cannot be changed on this Mac right now. Review available settings before applying.";
 "Use F1–F12 as standard function keys" = "Use F1–F12 as standard function keys";
 
@@ -690,7 +685,6 @@
 
 /* Input adapter messages */
 "CFPreferences is public, but Apple does not document the stability of these global input preference keys." = "CFPreferences is public, but Apple does not document the stability of these global input preference keys.";
-"Key-repeat preferences use undocumented global keys. Keyboard brightness uses public CoreHID only when permission and a compatible writable element are already available." = "Key-repeat preferences use undocumented global keys. Keyboard brightness uses public CoreHID only when permission and a compatible writable element are already available.";
 "Standard function keys" = "Standard function keys";
 "The input adapter received a different settings payload." = "The input adapter received a different settings payload.";
 "Current input preferences could not be read." = "Current input preferences could not be read.";
@@ -699,20 +693,14 @@
 "The previous input preference could not be restored." = "The previous input preference could not be restored.";
 "Global input preferences are isolated behind an experimental capability." = "Global input preferences are isolated behind an experimental capability.";
 "Key-repeat preferences are isolated behind an experimental capability." = "Key-repeat preferences are isolated behind an experimental capability.";
-"Keyboard brightness requires macOS 15 or later, prior Input Monitoring approval, and a compatible public CoreHID element." = "Keyboard brightness requires macOS 15 or later, prior Input Monitoring approval, and a compatible public CoreHID element.";
 "Experimental global preference" = "Experimental global preference";
 "No compatible value was found" = "No compatible value was found";
-"Public CoreHID keyboard-backlight control" = "Public CoreHID keyboard-backlight control";
-"Input Monitoring access must be granted in System Settings" = "Input Monitoring access must be granted in System Settings";
-"The compatible keyboard-backlight control could not be read" = "The compatible keyboard-backlight control could not be read";
-"No compatible public CoreHID keyboard-backlight control was found" = "No compatible public CoreHID keyboard-backlight control was found";
 "Change pointer speed" = "Change pointer speed";
 "Change natural scrolling" = "Change natural scrolling";
 "Change key repeat" = "Change key repeat";
 "Change initial key repeat delay" = "Change initial key repeat delay";
 "Change key repeat speed" = "Change key repeat speed";
 "Change repeat delay" = "Change repeat delay";
-"Change keyboard brightness" = "Change keyboard brightness";
 "Change function-key behavior" = "Change function-key behavior";
 "The saved input preference has no value." = "The saved input preference has no value.";
 "The saved keyboard setting has no value." = "The saved keyboard setting has no value.";
@@ -720,12 +708,6 @@
 "This Mac does not expose a compatible keyboard control." = "This Mac does not expose a compatible keyboard control.";
 "The keyboard control has no readable rollback value." = "The keyboard control has no readable rollback value.";
 "macOS accepted the experimental input preference write, but read-back did not confirm the requested value." = "macOS accepted the experimental input preference write, but read-back did not confirm the requested value.";
-"Keyboard brightness read-back did not confirm the requested value." = "Keyboard brightness read-back did not confirm the requested value.";
-"Updated keyboard brightness and confirmed it with public CoreHID." = "Updated keyboard brightness and confirmed it with public CoreHID.";
-"Keyboard brightness could not be updated." = "Keyboard brightness could not be updated.";
-"The previous keyboard brightness could not be confirmed after rollback." = "The previous keyboard brightness could not be confirmed after rollback.";
-"Restored the previous keyboard brightness." = "Restored the previous keyboard brightness.";
-"The previous keyboard brightness could not be restored." = "The previous keyboard brightness could not be restored.";
 
 /* Snapshot coordinator messages */
 "Only the first adapter registered for this group was queried." = "Only the first adapter registered for this group was queried.";
@@ -1163,15 +1145,10 @@
 "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi." = "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi.";
 "macOS System Settings could not be opened." = "macOS System Settings could not be opened.";
 "Captured %lld applicable settings. Location access is needed to include the current Wi-Fi network." = "Captured %lld applicable settings. Location access is needed to include the current Wi-Fi network.";
-"Captured %lld applicable settings. Input Monitoring access is needed to include keyboard brightness; keyboard brightness was omitted." = "Captured %lld applicable settings. Input Monitoring access is needed to include keyboard brightness; keyboard brightness was omitted.";
-"Captured %lld applicable settings. Location access is needed for the current Wi-Fi network. Input Monitoring access is needed to include keyboard brightness; keyboard brightness was omitted." = "Captured %lld applicable settings. Location access is needed for the current Wi-Fi network. Input Monitoring access is needed to include keyboard brightness; keyboard brightness was omitted.";
 "Captured %lld applicable settings." = "Captured %lld applicable settings.";
 "Location Access Needed" = "Location Access Needed";
-"Input Monitoring Needed" = "Input Monitoring Needed";
 "Permissions Needed" = "Permissions Needed";
 "Capture Incomplete" = "Capture Incomplete";
-"Input Monitoring access is needed to include keyboard brightness. Keyboard brightness was omitted." = "Input Monitoring access is needed to include keyboard brightness. Keyboard brightness was omitted.";
-"Keyboard brightness is unavailable right now and was omitted." = "Keyboard brightness is unavailable right now and was omitted.";
 "%lld applicable settings saved." = "%lld applicable settings saved.";
 "%lld applicable settings saved; %lld permission required." = "%lld applicable settings saved; %lld permission required.";
 "Could Not Open Destination" = "Could Not Open Destination";
@@ -1288,8 +1265,6 @@
 "editor.keyboard.keyRepeatSpeed.accessibility" = "Set the key repeat speed";
 "editor.keyboard.repeatDelay" = "Repeat delay";
 "editor.keyboard.repeatDelay.accessibility" = "Set the delay before a held key begins repeating";
-"editor.keyboard.brightness" = "Keyboard brightness";
-"editor.keyboard.brightness.accessibility" = "Set keyboard brightness from 0 to 100 percent";
 "editor.network.serviceIPv4" = "Service IPv4";
 "editor.network.serviceIPv4.accessibility" = "Configure DHCP or manual IPv4 for a network service";
 "Choose the display that should anchor the desktop" = "Choose the display that should anchor the desktop";

@@ -5,8 +5,8 @@ import Testing
 
 @Suite("Apply engine planning")
 struct ApplyEngineTests {
-  @Test("both apply modes prepare all ten registered settings without mutating hardware")
-  func tenRegisteredSettingsReachPreflight() async throws {
+  @Test("both apply modes prepare all nine registered settings without mutating hardware")
+  func nineRegisteredSettingsReachPreflight() async throws {
     let displayAdapter = MockSystemSettingsAdapter(group: .display)
     let audioAdapter = MockSystemSettingsAdapter(group: .audio)
     let inputAdapter = MockSystemSettingsAdapter(group: .input)
@@ -33,6 +33,8 @@ struct ApplyEngineTests {
       #expect(preparation.includedGroups == [.input, .audio, .display])
     }
     let expected = ProfileApplicabilityNormalizer().normalize(profile).settings
+    #expect(!expected.input.value.keyboardBrightness.isIncluded)
+    #expect(expected.input.value.keyboardBrightness.value == 0.5)
     #expect(
       await displayAdapter.recordedDesiredPayloads()
         == Array(

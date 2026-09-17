@@ -129,7 +129,6 @@ import Testing
       let png: Data
       let accessibility: String
       let layoutFrames: [String: CGRect]
-      let railSelectionPixelCount: Int
       let sidebarActionGeometry: SidebarActionGeometry?
       let footerDarkPixelCount: Int
       let storageErrorAccentPixelCount: Int
@@ -499,7 +498,7 @@ import Testing
           languageCode: "en",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          size: CGSize(width: 900, height: 700)
         ),
         SettingsFixture(
           name: "14-audio-ko-light",
@@ -507,7 +506,7 @@ import Testing
           languageCode: "ko",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          size: CGSize(width: 900, height: 700)
         ),
         SettingsFixture(
           name: "15-audio-en-dark",
@@ -515,7 +514,7 @@ import Testing
           languageCode: "en",
           colorScheme: .dark,
           displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          size: CGSize(width: 900, height: 700)
         ),
         SettingsFixture(
           name: "16-profile-ko-minimum",
@@ -557,7 +556,7 @@ import Testing
           languageCode: "en",
           colorScheme: .light,
           displayMode: .largeText,
-          size: CGSize(width: 900, height: 568)
+          size: CGSize(width: 900, height: 700)
         ),
         SettingsFixture(
           name: "18-display-resolution-en-dark",
@@ -573,7 +572,7 @@ import Testing
           languageCode: "en",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          size: CGSize(width: 900, height: 700)
         ),
         SettingsFixture(
           name: "19b-audio-grouped-sections-ko-light",
@@ -605,7 +604,7 @@ import Testing
           languageCode: "en",
           colorScheme: .dark,
           displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          size: CGSize(width: 900, height: 700)
         ),
         SettingsFixture(
           name: "23-system-en-dark",
@@ -613,7 +612,7 @@ import Testing
           languageCode: "en",
           colorScheme: .dark,
           displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          size: CGSize(width: 900, height: 700)
         ),
         SettingsFixture(
           name: "24-system-ko-minimum-large-text",
@@ -629,7 +628,7 @@ import Testing
           languageCode: "ko",
           colorScheme: .light,
           displayMode: .largeText,
-          size: CGSize(width: 900, height: 568),
+          size: CGSize(width: 900, height: 700),
           dynamicTypeSizeOverride: .accessibility5
         ),
         SettingsFixture(
@@ -646,7 +645,7 @@ import Testing
           languageCode: "en",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          size: CGSize(width: 900, height: 700)
         ),
         SettingsFixture(
           name: "28-keyboard-ko-light",
@@ -654,7 +653,7 @@ import Testing
           languageCode: "ko",
           colorScheme: .light,
           displayMode: .standard,
-          size: CGSize(width: 900, height: 568)
+          size: CGSize(width: 900, height: 700)
         ),
         SettingsFixture(
           name: "29-keyboard-en-large-text",
@@ -700,6 +699,12 @@ import Testing
         #expect(rendered.png.count > 10_000)
         #expect(rendered.accessibility.contains("synthetic-settings-host=true"))
         if fixture.isProfileSurface {
+          let sectionHeadings = try ["display", "audio", "input"].map { group in
+            try #require(rendered.layoutFrames["profile-section-\(group).heading"])
+          }
+          for (upper, lower) in zip(sectionHeadings, sectionHeadings.dropFirst()) {
+            #expect(upper.maxY < lower.minY, "Profile sections must form one vertical stack")
+          }
           for removedHeading in [
             "Display settings", "Sound settings", "When applying", "Apply with profile",
           ] {
@@ -745,7 +750,6 @@ import Testing
           let identifiers = [
             "keyboard.key-repeat-speed",
             "keyboard.repeat-delay",
-            "keyboard.brightness",
           ]
           let rows = try identifiers.map { identifier in
             try #require(rendered.layoutFrames[identifier])
@@ -774,13 +778,6 @@ import Testing
               "Each keyboard slider must render visible track and thumb content: \(identifier); contrast=\(ink.brightnessRange), bounds=\(slider)"
             )
           }
-        }
-        if fixture.isProfileSurface, fixture.size.width == 900,
-          !fixture.dynamicTypeSize.isAccessibilitySize, fixture.state == .standard
-        {
-          // Pixel evidence from the actual numbered rail, not a declaration
-          // recomputed from the policy. Catches content-dependent fallback.
-          #expect(rendered.railSelectionPixelCount > 100, "Missing rail in \(fixture.name)")
         }
         #expect(!rendered.accessibility.contains("/Users/"))
         #expect(!rendered.accessibility.localizedCaseInsensitiveContains("password"))
@@ -1527,17 +1524,6 @@ import Testing
       let evidenceRepresentation = try #require(NSBitmapImageRep(data: png))
       #expect(!evidenceRepresentation.hasAlpha)
       let imageStatistics = sampledImageStatistics(in: evidenceRepresentation)
-      // At a 900-point viewport this band contains only the rail's numbered
-      // selection circles, never the saved-profile sidebar or detail controls.
-      let railSelectionPixelCount = pixelCount(
-        in: evidenceRepresentation,
-        viewport: size,
-        logicalRegion: CGRect(x: 260, y: 130, width: 28, height: 225)
-      ) { color in
-        color.blueComponent > 0.65
-          && color.blueComponent - color.redComponent > 0.25
-          && color.blueComponent - color.greenComponent > 0.15
-      }
       let sidebarActionGeometry = sidebarActionGeometry(
         in: evidenceRepresentation,
         viewport: size
@@ -1583,10 +1569,9 @@ import Testing
         "sidebar-primary-action=\(fixture.isProfileSurface ? appLocalizedRuntime("New Profile") : "not-applicable")",
         "sidebar-secondary-menu=\(fixture.isProfileSurface ? appLocalizedRuntime("More Profile Actions") : "not-applicable")",
         "sidebar-action-background-runs=\(sidebarRuns)",
-        "rail-selection-pixel-count=\(railSelectionPixelCount)",
         "per-setting-inclusion-controls=none",
-        "step-navigation=\(fixture.isProfileSurface ? "display,sound,keyboard" : "not-applicable")",
-        "step-state-cues=\(fixture.isProfileSurface ? "number,title,checkmark" : "not-applicable")",
+        "profile-section-layout=\(fixture.isProfileSurface ? "vertical" : "not-applicable")",
+        "profile-section-order=\(fixture.isProfileSurface ? "display,sound,keyboard" : "not-applicable")",
         "login-item-details-visible=false",
         "login-status-refresh-placement=mismatch-only",
         "declared-dirty-export-notice=\(fixture.state == .dirtyDraft ? appLocalizedRuntime(ProfileExportScopePolicy.unsavedDraftNotice) : "none")",
@@ -1613,7 +1598,6 @@ import Testing
         png: png,
         accessibility: lines.joined(separator: "\n") + "\n",
         layoutFrames: layoutRecorder.frames,
-        railSelectionPixelCount: railSelectionPixelCount,
         sidebarActionGeometry: sidebarActionGeometry,
         footerDarkPixelCount: footerDarkPixelCount,
         storageErrorAccentPixelCount: storageErrorAccentPixelCount,

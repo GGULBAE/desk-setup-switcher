@@ -1,12 +1,18 @@
 # Roadmap
 
-## Keyboard profile settings — 2026-09-15
+## Keyboard brightness retirement and unified editor — 2026-09-17
+
+Reduce the current profile allowlist from ten to nine kinds by making keyboard brightness schema-compatible dormant data: preserve its legacy JSON value, force inclusion off at every normalization boundary, and remove its live snapshot, permission, capture, visible-registry, plan, Apply, verification, rollback, and UI paths. Keyboard now exposes exactly **Key repeat speed** and **Repeat delay**. Replace the profile editor's internal rail/segmented navigation with one vertically scrolling **Display**, **Sound**, and **Keyboard** page, and raise the initial Settings height to 700 points while preserving its resizable 680×480 minimum. Deterministic tests must prove that legacy brightness values round-trip but never become operations and that only the nine editable kinds cross Capture and Apply boundaries. No live setting mutation is part of this milestone.
+
+The 2026-09-15 milestone below remains exact historical evidence for the superseded three-control build.
+
+## Historical Keyboard profile settings — 2026-09-15
 
 Expand the current profile surface from seven Display/Sound settings to ten settings across **Display**, **Sound**, and **Keyboard**. Keyboard exposes exactly **Key repeat speed**, **Repeat delay**, and **Keyboard brightness** for read-only Capture, direct editing, explicit preview, Apply, immediate read-back, and rollback. The editor presents the enabled native repeat steps as discrete **Slow → Fast** and **Long → Short** axes and brightness as **Dim → Bright**, without exposing raw preference numbers. Native repeat **Off** is a distinct runtime threshold state; this milestone does not expose it or mislabel the slowest enabled value because the current CFPreferences contract cannot safely capture, persist, read back, and roll it back. Key repeat speed and repeat delay remain experimental because they use undocumented preference keys. Keyboard brightness is experimental on macOS 15 or later and participates only when Input Monitoring access has already been granted and public CoreHID discovers exactly one compatible backlight element from a built-in HID device that is both readable and writable. Background snapshots check Input Monitoring status without requesting it; unsupported hardware, denial, and ambiguous discovery are nonfatal and do not block Display or Sound. Pointer speed, natural scrolling, and standard-function-key behavior remain dormant compatibility data and never enter the current Apply path. Deterministic mock and public-copy verification are required for this milestone; no live keyboard mutation or hardware verification is claimed.
 
 Commit `95e2c63` records the implementation and deterministic evidence. Exact staged-source verification passed 378 Swift Testing cases and 202 XCTest cases with five explicit opt-in skips and zero failures, SwiftPM Release with warnings as errors, and every public-surface variant. The user-authorized [local reinstall and blank-window follow-up](KEYBOARD-REINSTALL-2026-09-15.md) launched that staged source from `/Applications` on Apple Silicon, preserved both profile files byte-for-byte, and reported zero visible app-owned windows after startup. Because the installed Xcode license is not accepted, this was an `arm64` SwiftPM development bundle rather than the canonical verified universal DMG; integrated `make verify`, distribution, installed Settings interaction, and Keyboard hardware gates remain open.
 
-This milestone supersedes the seven-setting current-scope descriptions in the 2026-09-07 through 2026-09-12 records. Those dated records remain evidence for the source state and verification boundary they describe rather than statements of the current ten-setting product.
+This milestone superseded the seven-setting current-scope descriptions in the 2026-09-07 through 2026-09-12 records. It is itself superseded by the nine-setting 2026-09-17 milestone above. Those dated records remain evidence for the source state and verification boundary they describe rather than statements of the current product.
 
 ## Public GitHub Pages holding site — 2026-09-12
 
@@ -14,7 +20,7 @@ Publish only the bilingual informational holding page at <https://ggulbae.github
 
 ## Current launch gallery and demo — 2026-09-12
 
-Historical scope note: these exact pixels and transcripts predate Keyboard and show only the then-current Display/Sound workflow. They remain truthful source-bound media, not visual evidence for the 2026-09-15 ten-setting product.
+Historical scope note: these exact pixels and transcripts predate Keyboard and show only the then-current Display/Sound workflow. They remain truthful source-bound media, not visual evidence for the current nine-setting product.
 
 Replace the stale three-screen media lineage with exact-source Capture, Edit Display, Edit Sound, and Review evidence from commit `4ecdf48`. Build four reusable `1270×760` launch cards and a silent, bilingual-captioned 40-second tour; expose them in the GitHub README and public bilingual holding site with explicit playback, a readable transcript, and no autoplay. Keep the product boundary local-only and manual: no Apply success simulation, public download, Release, directory submission, Threads campaign, or hardware mutation. Deterministic double-build hashes, strict source/public manifests, media/privacy checks, the public-surface gate, full non-live `make verify`, and `git diff --check` pass locally.
 

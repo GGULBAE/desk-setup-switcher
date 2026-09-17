@@ -101,7 +101,6 @@ func appApplicationItemTitle(_ key: String) -> String {
   case "com.apple.swipescrolldirection": return appLocalized("Natural scrolling")
   case "KeyRepeat": return appLocalized("Key repeat speed")
   case "InitialKeyRepeat": return appLocalized("Repeat delay")
-  case "KeyboardBrightness": return appLocalized("Keyboard brightness")
   case "com.apple.keyboard.fnState": return appLocalized("Function-key behavior")
   default:
     if key.hasPrefix("display.") {

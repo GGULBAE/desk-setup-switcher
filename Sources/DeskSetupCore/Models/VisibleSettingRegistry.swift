@@ -10,7 +10,6 @@ public enum VisibleSettingKind: String, CaseIterable, Codable, Hashable, Sendabl
   case audioOutputMute
   case keyboardKeyRepeatSpeed
   case keyboardRepeatDelay
-  case keyboardBrightness
 }
 
 public enum VisibleSettingStage: String, CaseIterable, Codable, Hashable, Sendable {
@@ -182,17 +181,6 @@ public struct VisibleSettingRegistry: Sendable {
       localizationKey: "editor.keyboard.repeatDelay",
       accessibilityLabelKey: "editor.keyboard.repeatDelay.accessibility"
     ),
-    .init(
-      kind: .keyboardBrightness,
-      group: .input,
-      snapshotKey: "KeyboardBrightness",
-      runtimeCatalogSource: "keyboardControlCatalog.keyboardBrightness",
-      validationKey: "KeyboardBrightness",
-      operationKeyPrefix: "KeyboardBrightness",
-      editorKind: .sliderAndField,
-      localizationKey: "editor.keyboard.brightness",
-      accessibilityLabelKey: "editor.keyboard.brightness.accessibility"
-    ),
   ]
 
   public init() {}
@@ -250,7 +238,6 @@ public struct VisibleSettingRegistry: Sendable {
       for (kind, control) in [
         (VisibleSettingKind.keyboardKeyRepeatSpeed, KeyboardControlKind.keyRepeatInterval),
         (.keyboardRepeatDelay, .initialKeyRepeatDelay),
-        (.keyboardBrightness, .keyboardBrightness),
       ]
       where (input.keyboardControlCatalog ?? []).contains(where: {
         $0.kind == control && $0.canApply && $0.currentValue != nil

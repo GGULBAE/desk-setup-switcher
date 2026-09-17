@@ -9,7 +9,7 @@ struct VisibleSettingRegistryTests {
   func completeContracts() {
     let contracts = VisibleSettingRegistry.contracts
 
-    #expect(contracts.count == 10)
+    #expect(contracts.count == 9)
     #expect(contracts.count == VisibleSettingKind.allCases.count)
     #expect(Set(contracts.map(\.kind)) == Set(VisibleSettingKind.allCases))
     #expect(Set(contracts.map(\.kind)).count == contracts.count)
@@ -37,7 +37,7 @@ struct VisibleSettingRegistryTests {
     #expect(counts[.audioOutputMute] == 1)
     #expect(counts[.keyboardKeyRepeatSpeed] == 1)
     #expect(counts[.keyboardRepeatDelay] == 1)
-    #expect(counts[.keyboardBrightness] == 1)
+    #expect(!fields.contains { $0.contract.snapshotKey == "KeyboardBrightness" })
     #expect(fields.allSatisfy { $0.contract.stages.contains(.rollback) })
   }
 
@@ -61,20 +61,14 @@ struct VisibleSettingRegistryTests {
       )
     }
     snapshots[2].networkIPv4RollbackCatalog = []
-    snapshots[3].keyboardControlCatalog = snapshots[3].keyboardControlCatalog?.map {
-      .init(
-        kind: $0.kind,
-        currentValue: $0.currentValue,
-        canApply: $0.kind != .keyboardBrightness
-      )
-    }
 
-    let kinds = VisibleSettingRegistry().fields(snapshots: snapshots).map(\.contract.kind)
+    let fields = VisibleSettingRegistry().fields(snapshots: snapshots)
+    let kinds = fields.map(\.contract.kind)
 
     #expect(!kinds.contains(.audioInputVolume))
     #expect(!kinds.contains(.audioOutputVolume))
     #expect(!kinds.contains(.audioOutputMute))
-    #expect(!kinds.contains(.keyboardBrightness))
+    #expect(!fields.contains { $0.contract.snapshotKey == "KeyboardBrightness" })
     #expect(kinds.contains(.keyboardKeyRepeatSpeed))
     #expect(kinds.contains(.keyboardRepeatDelay))
     #expect(kinds.contains(.audioDefaultInput))
@@ -172,6 +166,7 @@ struct VisibleSettingRegistryTests {
         keyboardControlCatalog: [
           .init(kind: .keyRepeatInterval, currentValue: 2, canApply: true),
           .init(kind: .initialKeyRepeatDelay, currentValue: 15, canApply: true),
+          // A legacy runtime catalog entry must not revive the retired editor field.
           .init(kind: .keyboardBrightness, currentValue: 0.5, canApply: true),
         ]
       ),

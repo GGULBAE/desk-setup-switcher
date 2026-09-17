@@ -59,14 +59,14 @@ The current concrete setting adapters are:
 | Display | [`CoreGraphicsDisplayAdapter`](../Sources/DeskSetupSystem/Display/CoreGraphicsDisplayAdapter.swift) | Public Core Graphics and ColorSync-facing system APIs through injected boundaries |
 | Audio | [`CoreAudioAdapter`](../Sources/DeskSetupSystem/Audio/CoreAudioAdapter.swift) | Public Core Audio properties through an injected API |
 | Network | [`NetworkAdapter`](../Sources/DeskSetupSystem/Network/NetworkAdapter.swift) | CoreWLAN and SystemConfiguration/Network-facing injected APIs |
-| Input | [`InputPreferencesAdapter`](../Sources/DeskSetupSystem/Input/InputPreferencesAdapter.swift) | Current Keyboard boundary: experimental undocumented CFPreferences keys for repeat speed/delay plus experimental public CoreHID brightness discovery on macOS 15 or later |
+| Input | [`InputPreferencesAdapter`](../Sources/DeskSetupSystem/Input/InputPreferencesAdapter.swift) | Current Keyboard boundary: experimental undocumented CFPreferences keys for repeat speed/delay |
 | Explicit absence | [`UnsupportedSystemSettingsAdapter`](../Sources/DeskSetupSystem/UnsupportedSystemSettingsAdapter.swift) | Typed unsupported capability, omissions, and diagnostics instead of a crash |
 
-Construction of [`LiveAdapterFactory`](../Sources/DeskSetupSystem/Snapshot/LiveAdapterFactory.swift) performs no discovery and changes no setting. The default registry includes Display, Audio, and Input so read-only Capture can collect the ten current settings. Current capability and evidence claims belong in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md), not in an adapter type name.
+Construction of [`LiveAdapterFactory`](../Sources/DeskSetupSystem/Snapshot/LiveAdapterFactory.swift) performs no discovery and changes no setting. The default registry includes Display, Audio, and Input so read-only Capture can collect the nine current settings. Current capability and evidence claims belong in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md), not in an adapter type name.
 
-The current Input projection contains exactly key repeat speed, repeat delay, and keyboard brightness. Existing inclusion flags for those three leaves are preserved during upgrade: a previously dormant excluded value does not silently become actionable. A new Capture includes each readable current value, and an explicit editor change opts that value in. Pointer speed, natural scrolling, and standard-function-key behavior remain normalized dormant in both normal and available-items planning.
+The current Input projection contains exactly key repeat speed and repeat delay. Existing inclusion flags for those two leaves are preserved during upgrade: a previously dormant excluded value does not silently become actionable. A new Capture includes each readable current value, and an explicit editor change opts that value in. Keyboard brightness, pointer speed, natural scrolling, and standard-function-key behavior remain normalized dormant in both normal and available-items planning.
 
-Repeat speed and delay remain `experimental` because CFPreferences is public but their global keys are undocumented. Brightness is `experimental` and available only on macOS 15 or later with previously granted Input Monitoring access when public CoreHID discovery resolves exactly one compatible backlight element from a built-in HID device that is both readable and writable. Capability and snapshot call `IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)` only as a status check and must not automatically request Input Monitoring. Zero or multiple matches, unsupported OS or hardware, denial, and unreadable/unwritable elements are typed nonfatal availability outcomes. Runtime CoreHID objects never cross the adapter boundary or become persistent identity. Apply and rollback must re-resolve safely, use the planned prior scalar, and require immediate read-back agreement. No live Input mutation or hardware verification is established by this contract.
+Repeat speed and delay remain `experimental` because CFPreferences is public but their global keys are undocumented. Apply and rollback use the planned typed value and require immediate read-back agreement. No live Input mutation or hardware verification is established by this contract. Legacy keyboard-brightness values may round-trip through profile JSON, but the normalizer forces their inclusion off and the live Input adapter has no brightness discovery, capture, plan, write, or rollback path.
 
 ## Group and registry invariants
 
@@ -82,7 +82,7 @@ Every value returned by an adapter must belong to `adapter.group`:
 
 The snapshot coordinator and apply engine check these boundaries and fail the affected group closed when they disagree. Operation UUIDs must be unique within a plan and across the combined plan; duplicate IDs are removed and surfaced as fatal infrastructure failures.
 
-Persistent target identity must be portable. Runtime device handles, CoreHID device/element references, `CGDirectDisplayID`, runtime network service IDs, and BSD interface names are not persistent identity by themselves. Session-only catalogs resolve a portable profile identity against the current host immediately before planning.
+Persistent target identity must be portable. Runtime device handles, `CGDirectDisplayID`, runtime network service IDs, and BSD interface names are not persistent identity by themselves. Session-only catalogs resolve a portable profile identity against the current host immediately before planning.
 
 ## 1. Capability
 

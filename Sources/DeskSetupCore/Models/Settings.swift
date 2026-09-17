@@ -656,7 +656,6 @@ extension InputProfileSettings {
       || naturalScrolling.isIncluded
       || keyRepeatInterval.isIncluded
       || initialKeyRepeatDelay.isIncluded
-      || keyboardBrightness.isIncluded
       || useStandardFunctionKeys.isIncluded
   }
 }

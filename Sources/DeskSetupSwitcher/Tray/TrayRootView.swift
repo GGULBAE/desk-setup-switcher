@@ -420,27 +420,6 @@ struct TrayRootView: View {
         Text(appLocalized("\(summary.applicableCount) applicable settings saved."))
           .font(.caption)
           .foregroundStyle(.secondary)
-        if permissionPresentation.showsInputMonitoringMessage {
-          Label(
-            appLocalized(
-              "Input Monitoring access is needed to include keyboard brightness. Keyboard brightness was omitted."
-            ),
-            systemImage: "keyboard"
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .accessibilityElement(children: .combine)
-        } else if permissionPresentation.showsUnavailableKeyboardBrightnessMessage {
-          Label(
-            appLocalized(
-              "Keyboard brightness is unavailable right now and was omitted."
-            ),
-            systemImage: "keyboard"
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .accessibilityElement(children: .combine)
-        }
         if permissionPresentation.showsLocationReviewAction {
           Button(appLocalized("Review Location Permission")) {
             route(.openPermissionWorkflow(.systemSettings))
@@ -464,8 +443,6 @@ struct TrayRootView: View {
       appLocalized("Capture Incomplete")
     case .locationAccess:
       appLocalized("Location Access Needed")
-    case .inputMonitoring:
-      appLocalized("Input Monitoring Needed")
     case .multiplePermissions:
       appLocalized("Permissions Needed")
     }

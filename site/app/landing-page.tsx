@@ -23,7 +23,7 @@ const content = {
     ],
     title: "Bring your desk back, deliberately.",
     summary:
-      "Save available values from ten Display, Sound, and Keyboard setting kinds as a local profile. Review the exact plan before you apply anything.",
+      "Save available values from nine Display, Sound, and Keyboard setting kinds as a local profile. Review the exact plan before you apply anything.",
     badges: ["Local only", "No account", "No cloud", "No auto-switching"],
     github: "View source on GitHub",
     heroAlt: "Synthetic empty tray with the Capture Current Settings action",
@@ -33,9 +33,9 @@ const content = {
       "Main display and resolution",
       "Output device, volume, and mute",
       "Input device and volume",
-      "Key repeat speed, repeat delay, and keyboard brightness",
+      "Key repeat speed and repeat delay",
     ],
-    scopeNote: "Ten settings · no Network or automatic switching",
+    scopeNote: "Nine settings · no Network or automatic switching",
     proof: "Current scope · pre-Keyboard synthetic UI image · no personal identifiers",
     flowEyebrow: "One decision at a time",
     flowTitle: "Capture → Edit → Review & Apply",
@@ -50,7 +50,7 @@ const content = {
       {
         number: "02",
         title: "Edit",
-        body: "Name the profile and set any available values across the ten current settings. Missing values stay absent.",
+        body: "Name the profile and set any available values across the nine current settings. Missing values stay absent.",
       },
       {
         number: "03",
@@ -108,7 +108,7 @@ const content = {
     supportEyebrow: "Honest support boundary",
     supportTitle: "Three areas. Evidence shown plainly.",
     supportSummary:
-      "Display and Sound retain read-only group evidence on Apple Silicon. Keyboard capture/apply/rollback remains deterministic mock evidence; no live repeat or backlight mutation has been hardware verified.",
+      "Display and Sound retain read-only group evidence on Apple Silicon. Keyboard capture/apply/rollback remains deterministic mock evidence; no live repeat mutation has been hardware verified.",
     capabilities: [
       {
         name: "Display",
@@ -122,7 +122,7 @@ const content = {
       },
       {
         name: "Keyboard",
-        items: "Key repeat speed, repeat delay, and keyboard brightness. Brightness requires macOS 15+, already-granted Input Monitoring access, and exactly one compatible readable/writable backlight element from a built-in HID device.",
+        items: "Key repeat speed and repeat delay. Keyboard brightness is legacy profile data only and is never captured or applied.",
         evidence: "Experimental · deterministic mock-only · no live mutation",
       },
     ],
@@ -140,7 +140,7 @@ const content = {
     privacyTitle: "Your desk profile stays on your Mac.",
     privacyCards: [
       ["No outbound app service", "No account, sync server, updater, product analytics, ads, or telemetry path."],
-      ["No automatic Capture prompt", "Capture does not request Location or microphone access. It checks Input Monitoring without prompting; denial omits Keyboard brightness only."],
+      ["No automatic Capture prompt", "Capture does not request Location, microphone, or Input Monitoring access."],
       ["Review before sharing", "Exports can contain device labels, stable identifiers, and dormant legacy data. Review and redact them before sharing."],
     ],
     hostingNote:
@@ -155,8 +155,8 @@ const content = {
     faqTitle: "Know the boundary before you install.",
     faqs: [
       ["Does it switch profiles automatically?", "No. Capture reads, Edit changes a draft, Review explains, and only Apply can start a system change."],
-      ["Which settings can a profile save?", "Main display, resolution, output device, output volume, output mute, input device, input volume, key repeat speed, repeat delay, and keyboard brightness. Pointer, scrolling, function-key, and Network settings are not current features."],
-      ["Why is keyboard brightness unavailable?", "It requires macOS 15+, already-granted Input Monitoring access, and exactly one compatible readable/writable backlight element from a built-in HID device. Background Capture does not request access; unsupported hardware, denial, or ambiguity is nonfatal."],
+      ["Which settings can a profile save?", "Main display, resolution, output device, output volume, output mute, input device, input volume, key repeat speed, and repeat delay. Keyboard brightness, pointer, scrolling, function-key, and Network settings are not current features."],
+      ["Why is keyboard brightness missing?", "Keyboard brightness is preserved only as dormant legacy profile data. The app never captures, edits, or applies it."],
       ["What happens if a risky display change is wrong?", "Protected display changes offer Keep or Revert and request rollback on timeout, close, or confirmation failure."],
       ["Is Intel supported?", "Not in the initial beta. The build contains an x86_64 slice, but physical Intel install and runtime verification are still missing."],
     ],
@@ -186,7 +186,7 @@ const content = {
     ],
     title: "책상 설정을 바꾸기 전에, 먼저 확인하세요.",
     summary:
-      "디스플레이·사운드·키보드의 열 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 저장하고, 실제 적용 전에 정확한 변경 계획을 확인하세요.",
+      "디스플레이·사운드·키보드의 아홉 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 저장하고, 실제 적용 전에 정확한 변경 계획을 확인하세요.",
     badges: ["로컬 전용", "계정 없음", "클라우드 없음", "자동 전환 없음"],
     github: "GitHub에서 소스 보기",
     heroAlt: "현재 설정 캡처 버튼이 있는 합성 빈 트레이 화면",
@@ -196,9 +196,9 @@ const content = {
       "주 디스플레이와 해상도",
       "출력 기기, 음량, 소리 끔",
       "입력 기기와 음량",
-      "키 반복 속도, 반복 지연 시간, 키보드 밝기",
+      "키 반복 속도와 반복 지연 시간",
     ],
-    scopeNote: "열 가지 설정 종류 · 네트워크 및 자동 전환 없음",
+    scopeNote: "아홉 가지 설정 종류 · 네트워크 및 자동 전환 없음",
     proof: "현재 범위 · 키보드 추가 전 합성 UI 이미지 · 개인 식별자 없음",
     flowEyebrow: "한 번에 하나의 결정",
     flowTitle: "캡처 → 편집 → 검토 후 적용",
@@ -213,7 +213,7 @@ const content = {
       {
         number: "02",
         title: "편집",
-        body: "프로필 이름과 열 가지 현재 설정 중 사용할 수 있는 값을 정합니다. 없는 값은 임의로 만들지 않습니다.",
+        body: "프로필 이름과 아홉 가지 현재 설정 중 사용할 수 있는 값을 정합니다. 없는 값은 임의로 만들지 않습니다.",
       },
       {
         number: "03",
@@ -271,7 +271,7 @@ const content = {
     supportEyebrow: "정직한 지원 경계",
     supportTitle: "세 가지 영역, 검증 수준까지 그대로.",
     supportSummary:
-      "디스플레이와 사운드는 Apple Silicon 읽기 전용 그룹 증거를 유지합니다. 키보드 Capture·적용·되돌리기는 결정론적 모의 증거만 있으며, 실제 반복 또는 백라이트 변경은 하드웨어에서 검증되지 않았습니다.",
+      "디스플레이와 사운드는 Apple Silicon 읽기 전용 그룹 증거를 유지합니다. 키보드 Capture·적용·되돌리기는 결정론적 모의 증거만 있으며, 실제 반복 변경은 하드웨어에서 검증되지 않았습니다.",
     capabilities: [
       {
         name: "디스플레이",
@@ -285,7 +285,7 @@ const content = {
       },
       {
         name: "키보드",
-        items: "키 반복 속도, 반복 지연 시간, 키보드 밝기. 밝기는 macOS 15 이상, 미리 허용된 입력 모니터링 접근, 내장 HID 기기에서 읽기·쓰기가 가능한 호환 백라이트 요소를 정확히 하나 찾아야 합니다.",
+        items: "키 반복 속도와 반복 지연 시간. 키보드 밝기는 이전 프로필 호환 데이터로만 보존하며 캡처하거나 적용하지 않습니다.",
         evidence: "실험적 · 결정론적 모의 검증만 · 실제 변경 없음",
       },
     ],
@@ -303,7 +303,7 @@ const content = {
     privacyTitle: "책상 프로필은 내 Mac에만 남습니다.",
     privacyCards: [
       ["앱의 외부 서비스 없음", "계정, 동기화 서버, 업데이터, 제품 분석, 광고, 텔레메트리 경로가 없습니다."],
-      ["Capture 자동 권한 요청 없음", "Capture는 위치 또는 마이크 권한을 요청하지 않습니다. 입력 모니터링 상태는 프롬프트 없이 확인하며, 거부되면 키보드 밝기만 제외합니다."],
+      ["Capture 자동 권한 요청 없음", "Capture는 위치, 마이크 또는 입력 모니터링 권한을 요청하지 않습니다."],
       ["공유 전 직접 검토", "내보내기에는 기기 이름, 안정 식별자, 사용하지 않는 과거 데이터가 남을 수 있습니다. 공유 전에 확인하고 가리세요."],
     ],
     hostingNote:
@@ -318,8 +318,8 @@ const content = {
     faqTitle: "설치 전에 경계를 확인하세요.",
     faqs: [
       ["프로필이 자동으로 전환되나요?", "아니요. Capture는 읽고, Edit은 초안을 바꾸고, Review는 설명합니다. 시스템 변경은 Apply에서만 시작할 수 있습니다."],
-      ["프로필에 어떤 설정을 저장하나요?", "주 디스플레이, 해상도, 출력 기기, 출력 음량, 출력 소리 끔, 입력 기기, 입력 음량, 키 반복 속도, 반복 지연 시간, 키보드 밝기입니다. 포인터·스크롤·기능 키·네트워크 설정은 현재 기능이 아닙니다."],
-      ["키보드 밝기를 사용할 수 없는 이유는 무엇인가요?", "macOS 15 이상, 미리 허용된 입력 모니터링 접근, 내장 HID 기기에서 읽기·쓰기가 가능한 호환 백라이트 요소를 정확히 하나 찾아야 합니다. 백그라운드 Capture는 권한을 요청하지 않으며 미지원·거부·모호한 검색은 치명적이지 않습니다."],
+      ["프로필에 어떤 설정을 저장하나요?", "주 디스플레이, 해상도, 출력 기기, 출력 음량, 출력 소리 끔, 입력 기기, 입력 음량, 키 반복 속도, 반복 지연 시간입니다. 키보드 밝기·포인터·스크롤·기능 키·네트워크 설정은 현재 기능이 아닙니다."],
+      ["키보드 밝기가 보이지 않는 이유는 무엇인가요?", "키보드 밝기는 이전 프로필 호환 데이터로만 비활성 보존합니다. 앱은 이를 캡처·편집·적용하지 않습니다."],
       ["위험한 디스플레이 변경이 잘못되면 어떻게 되나요?", "보호 대상 디스플레이 변경은 유지 또는 되돌리기를 제공하며, 시간 초과·닫기·확인 실패 시 복구를 요청합니다."],
       ["Intel Mac도 지원하나요?", "초기 베타에서는 지원하지 않습니다. x86_64 빌드는 포함하지만 실제 Intel 설치·실행 검증이 없습니다."],
     ],

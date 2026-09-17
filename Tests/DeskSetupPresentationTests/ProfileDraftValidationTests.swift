@@ -128,7 +128,7 @@ struct ProfileDraftValidationTests {
     )
   }
 
-  @Test("visible volume and keyboard ranges reject non-finite and out-of-range values")
+  @Test("visible volume and repeat ranges reject non-finite and out-of-range values")
   func numericRanges() {
     let settings = ProfileSettings(
       audio: .init(value: .init(outputVolume: .init(value: 1.01))),
@@ -149,7 +149,6 @@ struct ProfileDraftValidationTests {
         issue(.audio(.outputVolume), .audio, .outOfRange(minimum: 0, maximum: 1)),
         issue(.input(.keyRepeatInterval), .input, .outOfRange(minimum: 1, maximum: 120)),
         issue(.input(.initialKeyRepeatDelay), .input, .outOfRange(minimum: 1, maximum: 300)),
-        issue(.input(.keyboardBrightness), .input, .outOfRange(minimum: 0, maximum: 1)),
       ]
     )
   }
@@ -170,7 +169,6 @@ struct ProfileDraftValidationTests {
       ProfileDraftValidator().validate(settings).issues == [
         issue(.input(.keyRepeatInterval), .input, .required),
         issue(.input(.initialKeyRepeatDelay), .input, .required),
-        issue(.input(.keyboardBrightness), .input, .required),
       ]
     )
   }

@@ -106,7 +106,6 @@ public enum InputDraftField: String, Equatable, Sendable {
   case naturalScrolling
   case keyRepeatInterval
   case initialKeyRepeatDelay
-  case keyboardBrightness
   case standardFunctionKeys
 }
 
@@ -485,13 +484,6 @@ public struct ProfileDraftValidator: Equatable, Sendable {
       group.value.initialKeyRepeatDelay,
       range: 1...300,
       field: .input(.initialKeyRepeatDelay),
-      group: .input,
-      issues: &issues
-    )
-    validateIncludedNumber(
-      group.value.keyboardBrightness,
-      range: 0...1,
-      field: .input(.keyboardBrightness),
       group: .input,
       issues: &issues
     )

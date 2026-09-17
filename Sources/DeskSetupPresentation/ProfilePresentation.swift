@@ -218,7 +218,6 @@ public enum ProfileSummaryItemKind: String, Equatable, Sendable {
   case naturalScrolling
   case keyRepeatInterval
   case initialKeyRepeatDelay
-  case keyboardBrightness
   case standardFunctionKeys
 }
 
@@ -491,17 +490,6 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
           }
         ))
     }
-    if settings.keyboardBrightness.isIncluded {
-      items.append(
-        .init(
-          kind: .keyboardBrightness,
-          label: "Keyboard brightness",
-          value: optionalValue(settings.keyboardBrightness.value) {
-            .init(primaryText: FriendlyValueFormatter.percentage($0))
-          }
-        ))
-    }
-
     return ProfileGroupSummary(group: .input, items: items)
   }
 

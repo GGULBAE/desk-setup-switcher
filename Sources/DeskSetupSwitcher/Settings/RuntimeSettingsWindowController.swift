@@ -133,7 +133,7 @@ func presentApplicationSettings(
 }
 
 enum RuntimeSettingsWindowLayoutPolicy {
-  static let initialContentSize = CGSize(width: 900, height: 568)
+  static let initialContentSize = CGSize(width: 900, height: 700)
   static let minimumContentSize = CGSize(width: 680, height: 480)
 }
 

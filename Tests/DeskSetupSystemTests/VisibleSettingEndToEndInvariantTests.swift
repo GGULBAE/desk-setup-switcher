@@ -46,7 +46,6 @@ struct VisibleSettingEndToEndInvariantTests {
     #expect(audioAPI.mute(for: "output-B")?.value == false)
     #expect(inputPreferencesAPI.value(for: .keyRepeatInterval) == .number(2))
     #expect(inputPreferencesAPI.value(for: .initialKeyRepeatDelay) == .number(15))
-    #expect(await keyboardBacklightAPI.currentBrightness() == 0.4)
     #expect(await networkAPI.ipv4(for: ethernetIdentity) == .dhcp)
     #expect(
       await networkAPI.ipv4(for: wifiIdentity)
@@ -186,15 +185,8 @@ struct VisibleSettingEndToEndInvariantTests {
     InputInvariantFixture.shared.preferences
   }
 
-  private var keyboardBacklightAPI: MockInvariantKeyboardBacklightAPI {
-    InputInvariantFixture.shared.backlight
-  }
-
   private func makeInputSlice() async throws -> Slice {
-    let adapter = InputPreferencesAdapter(
-      api: inputPreferencesAPI,
-      keyboardBacklightAPI: keyboardBacklightAPI
-    )
+    let adapter = InputPreferencesAdapter(api: inputPreferencesAPI)
     let snapshot = try await adapter.snapshot()
     let desired = InputProfileSettings(
       keyRepeatInterval: .init(value: 3),
@@ -204,6 +196,7 @@ struct VisibleSettingEndToEndInvariantTests {
     let payload = SettingsPayload.input(desired)
     let issues = await adapter.validate(payload, against: snapshot)
     let plan = try await adapter.plan(payload, from: snapshot, mode: .normal)
+    #expect(plan.operations.map(\.key) == ["KeyRepeat", "InitialKeyRepeat"])
     return Slice(
       adapter: adapter,
       snapshot: snapshot,
@@ -346,7 +339,6 @@ private final class InputInvariantFixture: @unchecked Sendable {
     .keyRepeatInterval: .number(2),
     .initialKeyRepeatDelay: .number(15),
   ])
-  let backlight = MockInvariantKeyboardBacklightAPI(brightness: 0.4)
 
   private init() {}
 }
@@ -367,26 +359,5 @@ private final class MockInvariantInputPreferencesAPI: InputPreferencesAPI, @unch
     lock.withLock {
       values[key] = value
     }
-  }
-}
-
-private actor MockInvariantKeyboardBacklightAPI: KeyboardBacklightAPI {
-  private var brightness: Double
-
-  init(brightness: Double) {
-    self.brightness = brightness
-  }
-
-  func readBrightness() -> KeyboardBacklightReadResult {
-    .available(brightness)
-  }
-
-  func setBrightness(_ brightness: Double) -> KeyboardBacklightMeasurement {
-    self.brightness = brightness
-    return .init(value: brightness, quantizationTolerance: 0)
-  }
-
-  func currentBrightness() -> Double {
-    brightness
   }
 }

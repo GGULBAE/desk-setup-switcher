@@ -19,7 +19,7 @@ public struct CaptureSnapshotEvidence: Hashable, Sendable {
 
 /// Deterministically reports saved, applicable leaves and actionable permission
 /// gaps without carrying any SSID, address, device identifier, or other captured
-/// value into UI state. Unavailable evidence is surfaced only for the three
+/// value into UI state. Unavailable evidence is surfaced only for the two
 /// visible Keyboard controls; snapshot-only and retired-field evidence remains
 /// omitted because the user cannot act on it during capture.
 public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
@@ -76,7 +76,6 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     let input = settings.input.value
     applicable(input.keyRepeatInterval.isIncluded, .input, "KeyRepeat")
     applicable(input.initialKeyRepeatDelay.isIncluded, .input, "InitialKeyRepeat")
-    applicable(input.keyboardBrightness.isIncluded, .input, "KeyboardBrightness")
 
     let network = settings.network.value
     for (index, service) in network.serviceIPv4.enumerated() {
@@ -108,7 +107,7 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     _ item: CaptureSnapshotEvidence
   ) -> CaptureItemDisposition? {
     guard item.group == .input,
-      ["KeyRepeat", "InitialKeyRepeat", "KeyboardBrightness"].contains(item.key)
+      ["KeyRepeat", "InitialKeyRepeat"].contains(item.key)
     else {
       // Permission-gated legacy Wi-Fi/Location values and retired settings are
       // not editor fields. Their denial must not degrade an unrelated capture.

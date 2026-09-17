@@ -245,7 +245,7 @@ done
 # Reject previously published scope language that represented Network as a
 # profile feature, plus the obsolete six-setting count. Network can still be
 # named when copy explicitly says that it is dormant or unsupported. Current
-# copy must describe ten Display/Sound/Keyboard kinds while the exact-source
+# copy must describe nine Display/Sound/Keyboard kinds while the exact-source
 # gallery and demo remain explicitly bounded as pre-Keyboard media.
 public_copy_files=(
     "$ROOT_DIR/README.md"
@@ -291,15 +291,15 @@ require_current_copy() {
         fail "$relative_path is missing current Keyboard scope copy: $required_phrase"
 }
 
-require_current_copy "README.md" "One profile, ten setting types"
-require_current_copy "site/app/landing-page.tsx" "Ten settings · no Network or automatic switching"
+require_current_copy "README.md" "One profile, nine setting types"
+require_current_copy "site/app/landing-page.tsx" "Nine settings · no Network or automatic switching"
 require_current_copy "site/app/landing-page.tsx" "These exact-source synthetic screens predate the Keyboard step."
 require_current_copy "site/app/landing-page.tsx" "키보드 단계가 추가되기 전 정확한 소스에서 만든 합성 화면입니다."
-require_current_copy "site/app/landing-page.tsx" "exactly one compatible readable/writable backlight element from a built-in HID device"
-require_current_copy "site/app/landing-page.tsx" "It checks Input Monitoring without prompting; denial omits Keyboard brightness only."
-require_current_copy "docs/LAUNCH-COPY.md" "ten Display, Sound, and Keyboard setting kinds"
-require_current_copy "docs/guides/USER-GUIDE.md" "key repeat speed, repeat delay, and keyboard brightness"
-require_current_copy "docs/guides/USER-GUIDE.ko.md" "키 반복 속도, 반복 지연 시간, 키보드 밝기"
+require_current_copy "site/app/landing-page.tsx" "Keyboard brightness is legacy profile data only and is never captured or applied."
+require_current_copy "site/app/landing-page.tsx" "Capture does not request Location, microphone, or Input Monitoring access."
+require_current_copy "docs/LAUNCH-COPY.md" "nine Display, Sound, and Keyboard setting kinds"
+require_current_copy "docs/guides/USER-GUIDE.md" "Keyboard** has exactly **Key repeat speed** and **Repeat delay"
+require_current_copy "docs/guides/USER-GUIDE.ko.md" "키보드**에는 **키 반복 속도**, **반복 지연 시간**만"
 
 video_path="$PUBLIC_DIR/demo/desk-setup-switcher.mp4"
 video_stream_count="$(
