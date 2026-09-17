@@ -145,7 +145,7 @@ struct DeskSetupSwitcherApp: App {
     case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
       .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
       .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
-      .editorAudioUnsupported,
+      .editorAudioUnsupported, .editorKeyboard,
       .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
       .editorNetworkWiFiDHCP, .editorNetworkWiFiManual, .validation:
       initialSettingsTab = .profiles
@@ -312,21 +312,32 @@ struct DeskSetupSwitcherApp: App {
   }
 
   var body: some Scene {
-    Settings {
+    // The app owns its status item and every visible window through AppKit.
+    // A disabled MenuBarExtra satisfies the SwiftUI App scene requirement
+    // without exposing the former empty system Settings window or a second icon.
+    MenuBarExtra(
+      "Desk Setup Switcher Lifecycle",
+      isInserted: .constant(false)
+    ) {
       EmptyView()
     }
     .commands {
-      CommandGroup(replacing: .appSettings) {
-        Button("Settings…") {
-          Task {
-            await presentApplicationSettings(
-              navigation: settingsNavigation,
-              presenter: settingsWindowController
-            )
-          }
+      settingsCommands
+    }
+  }
+
+  @CommandsBuilder
+  private var settingsCommands: some Commands {
+    CommandGroup(replacing: .appSettings) {
+      Button("Settings…") {
+        Task {
+          await presentApplicationSettings(
+            navigation: settingsNavigation,
+            presenter: settingsWindowController
+          )
         }
-        .keyboardShortcut(",")
       }
+      .keyboardShortcut(",")
     }
   }
 }
@@ -378,7 +389,7 @@ struct DeskSetupSwitcherApp: App {
       case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
         .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
         .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
-        .editorAudioUnsupported,
+        .editorAudioUnsupported, .editorKeyboard,
         .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
         .editorNetworkWiFiDHCP, .editorNetworkWiFiManual, .validation:
         initialTab = .profiles
@@ -397,7 +408,7 @@ struct DeskSetupSwitcherApp: App {
         )
         .frame(width: TrayGeometry.width, height: trayPresentation.viewport.height)
       case .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
-        .editorAudioUnsupported,
+        .editorAudioUnsupported, .editorKeyboard,
         .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
         .editorNetworkWiFiDHCP, .editorNetworkWiFiManual, .validation, .permissions,
         .diagnostics:

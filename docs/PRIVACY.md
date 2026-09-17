@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 2026-09-12
+Last updated: 2026-09-15
 
 Desk Setup Switcher is designed to operate entirely on the Mac where it is installed.
 
@@ -22,7 +22,9 @@ Passwords are never model fields and are never written to profile JSON, backups,
 
 ## Permissions
 
-Current Capture reads only main display, resolutions, output device/volume, and input device/volume. It does not request Location permission or store network settings in new profiles; existing Location authorization does not gate capture. The app does not request or store coordinates. Listing or selecting an audio input device does not capture audio and does not require microphone recording permission. Dormant location conditions in older imported files remain a separate compatibility/privacy concern.
+Current Capture reads only the ten Display, Sound, and Keyboard values: main display, resolutions, output device/volume/mute, input device/volume, key repeat speed, repeat delay, and keyboard brightness when available. It does not request Location permission or store network settings in new profiles; existing Location authorization does not gate capture. The app does not request or store coordinates. Listing or selecting an audio input device does not capture audio and does not require microphone recording permission.
+
+Repeat values are read locally through experimental undocumented macOS preference keys. On macOS 15 or later, keyboard-brightness discovery uses public CoreHID locally and requires macOS **Input Monitoring** access to have been granted beforehand. Background capability and Capture snapshots check that status with `IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)` but do not automatically request access or open a system prompt. When access is granted, the app accepts exactly one compatible element from a built-in HID device that is both readable and writable. Unsupported hardware, denied Input Monitoring, or ambiguous discovery leaves brightness unavailable and does not cause an upload or disable unrelated capture. Profiles store only the selected brightness scalar, never permission state or a runtime CoreHID device/element handle. Dormant location conditions in older imported files remain a separate compatibility/privacy concern.
 
 ## Diagnostics
 

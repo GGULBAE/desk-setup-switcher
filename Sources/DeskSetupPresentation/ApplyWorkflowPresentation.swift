@@ -277,6 +277,11 @@ public enum ProfileCaptureStatus: String, Equatable, Sendable {
   }
 }
 
+public enum CapturePermissionRequirement: String, Hashable, Sendable {
+  case locationForCurrentWiFiNetwork
+  case inputMonitoringForKeyboardBrightness
+}
+
 /// Compact, value-free capture result used by the menu and settings editor.
 public struct ProfileCaptureSummary: Equatable, Sendable {
   /// Value-free item classifications used to explain partial captures without
@@ -324,6 +329,22 @@ public struct ProfileCaptureSummary: Equatable, Sendable {
 
   public var omittedCount: Int {
     unreadableCount + permissionRequiredCount + unsupportedCount
+  }
+
+  public var permissionRequirements: Set<CapturePermissionRequirement> {
+    Set(
+      items.compactMap { item in
+        guard item.disposition == .permissionRequired else { return nil }
+        switch (item.group, item.key) {
+        case (.network, "wifiSSID"), (.network, "wifi.ssid"):
+          return .locationForCurrentWiFiNetwork
+        case (.input, "KeyboardBrightness"):
+          return .inputMonitoringForKeyboardBrightness
+        default:
+          return nil
+        }
+      }
+    )
   }
 }
 

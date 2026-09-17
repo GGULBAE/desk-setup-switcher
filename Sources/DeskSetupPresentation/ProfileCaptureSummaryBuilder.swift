@@ -19,9 +19,9 @@ public struct CaptureSnapshotEvidence: Hashable, Sendable {
 
 /// Deterministically reports saved, applicable leaves and actionable permission
 /// gaps without carrying any SSID, address, device identifier, or other captured
-/// value into UI state. Snapshot-only, unreadable, and unsupported evidence is
-/// intentionally omitted from user-facing capture results because the user
-/// cannot act on it during capture.
+/// value into UI state. Unavailable evidence is surfaced only for the three
+/// visible Keyboard controls; snapshot-only and retired-field evidence remains
+/// omitted because the user cannot act on it during capture.
 public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
   public init() {}
 
@@ -73,6 +73,11 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     applicable(audio.outputVolume.isIncluded, .audio, "outputVolume")
     applicable(audio.outputMuted.isIncluded, .audio, "outputMute")
 
+    let input = settings.input.value
+    applicable(input.keyRepeatInterval.isIncluded, .input, "KeyRepeat")
+    applicable(input.initialKeyRepeatDelay.isIncluded, .input, "InitialKeyRepeat")
+    applicable(input.keyboardBrightness.isIncluded, .input, "KeyboardBrightness")
+
     let network = settings.network.value
     for (index, service) in network.serviceIPv4.enumerated() {
       applicable(
@@ -84,15 +89,7 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
 
     var seenEvidence = Set<CaptureSnapshotEvidence>()
     for item in evidence where seenEvidence.insert(item).inserted {
-      let disposition: CaptureItemDisposition?
-      switch item.state {
-      case .permissionRequired:
-        // Permission-gated legacy Wi-Fi/Location values are not editor fields.
-        // Their denial must not make an otherwise unrelated capture incomplete.
-        disposition = nil
-      case .detected, .storable, .unreadable, .unsupported:
-        disposition = nil
-      }
+      let disposition = visibleKeyboardOmissionDisposition(item)
       if let disposition {
         items.append(
           CaptureSummaryItem(
@@ -105,6 +102,29 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
     }
 
     return ProfileCaptureSummary(items: items)
+  }
+
+  private func visibleKeyboardOmissionDisposition(
+    _ item: CaptureSnapshotEvidence
+  ) -> CaptureItemDisposition? {
+    guard item.group == .input,
+      ["KeyRepeat", "InitialKeyRepeat", "KeyboardBrightness"].contains(item.key)
+    else {
+      // Permission-gated legacy Wi-Fi/Location values and retired settings are
+      // not editor fields. Their denial must not degrade an unrelated capture.
+      return nil
+    }
+
+    switch item.state {
+    case .unreadable:
+      return .unreadable
+    case .permissionRequired:
+      return .permissionRequired
+    case .unsupported:
+      return .unsupported
+    case .detected, .storable:
+      return nil
+    }
   }
 
   private func sanitizedEvidenceKey(_ item: CaptureSnapshotEvidence) -> String {

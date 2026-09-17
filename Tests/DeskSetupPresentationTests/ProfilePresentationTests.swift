@@ -7,6 +7,9 @@ import Testing
 struct ProfilePresentationTests {
   @Test("group summaries include only applicable groups in stable presentation order")
   func groupSummaryOrderAndInclusion() {
+    #expect(
+      ProfilePresentationBuilder.groupOrder == [.display, .audio, .network, .input]
+    )
     let profile = DeskProfile(
       name: "Synthetic desk",
       settings: ProfileSettings(
@@ -38,7 +41,10 @@ struct ProfilePresentationTests {
         input: .init(
           value: .init(
             pointerSpeed: .init(value: 1.75),
-            naturalScrolling: .init(value: false)
+            naturalScrolling: .init(value: false),
+            keyRepeatInterval: .init(value: 24),
+            initialKeyRepeatDelay: .init(value: 90),
+            keyboardBrightness: .init(value: 0.4)
           )
         )
       )
@@ -46,7 +52,7 @@ struct ProfilePresentationTests {
 
     let summaries = ProfilePresentationBuilder().summaries(for: profile)
 
-    #expect(summaries.map(\.group) == [.display, .audio])
+    #expect(summaries.map(\.group) == [.display, .audio, .input])
     #expect(!summaries.contains { $0.group == .network })
   }
 
@@ -178,8 +184,8 @@ struct ProfilePresentationTests {
     #expect(network == nil)
   }
 
-  @Test("service IPv4 values format deterministically while input remains dormant")
-  func serviceIPv4Formatting() {
+  @Test("keyboard summary exposes only the three supported values")
+  func keyboardSummaryFormatting() {
     let settings = ProfileSettings(
       network: .init(
         value: .init(
@@ -210,7 +216,9 @@ struct ProfilePresentationTests {
         value: .init(
           pointerSpeed: .init(value: 1.5),
           naturalScrolling: .init(value: true),
-          keyRepeatInterval: .init(value: 0.125),
+          keyRepeatInterval: .init(value: 24),
+          initialKeyRepeatDelay: .init(value: 90),
+          keyboardBrightness: .init(value: 0.64),
           useStandardFunctionKeys: .init(value: true)
         )
       )
@@ -221,7 +229,18 @@ struct ProfilePresentationTests {
     let input = builder.summary(for: .input, in: settings)
 
     #expect(network == nil)
-    #expect(input == nil)
+    #expect(
+      input?.items.map(\.kind) == [
+        .keyRepeatInterval, .initialKeyRepeatDelay, .keyboardBrightness,
+      ]
+    )
+    #expect(
+      input?.items.map(\.label) == [
+        "Key repeat speed", "Repeat delay", "Keyboard brightness",
+      ]
+    )
+    #expect(input?.items.map(\.value.primaryText) == ["24", "90", "64%"])
+    #expect(input?.summaryText == "24 · 90 · 64%")
   }
 
   @Test("legacy Wi-Fi formatter preserves target whitespace but its summary is dormant")

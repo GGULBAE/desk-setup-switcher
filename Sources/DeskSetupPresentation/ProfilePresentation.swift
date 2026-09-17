@@ -218,6 +218,7 @@ public enum ProfileSummaryItemKind: String, Equatable, Sendable {
   case naturalScrolling
   case keyRepeatInterval
   case initialKeyRepeatDelay
+  case keyboardBrightness
   case standardFunctionKeys
 }
 
@@ -261,7 +262,7 @@ public struct ProfileGroupSummary: Equatable, Sendable {
 /// The optional name map is transient presentation metadata and never changes
 /// the persisted profile schema.
 public struct ProfilePresentationBuilder: Equatable, Sendable {
-  public static let groupOrder: [SettingGroup] = [.display, .audio, .network]
+  public static let groupOrder: [SettingGroup] = [.display, .audio, .network, .input]
 
   public var audioDeviceNamesByUID: [String: String]
 
@@ -290,7 +291,7 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
     case .network:
       return networkSummary(settings.network.value)
     case .input:
-      return nil
+      return inputSummary(settings.input.value)
     }
   }
 
@@ -465,6 +466,43 @@ public struct ProfilePresentationBuilder: Equatable, Sendable {
     }
 
     return ProfileGroupSummary(group: .network, items: items)
+  }
+
+  private func inputSummary(_ settings: InputProfileSettings) -> ProfileGroupSummary {
+    var items: [ProfileSummaryItem] = []
+
+    if settings.keyRepeatInterval.isIncluded {
+      items.append(
+        .init(
+          kind: .keyRepeatInterval,
+          label: "Key repeat speed",
+          value: optionalValue(settings.keyRepeatInterval.value) {
+            .init(primaryText: FriendlyValueFormatter.decimal($0))
+          }
+        ))
+    }
+    if settings.initialKeyRepeatDelay.isIncluded {
+      items.append(
+        .init(
+          kind: .initialKeyRepeatDelay,
+          label: "Repeat delay",
+          value: optionalValue(settings.initialKeyRepeatDelay.value) {
+            .init(primaryText: FriendlyValueFormatter.decimal($0))
+          }
+        ))
+    }
+    if settings.keyboardBrightness.isIncluded {
+      items.append(
+        .init(
+          kind: .keyboardBrightness,
+          label: "Keyboard brightness",
+          value: optionalValue(settings.keyboardBrightness.value) {
+            .init(primaryText: FriendlyValueFormatter.percentage($0))
+          }
+        ))
+    }
+
+    return ProfileGroupSummary(group: .input, items: items)
   }
 
   private func audioItem(

@@ -12,7 +12,7 @@ struct InputPreferencesLiveSnapshotTests {
     let snapshot = try await adapter.snapshot()
 
     #expect(snapshot.group == .input)
-    #expect(snapshot.items.count == InputPreferenceKey.allCases.count)
+    #expect(snapshot.items.map(\.key) == ["KeyRepeat", "InitialKeyRepeat", "KeyboardBrightness"])
   }
 
   private static var liveReadTestsEnabled: Bool {

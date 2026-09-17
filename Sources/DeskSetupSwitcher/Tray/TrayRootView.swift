@@ -396,13 +396,13 @@ struct TrayRootView: View {
   @ViewBuilder
   private var captureSummary: some View {
     if let summary = model.lastCaptureSummary, summary.status != .complete {
+      let permissionPresentation =
+        TrayCapturePermissionPresentationPolicy.presentation(for: summary)
       VStack(alignment: .leading, spacing: 7) {
         HStack(alignment: .firstTextBaseline) {
           Label(
-            summary.permissionRequiredCount > 0
-              ? appLocalized("Location Access Needed") : appLocalized("Capture Failed"),
-            systemImage: summary.permissionRequiredCount > 0
-              ? "location.slash" : "xmark.octagon"
+            capturePermissionTitle(permissionPresentation.title),
+            systemImage: permissionPresentation.systemImage
           )
           .font(.caption.bold())
           Spacer()
@@ -420,8 +420,29 @@ struct TrayRootView: View {
         Text(appLocalized("\(summary.applicableCount) applicable settings saved."))
           .font(.caption)
           .foregroundStyle(.secondary)
-        if summary.permissionRequiredCount > 0 {
-          Button(appLocalized("Review Permission")) {
+        if permissionPresentation.showsInputMonitoringMessage {
+          Label(
+            appLocalized(
+              "Input Monitoring access is needed to include keyboard brightness. Keyboard brightness was omitted."
+            ),
+            systemImage: "keyboard"
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .accessibilityElement(children: .combine)
+        } else if permissionPresentation.showsUnavailableKeyboardBrightnessMessage {
+          Label(
+            appLocalized(
+              "Keyboard brightness is unavailable right now and was omitted."
+            ),
+            systemImage: "keyboard"
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .accessibilityElement(children: .combine)
+        }
+        if permissionPresentation.showsLocationReviewAction {
+          Button(appLocalized("Review Location Permission")) {
             route(.openPermissionWorkflow(.systemSettings))
           }
           .buttonStyle(.bordered)
@@ -432,6 +453,21 @@ struct TrayRootView: View {
       .padding(TrayGeometry.cardPadding)
       .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
       .accessibilityElement(children: .contain)
+    }
+  }
+
+  private func capturePermissionTitle(_ title: TrayCapturePermissionTitle) -> String {
+    switch title {
+    case .captureFailed:
+      appLocalized("Capture Failed")
+    case .captureIncomplete:
+      appLocalized("Capture Incomplete")
+    case .locationAccess:
+      appLocalized("Location Access Needed")
+    case .inputMonitoring:
+      appLocalized("Input Monitoring Needed")
+    case .multiplePermissions:
+      appLocalized("Permissions Needed")
     }
   }
 

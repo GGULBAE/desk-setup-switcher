@@ -1,6 +1,6 @@
 # Profile JSON schema and interchange guide
 
-Last updated: 2026-07-18
+Last updated: 2026-09-15
 
 Desk Setup Switcher stores and exchanges one JSON `ProfileDocument`. The current format is `schemaVersion: 1`. It is intended for this app's import, export, backup, and recovery paths; it is **not** a stable third-party automation API, public SDK, or plug-in format.
 
@@ -33,7 +33,7 @@ A current empty document encoded by the app has this shape:
 
 `selectedProfileID` is omitted when it is `null`. A normal export contains the non-optional nested setting groups and options even when they are dormant. Swift enums such as `DisplayMirroring`, `IPv4Configuration`, and `ProfileConditionKind` use the app's synthesized `Codable` representation; copy that representation from a same-version export rather than treating an example as a separate specification.
 
-For additive schema-1 compatibility, a missing display `colorProfile`, any missing `AudioProfileSettings` leaf, and missing `NetworkProfileSettings` leaves decode to their excluded defaults. Other missing required keys still fail decoding; do not infer that arbitrary partial objects are accepted.
+For additive schema-1 compatibility, a missing display `colorProfile`, any missing `AudioProfileSettings` leaf, missing `NetworkProfileSettings` leaves, and the newer Input `keyboardBrightness` leaf decode to their excluded defaults. An older schema-1 profile therefore does not invent a backlight value or become actionable merely because it predates that field. Other missing required keys still fail decoding; do not infer that arbitrary partial objects are accepted.
 
 ## Document and profile fields
 
@@ -135,9 +135,10 @@ Each `serviceIPv4` entry contains a portable `identity` and a `configuration` op
 | `naturalScrolling` | `SettingOption<Bool?>` |
 | `keyRepeatInterval` | `SettingOption<Double?>` |
 | `initialKeyRepeatDelay` | `SettingOption<Double?>` |
+| `keyboardBrightness` | `SettingOption<Double?>` |
 | `useStandardFunctionKeys` | `SettingOption<Bool?>` |
 
-These fields remain in schema 1 for decode and round-trip compatibility. They are not actionable in the default `v0.1.0` product surface.
+`keyRepeatInterval`, `initialKeyRepeatDelay`, and `keyboardBrightness` are the three current Keyboard values. Their existing `isIncluded` flags are preserved when an older document is decoded: normalization does not turn a formerly dormant excluded value on. A new Capture includes a readable current value, and an explicit editor change opts that leaf in. The first two remain experimental because their CFPreferences keys are undocumented. Brightness is experimental, available only on macOS 15 or later, and actionable only when Input Monitoring access has already been granted and runtime public-CoreHID discovery resolves exactly one compatible readable/writable backlight element from a built-in HID device. Background snapshot work checks access without requesting it. No permission state, CoreHID device, or element handle is serialized. `pointerSpeed`, `naturalScrolling`, and `useStandardFunctionKeys` remain round-trip-compatible dormant values.
 
 ## Current applicability policy
 
@@ -145,10 +146,10 @@ These fields remain in schema 1 for decode and round-trip compatibility. They ar
 
 | Group | Inclusion may remain actionable | Preserved but forced dormant |
 | --- | --- | --- |
-| Display | primary display, mirroring, mode, ColorSync profile | origin, rotation, active state |
+| Display | primary display, mode | mirroring, ColorSync profile, origin, rotation, active state |
 | Audio | default input, default output, input volume, output volume, output mute | system output |
-| Network | per-service IPv4 | Wi-Fi power/SSID, legacy global IPv4, DNS, web proxy, secure web proxy |
-| Input | none | every input leaf |
+| Network | none | per-service IPv4, Wi-Fi power/SSID, legacy global IPv4, DNS, web proxy, secure web proxy |
+| Input | key repeat interval, initial key repeat delay, keyboard brightness when present | pointer speed, natural scrolling, standard-function-key behavior |
 
 Primary-display selection is one global choice represented on all display targets. It remains included only when every target's `isPrimary` option is included and exactly one value is `true`, or when every target excludes it. A mixed or ambiguous state preserves values but disables all primary-display inclusion flags.
 

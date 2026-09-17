@@ -8,7 +8,7 @@
 
 <p align="center">
   Move between desks without rebuilding your Mac setup.<br>
-  Save display and sound settings as local profiles, preview every proposed change, and apply only when you are ready.
+  Save display, sound, and keyboard settings as local profiles, preview every proposed change, and apply only when you are ready.
 </p>
 
 <p align="center">
@@ -33,7 +33,7 @@ Desk Setup Switcher is a macOS menu-bar app for people who use the same Mac at d
 
 <table>
   <tr>
-    <td width="50%"><img src="site/public/gallery/01-capture.png" alt="Step 1: capture the current Display and Sound setup without changing the Mac"></td>
+    <td width="50%"><img src="site/public/gallery/01-capture.png" alt="Step 1: capture the Display and Sound setup shown in this synthetic pre-Keyboard product snapshot without changing the Mac"></td>
     <td width="50%"><img src="site/public/gallery/02-edit-display.png" alt="Step 2: edit the main display and resolution in a local profile"></td>
   </tr>
   <tr>
@@ -48,11 +48,11 @@ Desk Setup Switcher is a macOS menu-bar app for people who use the same Mac at d
   <a href="site/public/demo/captions.ko.vtt">한국어 자막</a>
 </p>
 
-<p align="center"><sub>Exact-commit synthetic product data. No personal device identifiers, live Capture, Apply, or hardware changes.</sub></p>
+<p align="center"><sub>Exact-commit synthetic Display/Sound product data captured before the Keyboard surface was added. No personal device identifiers, live Capture, Apply, or hardware changes.</sub></p>
 
 ## One Mac, more than one desk
 
-Changing desks often means repeating the same small decisions: choose the main display, restore a resolution, select the right speakers or microphone, and reset their levels.
+Changing desks often means repeating the same small decisions: choose the main display, restore a resolution, select the right speakers or microphone, reset their levels, and restore keyboard repeat and backlight preferences.
 
 Desk Setup Switcher keeps those choices together in a named profile, so every change begins with a clear plan instead of guesswork.
 
@@ -60,30 +60,31 @@ Desk Setup Switcher keeps those choices together in a named profile, so every ch
 
 | Product value | What you get |
 | --- | --- |
-| **Less setup repetition** | Keep the display and sound choices for each desk together in one named profile. |
+| **Less setup repetition** | Keep the display, sound, and keyboard choices for each desk together in one named profile. |
 | **Control before convenience** | See the exact plan, unavailable items, and risks before anything changes. Profiles never switch automatically. |
 | **A safer display workflow** | Protected display changes use a 15-second **Keep Changes / Revert Now** window. |
 | **Privacy by architecture** | No account, cloud sync, app-owned server, telemetry, analytics, advertising, or automatic/background profile switching. |
 
 ## Capture. Review. Get back to work.
 
-1. **Capture** reads the current Display and Sound values into a local profile. It changes nothing.
+1. **Capture** reads the current Display, Sound, and Keyboard values into a local profile. It changes nothing.
 2. **Edit** gives the setup a useful name and lets you choose from the values available on that Mac.
 3. **Review & Apply** shows proposed changes and omissions. Only a separate confirmation starts the change.
 
-## One profile, seven setting types
+## One profile, ten setting types
 
-| Display | Sound output | Sound input |
-| --- | --- | --- |
-| Main display | Output device | Input device |
-| Resolution | Output volume | Input volume |
-|  | Output mute |  |
+| Display | Sound output | Sound input | Keyboard |
+| --- | --- | --- | --- |
+| Main display | Output device | Input device | Key repeat speed |
+| Resolution | Output volume | Input volume | Repeat delay |
+|  | Output mute |  | Keyboard brightness |
 
-That is the complete current product scope. Network settings, editable refresh rate, mirroring, ColorSync profiles, per-setting inclusion switches, and automatic switching are not current features.
+That is the complete current product scope. Pointer speed, natural scrolling, standard-function-key behavior, Network settings, editable refresh rate, mirroring, ColorSync profiles, per-setting inclusion switches, and automatic switching are not current features.
 
 ## Designed to earn trust
 
 - Capture is read-only, and Apply always starts with a visible plan and explicit confirmation.
+- Upgrading does not silently activate an older excluded Keyboard value. A new Capture includes readable Keyboard values, and explicitly editing one opts it in.
 - The app reads current state again immediately before execution. If the plan changed, it applies nothing and returns to review.
 - Protected display changes remain temporary until you keep them. Rollback is attempted when required, but is not presented as a guarantee.
 - Results distinguish applied, skipped, failed, rolled-back, rollback-failed, and unverified outcomes.
@@ -95,7 +96,8 @@ Profiles, backups, and diagnostics stay on the Mac. Exports can contain device l
 
 - The bilingual project site is approved for public GitHub Pages hosting while its release state remains `holding`; it provides no app download or installation instructions.
 - The initial public-beta target is Apple Silicon on macOS 14 Sonoma. Exact release-candidate lifecycle evidence is still required before that becomes a supported public claim.
-- Current-source Capture and device discovery have read-only hardware evidence. Apply and rollback have deterministic mock evidence only; no live hardware mutation is claimed as verified.
+- Current-source Display and Sound Capture and device discovery have read-only hardware evidence. Keyboard Capture, Apply, and rollback have deterministic mock evidence only; no live keyboard mutation or hardware verification is claimed. The Keyboard editor uses macOS-aligned discrete **Slow → Fast**, **Long → Short**, and **Dim → Bright** axes instead of raw preference numbers. Native key-repeat **Off** is a separate runtime threshold state and is not exposed until it can be captured, persisted, read back, and rolled back safely; the slowest enabled value is never mislabeled as Off. Key repeat speed and repeat delay use experimental undocumented preference keys. Keyboard brightness is experimental on macOS 15 or later and is available only when Input Monitoring access has already been granted and public CoreHID discovers exactly one compatible backlight element from a built-in HID device that is both readable and writable. Background Capture checks access without prompting; denial, unsupported hardware, and ambiguous discovery omit only brightness.
+- A user-authorized 2026-09-15 local Apple Silicon build of the current Keyboard source was reinstalled and launched with both profile files unchanged. This is startup evidence for an `arm64` development bundle, not universal-package, supported-release, or Keyboard hardware evidence; see the [reinstall record](docs/KEYBOARD-REINSTALL-2026-09-15.md).
 - The app release remains on hold until the documented lifecycle, external-beta, and release-publication gates pass.
 
 For the evidence behind each statement, see the [support matrix](docs/SUPPORT-MATRIX.md) and [completion ledger](docs/COMPLETION-CRITERIA.md).

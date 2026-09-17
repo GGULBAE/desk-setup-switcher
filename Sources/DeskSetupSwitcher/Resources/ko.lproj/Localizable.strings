@@ -215,10 +215,12 @@
 "Shows this profile section" = "이 프로필 설정 항목을 표시합니다";
 "Sound" = "소리";
 "Input" = "입력";
+"Keyboard" = "키보드";
 "How your screens are arranged" = "화면 배치";
 "Your speakers and volume" = "스피커와 음량";
 "Your internet connection" = "인터넷 연결";
 "Your keyboard and pointer" = "키보드와 포인터";
+"Key repeat, repeat delay, and brightness" = "키 반복 속도, 반복 지연 시간 및 밝기";
 "Your network settings" = "네트워크 설정";
 "Your input settings" = "입력 설정";
 "Choose how your screens work together." = "여러 화면을 어떻게 사용할지 선택하세요.";
@@ -289,6 +291,21 @@
 "Natural scrolling" = "자연스러운 스크롤";
 "Key repeat" = "키 반복";
 "Initial key repeat delay" = "초기 키 반복 지연 시간";
+"Key repeat speed" = "키 반복 속도";
+"Repeat delay" = "반복 지연 시간";
+"Keyboard brightness" = "키보드 밝기";
+"Fast" = "빠르게";
+"Slow" = "느리게";
+"Short" = "짧게";
+"Long" = "길게";
+"Dim" = "어둡게";
+"Bright" = "밝게";
+"Slow to fast, level %lld of %lld" = "느리게에서 빠르게, %2$lld단계 중 %1$lld단계";
+"Long to short, level %lld of %lld" = "길게에서 짧게, %2$lld단계 중 %1$lld단계";
+"Set key repeat speed from slow to fast" = "키 반복 속도를 느리게에서 빠르게까지 설정합니다";
+"Set the delay before a held key begins repeating" = "키를 길게 눌렀을 때 반복이 시작될 때까지의 시간을 설정합니다";
+"Set keyboard brightness from 0 to 100 percent" = "키보드 밝기를 0~100퍼센트로 설정합니다";
+"This saved keyboard setting cannot be changed on this Mac right now. Review available settings before applying." = "이 Mac에서는 현재 저장된 키보드 설정을 변경할 수 없습니다. 적용하기 전에 사용 가능한 설정을 검토하세요.";
 "Use F1–F12 as standard function keys" = "F1–F12 키를 표준 기능 키로 사용";
 
 /* 준비 조건 편집기 */
@@ -673,6 +690,7 @@
 
 /* 입력 어댑터 메시지 */
 "CFPreferences is public, but Apple does not document the stability of these global input preference keys." = "CFPreferences는 공개 API이지만 Apple은 이러한 전역 입력 환경설정 키의 안정성을 문서화하지 않습니다.";
+"Key-repeat preferences use undocumented global keys. Keyboard brightness uses public CoreHID only when permission and a compatible writable element are already available." = "키 반복 환경설정에는 문서화되지 않은 전역 키를 사용합니다. 키보드 밝기는 권한이 이미 부여되어 있고 호환되는 쓰기 가능 요소가 있을 때만 공개 CoreHID를 사용합니다.";
 "Standard function keys" = "표준 기능 키";
 "The input adapter received a different settings payload." = "입력 어댑터가 다른 설정 페이로드를 받았습니다.";
 "Current input preferences could not be read." = "현재 입력 환경설정을 읽을 수 없습니다.";
@@ -680,14 +698,34 @@
 "Restored the previous experimental input preference." = "이전 실험적 입력 환경설정을 복원했습니다.";
 "The previous input preference could not be restored." = "이전 입력 환경설정을 복원할 수 없습니다.";
 "Global input preferences are isolated behind an experimental capability." = "전역 입력 환경설정은 실험적 기능으로 격리되어 있습니다.";
+"Key-repeat preferences are isolated behind an experimental capability." = "키 반복 환경설정은 실험적 기능으로 격리되어 있습니다.";
+"Keyboard brightness requires macOS 15 or later, prior Input Monitoring approval, and a compatible public CoreHID element." = "키보드 밝기를 사용하려면 macOS 15 이상, 사전에 허용된 입력 모니터링 접근 및 호환되는 공개 CoreHID 요소가 필요합니다.";
 "Experimental global preference" = "실험적 전역 환경설정";
 "No compatible value was found" = "호환되는 값을 찾지 못했습니다";
+"Public CoreHID keyboard-backlight control" = "공개 CoreHID 키보드 백라이트 제어";
+"Input Monitoring access must be granted in System Settings" = "시스템 설정에서 입력 모니터링 접근을 허용해야 합니다";
+"The compatible keyboard-backlight control could not be read" = "호환되는 키보드 백라이트 제어를 읽을 수 없습니다";
+"No compatible public CoreHID keyboard-backlight control was found" = "호환되는 공개 CoreHID 키보드 백라이트 제어를 찾지 못했습니다";
 "Change pointer speed" = "포인터 속도 변경";
 "Change natural scrolling" = "자연스러운 스크롤 변경";
 "Change key repeat" = "키 반복 변경";
 "Change initial key repeat delay" = "초기 키 반복 지연 변경";
+"Change key repeat speed" = "키 반복 속도 변경";
+"Change repeat delay" = "반복 지연 시간 변경";
+"Change keyboard brightness" = "키보드 밝기 변경";
 "Change function-key behavior" = "기능 키 동작 변경";
 "The saved input preference has no value." = "저장된 입력 환경설정 값이 없습니다.";
+"The saved keyboard setting has no value." = "저장된 키보드 설정 값이 없습니다.";
+"The keyboard control requires permission before it can be changed." = "키보드 제어를 변경하려면 먼저 권한이 필요합니다.";
+"This Mac does not expose a compatible keyboard control." = "이 Mac은 호환되는 키보드 제어를 제공하지 않습니다.";
+"The keyboard control has no readable rollback value." = "키보드 제어에 읽을 수 있는 롤백 값이 없습니다.";
+"macOS accepted the experimental input preference write, but read-back did not confirm the requested value." = "macOS가 실험적 입력 환경설정 쓰기를 수락했지만 다시 읽은 값으로 요청한 값을 확인하지 못했습니다.";
+"Keyboard brightness read-back did not confirm the requested value." = "다시 읽은 값으로 요청한 키보드 밝기를 확인하지 못했습니다.";
+"Updated keyboard brightness and confirmed it with public CoreHID." = "키보드 밝기를 업데이트하고 공개 CoreHID로 확인했습니다.";
+"Keyboard brightness could not be updated." = "키보드 밝기를 업데이트할 수 없습니다.";
+"The previous keyboard brightness could not be confirmed after rollback." = "롤백 후 이전 키보드 밝기를 확인하지 못했습니다.";
+"Restored the previous keyboard brightness." = "이전 키보드 밝기를 복원했습니다.";
+"The previous keyboard brightness could not be restored." = "이전 키보드 밝기를 복원할 수 없습니다.";
 
 /* 스냅샷 조정자 메시지 */
 "Only the first adapter registered for this group was queried." = "이 그룹에 등록된 첫 번째 어댑터만 조회했습니다.";
@@ -1125,8 +1163,15 @@
 "macOS cannot reveal the current Wi-Fi network name until Location access is enabled. You can enable it in Privacy & Security, or continue without Wi-Fi." = "위치 접근을 허용하기 전에는 macOS가 현재 Wi-Fi 네트워크 이름을 제공하지 않습니다. 개인정보 보호 및 보안에서 허용하거나 Wi-Fi 없이 계속할 수 있습니다.";
 "macOS System Settings could not be opened." = "macOS 시스템 설정을 열 수 없습니다.";
 "Captured %lld applicable settings. Location access is needed to include the current Wi-Fi network." = "적용 가능한 설정 %lld개를 캡처했습니다. 현재 Wi-Fi 네트워크를 포함하려면 위치 접근이 필요합니다.";
+"Captured %lld applicable settings. Input Monitoring access is needed to include keyboard brightness; keyboard brightness was omitted." = "적용 가능한 설정 %lld개를 캡처했습니다. 키보드 밝기를 포함하려면 입력 모니터링 접근이 필요하여 키보드 밝기는 제외했습니다.";
+"Captured %lld applicable settings. Location access is needed for the current Wi-Fi network. Input Monitoring access is needed to include keyboard brightness; keyboard brightness was omitted." = "적용 가능한 설정 %lld개를 캡처했습니다. 현재 Wi-Fi 네트워크에는 위치 접근이 필요합니다. 키보드 밝기를 포함하려면 입력 모니터링 접근이 필요하여 키보드 밝기는 제외했습니다.";
 "Captured %lld applicable settings." = "적용 가능한 설정 %lld개를 캡처했습니다.";
 "Location Access Needed" = "위치 접근 필요";
+"Input Monitoring Needed" = "입력 모니터링 필요";
+"Permissions Needed" = "권한 필요";
+"Capture Incomplete" = "캡처 미완료";
+"Input Monitoring access is needed to include keyboard brightness. Keyboard brightness was omitted." = "키보드 밝기를 포함하려면 입력 모니터링 접근이 필요합니다. 키보드 밝기는 제외했습니다.";
+"Keyboard brightness is unavailable right now and was omitted." = "현재 키보드 밝기를 사용할 수 없어 제외했습니다.";
 "%lld applicable settings saved." = "적용 가능한 설정 %lld개를 저장했습니다.";
 "%lld applicable settings saved; %lld permission required." = "적용 가능한 설정 %lld개를 저장했으며 권한 %lld개가 필요합니다.";
 "Could Not Open Destination" = "대상 화면을 열 수 없음";
@@ -1142,6 +1187,7 @@
 "Opens or closes the Desk Setup Switcher tray." = "책상 설정 전환기 트레이를 열거나 닫습니다.";
 "Opens persistent Desk Setup Switcher settings." = "닫히지 않는 책상 설정 전환기 설정 창을 엽니다.";
 "Review Permission" = "권한 검토";
+"Review Location Permission" = "위치 권한 검토";
 "Settings…" = "설정…";
 "The Settings window is unavailable." = "설정 창을 사용할 수 없습니다.";
 "The apply workflow window is unavailable." = "적용 작업 창을 사용할 수 없습니다.";
@@ -1238,6 +1284,12 @@
 "editor.audio.outputVolume.accessibility" = "출력 음량 설정";
 "editor.audio.outputMute" = "소리 끔";
 "editor.audio.outputMute.accessibility" = "출력 소리를 끄거나 켜기";
+"editor.keyboard.keyRepeatSpeed" = "키 반복 속도";
+"editor.keyboard.keyRepeatSpeed.accessibility" = "키 반복 속도 설정";
+"editor.keyboard.repeatDelay" = "반복 지연 시간";
+"editor.keyboard.repeatDelay.accessibility" = "키를 길게 눌렀을 때 반복이 시작될 때까지의 시간 설정";
+"editor.keyboard.brightness" = "키보드 밝기";
+"editor.keyboard.brightness.accessibility" = "키보드 밝기를 0~100퍼센트로 설정";
 "editor.network.serviceIPv4" = "서비스 IPv4";
 "editor.network.serviceIPv4.accessibility" = "네트워크 서비스의 DHCP 또는 수동 IPv4 구성";
 "Choose the display that should anchor the desktop" = "데스크탑 기준이 될 디스플레이를 선택하세요";

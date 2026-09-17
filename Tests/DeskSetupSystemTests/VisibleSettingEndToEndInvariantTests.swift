@@ -10,7 +10,8 @@ struct VisibleSettingEndToEndInvariantTests {
   func everyProjectedFieldHasAnExecutableVerticalSlice() async throws {
     let display = try await makeDisplaySlice()
     let audio = try await makeAudioSlice()
-    let slices = [display, audio]
+    let input = try await makeInputSlice()
+    let slices = [display, audio, input]
     let snapshots = slices.map(\.snapshot)
     let fields = VisibleSettingRegistry().fields(snapshots: snapshots)
 
@@ -43,6 +44,9 @@ struct VisibleSettingEndToEndInvariantTests {
     #expect(audioAPI.inputVolume(for: "input-B")?.value == 0.45)
     #expect(audioAPI.volume(for: "output-B")?.value == 0.4)
     #expect(audioAPI.mute(for: "output-B")?.value == false)
+    #expect(inputPreferencesAPI.value(for: .keyRepeatInterval) == .number(2))
+    #expect(inputPreferencesAPI.value(for: .initialKeyRepeatDelay) == .number(15))
+    #expect(await keyboardBacklightAPI.currentBrightness() == 0.4)
     #expect(await networkAPI.ipv4(for: ethernetIdentity) == .dhcp)
     #expect(
       await networkAPI.ipv4(for: wifiIdentity)
@@ -178,6 +182,36 @@ struct VisibleSettingEndToEndInvariantTests {
     )
   }
 
+  private var inputPreferencesAPI: MockInvariantInputPreferencesAPI {
+    InputInvariantFixture.shared.preferences
+  }
+
+  private var keyboardBacklightAPI: MockInvariantKeyboardBacklightAPI {
+    InputInvariantFixture.shared.backlight
+  }
+
+  private func makeInputSlice() async throws -> Slice {
+    let adapter = InputPreferencesAdapter(
+      api: inputPreferencesAPI,
+      keyboardBacklightAPI: keyboardBacklightAPI
+    )
+    let snapshot = try await adapter.snapshot()
+    let desired = InputProfileSettings(
+      keyRepeatInterval: .init(value: 3),
+      initialKeyRepeatDelay: .init(value: 20),
+      keyboardBrightness: .init(value: 0.8)
+    )
+    let payload = SettingsPayload.input(desired)
+    let issues = await adapter.validate(payload, against: snapshot)
+    let plan = try await adapter.plan(payload, from: snapshot, mode: .normal)
+    return Slice(
+      adapter: adapter,
+      snapshot: snapshot,
+      validationIssues: issues,
+      operations: plan.operations
+    )
+  }
+
   private var ethernetIdentity: NetworkServiceIdentity {
     .init(
       kind: .ethernet,
@@ -303,5 +337,56 @@ private final class NetworkInvariantFixture: @unchecked Sendable {
         ]
       )
     )
+  }
+}
+
+private final class InputInvariantFixture: @unchecked Sendable {
+  static let shared = InputInvariantFixture()
+  let preferences = MockInvariantInputPreferencesAPI(values: [
+    .keyRepeatInterval: .number(2),
+    .initialKeyRepeatDelay: .number(15),
+  ])
+  let backlight = MockInvariantKeyboardBacklightAPI(brightness: 0.4)
+
+  private init() {}
+}
+
+private final class MockInvariantInputPreferencesAPI: InputPreferencesAPI, @unchecked Sendable {
+  private let lock = NSLock()
+  private var values: [InputPreferenceKey: InputPreferenceValue]
+
+  init(values: [InputPreferenceKey: InputPreferenceValue]) {
+    self.values = values
+  }
+
+  func value(for key: InputPreferenceKey) -> InputPreferenceValue? {
+    lock.withLock { values[key] }
+  }
+
+  func setValue(_ value: InputPreferenceValue?, for key: InputPreferenceKey) throws {
+    lock.withLock {
+      values[key] = value
+    }
+  }
+}
+
+private actor MockInvariantKeyboardBacklightAPI: KeyboardBacklightAPI {
+  private var brightness: Double
+
+  init(brightness: Double) {
+    self.brightness = brightness
+  }
+
+  func readBrightness() -> KeyboardBacklightReadResult {
+    .available(brightness)
+  }
+
+  func setBrightness(_ brightness: Double) -> KeyboardBacklightMeasurement {
+    self.brightness = brightness
+    return .init(value: brightness, quantizationTolerance: 0)
+  }
+
+  func currentBrightness() -> Double {
+    brightness
   }
 }

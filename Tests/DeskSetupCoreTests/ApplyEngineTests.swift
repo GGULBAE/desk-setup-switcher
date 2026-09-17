@@ -5,12 +5,15 @@ import Testing
 
 @Suite("Apply engine planning")
 struct ApplyEngineTests {
-  @Test("both apply modes prepare all seven registered settings without mutating hardware")
-  func sevenRegisteredSettingsReachPreflight() async throws {
+  @Test("both apply modes prepare all ten registered settings without mutating hardware")
+  func tenRegisteredSettingsReachPreflight() async throws {
     let displayAdapter = MockSystemSettingsAdapter(group: .display)
     let audioAdapter = MockSystemSettingsAdapter(group: .audio)
-    let engine = ApplyEngine(registry: try AdapterRegistry([displayAdapter, audioAdapter]))
-    var profile = makeProfile(including: [.display, .audio])
+    let inputAdapter = MockSystemSettingsAdapter(group: .input)
+    let engine = ApplyEngine(
+      registry: try AdapterRegistry([displayAdapter, audioAdapter, inputAdapter])
+    )
+    var profile = makeProfile(including: [.display, .audio, .input])
     profile.settings.display.value.displays[0].isPrimary.isIncluded = false
     profile.settings.audio.value = .init(
       defaultInputUID: .init(isIncluded: false, value: "synthetic-input"),
@@ -19,10 +22,15 @@ struct ApplyEngineTests {
       outputVolume: .init(isIncluded: false, value: 0.8),
       outputMuted: .init(isIncluded: false, value: false)
     )
+    profile.settings.input.value = .init(
+      keyRepeatInterval: .init(value: 2),
+      initialKeyRepeatDelay: .init(value: 15),
+      keyboardBrightness: .init(value: 0.5)
+    )
     let original = profile
     for mode in [ApplyMode.normal, .force] {
       let preparation = await engine.prepare(profile: profile, mode: mode)
-      #expect(preparation.includedGroups == [.audio, .display])
+      #expect(preparation.includedGroups == [.input, .audio, .display])
     }
     let expected = ProfileApplicabilityNormalizer().normalize(profile).settings
     #expect(
@@ -33,7 +41,11 @@ struct ApplyEngineTests {
       await audioAdapter.recordedDesiredPayloads()
         == Array(
           repeating: .audio(expected.audio.value), count: 2))
-    for adapter in [displayAdapter, audioAdapter] {
+    #expect(
+      await inputAdapter.recordedDesiredPayloads()
+        == Array(
+          repeating: .input(expected.input.value), count: 2))
+    for adapter in [displayAdapter, audioAdapter, inputAdapter] {
       #expect(
         await adapter.recordedInvocations() == [
           .capability, .snapshot, .validate, .plan(.normal),

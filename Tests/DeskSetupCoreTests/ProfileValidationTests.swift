@@ -308,6 +308,7 @@ final class ProfileValidationTests: XCTestCase {
       naturalScrolling: .init(value: nil),
       keyRepeatInterval: .init(value: nil),
       initialKeyRepeatDelay: .init(value: .infinity),
+      keyboardBrightness: .init(value: 1.01),
       useStandardFunctionKeys: .init(value: nil)
     )
     let profile = DeskProfile(
@@ -320,6 +321,7 @@ final class ProfileValidationTests: XCTestCase {
     assertInvalidValue(issues, pathSuffix: ".naturalScrolling", reason: .missingIncludedValue)
     assertInvalidValue(issues, pathSuffix: ".keyRepeatInterval", reason: .missingIncludedValue)
     assertInvalidValue(issues, pathSuffix: ".initialKeyRepeatDelay", reason: .nonFinite)
+    assertInvalidValue(issues, pathSuffix: ".keyboardBrightness", reason: .outOfRange)
     assertInvalidValue(
       issues,
       pathSuffix: ".useStandardFunctionKeys",
@@ -417,6 +419,7 @@ final class ProfileValidationTests: XCTestCase {
           naturalScrolling: .init(value: true),
           keyRepeatInterval: .init(value: 120),
           initialKeyRepeatDelay: .init(value: 300),
+          keyboardBrightness: .init(value: 1),
           useStandardFunctionKeys: .init(value: false)
         )
       )

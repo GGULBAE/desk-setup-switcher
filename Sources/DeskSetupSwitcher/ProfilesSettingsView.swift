@@ -110,7 +110,7 @@ struct UnsavedPromptValidationHandoff: Equatable, Sendable {
 }
 
 enum ProfileEditorSurfacePolicy {
-  static let visibleGroups: Set<SettingGroup> = [.display, .audio]
+  static let visibleGroups: Set<SettingGroup> = [.display, .audio, .input]
   static let showsActivationControl = false
   static let showsUnsupportedControls = false
   static let showsDescription = false
@@ -131,12 +131,13 @@ enum ProfileEditorWorkspaceLayoutPolicy {
 
 enum ProfileEditorStepPolicy {
   static let defaultGroup: SettingGroup = .display
-  static let orderedGroups: [SettingGroup] = [.display, .audio]
+  static let orderedGroups: [SettingGroup] = [.display, .audio, .input]
 
   static func group(for fieldID: DraftFieldIdentifier) -> SettingGroup? {
     let rawValue = fieldID.rawValue
     if rawValue.hasPrefix("settings.display") { return .display }
     if rawValue.hasPrefix("settings.audio") { return .audio }
+    if rawValue.hasPrefix("settings.input") { return .input }
     return nil
   }
 
@@ -383,6 +384,87 @@ enum ProfileEditorUnavailableIncludedSettingPolicy {
         && target.configuration.isIncluded
         && !availableIdentities.contains(target.identity)
     }
+  }
+}
+
+enum ProfileEditorKeyboardOptionPolicy {
+  enum Scale: Equatable, Sendable {
+    case keyRepeatSpeed
+    case repeatDelay
+    case brightness
+  }
+
+  // These are the enabled steps exposed by macOS, ordered in the same
+  // left-to-right direction as its sliders. The separate native Off state is
+  // intentionally absent: the CFPreferences adapter cannot snapshot, persist,
+  // read back, and roll back that runtime threshold state safely yet.
+  static let keyRepeatSteps: [Double] = [120, 90, 60, 30, 12, 5, 2]
+  static let repeatDelaySteps: [Double] = [120, 94, 68, 30, 25, 15]
+
+  static func effectiveValue(
+    _ option: SettingOption<Double?>,
+    suggestedValue: Double?
+  ) -> Double? {
+    option.isIncluded ? option.value : suggestedValue
+  }
+
+  static func updating(
+    _ option: SettingOption<Double?>,
+    to value: Double?
+  ) -> SettingOption<Double?> {
+    var updated = option
+    updated.isIncluded = true
+    updated.value = value
+    return updated
+  }
+
+  static func sliderRange(for scale: Scale) -> ClosedRange<Double> {
+    switch scale {
+    case .keyRepeatSpeed:
+      1...Double(keyRepeatSteps.count)
+    case .repeatDelay:
+      1...Double(repeatDelaySteps.count)
+    case .brightness:
+      0...100
+    }
+  }
+
+  static func sliderValue(fromStoredValue value: Double, scale: Scale) -> Double {
+    switch scale {
+    case .keyRepeatSpeed:
+      nearestSliderStep(for: value, values: keyRepeatSteps)
+    case .repeatDelay:
+      nearestSliderStep(for: value, values: repeatDelaySteps)
+    case .brightness:
+      min(max(value * 100, 0), 100)
+    }
+  }
+
+  static func storedValue(fromSliderValue value: Double, scale: Scale) -> Double {
+    switch scale {
+    case .keyRepeatSpeed:
+      storedStepValue(at: value, values: keyRepeatSteps)
+    case .repeatDelay:
+      storedStepValue(at: value, values: repeatDelaySteps)
+    case .brightness:
+      min(max(value, 0), 100) / 100
+    }
+  }
+
+  private static func nearestSliderStep(for value: Double, values: [Double]) -> Double {
+    guard
+      let index = values.indices.min(by: {
+        abs(values[$0] - value) < abs(values[$1] - value)
+      })
+    else { return 1 }
+    return Double(index + 1)
+  }
+
+  private static func storedStepValue(at step: Double, values: [Double]) -> Double {
+    guard !values.isEmpty else { return step }
+    let index = min(
+      max(Int(step.rounded()) - 1, values.startIndex), values.index(before: values.endIndex))
+    return values[index]
   }
 }
 
@@ -1461,7 +1543,9 @@ private struct ProfileEditorForm: View {
       displaySimpleOptions
     case .audio:
       audioSimpleOptions
-    case .network, .input:
+    case .input:
+      inputSimpleOptions
+    case .network:
       EmptyView()
     }
   }
@@ -1486,7 +1570,8 @@ private struct ProfileEditorForm: View {
       ProfileEditorSurfacePolicy.visibleGroups.contains(.network)
         && (hasVisibleNetworkFields || hasIncludedUnavailableNetworkFields)
     case .input:
-      false
+      ProfileEditorSurfacePolicy.visibleGroups.contains(.input)
+        && (hasVisibleInputFields || profile.settings.input.value.hasIncludedOption)
     }
   }
 
@@ -1495,7 +1580,7 @@ private struct ProfileEditorForm: View {
     case .display: appLocalized("Display")
     case .audio: appLocalized("Sound")
     case .network: appLocalized("Network")
-    case .input: appLocalized("Input")
+    case .input: appLocalized("Keyboard")
     }
   }
 
@@ -1504,7 +1589,7 @@ private struct ProfileEditorForm: View {
     case .display: appLocalized("Main display and resolution")
     case .audio: appLocalized("Input, output, and volume")
     case .network: appLocalized("Your internet connection")
-    case .input: appLocalized("Your keyboard and pointer")
+    case .input: appLocalized("Key repeat, repeat delay, and brightness")
     }
   }
 
@@ -1746,6 +1831,173 @@ private struct ProfileEditorForm: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(identifier)
     .uiAuditLayoutAnchor(identifier)
+  }
+
+  @ViewBuilder
+  private var inputSimpleOptions: some View {
+    GroupBox {
+      VStack(alignment: .leading, spacing: 16) {
+        keyboardSliderOption(
+          "Key repeat speed",
+          option: $profile.settings.input.value.keyRepeatInterval,
+          suggestedValue: systemSnapshot?.profileSettings.input.value.keyRepeatInterval.value,
+          visibleKind: .keyboardKeyRepeatSpeed,
+          fallback: 60,
+          scale: .keyRepeatSpeed,
+          leadingLabel: "Slow",
+          trailingLabel: "Fast",
+          accessibilityHint: "Set key repeat speed from slow to fast",
+          fieldID: .input(.keyRepeatInterval),
+          identifier: "keyboard.key-repeat-speed"
+        )
+        keyboardSliderOption(
+          "Repeat delay",
+          option: $profile.settings.input.value.initialKeyRepeatDelay,
+          suggestedValue: systemSnapshot?.profileSettings.input.value.initialKeyRepeatDelay.value,
+          visibleKind: .keyboardRepeatDelay,
+          fallback: 68,
+          scale: .repeatDelay,
+          leadingLabel: "Long",
+          trailingLabel: "Short",
+          accessibilityHint: "Set the delay before a held key begins repeating",
+          fieldID: .input(.initialKeyRepeatDelay),
+          identifier: "keyboard.repeat-delay"
+        )
+        keyboardSliderOption(
+          "Keyboard brightness",
+          option: $profile.settings.input.value.keyboardBrightness,
+          suggestedValue: systemSnapshot?.profileSettings.input.value.keyboardBrightness.value,
+          visibleKind: .keyboardBrightness,
+          fallback: 0.5,
+          scale: .brightness,
+          leadingLabel: "Dim",
+          trailingLabel: "Bright",
+          accessibilityHint: "Set keyboard brightness from 0 to 100 percent",
+          fieldID: .input(.keyboardBrightness),
+          identifier: "keyboard.brightness"
+        )
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(10)
+    } label: {
+      Label(appLocalized("Keyboard"), systemImage: "keyboard")
+        .font(.headline)
+        .accessibilityAddTraits(.isHeader)
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("keyboard-settings")
+    .uiAuditLayoutAnchor("keyboard-settings")
+  }
+
+  @ViewBuilder
+  private func keyboardSliderOption(
+    _ title: String.LocalizationValue,
+    option: Binding<SettingOption<Double?>>,
+    suggestedValue: Double?,
+    visibleKind: VisibleSettingKind,
+    fallback: Double,
+    scale: ProfileEditorKeyboardOptionPolicy.Scale,
+    leadingLabel: String.LocalizationValue,
+    trailingLabel: String.LocalizationValue,
+    accessibilityHint: LocalizedStringKey,
+    fieldID: DraftFieldIdentifier,
+    identifier: String
+  ) -> some View {
+    let isRuntimeAvailable = isVisible(visibleKind)
+    if isRuntimeAvailable {
+      let effectiveValue = keyboardEffectiveValue(
+        option.wrappedValue,
+        suggestedValue: suggestedValue
+      )
+      optionEditor(
+        title,
+        embeddedTitle: title,
+        validationFields: [fieldID]
+      ) {
+        if effectiveValue == nil {
+          chooseSuggestedValueButton(fieldID: fieldID) {
+            setKeyboardValue(
+              suggestedValue ?? fallback,
+              option: option
+            )
+          }
+        } else {
+          VStack(spacing: 4) {
+            VStack(spacing: 0) {
+              if scale == .brightness {
+                Slider(
+                  value: keyboardSliderBinding(
+                    option,
+                    suggestedValue: suggestedValue,
+                    fallback: fallback,
+                    scale: scale
+                  ),
+                  in: ProfileEditorKeyboardOptionPolicy.sliderRange(for: scale)
+                ) {
+                  Text(appLocalized(title))
+                }
+              } else {
+                Slider(
+                  value: keyboardSliderBinding(
+                    option,
+                    suggestedValue: suggestedValue,
+                    fallback: fallback,
+                    scale: scale
+                  ),
+                  in: ProfileEditorKeyboardOptionPolicy.sliderRange(for: scale),
+                  step: 1
+                ) {
+                  Text(appLocalized(title))
+                }
+              }
+            }
+            .labelsHidden()
+            .focused($focusedField, equals: fieldID)
+            .accessibilityLabel(appLocalized(title))
+            .accessibilityValue(
+              keyboardValueDescription(
+                effectiveValue,
+                scale: scale
+              )
+            )
+            .accessibilityHint(
+              validationAccessibilityHint(for: fieldID, fallback: accessibilityHint)
+            )
+            .accessibilityInvalid(validation.issue(for: fieldID) != nil)
+            .accessibilityIdentifier("\(identifier).slider")
+            .uiAuditLayoutAnchor("\(identifier).slider")
+
+            HStack {
+              Text(appLocalized(leadingLabel))
+                .uiAuditLayoutAnchor("\(identifier).scale.leading")
+              Spacer(minLength: 12)
+              Text(appLocalized(trailingLabel))
+                .uiAuditLayoutAnchor("\(identifier).scale.trailing")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+            .uiAuditLayoutAnchor("\(identifier).scale")
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      }
+      .uiAuditLayoutAnchor(identifier)
+    } else if ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
+      isIncluded: option.wrappedValue.isIncluded,
+      isRuntimeAvailable: isRuntimeAvailable,
+      hasRuntimeEvidence: systemSnapshot != nil
+    ) {
+      unavailableSavedOption(
+        appLocalized(title),
+        embeddedTitle: title,
+        validationFields: [fieldID],
+        warning: appLocalized(
+          "This saved keyboard setting cannot be changed on this Mac right now. Review available settings before applying."
+        )
+      )
+      .uiAuditLayoutAnchor(identifier)
+    }
   }
 
   @ViewBuilder
@@ -2371,6 +2623,8 @@ private struct ProfileEditorForm: View {
       selectedGroup = .audio
     case .editorAudioUnsupported:
       selectedGroup = .audio
+    case .editorKeyboard:
+      selectedGroup = .input
     case .editorNetwork:
       selectedGroup = .display
     case .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
@@ -2464,6 +2718,10 @@ private struct ProfileEditorForm: View {
 
   private var hasVisibleNetworkFields: Bool {
     visibleSettingFields.contains { $0.contract.group == .network }
+  }
+
+  private var hasVisibleInputFields: Bool {
+    visibleSettingFields.contains { $0.contract.group == .input }
   }
 
   private var hasIncludedUnavailableNetworkFields: Bool {
@@ -2726,6 +2984,83 @@ private struct ProfileEditorForm: View {
       },
       set: { value.wrappedValue = AudioVolumePresentation.scalar(fromPercent: $0) }
     )
+  }
+
+  private func keyboardEffectiveValue(
+    _ option: SettingOption<Double?>,
+    suggestedValue: Double?
+  ) -> Double? {
+    ProfileEditorKeyboardOptionPolicy.effectiveValue(
+      option,
+      suggestedValue: suggestedValue
+    )
+  }
+
+  private func setKeyboardValue(
+    _ value: Double?,
+    option: Binding<SettingOption<Double?>>
+  ) {
+    option.wrappedValue = ProfileEditorKeyboardOptionPolicy.updating(
+      option.wrappedValue,
+      to: value
+    )
+  }
+
+  private func keyboardSliderBinding(
+    _ option: Binding<SettingOption<Double?>>,
+    suggestedValue: Double?,
+    fallback: Double,
+    scale: ProfileEditorKeyboardOptionPolicy.Scale
+  ) -> Binding<Double> {
+    Binding(
+      get: {
+        let storedValue =
+          keyboardEffectiveValue(
+            option.wrappedValue,
+            suggestedValue: suggestedValue
+          ) ?? fallback
+        return ProfileEditorKeyboardOptionPolicy.sliderValue(
+          fromStoredValue: storedValue,
+          scale: scale
+        )
+      },
+      set: { displayedValue in
+        setKeyboardValue(
+          ProfileEditorKeyboardOptionPolicy.storedValue(
+            fromSliderValue: displayedValue,
+            scale: scale
+          ),
+          option: option
+        )
+      }
+    )
+  }
+
+  private func keyboardValueDescription(
+    _ value: Double?,
+    scale: ProfileEditorKeyboardOptionPolicy.Scale
+  ) -> String {
+    guard let value else { return appLocalized("Value unavailable") }
+    let sliderValue = ProfileEditorKeyboardOptionPolicy.sliderValue(
+      fromStoredValue: value,
+      scale: scale
+    )
+    switch scale {
+    case .keyRepeatSpeed:
+      return String.localizedStringWithFormat(
+        appLocalized("Slow to fast, level %lld of %lld"),
+        Int64(sliderValue),
+        Int64(ProfileEditorKeyboardOptionPolicy.keyRepeatSteps.count)
+      )
+    case .repeatDelay:
+      return String.localizedStringWithFormat(
+        appLocalized("Long to short, level %lld of %lld"),
+        Int64(sliderValue),
+        Int64(ProfileEditorKeyboardOptionPolicy.repeatDelaySteps.count)
+      )
+    case .brightness:
+      return FriendlyValueFormatter.percentage(value)
+    }
   }
 
   private func optionalBoolBinding(

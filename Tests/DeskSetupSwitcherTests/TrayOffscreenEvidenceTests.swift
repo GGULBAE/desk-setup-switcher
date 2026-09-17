@@ -648,6 +648,22 @@ import Testing
           displayMode: .standard,
           size: CGSize(width: 900, height: 568)
         ),
+        SettingsFixture(
+          name: "28-keyboard-ko-light",
+          variant: .editorKeyboard,
+          languageCode: "ko",
+          colorScheme: .light,
+          displayMode: .standard,
+          size: CGSize(width: 900, height: 568)
+        ),
+        SettingsFixture(
+          name: "29-keyboard-en-large-text",
+          variant: .editorKeyboard,
+          languageCode: "en",
+          colorScheme: .light,
+          displayMode: .largeText,
+          size: CGSize(width: 900, height: 700)
+        ),
       ]
       let selectedFixture = ProcessInfo.processInfo.environment[
         "DESK_SETUP_REFINEMENT_EVIDENCE_FIXTURE"
@@ -720,6 +736,43 @@ import Testing
                   perceivedBrightness($0) < 0.8
                 } > 20, "Each measured field must actually render visible content")
             }
+          }
+        }
+        if fixture.variant == .editorKeyboard {
+          let representation = try #require(NSBitmapImageRep(data: rendered.png))
+          let keyboard = try #require(rendered.layoutFrames["keyboard-settings"])
+          let formViewport = try #require(rendered.layoutFrames["profile.form.viewport"])
+          let identifiers = [
+            "keyboard.key-repeat-speed",
+            "keyboard.repeat-delay",
+            "keyboard.brightness",
+          ]
+          let rows = try identifiers.map { identifier in
+            try #require(rendered.layoutFrames[identifier])
+          }
+          #expect(containsRenderedFrame(keyboard, in: formViewport))
+          #expect(rows.allSatisfy { containsRenderedFrame($0, in: keyboard) })
+          for (upper, lower) in zip(rows, rows.dropFirst()) {
+            #expect(upper.maxY < lower.minY, "Keyboard controls must remain distinct rows")
+          }
+          for identifier in identifiers {
+            let slider = try #require(rendered.layoutFrames[identifier + ".slider"])
+            let scale = try #require(rendered.layoutFrames[identifier + ".scale"])
+            let leading = try #require(rendered.layoutFrames[identifier + ".scale.leading"])
+            let trailing = try #require(rendered.layoutFrames[identifier + ".scale.trailing"])
+            #expect(containsRenderedFrame(slider, in: keyboard))
+            #expect(containsRenderedFrame(scale, in: keyboard))
+            #expect(slider.maxY < scale.minY)
+            #expect(leading.maxX < trailing.minX)
+            let ink = renderedInkEvidence(
+              in: representation,
+              viewport: fixture.size,
+              region: slider
+            )
+            #expect(
+              ink.verticalBounds != nil,
+              "Each keyboard slider must render visible track and thumb content: \(identifier); contrast=\(ink.brightnessRange), bounds=\(slider)"
+            )
           }
         }
         if fixture.isProfileSurface, fixture.size.width == 900,
@@ -1532,7 +1585,7 @@ import Testing
         "sidebar-action-background-runs=\(sidebarRuns)",
         "rail-selection-pixel-count=\(railSelectionPixelCount)",
         "per-setting-inclusion-controls=none",
-        "step-navigation=\(fixture.isProfileSurface ? "display,sound" : "not-applicable")",
+        "step-navigation=\(fixture.isProfileSurface ? "display,sound,keyboard" : "not-applicable")",
         "step-state-cues=\(fixture.isProfileSurface ? "number,title,checkmark" : "not-applicable")",
         "login-item-details-visible=false",
         "login-status-refresh-placement=mismatch-only",
@@ -1550,6 +1603,7 @@ import Testing
         "footer-dark-pixel-count=\(footerDarkPixelCount)",
         "storage-error-accent-pixel-count=\(storageErrorAccentPixelCount)",
         "live-display-audio-network-mutations=false",
+        "live-keyboard-mutations=false",
         "offscreen-ax-limit=virtual SwiftUI children require an onscreen accessibility host",
       ]
       var visited: Set<ObjectIdentifier> = []

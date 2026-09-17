@@ -172,6 +172,35 @@ public struct AudioMuteControlCatalogEntry: Codable, Hashable, Sendable {
   }
 }
 
+public enum KeyboardControlKind: String, Codable, CaseIterable, Hashable, Sendable {
+  case keyRepeatInterval
+  case initialKeyRepeatDelay
+  case keyboardBrightness
+}
+
+/// Session-only evidence that a keyboard control was read and has a concrete
+/// adapter path for a later preflight/apply/rollback transaction.
+public struct KeyboardControlCatalogEntry: Codable, Hashable, Sendable {
+  public var kind: KeyboardControlKind
+  public var currentValue: Double?
+  public var canApply: Bool
+  /// Half of the device's normalized logical step. A missing value preserves
+  /// compatibility with older session snapshots and requires exact equality.
+  public var quantizationTolerance: Double?
+
+  public init(
+    kind: KeyboardControlKind,
+    currentValue: Double?,
+    canApply: Bool,
+    quantizationTolerance: Double? = nil
+  ) {
+    self.kind = kind
+    self.currentValue = currentValue
+    self.canApply = canApply
+    self.quantizationTolerance = quantizationTolerance
+  }
+}
+
 public struct AdapterSnapshot: Codable, Hashable, Sendable {
   public var group: SettingGroup
   public var capturedAt: Date
@@ -191,6 +220,8 @@ public struct AdapterSnapshot: Codable, Hashable, Sendable {
   public var audioVolumeControlCatalog: [AudioVolumeControlCatalogEntry]?
   /// Typed writable-output-mute projection; unsupported controls remain non-visible.
   public var audioMuteControlCatalog: [AudioMuteControlCatalogEntry]?
+  /// Typed keyboard-control projection; unsupported controls remain non-visible.
+  public var keyboardControlCatalog: [KeyboardControlCatalogEntry]?
   /// Optional read-only saved-network choices; contains no credential material.
   public var savedWiFiNetworkNames: [String]?
 
@@ -206,6 +237,7 @@ public struct AdapterSnapshot: Codable, Hashable, Sendable {
     audioDeviceCatalog: [AudioDeviceCatalogEntry]? = nil,
     audioVolumeControlCatalog: [AudioVolumeControlCatalogEntry]? = nil,
     audioMuteControlCatalog: [AudioMuteControlCatalogEntry]? = nil,
+    keyboardControlCatalog: [KeyboardControlCatalogEntry]? = nil,
     savedWiFiNetworkNames: [String]? = nil
   ) {
     self.group = group
@@ -219,6 +251,7 @@ public struct AdapterSnapshot: Codable, Hashable, Sendable {
     self.audioDeviceCatalog = audioDeviceCatalog
     self.audioVolumeControlCatalog = audioVolumeControlCatalog
     self.audioMuteControlCatalog = audioMuteControlCatalog
+    self.keyboardControlCatalog = keyboardControlCatalog
     self.savedWiFiNetworkNames = savedWiFiNetworkNames
   }
 }

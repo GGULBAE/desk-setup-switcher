@@ -393,6 +393,12 @@ public struct ProfileDocumentValidator: Sendable {
       at: "\(base).initialKeyRepeatDelay",
       issues: &issues
     )
+    validateIncludedNumber(
+      settings.keyboardBrightness,
+      range: 0...1,
+      at: "\(base).keyboardBrightness",
+      issues: &issues
+    )
     validateIncludedPresence(
       settings.useStandardFunctionKeys,
       at: "\(base).useStandardFunctionKeys",

@@ -202,6 +202,7 @@ struct ApplyWorkflowPresentationTests {
     #expect(partial.permissionRequiredCount == 1)
     #expect(partial.unsupportedCount == 1)
     #expect(partial.wifiNetworkWasNotCaptured)
+    #expect(partial.permissionRequirements == [.locationForCurrentWiFiNetwork])
     #expect(unusable.status == .failure)
     #expect(!unusable.canCreateProfile)
   }

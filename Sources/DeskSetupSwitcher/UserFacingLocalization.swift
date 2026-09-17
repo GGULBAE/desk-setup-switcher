@@ -244,8 +244,9 @@ private func appLocalizedRuntime(_ value: String, bundle: Bundle) -> String {
   let inputKeys: [(String, String)] = [
     ("com.apple.mouse.scaling", "Pointer speed"),
     ("com.apple.swipescrolldirection", "Natural scrolling"),
-    ("KeyRepeat", "Key repeat"),
-    ("InitialKeyRepeat", "Initial key repeat delay"),
+    ("KeyRepeat", "Key repeat speed"),
+    ("InitialKeyRepeat", "Repeat delay"),
+    ("KeyboardBrightness", "Keyboard brightness"),
     ("com.apple.keyboard.fnState", "Function-key behavior"),
   ]
   for (key, titleKey) in inputKeys {
@@ -367,7 +368,7 @@ func appProfileSummaryValue(_ item: ProfileSummaryItem) -> String {
   case .displayMode, .displayRole, .displayActivity, .displayRotation,
     .displayPosition, .inputVolume, .outputVolume, .outputMute, .wifiPower,
     .pointerSpeed, .naturalScrolling, .keyRepeatInterval, .initialKeyRepeatDelay,
-    .standardFunctionKeys:
+    .keyboardBrightness, .standardFunctionKeys:
     primary = appLocalizedPresentationText(item.value.primaryText)
     secondary = item.value.secondaryText.map(appLocalizedPresentationText)
   }
@@ -584,7 +585,7 @@ private func appLocalizedSettingGroupTitle(_ group: SettingGroup, bundle: Bundle
     case .display: "Displays"
     case .audio: "Audio"
     case .network: "Network"
-    case .input: "Mouse & Keyboard"
+    case .input: "Keyboard"
     }
   return appLocalizedRuntimeKey(key, bundle: bundle)
 }

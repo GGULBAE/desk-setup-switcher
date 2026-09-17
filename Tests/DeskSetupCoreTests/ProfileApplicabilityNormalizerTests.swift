@@ -235,6 +235,35 @@ struct ProfileApplicabilityNormalizerTests {
     #expect(normalizer.normalize(ProfileSettings()).audio.value.outputMuted.value == nil)
   }
 
+  @Test(
+    "registered keyboard values preserve explicit applicability while legacy controls stay dormant"
+  )
+  func keyboardApplicabilityPreservesOnlyRegisteredControls() {
+    var settings = ProfileSettings()
+    settings.input = .init(
+      isIncluded: false,
+      value: .init(
+        pointerSpeed: .init(value: 4),
+        naturalScrolling: .init(value: true),
+        keyRepeatInterval: .init(isIncluded: false, value: 2),
+        initialKeyRepeatDelay: .init(isIncluded: true, value: 15),
+        keyboardBrightness: .init(isIncluded: true, value: 0.5),
+        useStandardFunctionKeys: .init(value: false)
+      )
+    )
+
+    let normalized = normalizer.normalize(settings)
+
+    #expect(normalized.input.isIncluded)
+    #expect(!normalized.input.value.pointerSpeed.isIncluded)
+    #expect(!normalized.input.value.naturalScrolling.isIncluded)
+    #expect(!normalized.input.value.useStandardFunctionKeys.isIncluded)
+    #expect(normalized.input.value.keyRepeatInterval == .init(isIncluded: false, value: 2))
+    #expect(normalized.input.value.initialKeyRepeatDelay == .init(value: 15))
+    #expect(normalized.input.value.keyboardBrightness == .init(value: 0.5))
+    #expect(normalizer.normalize(normalized) == normalized)
+  }
+
   @Test("registered resolution participates while empty and retired groups stay dormant")
   func emptyApplicableGroupsAreDisabled() {
     let display = DisplayTargetSettings(

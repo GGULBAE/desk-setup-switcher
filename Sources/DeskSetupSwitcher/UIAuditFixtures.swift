@@ -27,6 +27,7 @@ enum UIAuditVariant: String {
   case editorDisplayColor = "editor-display-color"
   case editorAudio = "editor-audio"
   case editorAudioUnsupported = "editor-audio-unsupported"
+  case editorKeyboard = "editor-keyboard"
   case editorNetwork = "editor-network"
   case editorNetworkEthernetDHCP = "editor-network-ethernet-dhcp"
   case editorNetworkEthernetManual = "editor-network-ethernet-manual"
@@ -42,7 +43,7 @@ enum UIAuditVariant: String {
       .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult:
       true
     case .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
-      .editorAudioUnsupported,
+      .editorAudioUnsupported, .editorKeyboard,
       .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
       .editorNetworkWiFiDHCP, .editorNetworkWiFiManual, .validation, .permissions,
       .diagnostics:
@@ -202,7 +203,7 @@ extension View {
       case .overview, .menuPolish, .trayDelete, .trayCapturePermission,
         .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
         .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
-        .editorAudioUnsupported,
+        .editorAudioUnsupported, .editorKeyboard,
         .editorNetwork, .editorNetworkEthernetDHCP, .editorNetworkEthernetManual,
         .editorNetworkWiFiDHCP, .editorNetworkWiFiManual, .validation, .permissions,
         .diagnostics:
@@ -403,6 +404,7 @@ extension View {
             naturalScrolling: .init(value: true),
             keyRepeatInterval: .init(value: 60),
             initialKeyRepeatDelay: .init(value: 150),
+            keyboardBrightness: .init(value: 0.7),
             useStandardFunctionKeys: .init(value: false)
           )
         )
@@ -512,6 +514,50 @@ extension View {
           )
         ]
       )
+      let inputSettings = settings.input.value
+      let inputItems = [
+        SnapshotItem(
+          key: "KeyRepeat",
+          label: "Key repeat speed",
+          state: .storable,
+          detail: "Readable and writable"
+        ),
+        SnapshotItem(
+          key: "InitialKeyRepeat",
+          label: "Repeat delay",
+          state: .storable,
+          detail: "Readable and writable"
+        ),
+        SnapshotItem(
+          key: "KeyboardBrightness",
+          label: "Keyboard brightness",
+          state: .storable,
+          detail: "Readable and writable"
+        ),
+      ]
+      let inputSnapshot = AdapterSnapshot(
+        group: .input,
+        capturedAt: capturedAt,
+        payload: .input(inputSettings),
+        items: inputItems,
+        keyboardControlCatalog: [
+          .init(
+            kind: .keyRepeatInterval,
+            currentValue: inputSettings.keyRepeatInterval.value,
+            canApply: true
+          ),
+          .init(
+            kind: .initialKeyRepeatDelay,
+            currentValue: inputSettings.initialKeyRepeatDelay.value,
+            canApply: true
+          ),
+          .init(
+            kind: .keyboardBrightness,
+            currentValue: inputSettings.keyboardBrightness.value,
+            canApply: true
+          ),
+        ]
+      )
       let networkRollbackCatalog = settings.network.value.serviceIPv4.map { service in
         NetworkIPv4RollbackCatalogEntry(
           identity: service.identity,
@@ -542,6 +588,13 @@ extension View {
             capability: .init(group: .audio, state: .supported, reason: ""),
             snapshot: audioSnapshot,
             items: audioItems,
+            failures: []
+          ),
+          SystemSnapshotGroupResult(
+            group: .input,
+            capability: .init(group: .input, state: .supported, reason: ""),
+            snapshot: inputSnapshot,
+            items: inputItems,
             failures: []
           ),
           SystemSnapshotGroupResult(
@@ -587,7 +640,7 @@ extension View {
         case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
           .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
           .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
-          .editorAudioUnsupported,
+          .editorAudioUnsupported, .editorKeyboard,
           .editorNetwork, .validation, .permissions, .diagnostics:
           nil
         }
@@ -611,6 +664,9 @@ extension View {
         .init(group: .audio, key: "defaultOutput", disposition: .savedApplicable),
         .init(group: .audio, key: "inputVolume", disposition: .savedApplicable),
         .init(group: .audio, key: "outputVolume", disposition: .savedApplicable),
+        .init(group: .input, key: "KeyRepeat", disposition: .savedApplicable),
+        .init(group: .input, key: "InitialKeyRepeat", disposition: .savedApplicable),
+        .init(group: .input, key: "KeyboardBrightness", disposition: .savedApplicable),
         .init(
           group: .network, key: "network.serviceIPv4.ethernet.0", disposition: .savedApplicable),
         .init(group: .network, key: "network.serviceIPv4.wifi.1", disposition: .savedApplicable),

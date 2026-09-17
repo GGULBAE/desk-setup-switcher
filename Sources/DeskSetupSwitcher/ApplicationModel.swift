@@ -66,7 +66,7 @@ func appSettingGroupTitle(_ group: SettingGroup) -> String {
   case .display: appLocalized("Displays")
   case .audio: appLocalized("Audio")
   case .network: appLocalized("Network")
-  case .input: appLocalized("Mouse & Keyboard")
+  case .input: appLocalized("Keyboard")
   }
 }
 
@@ -99,8 +99,9 @@ func appApplicationItemTitle(_ key: String) -> String {
   case "network.secureWebProxy": return appLocalized("Secure web proxy")
   case "com.apple.mouse.scaling": return appLocalized("Pointer speed")
   case "com.apple.swipescrolldirection": return appLocalized("Natural scrolling")
-  case "KeyRepeat": return appLocalized("Key repeat")
-  case "InitialKeyRepeat": return appLocalized("Initial key repeat delay")
+  case "KeyRepeat": return appLocalized("Key repeat speed")
+  case "InitialKeyRepeat": return appLocalized("Repeat delay")
+  case "KeyboardBrightness": return appLocalized("Keyboard brightness")
   case "com.apple.keyboard.fnState": return appLocalized("Function-key behavior")
   default:
     if key.hasPrefix("display.") {

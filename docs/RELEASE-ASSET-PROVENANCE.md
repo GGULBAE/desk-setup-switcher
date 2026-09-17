@@ -7,12 +7,14 @@ Desk Setup Switcher. Every product screen comes from checked-in DEBUG-only
 synthetic UI fixtures. No installed personal profile, live Capture, permission
 request, Apply, UI automation, or display/audio/network mutation was used.
 
-The current Capture, Edit Display, Edit Sound, and Review evidence was generated
+The retained Capture, Edit Display, Edit Sound, and Review evidence was generated
 from a clean detached checkout of exact application-source commit
 `4ecdf48a712fe1bee1142d00dc56403adc5caf0a` (`Add current-scope launch review
-fixture`). The resulting gallery demonstrates the current seven-setting
-Display/Sound scope and manual workflow. It is product-tour evidence, not proof
-of a supported download, installed-window behavior, or hardware mutation.
+fixture`). The resulting gallery demonstrates the then-current seven-setting
+Display/Sound scope and manual workflow. It predates the 2026-09-15 Keyboard
+surface and is not visual evidence for the current ten-setting product. It is
+product-tour evidence, not proof of a supported download, installed-window
+behavior, or hardware mutation.
 
 ## Source boundary
 
@@ -158,8 +160,9 @@ make verify-public-assets
 The verifier requires the exact source and public file trees and manifests. It
 checks geometry, opacity, missing ICC profiles, critical-only PNG chunks, AX
 fixture and no-mutation declarations, high-confidence secret/path/network/device
-patterns, current Display/Sound scope copy, video streams and BT.709 properties,
-and the exact bilingual six-cue timeline.
+patterns, the historical Display/Sound copy and its explicit pre-Keyboard
+boundary, video streams and BT.709 properties, and the exact bilingual six-cue
+timeline.
 
 On 2026-09-12, the four retained source frames, four gallery cards, regenerated
 social preview, and representative video frames at 2, 12, 20, 30, and 38 seconds

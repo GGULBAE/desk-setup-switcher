@@ -128,7 +128,7 @@ struct ProfileDraftValidationTests {
     )
   }
 
-  @Test("visible volume ranges reject non-finite and out-of-range values")
+  @Test("visible volume and keyboard ranges reject non-finite and out-of-range values")
   func numericRanges() {
     let settings = ProfileSettings(
       audio: .init(value: .init(outputVolume: .init(value: 1.01))),
@@ -136,7 +136,8 @@ struct ProfileDraftValidationTests {
         value: .init(
           pointerSpeed: .init(value: -.infinity),
           keyRepeatInterval: .init(value: 0),
-          initialKeyRepeatDelay: .init(value: 301)
+          initialKeyRepeatDelay: .init(value: 301),
+          keyboardBrightness: .init(value: .infinity)
         )
       )
     )
@@ -145,7 +146,31 @@ struct ProfileDraftValidationTests {
 
     #expect(
       result.issues == [
-        issue(.audio(.outputVolume), .audio, .outOfRange(minimum: 0, maximum: 1))
+        issue(.audio(.outputVolume), .audio, .outOfRange(minimum: 0, maximum: 1)),
+        issue(.input(.keyRepeatInterval), .input, .outOfRange(minimum: 1, maximum: 120)),
+        issue(.input(.initialKeyRepeatDelay), .input, .outOfRange(minimum: 1, maximum: 300)),
+        issue(.input(.keyboardBrightness), .input, .outOfRange(minimum: 0, maximum: 1)),
+      ]
+    )
+  }
+
+  @Test("included keyboard values must be present")
+  func missingKeyboardValues() {
+    let settings = ProfileSettings(
+      input: .init(
+        value: .init(
+          keyRepeatInterval: .init(value: nil),
+          initialKeyRepeatDelay: .init(value: nil),
+          keyboardBrightness: .init(value: nil)
+        )
+      )
+    )
+
+    #expect(
+      ProfileDraftValidator().validate(settings).issues == [
+        issue(.input(.keyRepeatInterval), .input, .required),
+        issue(.input(.initialKeyRepeatDelay), .input, .required),
+        issue(.input(.keyboardBrightness), .input, .required),
       ]
     )
   }
@@ -399,6 +424,7 @@ struct ProfileDraftValidationTests {
           naturalScrolling: .init(value: true),
           keyRepeatInterval: .init(value: 30),
           initialKeyRepeatDelay: .init(value: 45),
+          keyboardBrightness: .init(value: 0.65),
           useStandardFunctionKeys: .init(value: false)
         )
       )

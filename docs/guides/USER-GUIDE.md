@@ -2,7 +2,7 @@
 
 [한국어](USER-GUIDE.ko.md) · [Guide index](README.md)
 
-Desk Setup Switcher saves selected display and audio settings as local profiles. Nothing is applied automatically. The normal flow is **Capture → Edit → Review & Apply**.
+Desk Setup Switcher saves selected display, sound, and keyboard settings as local profiles. Nothing is applied automatically. The normal flow is **Capture → Edit → Review & Apply**.
 
 ## Before you install
 
@@ -16,7 +16,7 @@ After `v0.1.0` is approved and published, the canonical download will be the pro
 
 The included Intel slice is not an Intel support claim. Physical Intel installation and runtime testing have not passed. There is also no App Store release, in-app updater, or supported Homebrew installation yet.
 
-On 2026-07-20, opt-in read-only tests passed the then-current Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. That dated run did not itemize actual ColorSync-profile, input-volume, output-mute, or service-IPv4 field presence/read on the host, so those item-level live-read claims and every Display, Audio, and Network apply/rollback path remain mock-only. No live setting mutation is verified. Read the [support matrix](../SUPPORT-MATRIX.md) before relying on a capability. This guide must not be read as hardware certification.
+On 2026-07-20, opt-in read-only tests passed the then-current Display, Audio, Network, Input, ConditionContext, and ApplyLivePreparation group/base paths on Apple Silicon/macOS 26.5.2. That historical run predates the current Keyboard surface and did not itemize its repeat or brightness fields. Current Keyboard capture/apply/rollback evidence is deterministic and mock-only; no live repeat or backlight mutation is verified. Read the [support matrix](../SUPPORT-MATRIX.md) before relying on a capability. This guide must not be read as hardware certification.
 
 Keyboard behavior, accessibility names and values, and non-color state cues are maintained. Comprehensive assistive-technology certification is outside the initial beta scope.
 
@@ -36,7 +36,7 @@ Registration is requested only when you turn the switch on or choose **Retry Reg
 ## One-minute workflow
 
 1. **Capture:** Open the menu-bar item and choose **Capture Current Settings**. Capture reads the Mac and creates a new reviewable profile; it does not apply a change.
-2. **Edit:** Choose **Edit** on the tray card, name the profile, select only the settings you want under **Display** and **Sound**, then save.
+2. **Edit:** Choose **Edit** on the tray card, name the profile, work through **Display**, **Sound**, and **Keyboard**, then save.
 3. **Review & Apply:** Choose **Apply** on the tray card. Check every change and omission. Nothing changes until you explicitly choose **Apply Profile** or **Apply Available Settings** in the preview.
 
 There is no timer, condition, or background rule that applies a profile automatically.
@@ -45,15 +45,16 @@ There is no timer, condition, or background rule that applies a profile automati
 
 Open the menu-bar item and choose **Capture Current Settings**. On an empty first run, this is the single main action in the body. When profiles already exist, Capture is in the header.
 
-Capture stores only the main display, resolutions, output device/volume/mute, and input device/volume when readable and applicable. It does not capture network settings or require Location access. Older imported values outside this scope remain stored with inclusion off for compatibility and may appear in exported JSON.
+Capture stores only the ten current settings when readable and applicable: main display, resolutions, output device/volume/mute, input device/volume, key repeat speed, repeat delay, and keyboard brightness. It does not capture network settings or require Location access. Brightness is available only on macOS 15 or later after **Input Monitoring** access has already been granted, when public CoreHID finds exactly one compatible backlight control from a built-in HID device that can be read and written. Background Capture checks access but does not automatically request it or open a prompt. Unsupported hardware, denied Input Monitoring, or ambiguous discovery omits brightness without blocking the other settings. Older imported values outside this scope remain stored with inclusion off for compatibility and may appear in exported JSON.
 
 ## 2. Edit
 
 Choose **Edit** on a tray profile to open **Settings → Profiles**. The trash icon on the same row opens inline deletion confirmation directly; Cancel/Escape leaves the profile unchanged.
 
 - Give the profile a recognizable name and icon.
-- Work through the stable numbered **Display** and **Sound** steps. At the minimum window size or an accessibility text size, the same steps become a compact segmented selector.
-- **Display** has only **Main display** and per-display **Resolution**. **Sound** has two sections: **Output** and **Input**. Choose the device and volume together in each section. **Output mute** also appears in Output and saves whether sound is off or on. It is a value switch, not an inclusion switch; an unreadable mute value is never guessed. All options are shown directly; there is no Advanced or Network section. All registered values participate in Apply; there are no per-setting inclusion switches, including for previously excluded saved values. Missing values are not filled automatically. Resolution keeps the current refresh rate, or is skipped when that combination is unavailable. Capture reads only these settings and does not need Location access. Old mirroring, color, and network values remain dormant and are never applied.
+- Work through the stable numbered **Display**, **Sound**, and **Keyboard** steps. At the minimum window size or an accessibility text size, the same steps become a compact segmented selector.
+- **Display** has only **Main display** and per-display **Resolution**. **Sound** has **Output** and **Input** sections for devices and volume, plus the Output mute value. **Keyboard** has exactly **Key repeat speed**, **Repeat delay**, and **Keyboard brightness**, shown as discrete **Slow → Fast**, **Long → Short**, and **Dim → Bright** sliders instead of raw numbers. The speed slider covers enabled steps only; macOS's separate repeat **Off** state is not yet captured or applied and the slowest step is not labeled Off. There is no Advanced or Network section and no per-setting inclusion switch. A new Capture includes readable current Keyboard values; explicitly changing a Keyboard field opts it in. An older excluded Keyboard value stays excluded after upgrade, so the app does not silently activate a formerly dormant preference. Missing values are never invented. Pointer speed, natural scrolling, standard-function-key behavior, old mirroring, color, and network values remain dormant and are never applied. Resolution keeps the current refresh rate or is skipped when that combination is unavailable.
+- Key repeat speed and repeat delay are experimental because their macOS preference keys are undocumented. Keyboard brightness is experimental and hardware-conditional on macOS 15 or later, with Input Monitoring access. Background snapshots do not request that access. If brightness is unavailable, keep reviewing the explicit omission; Display, Sound, and available repeat values remain usable.
 - If a value is invalid, Save selects the owning step before focusing it.
 - The editor contains profile settings only. Itemized application results remain available after Apply.
 - Save the profile. `⌘S` saves a valid dirty draft.
@@ -97,8 +98,9 @@ Desk Setup Switcher is local-only. It has no account, cloud sync, app-owned serv
 
 | Access | Why it may appear | If declined |
 | --- | --- | --- |
-| Location | Not needed for the current Display/Sound Capture flow | Capture is available regardless of Location status |
+| Location | Not needed for the current Display/Sound/Keyboard Capture flow | Capture is available regardless of Location status |
 | Microphone | Not used; choosing an audio input device does not record audio | No microphone permission should be needed |
+| Input Monitoring | Keyboard brightness uses public CoreHID on a compatible Mac. Background Capture checks this access but does not request it automatically | If not granted, Keyboard brightness stays unavailable; repeat settings, Display, and Sound continue |
 
 Profiles and diagnostics stay under `~/Library/Application Support/Desk Setup Switcher/`. Imports are read from, and exports are written to, locations you select. The app does not store Wi-Fi passwords in profiles or logs; saved-network credentials remain managed by macOS.
 
@@ -142,7 +144,8 @@ Use [SUPPORT.md](../../SUPPORT.md) for public support and bug-report routes. For
 | Symptom | What to do |
 | --- | --- |
 | The app opened but no window appeared | Look for the menu-bar icon. The app is menu-bar-only by design. |
-| Network settings are missing | Expected: profiles now capture and apply only the seven Display/Sound setting kinds. |
+| Network settings are missing | Expected: profiles capture and apply only the ten Display/Sound/Keyboard setting kinds. |
+| Keyboard brightness is unavailable | It requires macOS 15 or later, previously granted Input Monitoring access, and exactly one compatible readable/writable backlight element from a built-in HID device. Background Capture does not request access automatically. Unsupported hardware, denial, or ambiguous discovery is nonfatal; continue with repeat, Display, or Sound settings and review the omission before Apply. |
 | A profile is Partial or Unavailable | Choose **Edit**, inspect warning rows, reconnect the required device/service, or exclude an unavailable setting. If **Apply** is enabled, inspect the preview and proceed only when every omission is intentional. |
 | Review shows no operation | The profile already matches the current readable state, or no included setting can be safely applied. Nothing needs to run. |
 | Review refreshes instead of applying | The profile, capability, current value, or rollback evidence changed after the first review. This is a safety stop; inspect the new plan. |

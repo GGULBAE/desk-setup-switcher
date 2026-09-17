@@ -95,6 +95,69 @@ struct ProfileCaptureSummaryBuilderTests {
     #expect(summary.canCreateProfile)
   }
 
+  @Test("keyboard capture reports exactly the three supported settings")
+  func keyboardCaptureIsApplicable() {
+    let settings = ProfileSettings(
+      input: .init(
+        value: .init(
+          pointerSpeed: .init(value: 4.5),
+          naturalScrolling: .init(value: true),
+          keyRepeatInterval: .init(value: 30),
+          initialKeyRepeatDelay: .init(value: 90),
+          keyboardBrightness: .init(value: 0.7),
+          useStandardFunctionKeys: .init(value: false)
+        )
+      )
+    )
+
+    let summary = ProfileCaptureSummaryBuilder().summary(
+      settings: settings,
+      evidence: []
+    )
+
+    #expect(summary.status == .complete)
+    #expect(summary.applicableCount == 3)
+    #expect(summary.canCreateProfile)
+    #expect(
+      summary.items == [
+        .init(group: .input, key: "KeyRepeat", disposition: .savedApplicable),
+        .init(group: .input, key: "InitialKeyRepeat", disposition: .savedApplicable),
+        .init(group: .input, key: "KeyboardBrightness", disposition: .savedApplicable),
+      ]
+    )
+  }
+
+  @Test("unavailable visible keyboard controls make capture explicitly partial")
+  func keyboardCaptureOmissionsRemainVisible() {
+    let settings = ProfileSettings(
+      input: .init(value: .init(keyRepeatInterval: .init(value: 30)))
+    )
+    let summary = ProfileCaptureSummaryBuilder().summary(
+      settings: settings,
+      evidence: [
+        .init(group: .input, key: "InitialKeyRepeat", state: .unreadable),
+        .init(group: .input, key: "KeyboardBrightness", state: .permissionRequired),
+        .init(group: .input, key: "retired-input-key", state: .unsupported),
+      ]
+    )
+
+    #expect(summary.status == .partial)
+    #expect(summary.applicableCount == 1)
+    #expect(summary.unreadableCount == 1)
+    #expect(summary.permissionRequiredCount == 1)
+    #expect(summary.unsupportedCount == 0)
+    #expect(
+      summary.permissionRequirements == [.inputMonitoringForKeyboardBrightness]
+    )
+    #expect(
+      summary.items.contains {
+        $0.group == .input
+          && $0.key == "KeyboardBrightness"
+          && $0.disposition == .permissionRequired
+      }
+    )
+  }
+
   @Test("unreadable and unsupported evidence is omitted from the user-facing result")
   func nonActionableEvidenceIsOmitted() {
     let duplicate = CaptureSnapshotEvidence(

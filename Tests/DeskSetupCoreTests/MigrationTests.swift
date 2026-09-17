@@ -62,7 +62,7 @@ final class MigrationTests: XCTestCase {
     XCTAssertEqual(decoded.document, document)
   }
 
-  func testMissingAdditiveAudioAndServiceIPv4KeysDecodeAsDormant() throws {
+  func testMissingAdditiveSettingsKeysDecodeAsDormant() throws {
     let encoder = JSONEncoder()
     let decoder = JSONDecoder()
 
@@ -86,9 +86,60 @@ final class MigrationTests: XCTestCase {
       from: JSONSerialization.data(withJSONObject: networkObject)
     )
 
+    var inputObject = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encoder.encode(InputProfileSettings()))
+        as? [String: Any]
+    )
+    inputObject.removeValue(forKey: "keyboardBrightness")
+    let input = try decoder.decode(
+      InputProfileSettings.self,
+      from: JSONSerialization.data(withJSONObject: inputObject)
+    )
+
     XCTAssertNil(audio.inputVolume.value)
     XCTAssertFalse(audio.inputVolume.isIncluded)
     XCTAssertTrue(network.serviceIPv4.isEmpty)
+    XCTAssertNil(input.keyboardBrightness.value)
+    XCTAssertFalse(input.keyboardBrightness.isIncluded)
+    XCTAssertEqual(
+      try decoder.decode(InputProfileSettings.self, from: encoder.encode(input)),
+      input
+    )
+  }
+
+  func testSchemaOneProfileWithoutKeyboardBrightnessDecodesAndRoundTrips() throws {
+    let date = Date(timeIntervalSince1970: 1_700_000_000)
+    let codec = ProfileJSONCodec()
+    let original = ProfileDocument(
+      profiles: [DeskProfile(name: "Existing profile", createdAt: date, updatedAt: date)],
+      updatedAt: date
+    )
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: codec.encode(original)) as? [String: Any]
+    )
+    XCTAssertEqual(object["schemaVersion"] as? Int, 1)
+    var profiles = try XCTUnwrap(object["profiles"] as? [[String: Any]])
+    var profile = try XCTUnwrap(profiles.first)
+    var settings = try XCTUnwrap(profile["settings"] as? [String: Any])
+    var input = try XCTUnwrap(settings["input"] as? [String: Any])
+    var inputValue = try XCTUnwrap(input["value"] as? [String: Any])
+    inputValue.removeValue(forKey: "keyboardBrightness")
+    input["value"] = inputValue
+    settings["input"] = input
+    profile["settings"] = settings
+    profiles[0] = profile
+    object["profiles"] = profiles
+
+    let decoded = try codec.decode(JSONSerialization.data(withJSONObject: object))
+    let decodedInput = try XCTUnwrap(decoded.document.profiles.first).settings.input.value
+
+    XCTAssertEqual(decoded.originalSchemaVersion, 1)
+    XCTAssertFalse(decoded.wasMigrated)
+    XCTAssertEqual(decodedInput.keyboardBrightness, .init(isIncluded: false, value: nil))
+    XCTAssertEqual(
+      try codec.decode(codec.encode(decoded.document)).document,
+      decoded.document
+    )
   }
 
   func testCurrentSchemaApplicabilityNormalizationPreservesValuesAndIsIdempotent() throws {

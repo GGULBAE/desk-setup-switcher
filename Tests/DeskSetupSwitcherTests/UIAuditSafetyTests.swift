@@ -191,18 +191,20 @@ import Testing
       #expect(ProfileWorkspaceLayoutPolicy.sidebarWidth == 210)
       #expect(ProfileWorkspaceLayoutPolicy.minimumEditorWidth == 390)
       #expect(ProfileWorkspaceLayoutPolicy.minimumContentWidth <= 640)
-      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio])
-      #expect(!ProfileEditorSurfacePolicy.visibleGroups.contains(.input))
+      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio, .input])
       #expect(!ProfileEditorSurfacePolicy.showsActivationControl)
       #expect(!ProfileEditorSurfacePolicy.showsUnsupportedControls)
       #expect(!ProfileEditorSurfacePolicy.showsDescription)
       #expect(!ProfileEditorSurfacePolicy.showsConditions)
       #expect(!ProfileEditorSurfacePolicy.showsCurrentSettingsDraftRefresh)
       #expect(ProfileEditorStepPolicy.defaultGroup == .display)
-      #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio])
+      #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio, .input])
       #expect(ProfileEditorStepPolicy.group(for: .displayPrimary) == .display)
       #expect(
         ProfileEditorStepPolicy.group(for: .audio(.defaultOutputDevice)) == .audio
+      )
+      #expect(
+        ProfileEditorStepPolicy.group(for: .input(.keyboardBrightness)) == .input
       )
       #expect(
         ProfileEditorStepPolicy.group(for: .networkService(at: 0, .ipv4Address))
@@ -252,10 +254,99 @@ import Testing
         !ProfileEditorWorkspaceLayoutPolicy.usesRail(
           availableWidth: 1_200, dynamicTypeSize: .accessibility3
         ))
-      #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio])
-      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio])
+      #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio, .input])
+      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio, .input])
       #expect(ProfileEditorStepPolicy.group(for: .audio(.defaultInputDevice)) == .audio)
+      #expect(ProfileEditorStepPolicy.group(for: .input(.keyRepeatInterval)) == .input)
       #expect(ProfileEditorStepPolicy.group(for: .networkService(at: 1, .ipv4Address)) == nil)
+    }
+
+    @Test("keyboard editor uses native semantic steps without rewriting dormant values")
+    func keyboardOptionActivationPolicy() {
+      let dormant = SettingOption<Double?>(isIncluded: false, value: 12)
+
+      #expect(
+        ProfileEditorKeyboardOptionPolicy.effectiveValue(
+          dormant,
+          suggestedValue: 30
+        ) == 30
+      )
+      #expect(
+        ProfileEditorKeyboardOptionPolicy.effectiveValue(
+          .init(isIncluded: true, value: 12),
+          suggestedValue: 30
+        ) == 12
+      )
+
+      let edited = ProfileEditorKeyboardOptionPolicy.updating(dormant, to: 45)
+      #expect(edited.isIncluded)
+      #expect(edited.value == 45)
+
+      #expect(ProfileEditorKeyboardOptionPolicy.keyRepeatSteps == [120, 90, 60, 30, 12, 5, 2])
+      #expect(ProfileEditorKeyboardOptionPolicy.repeatDelaySteps == [120, 94, 68, 30, 25, 15])
+
+      for (index, rawValue) in ProfileEditorKeyboardOptionPolicy.keyRepeatSteps.enumerated() {
+        let sliderValue = Double(index + 1)
+        #expect(
+          ProfileEditorKeyboardOptionPolicy.sliderValue(
+            fromStoredValue: rawValue,
+            scale: .keyRepeatSpeed
+          ) == sliderValue
+        )
+        #expect(
+          ProfileEditorKeyboardOptionPolicy.storedValue(
+            fromSliderValue: sliderValue,
+            scale: .keyRepeatSpeed
+          ) == rawValue
+        )
+      }
+
+      for (index, rawValue) in ProfileEditorKeyboardOptionPolicy.repeatDelaySteps.enumerated() {
+        let sliderValue = Double(index + 1)
+        #expect(
+          ProfileEditorKeyboardOptionPolicy.sliderValue(
+            fromStoredValue: rawValue,
+            scale: .repeatDelay
+          ) == sliderValue
+        )
+        #expect(
+          ProfileEditorKeyboardOptionPolicy.storedValue(
+            fromSliderValue: sliderValue,
+            scale: .repeatDelay
+          ) == rawValue
+        )
+      }
+
+      #expect(
+        ProfileEditorKeyboardOptionPolicy.sliderValue(
+          fromStoredValue: 0.75,
+          scale: .brightness
+        ) == 75
+      )
+      #expect(
+        ProfileEditorKeyboardOptionPolicy.storedValue(
+          fromSliderValue: 75,
+          scale: .brightness
+        ) == 0.75
+      )
+
+      // 120 is the slowest enabled step, never the native Off state.
+      #expect(
+        ProfileEditorKeyboardOptionPolicy.sliderValue(
+          fromStoredValue: 120,
+          scale: .keyRepeatSpeed
+        ) == 1
+      )
+      // A custom imported value is represented by its nearest step without
+      // changing the stored value until the user moves the slider.
+      #expect(
+        ProfileEditorKeyboardOptionPolicy.sliderValue(
+          fromStoredValue: 45,
+          scale: .keyRepeatSpeed
+        ) == 3
+      )
+      #expect(dormant.value == 12)
+      #expect(!dormant.isIncluded)
     }
 
     @Test("apply result count presentation hides zero outcomes without losing safety states")
@@ -625,6 +716,31 @@ import Testing
       #expect(!window.isReleasedWhenClosed)
       #expect(window.collectionBehavior.contains(.managed))
       #expect(window.collectionBehavior.contains(.participatesInCycle))
+    }
+
+    @Test("app lifecycle scene cannot open an empty system Settings window")
+    func appLifecycleSceneSuppressesBlankSettingsWindow() throws {
+      let testFile = URL(fileURLWithPath: #filePath)
+      let repositoryRoot =
+        testFile
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+      let source = try String(
+        contentsOf: repositoryRoot.appendingPathComponent(
+          "Sources/DeskSetupSwitcher/DeskSetupSwitcherApp.swift"
+        ),
+        encoding: .utf8
+      )
+
+      #expect(!source.contains("Settings {\n      EmptyView()"))
+      #expect(
+        source.contains(
+          "MenuBarExtra(\n      \"Desk Setup Switcher Lifecycle\",\n      isInserted: .constant(false)"
+        )
+      )
+      #expect(!source.contains("Settings {"))
+      #expect(source.components(separatedBy: "CommandGroup(replacing: .appSettings)").count == 2)
     }
 
     @Test("advanced diagnostics is contained by the minimum Settings viewport")

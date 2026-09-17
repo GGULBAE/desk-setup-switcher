@@ -502,6 +502,7 @@ public struct InputProfileSettings: Codable, Hashable, Sendable {
   public var naturalScrolling: SettingOption<Bool?>
   public var keyRepeatInterval: SettingOption<Double?>
   public var initialKeyRepeatDelay: SettingOption<Double?>
+  public var keyboardBrightness: SettingOption<Double?>
   public var useStandardFunctionKeys: SettingOption<Bool?>
 
   public init(
@@ -509,13 +510,60 @@ public struct InputProfileSettings: Codable, Hashable, Sendable {
     naturalScrolling: SettingOption<Bool?> = .init(isIncluded: false, value: nil),
     keyRepeatInterval: SettingOption<Double?> = .init(isIncluded: false, value: nil),
     initialKeyRepeatDelay: SettingOption<Double?> = .init(isIncluded: false, value: nil),
+    keyboardBrightness: SettingOption<Double?> = .init(isIncluded: false, value: nil),
     useStandardFunctionKeys: SettingOption<Bool?> = .init(isIncluded: false, value: nil)
   ) {
     self.pointerSpeed = pointerSpeed
     self.naturalScrolling = naturalScrolling
     self.keyRepeatInterval = keyRepeatInterval
     self.initialKeyRepeatDelay = initialKeyRepeatDelay
+    self.keyboardBrightness = keyboardBrightness
     self.useStandardFunctionKeys = useStandardFunctionKeys
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case pointerSpeed
+    case naturalScrolling
+    case keyRepeatInterval
+    case initialKeyRepeatDelay
+    case keyboardBrightness
+    case useStandardFunctionKeys
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    pointerSpeed = try container.decode(SettingOption<Double?>.self, forKey: .pointerSpeed)
+    naturalScrolling = try container.decode(
+      SettingOption<Bool?>.self,
+      forKey: .naturalScrolling
+    )
+    keyRepeatInterval = try container.decode(
+      SettingOption<Double?>.self,
+      forKey: .keyRepeatInterval
+    )
+    initialKeyRepeatDelay = try container.decode(
+      SettingOption<Double?>.self,
+      forKey: .initialKeyRepeatDelay
+    )
+    keyboardBrightness =
+      try container.decodeIfPresent(
+        SettingOption<Double?>.self,
+        forKey: .keyboardBrightness
+      ) ?? .init(isIncluded: false, value: nil)
+    useStandardFunctionKeys = try container.decode(
+      SettingOption<Bool?>.self,
+      forKey: .useStandardFunctionKeys
+    )
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(pointerSpeed, forKey: .pointerSpeed)
+    try container.encode(naturalScrolling, forKey: .naturalScrolling)
+    try container.encode(keyRepeatInterval, forKey: .keyRepeatInterval)
+    try container.encode(initialKeyRepeatDelay, forKey: .initialKeyRepeatDelay)
+    try container.encode(keyboardBrightness, forKey: .keyboardBrightness)
+    try container.encode(useStandardFunctionKeys, forKey: .useStandardFunctionKeys)
   }
 }
 
@@ -608,6 +656,7 @@ extension InputProfileSettings {
       || naturalScrolling.isIncluded
       || keyRepeatInterval.isIncluded
       || initialKeyRepeatDelay.isIncluded
+      || keyboardBrightness.isIncluded
       || useStandardFunctionKeys.isIncluded
   }
 }

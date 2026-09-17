@@ -59,8 +59,6 @@ public struct ProfileApplicabilityNormalizer: Sendable {
 
     normalized.input.value.pointerSpeed.isIncluded = false
     normalized.input.value.naturalScrolling.isIncluded = false
-    normalized.input.value.keyRepeatInterval.isIncluded = false
-    normalized.input.value.initialKeyRepeatDelay.isIncluded = false
     normalized.input.value.useStandardFunctionKeys.isIncluded = false
 
     normalized.display.isIncluded = normalized.display.value.hasIncludedOption

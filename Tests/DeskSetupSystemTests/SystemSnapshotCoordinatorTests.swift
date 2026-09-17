@@ -8,6 +8,15 @@ import XCTest
 #endif
 
 final class SystemSnapshotCoordinatorTests: XCTestCase {
+  func testLiveFactoryRegistersOnlyGroupsExposedByTheEditor() {
+    let liveGroups = LiveAdapterFactory.makeAdapters().map(\.group)
+    let visibleGroups = Set(VisibleSettingRegistry.contracts.map(\.group))
+
+    XCTAssertEqual(liveGroups, [.display, .audio, .input])
+    XCTAssertEqual(Set(liveGroups), visibleGroups)
+    XCTAssertFalse(liveGroups.contains(.network))
+  }
+
   func testSuccessfulSnapshotsBuildVisibleSettingsAndPreserveDormantValues() async throws {
     let displayValue = DisplayProfileSettings()
     let audioValue = AudioProfileSettings(
@@ -31,7 +40,10 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     )
     let inputValue = InputProfileSettings(
       pointerSpeed: .init(isIncluded: true, value: 1.25),
-      naturalScrolling: .init(isIncluded: false, value: true)
+      naturalScrolling: .init(isIncluded: false, value: true),
+      keyRepeatInterval: .init(isIncluded: true, value: 2),
+      initialKeyRepeatDelay: .init(isIncluded: true, value: 15),
+      keyboardBrightness: .init(isIncluded: true, value: 0.4)
     )
     let display = makeAdapter(
       group: .display,
@@ -51,7 +63,12 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     let input = makeAdapter(
       group: .input,
       payload: .input(inputValue),
-      items: [item("input", state: .storable)]
+      items: [item("input", state: .storable)],
+      keyboardControlCatalog: [
+        .init(kind: .keyRepeatInterval, currentValue: 2, canApply: true),
+        .init(kind: .initialKeyRepeatDelay, currentValue: 15, canApply: true),
+        .init(kind: .keyboardBrightness, currentValue: 0.4, canApply: true),
+      ]
     )
     let adapters: [MockSystemSettingsAdapter] = [input, network, audio, display]
     let coordinator = SystemSnapshotCoordinator(
@@ -66,7 +83,7 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     XCTAssertFalse(result.settings.display.isIncluded)
     XCTAssertTrue(result.settings.audio.isIncluded)
     XCTAssertFalse(result.settings.network.isIncluded)
-    XCTAssertFalse(result.settings.input.isIncluded)
+    XCTAssertTrue(result.settings.input.isIncluded)
     XCTAssertEqual(result.settings.display.value, displayValue)
     XCTAssertEqual(result.settings.audio.value.defaultInputUID, audioValue.defaultInputUID)
     XCTAssertEqual(
@@ -86,6 +103,13 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     XCTAssertEqual(result.settings.network.value.wifiSSID.value, "Office")
     XCTAssertFalse(result.settings.input.value.naturalScrolling.isIncluded)
     XCTAssertEqual(result.settings.input.value.naturalScrolling.value, true)
+    XCTAssertEqual(result.settings.input.value.keyRepeatInterval, .init(value: 2))
+    XCTAssertEqual(result.settings.input.value.initialKeyRepeatDelay, .init(value: 15))
+    XCTAssertEqual(result.settings.input.value.keyboardBrightness, .init(value: 0.4))
+    XCTAssertEqual(
+      result.keyboardControlCatalog.map(\.kind),
+      [.keyRepeatInterval, .initialKeyRepeatDelay, .keyboardBrightness]
+    )
 
     let displayResult = try XCTUnwrap(result.result(for: .display))
     XCTAssertEqual(displayResult.detectedItems.map(\.key), ["detected"])
@@ -300,15 +324,17 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
   func testLiveFactoryReturnsEveryConcreteAdapterWithoutPerformingIO() {
     let adapters = LiveAdapterFactory.makeAdapters()
 
-    XCTAssertEqual(adapters.map(\.group), [.display, .audio])
+    XCTAssertEqual(adapters.map(\.group), [.display, .audio, .input])
     XCTAssertTrue(adapters[0] is CoreGraphicsDisplayAdapter)
     XCTAssertTrue(adapters[1] is CoreAudioAdapter)
+    XCTAssertTrue(adapters[2] is InputPreferencesAdapter)
   }
 
   private func makeAdapter(
     group: SettingGroup,
     payload: SettingsPayload?,
-    items: [SnapshotItem]
+    items: [SnapshotItem],
+    keyboardControlCatalog: [KeyboardControlCatalogEntry]? = nil
   ) -> MockSystemSettingsAdapter {
     MockSystemSettingsAdapter(
       group: group,
@@ -316,7 +342,8 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
         group: group,
         capturedAt: Date(timeIntervalSince1970: 100),
         payload: payload,
-        items: items
+        items: items,
+        keyboardControlCatalog: keyboardControlCatalog
       )
     )
   }

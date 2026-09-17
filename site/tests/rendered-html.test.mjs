@@ -178,9 +178,15 @@ test("renders the complete public-beta landing page without setting cookies", as
   assert.match(html, /Main display and resolution/);
   assert.match(html, /Output device, volume, and mute/);
   assert.match(html, /Input device and volume/);
+  assert.match(html, /Key repeat speed, repeat delay, and keyboard brightness/);
+  assert.match(html, /Ten settings · no Network or automatic switching/);
+  assert.match(html, /macOS 15\+, already-granted Input Monitoring access/);
+  assert.match(html, /exactly one compatible readable\/writable backlight element from a built-in HID device/);
+  assert.match(html, /Experimental · deterministic mock-only · no live mutation/);
   assert.match(html, /Current-source group live-read/);
   assert.match(html, /apply\/rollback mock-only/);
-  assert.match(html, /no live setting mutation has been hardware verified\./i);
+  assert.match(html, /no live repeat or backlight mutation has been hardware verified\./i);
+  assert.match(html, /It checks Input Monitoring without prompting; denial omits Keyboard brightness only/);
   assert.match(html, /Apply Available Settings/);
   assert.match(html, /Keep Changes/);
   assert.match(html, /Revert Now/);
@@ -199,6 +205,7 @@ test("renders the complete public-beta landing page without setting cookies", as
   assert.match(html, /\/og\.png/);
   assert.match(html, /Four screens\. One deliberate flow\./);
   assert.match(html, /Synthetic data · No Apply performed · No automatic switching/);
+  assert.match(html, /These exact-source synthetic screens predate the Keyboard step/);
   assert.match(html, /Transcript summary/);
   assert.match(html, /only a separate explicit Apply can begin a system change/);
   const videoTag = html.match(/<video\b[^>]*>/i)?.[0];
@@ -318,6 +325,11 @@ test("keeps the site account-free, local-content-only, and free of starter capab
   );
   assert.doesNotMatch(browserSource, /<script[^>]+src=["']https?:\/\//i);
   assert.match(landing, /책상 설정을 바꾸기 전에, 먼저 확인하세요/);
+  assert.match(landing, /디스플레이·사운드·키보드의 열 가지 설정 종류/);
+  assert.match(landing, /키 반복 속도, 반복 지연 시간, 키보드 밝기/);
+  assert.match(landing, /입력 모니터링 상태는 프롬프트 없이 확인/);
+  assert.match(landing, /내장 HID 기기에서 읽기·쓰기가 가능한 호환 백라이트 요소를 정확히 하나/);
+  assert.match(landing, /키보드 단계가 추가되기 전 정확한 소스에서 만든 합성 화면/);
   assert.match(landing, /자동 전환 없음/);
   assert.match(landing, /네 화면으로 보는 명확한 흐름/);
   assert.match(landing, /합성 데이터 · Apply 실행 없음 · 자동 전환 없음/);
