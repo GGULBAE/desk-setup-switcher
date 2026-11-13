@@ -763,7 +763,10 @@ import Testing
             ("audio-output", output, ["device", "volume", "mute"]),
             ("audio-input", input, ["device", "volume"]),
           ] {
-            #expect(section.height > 120)
+            // Native control heights differ across macOS versions. Enforce
+            // consistent widths and content containment instead of a fixed
+            // minimum that rejects the intentionally compact input section.
+            #expect(abs(section.width - output.width) <= 1)
             #expect(containsRenderedFrame(section, in: CGRect(origin: .zero, size: fixture.size)))
             #expect(
               containsRenderedFrame(section, in: formViewport), "Both sections must be visible")
@@ -771,6 +774,9 @@ import Testing
               try #require(rendered.layoutFrames[identifier + "." + field])
             }
             #expect(rows.allSatisfy { containsRenderedFrame($0, in: section) })
+            #expect(
+              rows.last.map { $0.maxY + 8 <= section.maxY } == true,
+              "The last control must retain bottom padding")
             for (upper, lower) in zip(rows, rows.dropFirst()) {
               #expect(upper.maxY < lower.minY, "Fields must not overlap or become separate cards")
             }
