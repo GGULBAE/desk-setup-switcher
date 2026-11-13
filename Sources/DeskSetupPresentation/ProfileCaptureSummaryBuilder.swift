@@ -39,25 +39,6 @@ public struct ProfileCaptureSummaryBuilder: Equatable, Sendable {
       )
     }
 
-    for (index, display) in settings.display.value.displays.enumerated() {
-      let prefix = "display.\(index)"
-      applicable(
-        display.isPrimary.isIncluded,
-        .display,
-        "\(prefix).primary"
-      )
-      applicable(
-        display.mirroring.isIncluded,
-        .display,
-        "\(prefix).mirroring"
-      )
-      applicable(
-        display.mode.isIncluded,
-        .display,
-        "\(prefix).mode"
-      )
-    }
-
     let audio = settings.audio.value
     applicable(
       audio.defaultInputUID.isIncluded,

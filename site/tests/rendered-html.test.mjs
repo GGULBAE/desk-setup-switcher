@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 
 const root = new URL("../", import.meta.url);
 const originGatePath = fileURLToPath(new URL("scripts/verify-site-origin.mjs", root));
@@ -30,13 +31,13 @@ assert.match(expectedSiteAudience, /^(local|private)$/);
 
 // Inspect every emitted JavaScript chunk, independent of the bundler's layout.
 // Refuse links so this build-output audit cannot leave the selected directory.
-async function javaScriptChunks(directory) {
+async function javaScriptChunks(directory, { pathsOnly = false } = {}) {
   const chunks = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     assert.equal(entry.isSymbolicLink(), false, "build output must not contain symbolic links");
     const entryURL = new URL(encodeURIComponent(entry.name) + (entry.isDirectory() ? "/" : ""), directory);
-    if (entry.isDirectory()) chunks.push(...await javaScriptChunks(entryURL));
-    else if (/\.[cm]?js$/.test(entry.name)) chunks.push(await readFile(entryURL, "utf8"));
+    if (entry.isDirectory()) chunks.push(...await javaScriptChunks(entryURL, { pathsOnly }));
+    else if (/\.[cm]?js$/.test(entry.name)) chunks.push(pathsOnly ? fileURLToPath(entryURL) : await readFile(entryURL, "utf8"));
   }
   return chunks;
 }
@@ -98,24 +99,41 @@ function runOriginGate(
 }
 
 async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  return worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
+  // Cloudflare's generated entry now imports cloudflare:workers. Exercise the
+  // real Worker runtime instead of substituting platform modules in Node.
+  const config = JSON.parse(await readFile(new URL("dist/server/wrangler.json", root), "utf8"));
+  const entry = fileURLToPath(new URL("dist/server/index.js", root));
+  const paths = await javaScriptChunks(new URL("dist/server/", root), { pathsOnly: true });
+  const modules = [entry, ...paths.filter((path) => path !== entry)]
+    .map((path) => ({ type: "ESModule", path }));
+  const runtime = new Miniflare({
+    ...convertV4MiniflareOptions({
+      cf: false,
+      modules,
+      modulesRoot: fileURLToPath(new URL("dist/server/", root)),
+      compatibilityDate: config.compatibility_date,
+      compatibilityFlags: config.compatibility_flags,
+      serviceBindings: {
+        ASSETS: async () => new Response("Not found", { status: 404 }),
       },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
+      outboundService: async () => {
+        throw new Error("The informational page must not make outbound requests");
+      },
+    }),
+    telemetry: { enabled: false },
+    enableDevRegistry: false,
+  });
+  try {
+    const response = await runtime.dispatchFetch("http://localhost/", {
+      headers: { accept: "text/html" },
+    });
+    return new Response(await response.arrayBuffer(), {
+      status: response.status,
+      headers: response.headers,
+    });
+  } finally {
+    await runtime.dispose();
+  }
 }
 
 test("renders the complete public-beta landing page without setting cookies", async () => {
@@ -175,11 +193,10 @@ test("renders the complete public-beta landing page without setting cookies", as
     assert.doesNotMatch(html, /private vulnerability reporting must be enabled and tested before release/);
     assert.match(html, /Download the unsigned DMG and checksum/);
   }
-  assert.match(html, /Main display and resolution/);
   assert.match(html, /Output device, volume, and mute/);
   assert.match(html, /Input device and volume/);
   assert.match(html, /Key repeat speed and repeat delay/);
-  assert.match(html, /Nine settings · no Network or automatic switching/);
+  assert.match(html, /Seven settings · no Display, Network, or automatic switching/);
   assert.match(html, /Keyboard brightness is legacy profile data only/);
   assert.match(html, /Experimental · deterministic mock-only · no live mutation/);
   assert.match(html, /Current-source group live-read/);
@@ -187,8 +204,8 @@ test("renders the complete public-beta landing page without setting cookies", as
   assert.match(html, /no live repeat mutation has been hardware verified\./i);
   assert.match(html, /does not request Location, microphone, or Input Monitoring access/);
   assert.match(html, /Apply Available Settings/);
-  assert.match(html, /Keep Changes/);
-  assert.match(html, /Revert Now/);
+  assert.match(html, /Stale plan rejected before mutation/);
+  assert.match(html, /Apply explicitly/);
   assert.match(html, /hosting provider still processes requests and may retain aggregate operational metrics/);
   assert.doesNotMatch(html, /VoiceOver/i);
   assert.match(html, /\/screenshots\/capture\.png/);
@@ -251,6 +268,7 @@ test("keeps the site account-free, local-content-only, and free of starter capab
   assert.equal(wrangler.observability?.enabled, false);
   assert.deepEqual(wrangler.assets, { directory: "../client" });
   assert.deepEqual(wrangler.vars, {});
+  assert.equal(wrangler.upload_source_maps, false, "source-map uploads must stay disabled");
 
   const emptyArrayBindingKeys = [
     "agent_memory",
@@ -258,11 +276,13 @@ test("keeps the site account-free, local-content-only, and free of starter capab
     "ai_search_namespaces",
     "analytics_engine_datasets",
     "artifacts",
+    "connect",
     "d1_databases",
     "dispatch_namespaces",
     "flagship",
     "hyperdrive",
     "kv_namespaces",
+    "k2",
     "migrations",
     "mtls_certificates",
     "pipelines",
@@ -311,6 +331,7 @@ test("keeps the site account-free, local-content-only, and free of starter capab
     "rules",
     "topLevelName",
     "triggers",
+    "upload_source_maps",
     "vars",
   ]);
   assert.deepEqual(
@@ -324,11 +345,12 @@ test("keeps the site account-free, local-content-only, and free of starter capab
   );
   assert.doesNotMatch(browserSource, /<script[^>]+src=["']https?:\/\//i);
   assert.match(landing, /책상 설정을 바꾸기 전에, 먼저 확인하세요/);
-  assert.match(landing, /디스플레이·사운드·키보드의 아홉 가지 설정 종류/);
+  assert.match(landing, /사운드·키보드의 일곱 가지 설정 종류/);
+  assert.match(landing, /디스플레이·네트워크·자동 전환 없음/);
   assert.match(landing, /키 반복 속도와 반복 지연 시간/);
   assert.match(landing, /입력 모니터링 권한을 요청하지 않습니다/);
   assert.match(landing, /키보드 밝기는 이전 프로필 호환 데이터로만 보존/);
-  assert.match(landing, /키보드 단계가 추가되기 전 정확한 소스에서 만든 합성 화면/);
+  assert.match(landing, /디스플레이가 현재 범위에서 제외되기 전 정확한 소스에서 만든 합성 화면/);
   assert.match(landing, /자동 전환 없음/);
   assert.match(landing, /네 화면으로 보는 명확한 흐름/);
   assert.match(landing, /합성 데이터 · Apply 실행 없음 · 자동 전환 없음/);

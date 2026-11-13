@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 2026-09-15
+Last updated: 2026-09-17
 
 Desk Setup Switcher is designed to operate entirely on the Mac where it is installed.
 
@@ -22,9 +22,9 @@ Passwords are never model fields and are never written to profile JSON, backups,
 
 ## Permissions
 
-Current Capture reads only the nine Display, Sound, and Keyboard values: main display, resolutions, output device/volume/mute, input device/volume, key repeat speed, and repeat delay. It does not request Location or Input Monitoring permission or store network settings in new profiles; existing Location authorization does not gate capture. The app does not request or store coordinates. Listing or selecting an audio input device does not capture audio and does not require microphone recording permission.
+Current Capture reads only the seven Sound and Keyboard values: output device/volume/mute, input device/volume, key repeat speed, and repeat delay. It does not query Display, request Location or Input Monitoring permission, or store network settings in new profiles; existing Location authorization does not gate capture. The app does not request or store coordinates. Listing or selecting an audio input device does not capture audio and does not require microphone recording permission.
 
-Repeat values are read locally through experimental undocumented macOS preference keys. Keyboard brightness is not discovered, captured, edited, or applied; a legacy scalar may remain in an older profile only for local JSON round-trip compatibility and is normalized to inclusion off. Dormant location conditions in older imported files remain a separate compatibility/privacy concern.
+Repeat values are read locally through experimental undocumented macOS preference keys. Display settings and keyboard brightness are not discovered, captured, edited, or applied; legacy values may remain in an older profile only for local JSON round-trip compatibility and are normalized to inclusion off. Dormant location conditions in older imported files remain a separate compatibility/privacy concern.
 
 ## Diagnostics
 
@@ -61,4 +61,4 @@ The implementation and its permission declarations are public under the MIT Lice
 
 ## Current status
 
-The pre-release implementation follows the local-only architecture: no app-owned `URLSession`, telemetry, analytics, account, or cloud path exists; profile/diagnostic storage and redaction tests pass. A historical locally packaged build launched, but the current development-evidence package was not installed or launched and no public release exists. Permission-denied behavior, downloaded/quarantined install behavior, and clean-user removal/clearing still require manual verification, and live hardware tests must keep their evidence redacted. The [evidence ledger](COMPLETION-CRITERIA.md) tracks conformance without treating source, mocks, or read-only discovery as mutation proof.
+The pre-release implementation follows the local-only architecture: no app-owned `URLSession`, telemetry, analytics, account, or cloud path exists; profile/diagnostic storage and redaction tests pass. The 2026-11-13 development package was reinstalled locally with stored profile values preserved. For the supported v0.1.0 beta, no public release exists; the separate v0.0.9 development preview is an explicitly requested DMG delivery and does not establish platform support. Permission-denied behavior, downloaded/quarantined install behavior, and clean-user removal/clearing still require manual verification, and live hardware tests must keep their evidence redacted. The [evidence ledger](COMPLETION-CRITERIA.md) tracks conformance without treating source, mocks, or read-only discovery as mutation proof.

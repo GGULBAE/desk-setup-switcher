@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Mock apply integration")
 struct MockIntegrationTests {
-  @Test("force mode applies available operations and records omissions")
+  @Test("force mode applies current operations while legacy display stays dormant")
   func forceModeAppliesPartialPlan() async throws {
     let audioOperation = PlannedOperation(
       group: .audio,
@@ -35,9 +35,9 @@ struct MockIntegrationTests {
 
     #expect(result.didExecute)
     #expect(result.status == .applied)
-    #expect(result.preparation.readiness.status == .partial)
-    #expect(result.itemResults.map(\.status) == [.unsupported, .succeeded])
-    #expect(await displayAdapter.recordedInvocations() == [.capability])
+    #expect(result.preparation.readiness.status == .ready)
+    #expect(result.itemResults.map(\.status) == [.succeeded])
+    #expect(await displayAdapter.recordedInvocations().isEmpty)
     #expect(
       await audioAdapter.recordedInvocations() == [
         .capability,

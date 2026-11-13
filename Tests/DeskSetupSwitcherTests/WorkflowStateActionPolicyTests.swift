@@ -284,32 +284,6 @@ import Testing
       #expect(englishForce == "Apply Available Settings")
       #expect(koreanNormal == "프로필 적용")
       #expect(koreanForce == "사용 가능한 설정 적용")
-      #expect(
-        ApplyPreviewActionCopy.hardwareVerificationNotice(languageCode: "en")
-          == "Beta · Apply/rollback not hardware-verified. Check System Settings after applying."
-      )
-      #expect(
-        ApplyPreviewActionCopy.hardwareVerificationNotice(languageCode: "ko")
-          == "베타 · 적용/롤백은 실제 하드웨어 검증 전입니다. 적용 후 시스템 설정을 확인하세요."
-      )
-      #expect(
-        ApplyPreviewHardwareVerificationStatus.localized(languageCode: "en")
-          == ApplyPreviewHardwareVerificationStatus(
-            text:
-              "Beta · Apply/rollback not hardware-verified. Check System Settings after applying.",
-            systemImage: "exclamationmark.shield",
-            accessibilityLabel: "Beta hardware verification status"
-          )
-      )
-      #expect(
-        ApplyPreviewHardwareVerificationStatus.localized(languageCode: "ko")
-          == ApplyPreviewHardwareVerificationStatus(
-            text:
-              "베타 · 적용/롤백은 실제 하드웨어 검증 전입니다. 적용 후 시스템 설정을 확인하세요.",
-            systemImage: "exclamationmark.shield",
-            accessibilityLabel: "베타 하드웨어 검증 상태"
-          )
-      )
       #expect(ApplyPreviewDecisionPolicy.primaryActionShortcut == .none)
       #expect(!ApplyPreviewDecisionPolicy.focusesActionsOnAppear)
       #expect(ApplyPreviewReviewOrderPolicy.primarySection == .plannedChanges)
@@ -330,6 +304,24 @@ import Testing
       )
       #expect(!ApplyPreviewSummaryPolicy.expandsDetailsInitially(canExecute: true))
       #expect(ApplyPreviewSummaryPolicy.expandsDetailsInitially(canExecute: false))
+      #expect(
+        ApplyPreviewOperationGridPolicy.columnCount(
+          for: 580,
+          usesAccessibilityText: false
+        ) == 2
+      )
+      #expect(
+        ApplyPreviewOperationGridPolicy.columnCount(
+          for: 500,
+          usesAccessibilityText: false
+        ) == 1
+      )
+      #expect(
+        ApplyPreviewOperationGridPolicy.columnCount(
+          for: 580,
+          usesAccessibilityText: true
+        ) == 1
+      )
       #expect(
         !ApplyPreviewDecisionPolicy.isPrimaryActionDisabled(
           canExecute: true,
@@ -380,7 +372,7 @@ import Testing
       )
     }
 
-    @Test("Apply Preview source binds review order, Beta semantics, and safe keyboard behavior")
+    @Test("Apply Preview source binds review order, adaptive grid, and safe keyboard behavior")
     func applyPreviewSourceContract() throws {
       let testFile = URL(fileURLWithPath: #filePath)
       let repositoryRoot =
@@ -402,9 +394,9 @@ import Testing
       )
       let orderedTokens = [
         "previewHeader",
-        "hardwareVerificationNotice",
         "previewSummary",
-        "reviewSection(ApplyPreviewReviewOrderPolicy.primarySection)",
+        "ApplyPreviewReviewOrderPolicy.primarySection,",
+        "availableWidth: viewport.size.width",
         "secondaryReviewDetails",
         "applyNotices",
         "Spacer(minLength: 0)",
@@ -418,6 +410,17 @@ import Testing
       }
       #expect(body.contains(".defaultScrollAnchor(initialScrollAnchor)"))
       #expect(body.contains("minHeight: viewport.size.height"))
+
+      let plannedChanges = try #require(
+        sourceSlice(
+          source,
+          after: "    case .plannedChanges:",
+          before: "\n    case .omissions:"
+        )
+      )
+      #expect(plannedChanges.contains("LazyVGrid("))
+      #expect(plannedChanges.contains("plannedOperationColumns(for: availableWidth)"))
+      #expect(plannedChanges.contains("ForEach(request.preparation.operations)"))
 
       let actionBar = try #require(
         sourceSlice(
@@ -439,26 +442,6 @@ import Testing
         actionBar.contains("ApplyPreviewDecisionPolicy.isPrimaryActionDisabled(")
       )
 
-      let hardwareStatus = try #require(
-        sourceSlice(
-          source,
-          after: "  private var hardwareVerificationNotice: some View {",
-          before: "\n  @ViewBuilder\n  private func operationRow"
-        )
-      )
-      #expect(
-        hardwareStatus.contains("Label(status.text, systemImage: status.systemImage)")
-      )
-      #expect(hardwareStatus.contains(".font(.caption)"))
-      #expect(hardwareStatus.contains(".foregroundStyle(.secondary)"))
-      #expect(
-        hardwareStatus.contains(
-          ".accessibilityIdentifier(\"apply-preview-beta-hardware-status\")"
-        )
-      )
-      #expect(hardwareStatus.contains(".accessibilityLabel(status.accessibilityLabel)"))
-      #expect(hardwareStatus.contains(".accessibilityValue(status.text)"))
-
       let productionInitializer = try #require(
         sourceSlice(
           source,
@@ -466,8 +449,9 @@ import Testing
           before: "\n  #if DEBUG"
         )
       )
-      #expect(productionInitializer.contains("self.showsHardwareVerificationStatus = true"))
       #expect(productionInitializer.contains("self.initialScrollAnchor = .top"))
+      #expect(!source.contains("apply-preview-beta-hardware-status"))
+      #expect(!source.contains("Beta hardware verification status"))
     }
 
     private func sourceSlice(

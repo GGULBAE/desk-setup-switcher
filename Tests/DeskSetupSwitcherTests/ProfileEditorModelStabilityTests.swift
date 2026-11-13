@@ -8,7 +8,7 @@ import Testing
   @Suite("Profile editor publication stability")
   @MainActor
   struct ProfileEditorModelStabilityTests {
-    @Test("editing values registers them without inclusion controls and revert keeps saved values")
+    @Test("editing values preserves explicit exclusion and revert keeps saved values")
     func registeredValuesFollowDraftAndSave() throws {
       let profile = DeskProfile(name: "Synthetic")
       let editor = ProfileEditorModel()
@@ -19,8 +19,8 @@ import Testing
           $0.settings.audio.value.outputVolume.value = 0
         })
       let candidate = try #require(editor.session.saveCandidate())
-      #expect(candidate.settings.audio.value.defaultOutputUID.isIncluded)
-      #expect(candidate.settings.audio.value.outputVolume == .init(value: 0))
+      #expect(!candidate.settings.audio.value.defaultOutputUID.isIncluded)
+      #expect(candidate.settings.audio.value.outputVolume == .init(isIncluded: false, value: 0))
       #expect(!candidate.settings.audio.value.inputVolume.isIncluded)
       #expect(candidate.settings.audio.value.inputVolume.value == nil)
       #expect(editor.isDirty)
@@ -30,6 +30,27 @@ import Testing
       #expect(editor.replaceDraft(candidate))
       #expect(editor.completeSave(with: candidate) == .saved)
       #expect(!editor.isDirty)
+    }
+
+    @Test("section selection remains off through recapture, save and reload")
+    func sectionSelectionSurvivesEditorLifecycle() throws {
+      var profile = try #require(UIAuditFixtures.fixture(.editorAudio).profiles.first)
+      let captured = profile.settings
+      let editor = ProfileEditorModel()
+      editor.initialize(profiles: [profile], preferredProfileID: profile.id)
+      #expect(editor.updateDraft { $0.settings.setIncluded(false, for: .soundInput) })
+      #expect(editor.isDirty)
+      #expect(editor.replaceSettingsFromSnapshot(captured, expectedProfileID: profile.id))
+      #expect(editor.draft?.settings.isIncluded(.soundInput) == false)
+      profile = try #require(editor.session.saveCandidate())
+      #expect(editor.completeSave(with: profile) == .saved)
+      #expect(!editor.isDirty)
+      let codec = ProfileJSONCodec()
+      let reloaded = try codec.decode(codec.encode(.init(profiles: [profile]))).document.profiles
+      let reopened = ProfileEditorModel()
+      reopened.initialize(profiles: reloaded, preferredProfileID: profile.id)
+      #expect(reopened.draft?.settings.isIncluded(.soundInput) == false)
+      #expect(reopened.draft?.settings.isIncluded(.soundOutput) == true)
     }
 
     @Test("reinstalling an identical draft does not republish the editor hierarchy")

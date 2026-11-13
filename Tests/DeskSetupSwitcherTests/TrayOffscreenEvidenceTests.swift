@@ -80,6 +80,7 @@ import Testing
       let state: State
       let dynamicTypeSizeOverride: DynamicTypeSize?
       let expandsProfileDetails: Bool
+      let allSettingsOff: Bool
 
       var dynamicTypeSize: DynamicTypeSize {
         dynamicTypeSizeOverride ?? (displayMode == .largeText ? .accessibility3 : .large)
@@ -111,7 +112,8 @@ import Testing
         size: CGSize,
         state: State = .standard,
         dynamicTypeSizeOverride: DynamicTypeSize? = nil,
-        expandsProfileDetails: Bool = false
+        expandsProfileDetails: Bool = false,
+        allSettingsOff: Bool = false
       ) {
         self.name = name
         self.variant = variant
@@ -122,6 +124,7 @@ import Testing
         self.state = state
         self.dynamicTypeSizeOverride = dynamicTypeSizeOverride
         self.expandsProfileDetails = expandsProfileDetails
+        self.allSettingsOff = allSettingsOff
       }
     }
 
@@ -149,6 +152,7 @@ import Testing
       let size: CGSize
       let largeText: Bool
       var includesReviewDetails = false
+      var darkAppearance = false
     }
 
     @Test("all tray states render offscreen with readable accessibility structure")
@@ -493,6 +497,12 @@ import Testing
     func rendersSimplifiedProfileSections() throws {
       let allFixtures = [
         SettingsFixture(
+          name: "12-all-settings-off-ko-light",
+          variant: .editorDisplay,
+          languageCode: "ko", colorScheme: .light, displayMode: .standard,
+          size: CGSize(width: 900, height: 700), allSettingsOff: true
+        ),
+        SettingsFixture(
           name: "13-display-en-light",
           variant: .editorDisplay,
           languageCode: "en",
@@ -696,15 +706,28 @@ import Testing
         let rendered = try renderSettings(fixture)
         unsetenv("DESK_SETUP_UI_AUDIT_LANGUAGE")
 
+        if let outputDirectory {
+          try rendered.png.write(
+            to: outputDirectory.appendingPathComponent("\(fixture.name).png"), options: .atomic)
+          try rendered.accessibility.write(
+            to: outputDirectory.appendingPathComponent("\(fixture.name).ax.txt"), atomically: true,
+            encoding: .utf8)
+        }
         #expect(rendered.png.count > 10_000)
         #expect(rendered.accessibility.contains("synthetic-settings-host=true"))
         if fixture.isProfileSurface {
-          let sectionHeadings = try ["display", "audio", "input"].map { group in
-            try #require(rendered.layoutFrames["profile-section-\(group).heading"])
+          let sectionFrames = try [
+            "audio-output",
+            "audio-input",
+            "keyboard-section.enabled",
+          ].map { identifier in
+            try #require(rendered.layoutFrames[identifier])
           }
-          for (upper, lower) in zip(sectionHeadings, sectionHeadings.dropFirst()) {
+          for (upper, lower) in zip(sectionFrames, sectionFrames.dropFirst()) {
             #expect(upper.maxY < lower.minY, "Profile sections must form one vertical stack")
           }
+          #expect(rendered.layoutFrames["profile-section-display.heading"] == nil)
+          #expect(rendered.layoutFrames["profile-section-audio.heading"] == nil)
           for removedHeading in [
             "Display settings", "Sound settings", "When applying", "Apply with profile",
           ] {
@@ -714,12 +737,28 @@ import Testing
               ))
           }
         }
+        if fixture.allSettingsOff {
+          let output = try #require(rendered.layoutFrames["audio-output"])
+          let input = try #require(rendered.layoutFrames["audio-input"])
+          let keyboard = try #require(rendered.layoutFrames["keyboard-settings"])
+          let viewport = try #require(rendered.layoutFrames["profile.form.viewport"])
+          for section in [output, input, keyboard] {
+            #expect(containsRenderedFrame(section, in: viewport))
+            #expect(abs(section.width - output.width) <= 1)
+          }
+          #expect(rendered.layoutFrames["audio-output.mute.switch"] == nil)
+          #expect(rendered.layoutFrames["keyboard.key-repeat-speed.slider"] == nil)
+        }
         if fixture.name == "19b-audio-grouped-sections-ko-light" {
           let representation = try #require(NSBitmapImageRep(data: rendered.png))
           let output = try #require(rendered.layoutFrames["audio-output"])
           let input = try #require(rendered.layoutFrames["audio-input"])
+          let muteRow = try #require(rendered.layoutFrames["audio-output.mute"])
+          let muteSwitch = try #require(rendered.layoutFrames["audio-output.mute.switch"])
           let formViewport = try #require(rendered.layoutFrames["profile.form.viewport"])
           #expect(output.maxY < input.minY, "Output and Input must remain separate surfaces")
+          #expect(muteSwitch.minX > muteRow.midX, "Mute switch must remain trailing aligned")
+          #expect(containsRenderedFrame(muteSwitch, in: muteRow))
           for (identifier, section, fields) in [
             ("audio-output", output, ["device", "volume", "mute"]),
             ("audio-input", input, ["device", "volume"]),
@@ -790,9 +829,6 @@ import Testing
           fixture.displayMode == .largeText
         {
           if fixture.state != .storageError {
-            let geometry = try #require(rendered.sidebarActionGeometry)
-            #expect(geometry.runs.count == 2)
-            #expect(geometry.runs[0].upperBound + 20 < geometry.runs[1].lowerBound)
             let create = try #require(rendered.layoutFrames["sidebar.new.button"])
             let label = try #require(rendered.layoutFrames["sidebar.new.label"])
             let more = try #require(rendered.layoutFrames["sidebar.more.button"])
@@ -803,16 +839,25 @@ import Testing
             // CGRect.maxX is exclusive; exactly 20 points is a valid gap.
             #expect(create.maxX + 20 <= more.minX)
             #expect(abs(create.midY - more.midY) <= 1)
-            #expect(geometry.runs[1].upperBound - geometry.runs[1].lowerBound > 40)
+            let bitmap = try #require(NSBitmapImageRep(data: rendered.png))
+            for region in [label, more] {
+              let ink = renderedInkEvidence(in: bitmap, viewport: fixture.size, region: region)
+              #expect(ink.verticalBounds != nil, "Both sidebar actions must render visible content")
+              #expect(ink.brightnessRange > 0.1)
+            }
           }
           #expect(rendered.accessibility.contains("dynamic-type=\(fixture.dynamicTypeName)"))
-          #expect(rendered.accessibility.contains("per-setting-inclusion-controls=none"))
+          #expect(
+            rendered.accessibility.contains(
+              "per-setting-inclusion-controls=checkboxes-and-section-switches"))
           #expect(rendered.accessibility.contains("sidebar-primary-action="))
           #expect(rendered.accessibility.contains("sidebar-secondary-menu="))
         }
         if fixture.dynamicTypeSizeOverride == .accessibility5 {
           #expect(rendered.accessibility.contains("dynamic-type=accessibility5"))
-          #expect(rendered.accessibility.contains("per-setting-inclusion-controls=none"))
+          #expect(
+            rendered.accessibility.contains(
+              "per-setting-inclusion-controls=checkboxes-and-section-switches"))
         }
         if fixture.variant == .validation {
           #expect(rendered.accessibility.contains("validation-summary-visible=true"))
@@ -862,17 +907,6 @@ import Testing
             )
           )
           #expect(rendered.storageErrorAccentPixelCount > 500)
-        }
-        if let outputDirectory {
-          try rendered.png.write(
-            to: outputDirectory.appendingPathComponent("\(fixture.name).png"),
-            options: .atomic
-          )
-          try rendered.accessibility.write(
-            to: outputDirectory.appendingPathComponent("\(fixture.name).ax.txt"),
-            atomically: true,
-            encoding: .utf8
-          )
         }
         renderedEvidenceByFixtureName[fixture.name] = rendered
       }
@@ -963,6 +997,16 @@ import Testing
           mode: .force,
           size: CGSize(width: 620, height: 440),
           largeText: false,
+          includesReviewDetails: true,
+          darkAppearance: true
+        ),
+        ApplyPreviewFixture(
+          name: "27-apply-preview-ko-compact-details-light",
+          languageCode: "ko",
+          reviewReason: .initial,
+          mode: .force,
+          size: CGSize(width: 620, height: 440),
+          largeText: false,
           includesReviewDetails: true
         ),
       ]
@@ -984,10 +1028,6 @@ import Testing
       for fixture in fixtures {
         setenv("DESK_SETUP_UI_AUDIT_LANGUAGE", fixture.languageCode, 1)
         let rendered = try renderApplyPreview(fixture)
-        let withoutHardwareStatus =
-          fixture.name == "23-apply-preview-en-initial"
-          ? try renderApplyPreview(fixture, showsHardwareVerificationStatus: false)
-          : nil
         let bottomRendered =
           fixture.largeText
           ? try renderApplyPreview(fixture, initialScrollAnchor: .bottom)
@@ -995,9 +1035,6 @@ import Testing
         unsetenv("DESK_SETUP_UI_AUDIT_LANGUAGE")
 
         #expect(rendered.png.count > 10_000)
-        if let withoutHardwareStatus {
-          #expect(rendered.png != withoutHardwareStatus.png)
-        }
         if let bottomRendered {
           #expect(bottomRendered.png.count > 10_000)
           #expect(rendered.png != bottomRendered.png)
@@ -1044,30 +1081,44 @@ import Testing
           }
         }
         #expect(rendered.accessibility.contains("synthetic-apply-preview=true"))
-        #expect(
-          rendered.accessibility.contains(
-            "declared-beta-hardware-verification-status="
-              + ApplyPreviewActionCopy.hardwareVerificationNotice(
-                languageCode: fixture.languageCode
-              )
-          )
+        let expectedColumnCount = ApplyPreviewOperationGridPolicy.columnCount(
+          for: fixture.size.width - WorkflowSurfaceMetrics.contentInset * 2,
+          usesAccessibilityText: fixture.largeText
         )
         #expect(
           rendered.accessibility.contains(
-            "declared-beta-hardware-verification-accessibility-label="
-              + ApplyPreviewActionCopy.hardwareVerificationAccessibilityLabel(
-                languageCode: fixture.languageCode
-              )
+            "planned-change-column-count=\(expectedColumnCount)"
           )
         )
-        #expect(
-          rendered.accessibility.contains(
-            "declared-beta-hardware-verification-cues=text,exclamationmark.shield"
-          )
-        )
-        #expect(rendered.accessibility.contains("hardware-verification-status-visible=true"))
+        #expect(!rendered.accessibility.contains("Beta hardware verification"))
+        #expect(!rendered.accessibility.contains("베타 하드웨어 검증"))
         #expect(!rendered.accessibility.contains("/Users/"))
         #expect(!rendered.accessibility.localizedCaseInsensitiveContains("password"))
+        if fixture.name == "27-apply-preview-ko-compact-details-light" {
+          let topRepresentation = try #require(NSBitmapImageRep(data: rendered.png))
+          let cancelActionInkCount = pixelCount(
+            in: topRepresentation,
+            viewport: fixture.size,
+            logicalRegion: CGRect(
+              x: 15,
+              y: fixture.size.height - 65,
+              width: 130,
+              height: 50
+            )
+          ) { perceivedBrightness($0) < 0.75 }
+          let applyActionInkCount = pixelCount(
+            in: topRepresentation,
+            viewport: fixture.size,
+            logicalRegion: CGRect(
+              x: fixture.size.width - 190,
+              y: fixture.size.height - 65,
+              width: 175,
+              height: 50
+            )
+          ) { perceivedBrightness($0) < 0.75 }
+          #expect(cancelActionInkCount > 50)
+          #expect(applyActionInkCount > 200)
+        }
         if let outputDirectory {
           try rendered.png.write(
             to: outputDirectory.appendingPathComponent("\(fixture.name).png"),
@@ -1233,7 +1284,6 @@ import Testing
 
     private func renderApplyPreview(
       _ fixture: ApplyPreviewFixture,
-      showsHardwareVerificationStatus: Bool = true,
       initialScrollAnchor: UnitPoint = .top
     ) throws -> (png: Data, accessibility: String) {
       let configuration = UIAuditConfiguration(
@@ -1243,7 +1293,10 @@ import Testing
         showsStatusPopover: false
       )
       let model = UIAuditFixtures.makeModel(configuration: configuration)
-      let profile = try #require(model.profiles.first)
+      var profile = try #require(model.profiles.first)
+      if fixture.name == "27-apply-preview-ko-compact-details-light" {
+        profile.name = "집-스피커"
+      }
       var operations = [
         PlannedOperation(
           group: .audio,
@@ -1270,7 +1323,27 @@ import Testing
           )
         ),
       ]
-      if fixture.includesReviewDetails {
+      if fixture.name == "27-apply-preview-ko-compact-details-light" {
+        operations = [
+          PlannedOperation(
+            group: .audio,
+            key: "defaultOutput",
+            summary: "Change the default output device",
+            risk: .low,
+            preview: OperationPreview(
+              previousValue: "USB Audio Device [synthetic-output-old]",
+              desiredValue: "MacBook Pro 스피커 [synthetic-output-new]"
+            )
+          ),
+          PlannedOperation(
+            group: .audio,
+            key: "inputVolume",
+            summary: "Change input volume",
+            risk: .low,
+            preview: OperationPreview(previousValue: "78%", desiredValue: "50%")
+          ),
+        ]
+      } else if fixture.includesReviewDetails {
         operations = [
           PlannedOperation(
             group: .audio,
@@ -1291,9 +1364,18 @@ import Testing
       let inactiveDisplayMessage = "The saved display is not currently active."
       let inactiveColorProfileMessage =
         "The saved display for this ColorSync ICC profile is not currently active."
-      let omissions =
-        fixture.includesReviewDetails
-        ? [
+      let omissions: [PlanOmission]
+      if fixture.name == "27-apply-preview-ko-compact-details-light" {
+        omissions = [
+          PlanOmission(
+            group: .display,
+            key: "displayConfiguration",
+            status: .skipped,
+            reason: inactiveDisplayMessage
+          )
+        ]
+      } else if fixture.includesReviewDetails {
+        omissions = [
           PlanOmission(
             group: .display,
             key: "displayConfiguration",
@@ -1306,10 +1388,23 @@ import Testing
             status: .skipped,
             reason: inactiveColorProfileMessage
           ),
-        ] : []
-      let validationIssues =
-        fixture.includesReviewDetails
-        ? [
+        ]
+      } else {
+        omissions = []
+      }
+      let validationIssues: [ValidationIssue]
+      if fixture.name == "27-apply-preview-ko-compact-details-light" {
+        validationIssues = [
+          ValidationIssue(
+            group: .display,
+            key: "displayConfiguration",
+            severity: .warning,
+            isFatal: false,
+            message: inactiveDisplayMessage
+          )
+        ]
+      } else if fixture.includesReviewDetails {
+        validationIssues = [
           ValidationIssue(
             group: .display,
             key: "displayConfiguration",
@@ -1324,7 +1419,10 @@ import Testing
             isFatal: false,
             message: inactiveColorProfileMessage
           ),
-        ] : []
+        ]
+      } else {
+        validationIssues = []
+      }
       let preparation = ApplyPreparation(
         profileID: profile.id,
         mode: fixture.mode,
@@ -1351,7 +1449,6 @@ import Testing
       let size = fixture.size
       let root = ApplyPreviewView(
         request: request,
-        showsHardwareVerificationStatus: showsHardwareVerificationStatus,
         initialScrollAnchor: initialScrollAnchor,
         onConfirm: {}
       )
@@ -1360,12 +1457,12 @@ import Testing
       .dynamicTypeSize(fixture.largeText ? .accessibility3 : .large)
       .uiAuditEnvironment(configuration)
       .frame(width: size.width, height: size.height)
-      .preferredColorScheme(fixture.includesReviewDetails ? .dark : .light)
-      .background(fixture.includesReviewDetails ? Color.black : Color.white)
+      .preferredColorScheme(fixture.darkAppearance ? .dark : .light)
+      .background(fixture.darkAppearance ? Color.black : Color.white)
       let host = NSHostingView(rootView: root)
       host.frame = NSRect(origin: .zero, size: size)
       host.appearance = NSAppearance(
-        named: fixture.includesReviewDetails ? .darkAqua : .aqua)
+        named: fixture.darkAppearance ? .darkAqua : .aqua)
       let window = NSWindow(
         contentRect: NSRect(origin: .zero, size: size),
         styleMask: .borderless,
@@ -1388,7 +1485,7 @@ import Testing
       host.cacheDisplay(in: host.bounds, to: sourceRepresentation)
       let representation = try opaqueRepresentation(
         from: sourceRepresentation,
-        background: fixture.includesReviewDetails ? .black : .white
+        background: fixture.darkAppearance ? .black : .white
       )
       #expect(!representation.hasAlpha)
       let png = try #require(
@@ -1397,7 +1494,10 @@ import Testing
           properties: [:]
         )
       )
-      let hardwareStatus = ApplyPreviewHardwareVerificationStatus.localized()
+      let plannedChangeColumnCount = ApplyPreviewOperationGridPolicy.columnCount(
+        for: size.width - WorkflowSurfaceMetrics.contentInset * 2,
+        usesAccessibilityText: fixture.largeText
+      )
       var lines = [
         "source=ApplyPreviewView in attached offscreen NSWindow",
         "synthetic-apply-preview=true",
@@ -1412,12 +1512,8 @@ import Testing
         "review-details-expanded-by-default=\(!request.preparation.canExecute)",
         "large-text=\(fixture.largeText)",
         "initial-scroll-anchor=\(initialScrollAnchor == .bottom ? "bottom" : "top")",
+        "planned-change-column-count=\(plannedChangeColumnCount)",
         "live-display-audio-network-mutations=false",
-        "declared-beta-hardware-verification-status=" + hardwareStatus.text,
-        "declared-beta-hardware-verification-accessibility-label="
-          + hardwareStatus.accessibilityLabel,
-        "declared-beta-hardware-verification-cues=text,\(hardwareStatus.systemImage)",
-        "hardware-verification-status-visible=\(showsHardwareVerificationStatus)",
         "offscreen-ax-limit=SwiftUI descendants may remain collapsed into AXGroup without ordering the window front",
       ]
       var visited: Set<ObjectIdentifier> = []
@@ -1457,6 +1553,15 @@ import Testing
         )
       case .storageError:
         model.configureProfileStorageFailureForUIAudit()
+      }
+      if fixture.allSettingsOff {
+        editor.initialize(profiles: model.profiles, preferredProfileID: model.selectedProfileID)
+        #expect(
+          editor.updateDraft { profile in
+            for section in ProfileSettingSection.allCases {
+              profile.settings.setIncluded(false, for: section)
+            }
+          })
       }
       let size = fixture.size
       let navigation = SettingsNavigationModel(selectedTab: fixture.selectedTab)
@@ -1569,9 +1674,9 @@ import Testing
         "sidebar-primary-action=\(fixture.isProfileSurface ? appLocalizedRuntime("New Profile") : "not-applicable")",
         "sidebar-secondary-menu=\(fixture.isProfileSurface ? appLocalizedRuntime("More Profile Actions") : "not-applicable")",
         "sidebar-action-background-runs=\(sidebarRuns)",
-        "per-setting-inclusion-controls=none",
+        "per-setting-inclusion-controls=checkboxes-and-section-switches",
         "profile-section-layout=\(fixture.isProfileSurface ? "vertical" : "not-applicable")",
-        "profile-section-order=\(fixture.isProfileSurface ? "display,sound,keyboard" : "not-applicable")",
+        "profile-section-order=\(fixture.isProfileSurface ? "sound-output,sound-input,keyboard" : "not-applicable")",
         "login-item-details-visible=false",
         "login-status-refresh-placement=mismatch-only",
         "declared-dirty-export-notice=\(fixture.state == .dirtyDraft ? appLocalizedRuntime(ProfileExportScopePolicy.unsavedDraftNotice) : "none")",

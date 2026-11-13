@@ -191,14 +191,14 @@ import Testing
       #expect(ProfileWorkspaceLayoutPolicy.sidebarWidth == 210)
       #expect(ProfileWorkspaceLayoutPolicy.minimumEditorWidth == 390)
       #expect(ProfileWorkspaceLayoutPolicy.minimumContentWidth <= 640)
-      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio, .input])
+      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.audio, .input])
       #expect(!ProfileEditorSurfacePolicy.showsActivationControl)
       #expect(!ProfileEditorSurfacePolicy.showsUnsupportedControls)
       #expect(!ProfileEditorSurfacePolicy.showsDescription)
       #expect(!ProfileEditorSurfacePolicy.showsConditions)
       #expect(!ProfileEditorSurfacePolicy.showsCurrentSettingsDraftRefresh)
-      #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio, .input])
-      #expect(ProfileEditorStepPolicy.group(for: .displayPrimary) == .display)
+      #expect(ProfileEditorStepPolicy.orderedGroups == [.audio, .input])
+      #expect(ProfileEditorStepPolicy.group(for: .displayPrimary) == nil)
       #expect(
         ProfileEditorStepPolicy.group(for: .audio(.defaultOutputDevice)) == .audio
       )
@@ -238,11 +238,35 @@ import Testing
 
     @Test("profile sections remain in one stable vertical order")
     func stableProfileSectionOrder() {
-      #expect(ProfileEditorStepPolicy.orderedGroups == [.display, .audio, .input])
-      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.display, .audio, .input])
+      #expect(ProfileEditorStepPolicy.orderedGroups == [.audio, .input])
+      #expect(ProfileEditorSurfacePolicy.visibleGroups == [.audio, .input])
       #expect(ProfileEditorStepPolicy.group(for: .audio(.defaultInputDevice)) == .audio)
       #expect(ProfileEditorStepPolicy.group(for: .input(.keyRepeatInterval)) == .input)
       #expect(ProfileEditorStepPolicy.group(for: .networkService(at: 1, .ipv4Address)) == nil)
+    }
+
+    @Test("current UI audit evidence contains only the seven Sound and Keyboard settings")
+    func currentUIAuditFixtureMatchesVisibleScope() throws {
+      let fixture = UIAuditFixtures.fixture(.editorAudio)
+      let profile = try #require(fixture.profiles.first)
+
+      #expect(fixture.snapshot.groups.map(\.group) == [.audio, .input])
+      #expect(profile.settings.display.value.displays.isEmpty)
+      #expect(!profile.settings.display.value.hasIncludedOption)
+      #expect(profile.settings.network.value.serviceIPv4.isEmpty)
+      #expect(!profile.settings.network.value.hasIncludedOption)
+      #expect(Set(profile.lastApplication?.items.map(\.group) ?? []) == [.audio, .input])
+
+      let overview = UIAuditFixtures.fixture(.overview)
+      let capture = try #require(overview.captureSummary)
+      #expect(capture.applicableCount == 7)
+      #expect(capture.items.count == 7)
+      #expect(Set(capture.items.map(\.group)) == [.audio, .input])
+
+      let apply = try #require(overview.applySummary)
+      #expect(apply.totalCount == 7)
+      #expect(apply.succeededCount == 6)
+      #expect(apply.notVerifiedCount == 1)
     }
 
     @Test("keyboard editor uses native semantic steps without rewriting dormant values")
@@ -253,7 +277,7 @@ import Testing
         ProfileEditorKeyboardOptionPolicy.effectiveValue(
           dormant,
           suggestedValue: 30
-        ) == 30
+        ) == 12
       )
       #expect(
         ProfileEditorKeyboardOptionPolicy.effectiveValue(
@@ -387,7 +411,7 @@ import Testing
           selectedDevice: SettingOption(isIncluded: false, value: "read-only-output"),
           currentDeviceUID: "writable-output",
           catalog: catalog
-        ) == ProfileEditorAudioVolumeCapability(isWritable: false, suggestedValue: 0.8)
+        ) == ProfileEditorAudioVolumeCapability(isWritable: true, suggestedValue: 0.42)
       )
     }
 
@@ -423,7 +447,7 @@ import Testing
     }
 
     @Test(
-      "mute targets registered output despite legacy exclusion and never invents unreadable state")
+      "mute uses the current output when saved device switching is excluded")
     func muteCapabilityHonorsRegisteredDeviceAndReadability() {
       let catalog = [
         AudioMuteControlCatalogEntry(deviceUID: "current", currentValue: false, canApply: true),
@@ -434,7 +458,7 @@ import Testing
         ProfileEditorAudioMuteCapabilityResolver.resolve(
           selectedDevice: .init(isIncluded: false, value: "saved"),
           currentDeviceUID: "current", catalog: catalog
-        ) == ProfileEditorAudioMuteCapability(isWritable: false, suggestedValue: true))
+        ) == ProfileEditorAudioMuteCapability(isWritable: true, suggestedValue: false))
       #expect(
         ProfileEditorAudioMuteCapabilityResolver.resolve(
           selectedDevice: .init(value: "unreadable"),

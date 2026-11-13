@@ -1,6 +1,6 @@
 # Profile JSON schema and interchange guide
 
-Last updated: 2026-09-15
+Last updated: 2026-09-17
 
 Desk Setup Switcher stores and exchanges one JSON `ProfileDocument`. The current format is `schemaVersion: 1`. It is intended for this app's import, export, backup, and recovery paths; it is **not** a stable third-party automation API, public SDK, or plug-in format.
 
@@ -70,7 +70,7 @@ Every setting group is a `SettingGroupConfiguration<Value>` object with:
 - `isIncluded: Bool`
 - `value: Value`
 
-Every leaf is a `SettingOption<Value>` with the same two fields. A decoded document is normalized before use: group inclusion is recomputed from actionable included leaves, so manually forcing only the group flag does not make dormant values executable. A stored field is not evidence that the running Mac can read or apply it; runtime adapter capability and validation remain authoritative.
+Every leaf is a `SettingOption<Value>` with the same two fields. Explicit `isIncluded: false` is authoritative for every current sound/keyboard leaf, even when a value exists. No new schema fields are required for section switches: section state is derived from its included leaves, Off excludes them without clearing values, and On includes populated leaves. Recapture preserves the existing seven leaf flags for a populated draft. A decoded document is normalized before use: group inclusion is recomputed from actionable included leaves, so manually forcing only the group flag does not make dormant values executable. A stored field is not evidence that the running Mac can read or apply it; runtime adapter capability and validation remain authoritative.
 
 ### Display
 
@@ -92,7 +92,7 @@ Each display target contains:
 
 `DisplayIdentity` contains optional `uuid`, `vendorID`, `modelID`, `serialNumber`, and `productName`, plus `isBuiltIn`. A runtime `CGDirectDisplayID` is deliberately not persisted. `DisplayPoint` contains integer `x` and `y`. `DisplayMode` contains logical `width`/`height`, pixel `pixelWidth`/`pixelHeight`, and `refreshRate`. `DisplayMirroring` is either `extended` or `mirrors(DisplayIdentity)`.
 
-`ColorSyncProfileTarget` stores `registeredProfileID`, `fileSHA256`, and `displayName`. A runtime ICC file URL is resolved from the current ColorSync catalog and is not stored in profile JSON.
+`ColorSyncProfileTarget` stores `registeredProfileID`, `fileSHA256`, and `displayName`. A runtime ICC file URL is not stored in profile JSON. Every Display leaf is currently dormant compatibility data: it can round-trip through schema 1 but is not captured, edited, or applied.
 
 ### Audio
 
@@ -146,12 +146,12 @@ Each `serviceIPv4` entry contains a portable `identity` and a `configuration` op
 
 | Group | Inclusion may remain actionable | Preserved but forced dormant |
 | --- | --- | --- |
-| Display | primary display, mode | mirroring, ColorSync profile, origin, rotation, active state |
+| Display | none | primary display, mode, mirroring, ColorSync profile, origin, rotation, active state |
 | Audio | default input, default output, input volume, output volume, output mute | system output |
 | Network | none | per-service IPv4, Wi-Fi power/SSID, legacy global IPv4, DNS, web proxy, secure web proxy |
 | Input | key repeat interval, initial key repeat delay | keyboard brightness, pointer speed, natural scrolling, standard-function-key behavior |
 
-Primary-display selection is one global choice represented on all display targets. It remains included only when every target's `isPrimary` option is included and exactly one value is `true`, or when every target excludes it. A mixed or ambiguous state preserves values but disables all primary-display inclusion flags.
+All Display inclusion flags are forced off together. Stored identities and values are preserved for schema-1 round trips, but the normal Capture and Apply paths do not register the Display adapter.
 
 This table is an applicability boundary, not a hardware support claim. Consult [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md) for implemented, mock, live-read, experimental, and unverified status.
 

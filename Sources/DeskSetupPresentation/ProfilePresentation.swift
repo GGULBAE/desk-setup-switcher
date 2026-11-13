@@ -261,7 +261,7 @@ public struct ProfileGroupSummary: Equatable, Sendable {
 /// The optional name map is transient presentation metadata and never changes
 /// the persisted profile schema.
 public struct ProfilePresentationBuilder: Equatable, Sendable {
-  public static let groupOrder: [SettingGroup] = [.display, .audio, .network, .input]
+  public static let groupOrder: [SettingGroup] = [.audio, .input]
 
   public var audioDeviceNamesByUID: [String: String]
 

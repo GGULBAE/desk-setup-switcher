@@ -9,7 +9,6 @@ public enum LiveAdapterFactory {
   /// performs no discovery and changes no system setting.
   public static func makeAdapters() -> [any SystemSettingsAdapter] {
     [
-      CoreGraphicsDisplayAdapter(),
       CoreAudioAdapter(),
       InputPreferencesAdapter(),
     ]

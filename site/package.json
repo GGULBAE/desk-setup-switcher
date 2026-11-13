@@ -24,29 +24,36 @@
     "verify": "node scripts/verify-site.mjs"
   },
   "dependencies": {
-    "next": "16.3.4",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.50.0",
+    "@cloudflare/vite-plugin": "1.69.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.3",
-    "@vitejs/plugin-rsc": "0.5.34",
+    "@vitejs/plugin-rsc": "0.5.37",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.3.4",
-    "react-server-dom-webpack": "19.2.8",
+    "eslint-config-next": "16.4.6",
+    "react-server-dom-webpack": "19.3.1",
     "typescript": "5.9.3",
-    "vinext": "1.0.0-beta.9",
-    "vite": "8.1.5",
-    "wrangler": "4.118.0"
+    "vinext": "1.4.5",
+    "vite": "8.3.8",
+    "wrangler": "4.161.0",
+    "miniflare": "5.20261110.0-beta"
   },
   "overrides": {
-    "postcss": "8.5.25",
-    "sharp": "0.35.4",
-    "undici": "7.29.0"
+    "postcss": "8.5.32",
+    "sharp": "0.35.5",
+    "undici": "7.30.1",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.1"
+    },
+    "satori": {
+      "fflate": "0.7.5"
+    }
   },
   "type": "module"
 }

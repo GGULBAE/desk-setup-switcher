@@ -245,8 +245,9 @@ done
 # Reject previously published scope language that represented Network as a
 # profile feature, plus the obsolete six-setting count. Network can still be
 # named when copy explicitly says that it is dormant or unsupported. Current
-# copy must describe nine Display/Sound/Keyboard kinds while the exact-source
-# gallery and demo remain explicitly bounded as pre-Keyboard media.
+# copy must describe seven Sound/Keyboard kinds while the exact-source gallery
+# and demo remain explicitly bounded as pre-Keyboard, pre-Display-retirement
+# historical media.
 public_copy_files=(
     "$ROOT_DIR/README.md"
     "$ROOT_DIR/site/README.md"
@@ -279,9 +280,9 @@ for stale_phrase in "${stale_public_copy_phrases[@]}"; do
     fi
 done
 
-stale_profile_count_pattern='(^|[^[:alnum:]_])six[[:space:]]+((Display|display)[-/[:space:]]*(Sound|sound)[[:space:]]+)?setting([[:space:]]+type)?s?([^[:alnum:]_]|$)|여섯[[:space:]]*가지[[:space:]]*(설정[[:space:]]*종류|항목)'
+stale_profile_count_pattern='(^|[^[:alnum:]_])(six|nine)[[:space:]]+((Display|display)[-/[:space:]]*(Sound|sound)[[:space:]]+)?setting([[:space:]]+type)?s?([^[:alnum:]_]|$)|(여섯|아홉)[[:space:]]*가지[[:space:]]*(설정[[:space:]]*종류|항목)'
 if LC_ALL=C grep -Eiq -- "$stale_profile_count_pattern" "${public_copy_files[@]}"; then
-    fail "stale six-setting public profile scope remains"
+    fail "stale six- or nine-setting public profile scope remains"
 fi
 
 require_current_copy() {
@@ -291,13 +292,13 @@ require_current_copy() {
         fail "$relative_path is missing current Keyboard scope copy: $required_phrase"
 }
 
-require_current_copy "README.md" "One profile, nine setting types"
-require_current_copy "site/app/landing-page.tsx" "Nine settings · no Network or automatic switching"
-require_current_copy "site/app/landing-page.tsx" "These exact-source synthetic screens predate the Keyboard step."
-require_current_copy "site/app/landing-page.tsx" "키보드 단계가 추가되기 전 정확한 소스에서 만든 합성 화면입니다."
+require_current_copy "README.md" "One profile, seven setting types"
+require_current_copy "site/app/landing-page.tsx" "Seven settings · no Display, Network, or automatic switching"
+require_current_copy "site/app/landing-page.tsx" "These exact-source synthetic screens predate the Keyboard step and Display retirement."
+require_current_copy "site/app/landing-page.tsx" "디스플레이가 현재 범위에서 제외되기 전 정확한 소스에서 만든 합성 화면입니다."
 require_current_copy "site/app/landing-page.tsx" "Keyboard brightness is legacy profile data only and is never captured or applied."
 require_current_copy "site/app/landing-page.tsx" "Capture does not request Location, microphone, or Input Monitoring access."
-require_current_copy "docs/LAUNCH-COPY.md" "nine Display, Sound, and Keyboard setting kinds"
+require_current_copy "docs/LAUNCH-COPY.md" "seven Sound and Keyboard setting kinds"
 require_current_copy "docs/guides/USER-GUIDE.md" "Keyboard** has exactly **Key repeat speed** and **Repeat delay"
 require_current_copy "docs/guides/USER-GUIDE.ko.md" "키보드**에는 **키 반복 속도**, **반복 지연 시간**만"
 

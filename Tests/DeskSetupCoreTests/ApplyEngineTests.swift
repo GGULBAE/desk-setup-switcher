@@ -5,8 +5,8 @@ import Testing
 
 @Suite("Apply engine planning")
 struct ApplyEngineTests {
-  @Test("both apply modes prepare all nine registered settings without mutating hardware")
-  func nineRegisteredSettingsReachPreflight() async throws {
+  @Test("both apply modes prepare all seven registered settings without invoking display")
+  func sevenRegisteredSettingsReachPreflight() async throws {
     let displayAdapter = MockSystemSettingsAdapter(group: .display)
     let audioAdapter = MockSystemSettingsAdapter(group: .audio)
     let inputAdapter = MockSystemSettingsAdapter(group: .input)
@@ -16,11 +16,11 @@ struct ApplyEngineTests {
     var profile = makeProfile(including: [.display, .audio, .input])
     profile.settings.display.value.displays[0].isPrimary.isIncluded = false
     profile.settings.audio.value = .init(
-      defaultInputUID: .init(isIncluded: false, value: "synthetic-input"),
-      defaultOutputUID: .init(isIncluded: false, value: "synthetic-output"),
-      inputVolume: .init(isIncluded: false, value: 0.2),
-      outputVolume: .init(isIncluded: false, value: 0.8),
-      outputMuted: .init(isIncluded: false, value: false)
+      defaultInputUID: .init(isIncluded: true, value: "synthetic-input"),
+      defaultOutputUID: .init(isIncluded: true, value: "synthetic-output"),
+      inputVolume: .init(isIncluded: true, value: 0.2),
+      outputVolume: .init(isIncluded: true, value: 0.8),
+      outputMuted: .init(isIncluded: true, value: false)
     )
     profile.settings.input.value = .init(
       keyRepeatInterval: .init(value: 2),
@@ -30,15 +30,13 @@ struct ApplyEngineTests {
     let original = profile
     for mode in [ApplyMode.normal, .force] {
       let preparation = await engine.prepare(profile: profile, mode: mode)
-      #expect(preparation.includedGroups == [.input, .audio, .display])
+      #expect(preparation.includedGroups == [.input, .audio])
     }
     let expected = ProfileApplicabilityNormalizer().normalize(profile).settings
     #expect(!expected.input.value.keyboardBrightness.isIncluded)
     #expect(expected.input.value.keyboardBrightness.value == 0.5)
-    #expect(
-      await displayAdapter.recordedDesiredPayloads()
-        == Array(
-          repeating: .display(expected.display.value), count: 2))
+    #expect(!expected.display.isIncluded)
+    #expect(await displayAdapter.recordedDesiredPayloads().isEmpty)
     #expect(
       await audioAdapter.recordedDesiredPayloads()
         == Array(
@@ -47,7 +45,8 @@ struct ApplyEngineTests {
       await inputAdapter.recordedDesiredPayloads()
         == Array(
           repeating: .input(expected.input.value), count: 2))
-    for adapter in [displayAdapter, audioAdapter, inputAdapter] {
+    #expect(await displayAdapter.recordedInvocations().isEmpty)
+    for adapter in [audioAdapter, inputAdapter] {
       #expect(
         await adapter.recordedInvocations() == [
           .capability, .snapshot, .validate, .plan(.normal),
@@ -57,8 +56,8 @@ struct ApplyEngineTests {
     #expect(profile == original)
   }
 
-  @Test("planning defensively excludes unsupported leaves without mutating the profile value")
-  func planningNormalizesUnsupportedLeaves() async throws {
+  @Test("planning excludes legacy display and network values without mutating the profile")
+  func planningNormalizesRetiredGroups() async throws {
     let displayOperation = PlannedOperation(
       group: .display,
       key: "display.atomic-configuration",
@@ -81,9 +80,11 @@ struct ApplyEngineTests {
 
     let preparation = await engine.prepare(profile: profile, mode: .force)
 
-    #expect(preparation.includedGroups == [.display])
-    #expect(preparation.operations.map(\.key) == [displayOperation.key])
+    #expect(preparation.includedGroups.isEmpty)
+    #expect(preparation.operations.isEmpty)
     #expect(preparation.omissions.isEmpty)
+    #expect(preparation.rejectionReasons == [.noIncludedSettings, .noOperations])
+    #expect(await displayAdapter.recordedInvocations().isEmpty)
     #expect(await networkAdapter.recordedInvocations().isEmpty)
     #expect(profile.settings.display.value.displays[0].rotationDegrees.isIncluded)
     #expect(profile.settings.display.value.displays[0].rotationDegrees.value == 90)
@@ -91,7 +92,7 @@ struct ApplyEngineTests {
     #expect(profile.settings.network.value.dnsServers.value == ["192.0.2.53"])
   }
 
-  @Test("legacy color remains dormant while registered display values reach planning")
+  @Test("legacy display color remains dormant in both apply modes")
   func retiredColorProfilesCannotApply() async throws {
     let adapter = MockSystemSettingsAdapter(group: .display)
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
@@ -106,19 +107,18 @@ struct ApplyEngineTests {
     )
     for mode in [ApplyMode.normal, .force] {
       let preparation = await engine.prepare(profile: profile, mode: mode)
-      #expect(preparation.includedGroups == [.display])
+      #expect(preparation.includedGroups.isEmpty)
       #expect(preparation.operations.isEmpty)
       #expect(!preparation.canExecute)
     }
-    #expect(await adapter.recordedInvocations().contains(.plan(.normal)))
-    #expect(await adapter.recordedInvocations().contains(.plan(.force)))
+    #expect(await adapter.recordedInvocations().isEmpty)
     #expect(
       !ProfileApplicabilityNormalizer().normalize(profile).settings.display.value.displays[0]
         .colorProfile.isIncluded)
     #expect(profile.settings.display.value.displays[0].colorProfile.isIncluded)
   }
 
-  @Test("retired settings remain dormant beside registered display values in either apply mode")
+  @Test("retired settings remain dormant in either apply mode")
   func retiredOptionsCannotApply() async throws {
     let adapters = SettingGroup.allCases.map { MockSystemSettingsAdapter(group: $0) }
     let engine = ApplyEngine(registry: try AdapterRegistry(adapters))
@@ -130,10 +130,10 @@ struct ApplyEngineTests {
     for mode in [ApplyMode.normal, .force] {
       let result = await engine.apply(profile: profile, mode: mode)
       #expect(!result.didExecute)
-      #expect(result.preparation.includedGroups == [.display])
+      #expect(result.preparation.includedGroups.isEmpty)
       #expect(result.preparation.operations.isEmpty)
     }
-    for adapter in adapters where adapter.group != .display {
+    for adapter in adapters {
       #expect(await adapter.recordedInvocations().isEmpty)
     }
     #expect(profile == original)
@@ -145,7 +145,7 @@ struct ApplyEngineTests {
     #expect(normalized.settings.display.value.displays[0].mirroring.value == .extended)
     #expect(normalized.settings.audio.value.systemOutputUID.value == "synthetic-alert-output")
     #expect(normalized.settings.network.value.serviceIPv4[0].configuration.value == .dhcp)
-    #expect(normalized.settings.display.isIncluded)
+    #expect(!normalized.settings.display.isIncluded)
     #expect(!normalized.settings.display.value.displays[0].mirroring.isIncluded)
     #expect(!normalized.settings.audio.value.systemOutputUID.isIncluded)
     #expect(!normalized.settings.audio.isIncluded)
@@ -196,8 +196,8 @@ struct ApplyEngineTests {
       ])
   }
 
-  @Test("planning resolves legacy mixed primary flags to the registered selection")
-  func mixedPrimaryDisplayInclusionUsesRegisteredSelection() async throws {
+  @Test("planning never invokes display for legacy mixed primary flags")
+  func mixedPrimaryDisplayInclusionStaysDormant() async throws {
     let adapter = MockSystemSettingsAdapter(group: .display)
     let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
     var profile = makeProfile(including: [.display])
@@ -211,9 +211,9 @@ struct ApplyEngineTests {
 
     let preparation = await engine.prepare(profile: profile, mode: .force)
 
-    #expect(preparation.includedGroups == [.display])
-    #expect(preparation.rejectionReasons == [.noOperations])
-    #expect(await adapter.recordedInvocations().contains(.plan(.force)))
+    #expect(preparation.includedGroups.isEmpty)
+    #expect(preparation.rejectionReasons == [.noIncludedSettings, .noOperations])
+    #expect(await adapter.recordedInvocations().isEmpty)
   }
 
   @Test("legacy conditions do not block the default manual apply policy")
@@ -419,15 +419,17 @@ struct ApplyEngineTests {
       plan: AdapterPlan(group: .input, operations: [inputLow])
     )
 
+    let displayAdapter = MockSystemSettingsAdapter(
+      group: .display,
+      plan: AdapterPlan(group: .display, operations: [displayHigh, displayLow])
+    )
+    let networkAdapter = MockSystemSettingsAdapter(
+      group: .network,
+      plan: AdapterPlan(group: .network, operations: [networkLow])
+    )
     let adapters: [any SystemSettingsAdapter] = [
-      MockSystemSettingsAdapter(
-        group: .display,
-        plan: AdapterPlan(group: .display, operations: [displayHigh, displayLow])
-      ),
-      MockSystemSettingsAdapter(
-        group: .network,
-        plan: AdapterPlan(group: .network, operations: [networkLow])
-      ),
+      displayAdapter,
+      networkAdapter,
       MockSystemSettingsAdapter(
         group: .audio,
         plan: AdapterPlan(group: .audio, operations: [audioModerate, audioLow])
@@ -436,20 +438,19 @@ struct ApplyEngineTests {
     ]
     let engine = ApplyEngine(registry: try AdapterRegistry(adapters))
 
-    let preparation = await engine.prepare(
-      profile: makeProfile(including: Set(SettingGroup.allCases)),
-      mode: .normal
-    )
+    var profile = makeProfile(including: Set(SettingGroup.allCases))
+    profile.settings.input.value.keyRepeatInterval = .init(value: 2)
+    let preparation = await engine.prepare(profile: profile, mode: .normal)
 
     #expect(preparation.canExecute)
     #expect(
       preparation.operations.map(\.key) == [
+        "input.low",
         "audio.low",
-        "display.low",
         "audio.moderate",
-        "display.high",
       ])
-    #expect(await inputAdapter.recordedInvocations().isEmpty)
+    #expect(await displayAdapter.recordedInvocations().isEmpty)
+    #expect(await networkAdapter.recordedInvocations().isEmpty)
   }
 
   @Test("execution results decode when legacy data omits the safety token")

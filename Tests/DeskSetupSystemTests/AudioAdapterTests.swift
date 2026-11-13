@@ -8,6 +8,75 @@ import XCTest
 #endif
 
 final class AudioAdapterTests: XCTestCase {
+  func testEveryAudioSelectionAppliesAndRollsBackOnlyEnabledOptions() async throws {
+    let keys = ["defaultInput", "defaultOutput", "inputVolume", "outputVolume", "outputMute"]
+    for mode in [ApplyMode.normal, .force] {
+      for mask in 0..<32 {
+        let api = makeAPI()
+        let adapter = makeAdapter(api: api)
+        let selected = keys.indices.map { mask & (1 << $0) != 0 }
+        var settings = ProfileSettings(
+          audio: .init(
+            value: .init(
+              defaultInputUID: .init(isIncluded: selected[0], value: "input-B"),
+              defaultOutputUID: .init(isIncluded: selected[1], value: "output-B"),
+              inputVolume: .init(isIncluded: selected[2], value: 0.65),
+              outputVolume: .init(isIncluded: selected[3], value: 0.75),
+              outputMuted: .init(isIncluded: selected[4], value: true))))
+        settings = ProfileApplicabilityNormalizer().normalize(settings)
+        let profile = DeskProfile(name: "Synthetic selection", settings: settings)
+        let codec = ProfileJSONCodec()
+        let imported = try codec.decode(codec.encode(.init(profiles: [profile]))).document.profiles[
+          0]
+        let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+        let result = await engine.apply(profile: imported, mode: mode)
+        XCTAssertEqual(
+          result.preparation.operations.map(\.key),
+          keys.indices.compactMap {
+            selected[$0] ? keys[$0] : nil
+          })
+        XCTAssertEqual(api.mutations().count, selected.filter { $0 }.count)
+        XCTAssertEqual(api.defaultUID(for: .input), selected[0] ? "input-B" : "input-A")
+        XCTAssertEqual(api.defaultUID(for: .output), selected[1] ? "output-B" : "output-A")
+        XCTAssertEqual(
+          api.inputVolume(for: selected[0] ? "input-B" : "input-A")?.value,
+          selected[2] ? 0.65 : (selected[0] ? 0.55 : 0.35))
+        XCTAssertEqual(
+          api.volume(for: selected[1] ? "output-B" : "output-A")?.value,
+          selected[3] ? 0.75 : (selected[1] ? 0.4 : 0.25))
+        XCTAssertEqual(api.mute(for: selected[1] ? "output-B" : "output-A")?.value, selected[4])
+        for operation in result.preparation.operations.reversed() {
+          let rollback = await adapter.rollback(operation)
+          XCTAssertEqual(rollback.status, .rolledBack)
+        }
+        XCTAssertEqual(api.mutations().count, selected.filter { $0 }.count * 2)
+        XCTAssertEqual(api.defaultUID(for: .input), "input-A")
+        XCTAssertEqual(api.defaultUID(for: .output), "output-A")
+        XCTAssertEqual(api.inputVolume(for: "input-A")?.value, 0.35)
+        XCTAssertEqual(api.volume(for: "output-A")?.value, 0.25)
+        XCTAssertEqual(api.mute(for: "output-A")?.value, false)
+      }
+    }
+  }
+
+  func testExcludedUnavailableDeviceDoesNotBlockSelectedVolume() async throws {
+    let api = makeAPI()
+    let adapter = makeAdapter(api: api)
+    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+    let profile = DeskProfile(
+      name: "Synthetic disconnected device",
+      settings: .init(
+        audio: .init(
+          value: .init(
+            defaultOutputUID: .init(isIncluded: false, value: "disconnected"),
+            outputVolume: .init(value: 0.7)))))
+    let result = await engine.apply(profile: profile, mode: .normal)
+    XCTAssertEqual(result.status, .applied)
+    XCTAssertEqual(result.preparation.operations.map(\.key), ["outputVolume"])
+    XCTAssertEqual(api.defaultUID(for: .output), "output-A")
+    XCTAssertEqual(api.volume(for: "output-A")?.value, 0.7)
+  }
+
   func testSnapshotUsesUIDsAndReportsScopesAndControls() async throws {
     let api = makeAPI()
     let adapter = makeAdapter(api: api)

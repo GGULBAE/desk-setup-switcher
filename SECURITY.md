@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-There is no public release yet. The table describes the current pre-release boundary; it does not turn a local or CI artifact into a supported download.
+For the supported v0.1.0 beta, there is no public release yet. The separately labeled v0.0.9 development preview is a requested DMG delivery and remains outside the supported-beta gate. The table describes that support boundary; it does not turn a local or CI artifact into a supported download.
 
 | Version | Security status |
 | --- | --- |

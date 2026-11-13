@@ -675,3 +675,67 @@ public enum SettingsPayload: Codable, Hashable, Sendable {
     }
   }
 }
+
+/// User-facing sections share the existing schema-v1 per-option inclusion flags.
+/// Switching a section off preserves every saved value. Switching it on selects
+/// its populated options; individual options can then be excluded independently.
+public enum ProfileSettingSection: String, CaseIterable, Hashable, Sendable {
+  case soundOutput
+  case soundInput
+  case keyboard
+}
+
+extension ProfileSettings {
+  public func isIncluded(_ section: ProfileSettingSection) -> Bool {
+    switch section {
+    case .soundOutput:
+      audio.value.defaultOutputUID.isIncluded || audio.value.outputVolume.isIncluded
+        || audio.value.outputMuted.isIncluded
+    case .soundInput:
+      audio.value.defaultInputUID.isIncluded || audio.value.inputVolume.isIncluded
+    case .keyboard:
+      input.value.keyRepeatInterval.isIncluded || input.value.initialKeyRepeatDelay.isIncluded
+    }
+  }
+
+  public mutating func setIncluded(_ included: Bool, for section: ProfileSettingSection) {
+    switch section {
+    case .soundOutput:
+      audio.value.defaultOutputUID.isIncluded =
+        included && audio.value.defaultOutputUID.value != nil
+      audio.value.outputVolume.isIncluded = included && audio.value.outputVolume.value != nil
+      audio.value.outputMuted.isIncluded = included && audio.value.outputMuted.value != nil
+    case .soundInput:
+      audio.value.defaultInputUID.isIncluded = included && audio.value.defaultInputUID.value != nil
+      audio.value.inputVolume.isIncluded = included && audio.value.inputVolume.value != nil
+    case .keyboard:
+      input.value.keyRepeatInterval.isIncluded =
+        included && input.value.keyRepeatInterval.value != nil
+      input.value.initialKeyRepeatDelay.isIncluded =
+        included && input.value.initialKeyRepeatDelay.value != nil
+    }
+    self = ProfileApplicabilityNormalizer().normalize(self)
+  }
+
+  /// A recapture refreshes values without silently opting excluded settings back in.
+  /// A new, empty draft uses the snapshot's initial selection.
+  public func refreshingValues(from snapshot: ProfileSettings) -> ProfileSettings {
+    let hasSavedValues =
+      audio.value.defaultOutputUID.value != nil
+      || audio.value.defaultInputUID.value != nil || audio.value.outputVolume.value != nil
+      || audio.value.inputVolume.value != nil || audio.value.outputMuted.value != nil
+      || input.value.keyRepeatInterval.value != nil
+      || input.value.initialKeyRepeatDelay.value != nil
+    guard hasSavedValues else { return snapshot }
+    var refreshed = snapshot
+    refreshed.audio.value.defaultOutputUID.isIncluded = audio.value.defaultOutputUID.isIncluded
+    refreshed.audio.value.defaultInputUID.isIncluded = audio.value.defaultInputUID.isIncluded
+    refreshed.audio.value.outputVolume.isIncluded = audio.value.outputVolume.isIncluded
+    refreshed.audio.value.inputVolume.isIncluded = audio.value.inputVolume.isIncluded
+    refreshed.audio.value.outputMuted.isIncluded = audio.value.outputMuted.isIncluded
+    refreshed.input.value.keyRepeatInterval.isIncluded = input.value.keyRepeatInterval.isIncluded
+    refreshed.input.value.initialKeyRepeatDelay.isIncluded =
+      input.value.initialKeyRepeatDelay.isIncluded
+    return ProfileApplicabilityNormalizer().normalize(refreshed)
+  }
+}

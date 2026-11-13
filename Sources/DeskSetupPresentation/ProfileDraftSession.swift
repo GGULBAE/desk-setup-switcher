@@ -122,7 +122,7 @@ public struct ProfileDraftSession: Equatable, Sendable {
     expectedProfileID: UUID
   ) -> Bool {
     guard draft?.id == expectedProfileID else { return false }
-    return updateDraft { $0.settings = settings }
+    return updateDraft { $0.settings = $0.settings.refreshingValues(from: settings) }
   }
 
   /// Restores the latest saved values and cancels any pending selection request.

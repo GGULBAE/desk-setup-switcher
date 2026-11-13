@@ -89,8 +89,8 @@ struct SafetyRollbackTests {
       ])
   }
 
-  @Test("retired network is never queried while display retains safety rollback")
-  func networkIsLastAppliedAndFirstRolledBack() async throws {
+  @Test("retired display and network groups are never queried")
+  func retiredGroupsNeverReachSafetyTransactions() async throws {
     let audio = PlannedOperation(group: .audio, key: "audio", summary: "Audio")
     let display = PlannedOperation(
       group: .display,
@@ -125,17 +125,11 @@ struct SafetyRollbackTests {
     )
 
     let result = await engine.apply(profile: multiGroupSafetyProfile(), mode: .normal)
-    let confirmationID = try #require(result.safetyConfirmationID)
-    let reverted = await engine.revertSafetyRollback(confirmationID)
 
-    #expect(result.itemResults.map(\.key) == ["audio", "display"])
-    #expect(reverted.rollbackResults.map(\.key) == ["display"])
+    #expect(result.itemResults.map(\.key) == ["audio"])
+    #expect(result.safetyConfirmationID == nil)
     #expect(await audioAdapter.recordedInvocations().last == .apply(audio.id))
-    #expect(
-      await displayAdapter.recordedInvocations().suffix(2) == [
-        .apply(display.id),
-        .rollback(display.id),
-      ])
+    #expect(await displayAdapter.recordedInvocations().isEmpty)
     #expect(await networkAdapter.recordedInvocations().isEmpty)
   }
 

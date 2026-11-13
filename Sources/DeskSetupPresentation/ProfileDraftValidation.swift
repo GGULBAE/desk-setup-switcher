@@ -252,7 +252,6 @@ public struct ProfileDraftValidator: Equatable, Sendable {
     _ settings: ProfileSettings,
     issues: inout [DraftValidationIssue]
   ) {
-    validateDisplay(settings.display, issues: &issues)
     validateAudio(settings.audio, issues: &issues)
     validateNetwork(settings.network, issues: &issues)
     validateInput(settings.input, issues: &issues)

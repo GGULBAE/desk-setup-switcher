@@ -716,6 +716,30 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
     ["0b02c6c456890ef10aa590fbab57dc2e236be266", "scripts/test-audit-public-release.sh", "device-identifier"],
     ["0b02c6c456890ef10aa590fbab57dc2e236be266", "scripts/test-audit-public-release.sh", "ip-host"],
     ["0b02c6c456890ef10aa590fbab57dc2e236be266", "scripts/test-audit-public-release.sh", "ssid"],
+    # Selective-settings fixture review (2026-11-13): documentation-only IPs
+    # and synthetic current/saved audio device labels; no live identifiers.
+    ["2de55c9a917832b0c8118cb91feb254b7400d560", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
+    ["2035534dd2f1b8c2d2534f527c4cfe055bd57659", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    ["6336d0a6c489393103ab7d5050b6d1731d0f7d58", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
+    # Reviewed 2026-11-13 historical/current test blobs: constructed network
+    # validation inputs, invalid coordinate boundaries, and mock device labels.
+    # The regression-script probes remain bound to exact bytes, path, category.
+    ["01e8668f7eacde6bddf06cfbd9da8e26d7b5bff1", "Tests/DeskSetupPresentationTests/ProfileDraftValidationTests.swift", "ip-host"],
+    ["18f58fac2be03b94d9eb2565e11999af840160da", "scripts/test-audit-public-release.sh", "device-identifier"],
+    ["18f58fac2be03b94d9eb2565e11999af840160da", "scripts/test-audit-public-release.sh", "ip-host"],
+    ["18f58fac2be03b94d9eb2565e11999af840160da", "scripts/test-audit-public-release.sh", "ssid"],
+    ["1bae8d145a53fb52f9c2d14c009d7728528d4cfe", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    ["255dd4787ca54655ede8d58810b918d33f020c2d", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
+    ["2b1511f018f6e75e0a578848558c43bcca5444c6", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
+    ["3695a0460deeabca24440300c0d57c94cf9a5b65", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
+    ["37001dfe4f51afc87ed51fb235d36f3dac48db15", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
+    ["388dc5841a6887c9bfbcb41472c98f14b76d2bd1", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
+    ["5eb9933c1964903039322fdfd900136f7c5afac8", "Tests/DeskSetupPresentationTests/ProfileDraftValidationTests.swift", "ip-host"],
+    ["63bebc347e2ebc3700954148d884e9b2b34a444b", "Sources/DeskSetupSwitcher/UIAuditFixtures.swift", "ip-host"],
+    ["74b1bf92832123fc7c03d54585a1293ded0f445e", "Sources/DeskSetupSwitcher/UIAuditFixtures.swift", "ip-host"],
+    ["d939113d6dbae2f9335583bb3a3e82297b7b829c", "Tests/DeskSetupCoreTests/ProfileValidationTests.swift", "coordinates"],
+    ["d939113d6dbae2f9335583bb3a3e82297b7b829c", "Tests/DeskSetupCoreTests/ProfileValidationTests.swift", "ip-host"],
+    ["ff32b493dcf2e55a3c01345f165ba33b68c9d4e2", "Tests/DeskSetupPresentationTests/ProfileDraftValidationTests.swift", "ip-host"],
   ]).freeze
   SAFE_VALUE_WORDS = /(?:\A|[^a-z0-9])(?:demo|example|fake|fixture|mock|placeholder|redacted|sample|synthetic|test(?:ing)?)(?:\z|[^a-z0-9])/i
   SAFE_CONTEXT_WORDS = /(?:\b(?:documentation[- ]only|e\.g\.|example data|for example|mock fixture|redacted fixture|synthetic(?: data| fixture| value)?|test fixture)\b|예시?\s*[:：]?)/i

@@ -1,8 +1,6 @@
 import Foundation
 
 public enum VisibleSettingKind: String, CaseIterable, Codable, Hashable, Sendable {
-  case displayPrimary
-  case displayMode
   case audioDefaultInput
   case audioDefaultOutput
   case audioInputVolume
@@ -82,28 +80,6 @@ public struct VisibleSettingField: Codable, Hashable, Sendable, Identifiable {
 /// rollback evidence required by every vertical-slice stage.
 public struct VisibleSettingRegistry: Sendable {
   public static let contracts: [VisibleSettingContract] = [
-    .init(
-      kind: .displayPrimary,
-      group: .display,
-      snapshotKey: "display.primary",
-      runtimeCatalogSource: "displayModeCatalog",
-      validationKey: "display.primary",
-      operationKeyPrefix: "display.atomic-configuration",
-      editorKind: .picker,
-      localizationKey: "editor.display.primary",
-      accessibilityLabelKey: "editor.display.primary.accessibility"
-    ),
-    .init(
-      kind: .displayMode,
-      group: .display,
-      snapshotKey: "display.mode",
-      runtimeCatalogSource: "displayModeCatalog",
-      validationKey: "display.mode",
-      operationKeyPrefix: "display.atomic-configuration",
-      editorKind: .picker,
-      localizationKey: "editor.display.mode",
-      accessibilityLabelKey: "editor.display.mode.accessibility"
-    ),
     .init(
       kind: .audioDefaultInput,
       group: .audio,
@@ -190,19 +166,6 @@ public struct VisibleSettingRegistry: Sendable {
       uniqueKeysWithValues: Self.contracts.map { ($0.kind, $0) }
     )
     var fields: [VisibleSettingField] = []
-
-    if let display = snapshots.first(where: { $0.group == .display }) {
-      let modes = display.displayModeCatalog ?? []
-      if !modes.isEmpty, let contract = contractByKind[.displayPrimary] {
-        fields.append(.init(id: contract.kind.rawValue, contract: contract))
-      }
-      if let contract = contractByKind[.displayMode] {
-        for index in modes.indices where !modes[index].modes.isEmpty {
-          fields.append(.init(id: "\(contract.kind.rawValue).\(index)", contract: contract))
-        }
-      }
-
-    }
 
     if let audio = snapshots.first(where: { $0.group == .audio }) {
       let devices = audio.audioDeviceCatalog ?? []

@@ -57,13 +57,13 @@ struct DisplayAdapterTests {
     let snapshot = try await adapter.snapshot()
     var desired = try displaySettings(from: snapshot)
     desired.displays[1].mode.value = .init(width: 1_920, height: 1_080, refreshRate: 144)
-    desired.displays[1].mirroring = .init(value: .extended)
-    desired.displays[1].origin = .init(value: .init(x: 999, y: 999))
-    let profile = ProfileApplicabilityNormalizer().normalize(
-      DeskProfile(name: "Synthetic resolution", settings: .init(display: .init(value: desired)))
+    desired.displays[1].mirroring = .init(isIncluded: false, value: .extended)
+    desired.displays[1].origin = .init(
+      isIncluded: false,
+      value: .init(x: 999, y: 999)
     )
     let plan = try await adapter.plan(
-      .display(profile.settings.display.value), from: snapshot, mode: .force
+      .display(desired), from: snapshot, mode: .force
     )
     let operation = try #require(plan.operations.first)
     let configuration = try JSONDecoder().decode(
@@ -709,8 +709,8 @@ struct DisplayAdapterTests {
     #expect(plan.operations[0].key.hasPrefix("display.colorProfile."))
   }
 
-  @Test("profile transactions apply and roll back topology without retired color settings")
-  func topologyTransactionIgnoresLegacyColorProfile() async throws {
+  @Test("the lower-level adapter applies and rolls back topology without legacy color")
+  func topologyAdapterIgnoresLegacyColorProfile() async throws {
     let original = colorProfile("original", hash: "e", name: "Original ICC")
     let target = colorProfile("target", hash: "f", name: "Target ICC")
     var displays = makeDisplays()
@@ -724,23 +724,21 @@ struct DisplayAdapterTests {
     let adapter = CoreGraphicsDisplayAdapter(systemAPI: api)
     let initialSnapshot = try await adapter.snapshot()
     var settings = try displaySettings(from: initialSnapshot)
-    settings.displays[0].colorProfile = .init(value: target)
+    settings.displays[0].colorProfile = .init(isIncluded: false, value: target)
     settings.displays[1].mode.value = try #require(
       displays[1].supportedModes.first(where: { $0 != displays[1].currentMode })
     )
-    let profile = DeskProfile(
-      name: "Synthetic",
-      settings: .init(
-        display: .init(value: settings)
-      ))
-    let engine = ApplyEngine(registry: try AdapterRegistry([adapter]))
+    let plan = try await adapter.plan(
+      .display(settings),
+      from: initialSnapshot,
+      mode: .normal
+    )
+    let operation = try #require(
+      plan.operations.first(where: { $0.key == "display.atomic-configuration" })
+    )
 
-    let result = await engine.apply(profile: profile, mode: .normal)
-    let confirmationID = try #require(result.safetyConfirmationID)
-    let rollback = await engine.revertSafetyRollback(confirmationID)
-
-    #expect(result.status == .applied)
-    #expect(rollback.status == .reverted)
+    #expect(await adapter.apply(operation).status == .succeeded)
+    #expect(await adapter.rollback(operation).status == .rolledBack)
     #expect(
       await api.recordedMutationNames() == [
         "topology.appOnly",

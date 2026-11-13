@@ -110,7 +110,7 @@ struct UnsavedPromptValidationHandoff: Equatable, Sendable {
 }
 
 enum ProfileEditorSurfacePolicy {
-  static let visibleGroups: Set<SettingGroup> = [.display, .audio, .input]
+  static let visibleGroups: Set<SettingGroup> = [.audio, .input]
   static let showsActivationControl = false
   static let showsUnsupportedControls = false
   static let showsDescription = false
@@ -119,11 +119,10 @@ enum ProfileEditorSurfacePolicy {
 }
 
 enum ProfileEditorStepPolicy {
-  static let orderedGroups: [SettingGroup] = [.display, .audio, .input]
+  static let orderedGroups: [SettingGroup] = [.audio, .input]
 
   static func group(for fieldID: DraftFieldIdentifier) -> SettingGroup? {
     let rawValue = fieldID.rawValue
-    if rawValue.hasPrefix("settings.display") { return .display }
     if rawValue.hasPrefix("settings.audio") { return .audio }
     if rawValue.hasPrefix("settings.input") { return .input }
     return nil
@@ -311,7 +310,7 @@ enum ProfileEditorAudioVolumeCapabilityResolver {
     currentDeviceUID: String?,
     catalog: [AudioVolumeControlCatalogEntry]
   ) -> ProfileEditorAudioVolumeCapability {
-    let targetDeviceUID = selectedDevice.value ?? currentDeviceUID
+    let targetDeviceUID = selectedDevice.isIncluded ? selectedDevice.value : currentDeviceUID
     guard
       let targetDeviceUID,
       let entry = catalog.first(where: {
@@ -338,7 +337,7 @@ enum ProfileEditorAudioMuteCapabilityResolver {
     currentDeviceUID: String?,
     catalog: [AudioMuteControlCatalogEntry]
   ) -> ProfileEditorAudioMuteCapability {
-    let targetDeviceUID = selectedDevice.value ?? currentDeviceUID
+    let targetDeviceUID = selectedDevice.isIncluded ? selectedDevice.value : currentDeviceUID
     guard
       let targetDeviceUID,
       let entry = catalog.first(where: { $0.deviceUID == targetDeviceUID })
@@ -392,7 +391,7 @@ enum ProfileEditorKeyboardOptionPolicy {
     _ option: SettingOption<Double?>,
     suggestedValue: Double?
   ) -> Double? {
-    option.isIncluded ? option.value : suggestedValue
+    option.value ?? suggestedValue
   }
 
   static func updating(
@@ -728,6 +727,7 @@ struct ProfilesSettingsView: View {
         .accessibilityLabel(appLocalized("More Profile Actions"))
         .help(appLocalized("More Profile Actions"))
       }
+      .buttonStyle(.bordered)
       .padding(ProfileWorkspaceLayoutPolicy.sidebarActionInset)
       .uiAuditLayoutAnchor("sidebar.actions")
       .accessibilityIdentifier("profile-sidebar-actions")
@@ -1345,7 +1345,7 @@ private struct ProfileEditorForm: View {
     guard uiAuditConfiguration.isEnabled else { return .top }
     switch uiAuditConfiguration.variant {
     case .editorAudio, .editorAudioUnsupported:
-      return .center
+      return .top
     case .editorKeyboard:
       return .bottom
     default:
@@ -1422,7 +1422,7 @@ private struct ProfileEditorForm: View {
   }
 
   private var settingsSections: some View {
-    VStack(alignment: .leading, spacing: 28) {
+    VStack(alignment: .leading, spacing: 12) {
       ForEach(availableGroups, id: \.self) { group in
         settingsSection(group)
       }
@@ -1432,10 +1432,12 @@ private struct ProfileEditorForm: View {
 
   private func settingsSection(_ group: SettingGroup) -> some View {
     VStack(alignment: .leading, spacing: 14) {
-      Label(stepTitle(group), systemImage: stepSystemImage(group))
-        .font(.title3.weight(.semibold))
-        .accessibilityAddTraits(.isHeader)
-        .uiAuditLayoutAnchor("profile-section-\(group.rawValue).heading")
+      if group != .audio && group != .input {
+        Label(stepTitle(group), systemImage: stepSystemImage(group))
+          .font(.title3.weight(.semibold))
+          .accessibilityAddTraits(.isHeader)
+          .uiAuditLayoutAnchor("profile-section-\(group.rawValue).heading")
+      }
 
       if let issue = validation.issue(for: .group(group)) {
         inlineValidationMessage(
@@ -1459,7 +1461,7 @@ private struct ProfileEditorForm: View {
   private func settingsOptions(_ group: SettingGroup) -> some View {
     switch group {
     case .display:
-      displaySimpleOptions
+      EmptyView()
     case .audio:
       audioSimpleOptions
     case .input:
@@ -1476,17 +1478,23 @@ private struct ProfileEditorForm: View {
   private func groupIsAvailable(_ group: SettingGroup) -> Bool {
     switch group {
     case .display:
-      ProfileEditorSurfacePolicy.visibleGroups.contains(.display)
-        && (hasVisibleDisplayFields || !profile.settings.display.value.displays.isEmpty)
+      false
     case .audio:
       ProfileEditorSurfacePolicy.visibleGroups.contains(.audio)
-        && (hasVisibleAudioFields || profile.settings.audio.value.hasIncludedOption)
+        && (hasVisibleAudioFields || profile.settings.audio.value.hasIncludedOption
+          || profile.settings.audio.value.defaultOutputUID.value != nil
+          || profile.settings.audio.value.defaultInputUID.value != nil
+          || profile.settings.audio.value.outputVolume.value != nil
+          || profile.settings.audio.value.inputVolume.value != nil
+          || profile.settings.audio.value.outputMuted.value != nil)
     case .network:
       ProfileEditorSurfacePolicy.visibleGroups.contains(.network)
         && (hasVisibleNetworkFields || hasIncludedUnavailableNetworkFields)
     case .input:
       ProfileEditorSurfacePolicy.visibleGroups.contains(.input)
-        && (hasVisibleInputFields || profile.settings.input.value.hasIncludedOption)
+        && (hasVisibleInputFields || profile.settings.input.value.hasIncludedOption
+          || profile.settings.input.value.keyRepeatInterval.value != nil
+          || profile.settings.input.value.initialKeyRepeatDelay.value != nil)
     }
   }
 
@@ -1556,121 +1564,13 @@ private struct ProfileEditorForm: View {
     )
   }
 
-  private var displaySimpleOptions: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      if isVisible(.displayPrimary) || !profile.settings.display.value.displays.isEmpty {
-        optionEditor(
-          "Main display",
-          validationFields: [.displayPrimary]
-        ) {
-          Picker(appLocalized("Main display"), selection: primaryDisplaySelectionBinding()) {
-            if primaryDisplaySelectionIsAmbiguous {
-              Text(appLocalized("Choose a display")).tag(invalidPrimaryDisplaySelectionID)
-            }
-            ForEach(profile.settings.display.value.displays) { display in
-              Text(displayName(display)).tag(display.id)
-            }
-          }
-          .labelsHidden()
-          .accessibilityLabel(appLocalized("Primary display"))
-          .accessibilityValue(primaryDisplaySummary)
-          .accessibilityHint(
-            validationAccessibilityHint(
-              for: .displayPrimary,
-              fallback: "Choose the display that should anchor the desktop"
-            )
-          )
-          .accessibilityInvalid(validation.issue(for: .displayPrimary) != nil)
-          .focused($focusedField, equals: .displayPrimary)
-        }
-      }
-      displayDeviceOptions
-    }
-  }
-
-  @ViewBuilder
-  private var displayDeviceOptions: some View {
-    if !profile.settings.display.value.displays.isEmpty {
-      ForEach($profile.settings.display.value.displays) { $display in
-        let supportedModes = supportedDisplayModes(for: display)
-        if !supportedModes.isEmpty || display.mode.isIncluded {
-          GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-              if !supportedModes.isEmpty || display.mode.isIncluded {
-                optionEditor(
-                  "Resolution",
-                  validationFields: [
-                    .display(display.id, .modeWidth),
-                    .display(display.id, .modeHeight),
-                    .display(display.id, .modePixelWidth),
-                    .display(display.id, .modePixelHeight),
-                    .display(display.id, .modeRefreshRate),
-                  ]
-                ) {
-                  Picker(
-                    appLocalized("Resolution"),
-                    selection: supportedDisplayModeBinding(
-                      $display.mode.value,
-                      supportedModes: supportedModes
-                    )
-                  ) {
-                    ForEach(supportedModes, id: \.self) { mode in
-                      Text(displayModeSummary(mode)).tag(mode)
-                    }
-                    if DisplayResolutionMatcher().match(
-                      display.mode.value,
-                      among: supportedModes
-                    ) == nil {
-                      Text(appLocalized("Saved mode — currently unavailable"))
-                        .tag(display.mode.value)
-                    }
-                  }
-                  .labelsHidden()
-                  .focused(
-                    $focusedField,
-                    equals: .display(display.id, .modeWidth)
-                  )
-                  .accessibilityLabel(appLocalized("Resolution"))
-                  .accessibilityValue(displayModeSummary(display.mode.value))
-                  .accessibilityHint(
-                    validationAccessibilityHint(
-                      for: .display(display.id, .modeWidth),
-                      fallback:
-                        "Choose a supported resolution; the current refresh rate is preserved"
-                    )
-                  )
-                  .accessibilityInvalid(
-                    validationIssues(for: [
-                      .display(display.id, .modeWidth),
-                      .display(display.id, .modeHeight),
-                      .display(display.id, .modePixelWidth),
-                      .display(display.id, .modePixelHeight),
-                      .display(display.id, .modeRefreshRate),
-                    ]).isEmpty == false
-                  )
-                }
-              }
-
-            }
-          } label: {
-            HStack {
-              Label(displayName(display), systemImage: "display")
-              Spacer()
-              Text(appLocalized(display.isPrimary.value ? "Primary" : "Secondary"))
-                .font(.caption.bold())
-                .foregroundStyle(.secondary)
-            }
-            .font(.headline)
-          }
-        }
-      }
-    }
-  }
-
   @ViewBuilder
   private var audioSimpleOptions: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      audioSection("Output", systemImage: "speaker.wave.2", identifier: "audio-output") {
+    VStack(alignment: .leading, spacing: 12) {
+      settingSection(
+        "Sound Output", section: .soundOutput, systemImage: "speaker.wave.2",
+        identifier: "audio-output"
+      ) {
         audioDeviceOption(
           "Output device",
           option: $profile.settings.audio.value.defaultOutputUID,
@@ -1691,7 +1591,10 @@ private struct ProfileEditorForm: View {
         )
         .uiAuditLayoutAnchor("audio-output.mute")
       }
-      audioSection("Input", systemImage: "mic", identifier: "audio-input") {
+
+      settingSection(
+        "Sound Input", section: .soundInput, systemImage: "mic", identifier: "audio-input"
+      ) {
         audioDeviceOption(
           "Input device",
           option: $profile.settings.audio.value.defaultInputUID,
@@ -1710,29 +1613,128 @@ private struct ProfileEditorForm: View {
     }
   }
 
-  private func audioSection<Content: View>(
+  private func settingSection<Content: View>(
     _ title: String.LocalizationValue,
+    section: ProfileSettingSection,
     systemImage: String,
     identifier: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    GroupBox {
-      VStack(alignment: .leading, spacing: 16, content: content)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-    } label: {
-      Label(appLocalized(title), systemImage: systemImage)
-        .font(.headline)
-        .accessibilityAddTraits(.isHeader)
+    let included = profile.settings.isIncluded(section)
+    return VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 8) {
+        Label(appLocalized(title), systemImage: systemImage)
+          .font(.headline)
+          .accessibilityAddTraits(.isHeader)
+        Spacer(minLength: 8)
+        Text(appLocalized(included ? "On" : "Off"))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .accessibilityHidden(true)
+        Toggle(isOn: sectionInclusion(section)) { EmptyView() }
+          .disabled(!included && !canEnableSection(section))
+          .labelsHidden()
+          .toggleStyle(.switch)
+          .accessibilityLabel(appLocalized(title))
+          .accessibilityValue(appLocalized(included ? "On" : "Off"))
+          .accessibilityHint(
+            appLocalized("Only enabled settings change when applying this profile.")
+          )
+          .accessibilityIdentifier("\(identifier).enabled")
+          .uiAuditLayoutAnchor("\(identifier).enabled")
+      }
+      if included {
+        Divider()
+        VStack(alignment: .leading, spacing: 8, content: content)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      } else {
+        Text(
+          appLocalized(
+            canEnableSection(section)
+              ? "Not applied. Saved values are kept." : "No settings available on this Mac.")
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
     }
+    .padding(12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .simpleSettingsSurface()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(identifier)
     .uiAuditLayoutAnchor(identifier)
   }
 
+  private func canEnableSection(_ section: ProfileSettingSection) -> Bool {
+    func hasValue(_ settings: ProfileSettings) -> Bool {
+      switch section {
+      case .soundOutput:
+        settings.audio.value.defaultOutputUID.value != nil
+          || settings.audio.value.outputVolume.value != nil
+          || settings.audio.value.outputMuted.value != nil
+      case .soundInput:
+        settings.audio.value.defaultInputUID.value != nil
+          || settings.audio.value.inputVolume.value != nil
+      case .keyboard:
+        settings.input.value.keyRepeatInterval.value != nil
+          || settings.input.value.initialKeyRepeatDelay.value != nil
+      }
+    }
+    return hasValue(profile.settings)
+      || systemSnapshot.map { hasValue($0.profileSettings) } == true
+  }
+
+  private func sectionInclusion(_ section: ProfileSettingSection) -> Binding<Bool> {
+    Binding(
+      get: { profile.settings.isIncluded(section) },
+      set: { included in
+        // Seed an empty section from read-only runtime values only after the user
+        // explicitly enables it. No system setting is changed by editing a draft.
+        if included, let snapshot = systemSnapshot?.profileSettings {
+          switch section {
+          case .soundOutput:
+            if profile.settings.audio.value.defaultOutputUID.value == nil {
+              profile.settings.audio.value.defaultOutputUID.value =
+                snapshot.audio.value.defaultOutputUID.value
+            }
+            if profile.settings.audio.value.outputVolume.value == nil {
+              profile.settings.audio.value.outputVolume.value =
+                snapshot.audio.value.outputVolume.value
+            }
+            if profile.settings.audio.value.outputMuted.value == nil {
+              profile.settings.audio.value.outputMuted.value =
+                snapshot.audio.value.outputMuted.value
+            }
+          case .soundInput:
+            if profile.settings.audio.value.defaultInputUID.value == nil {
+              profile.settings.audio.value.defaultInputUID.value =
+                snapshot.audio.value.defaultInputUID.value
+            }
+            if profile.settings.audio.value.inputVolume.value == nil {
+              profile.settings.audio.value.inputVolume.value =
+                snapshot.audio.value.inputVolume.value
+            }
+          case .keyboard:
+            if profile.settings.input.value.keyRepeatInterval.value == nil {
+              profile.settings.input.value.keyRepeatInterval.value =
+                snapshot.input.value.keyRepeatInterval.value
+            }
+            if profile.settings.input.value.initialKeyRepeatDelay.value == nil {
+              profile.settings.input.value.initialKeyRepeatDelay.value =
+                snapshot.input.value.initialKeyRepeatDelay.value
+            }
+          }
+        }
+        profile.settings.setIncluded(included, for: section)
+      }
+    )
+  }
+
   @ViewBuilder
   private var inputSimpleOptions: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    settingSection(
+      "Keyboard", section: .keyboard, systemImage: "keyboard", identifier: "keyboard-section"
+    ) {
       keyboardSliderOption(
         "Key repeat speed",
         option: $profile.settings.input.value.keyRepeatInterval,
@@ -1788,6 +1790,8 @@ private struct ProfileEditorForm: View {
       )
       optionEditor(
         title,
+        embeddedTitle: title,
+        inclusion: option.isIncluded,
         validationFields: [fieldID]
       ) {
         if effectiveValue == nil {
@@ -1845,13 +1849,16 @@ private struct ProfileEditorForm: View {
         }
       }
       .uiAuditLayoutAnchor(identifier)
-    } else if ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
-      isIncluded: option.wrappedValue.isIncluded,
-      isRuntimeAvailable: isRuntimeAvailable,
-      hasRuntimeEvidence: systemSnapshot != nil
-    ) {
+    } else if option.wrappedValue.value != nil
+      || ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
+        isIncluded: option.wrappedValue.isIncluded,
+        isRuntimeAvailable: isRuntimeAvailable,
+        hasRuntimeEvidence: systemSnapshot != nil
+      )
+    {
       unavailableSavedOption(
         appLocalized(title),
+        inclusion: option.isIncluded,
         validationFields: [fieldID],
         warning: appLocalized(
           "This saved keyboard setting cannot be changed on this Mac right now. Review available settings before applying."
@@ -2072,21 +2079,43 @@ private struct ProfileEditorForm: View {
   private func optionEditor<Content: View>(
     _ title: String.LocalizationValue,
     embeddedTitle: String.LocalizationValue? = nil,
+    inclusion: Binding<Bool>? = nil,
     validationFields: [DraftFieldIdentifier] = [],
     @ViewBuilder content: () -> Content
   ) -> some View {
     let localizedTitle = appLocalized(title)
 
-    VStack(alignment: .leading, spacing: 8) {
-      optionTitle(
-        embeddedTitle.map { appLocalized($0) } ?? localizedTitle,
-        validationFields: validationFields
-      )
+    VStack(alignment: .leading, spacing: 6) {
+      let rowLayout =
+        dynamicTypeSize.isAccessibilitySize
+        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+        : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+      rowLayout {
+        Group {
+          if let inclusion {
+            Toggle(appLocalized(title), isOn: inclusion)
+              .toggleStyle(.checkbox)
+              .fontWeight(.medium)
+              .accessibilityHint(
+                appLocalized("Only enabled settings change when applying this profile.")
+              )
+              .accessibilityIdentifier(
+                "include.\(validationFields.first?.rawValue ?? localizedTitle)")
+          } else {
+            optionTitle(
+              embeddedTitle.map { appLocalized($0) } ?? localizedTitle,
+              validationFields: validationFields
+            )
+          }
+        }
+        .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 140, alignment: .leading)
 
-      VStack(alignment: .leading, spacing: 8) {
-        content()
+        VStack(alignment: .leading, spacing: 6) {
+          content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .disabled(inclusion?.wrappedValue == false)
       }
-      .padding(.leading, ProfileSettingRowStylePolicy.contentLeadingInset)
 
       ForEach(validationIssues(for: validationFields)) { issue in
         inlineValidationMessage(
@@ -2124,14 +2153,23 @@ private struct ProfileEditorForm: View {
   private func unavailableSavedOption(
     _ title: String,
     embeddedTitle: String.LocalizationValue? = nil,
+    inclusion: Binding<Bool>? = nil,
     validationFields: [DraftFieldIdentifier] = [],
     warning: String
   ) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      optionTitle(
-        embeddedTitle.map { appLocalized($0) } ?? title,
-        validationFields: validationFields
-      )
+      if let inclusion {
+        Toggle(title, isOn: inclusion)
+          .toggleStyle(.checkbox)
+          .fontWeight(.medium)
+          .accessibilityHint(
+            appLocalized("Only enabled settings change when applying this profile."))
+      } else {
+        optionTitle(
+          embeddedTitle.map { appLocalized($0) } ?? title,
+          validationFields: validationFields
+        )
+      }
 
       Label(warning, systemImage: "exclamationmark.triangle.fill")
         .font(.caption)
@@ -2208,6 +2246,7 @@ private struct ProfileEditorForm: View {
       optionEditor(
         title,
         embeddedTitle: "Device",
+        inclusion: option.isIncluded,
         validationFields: [fieldID]
       ) {
         Picker(appLocalized("Device"), selection: option.value) {
@@ -2223,6 +2262,7 @@ private struct ProfileEditorForm: View {
           }
         }
         .labelsHidden()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .focused($focusedField, equals: fieldID)
         .accessibilityLabel(
           appLocalized(scope == .input ? "Default input device" : "Default output device")
@@ -2252,6 +2292,7 @@ private struct ProfileEditorForm: View {
       optionEditor(
         title,
         embeddedTitle: "Volume",
+        inclusion: option.isIncluded,
         validationFields: [fieldID]
       ) {
         if option.wrappedValue.value == nil {
@@ -2271,6 +2312,7 @@ private struct ProfileEditorForm: View {
             } maximumValueLabel: {
               Text("100")
             }
+            .labelsHidden()
             .accessibilityLabel(appLocalized(title))
             TextField(
               appLocalized("Volume percent"),
@@ -2293,14 +2335,17 @@ private struct ProfileEditorForm: View {
           .accessibilityInvalid(validation.issue(for: fieldID) != nil)
         }
       }
-    } else if ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
-      isIncluded: option.wrappedValue.isIncluded,
-      isRuntimeAvailable: capability.isWritable,
-      hasRuntimeEvidence: systemSnapshot != nil
-    ) {
+    } else if option.wrappedValue.value != nil
+      || ProfileEditorUnavailableIncludedSettingPolicy.showsRepairControl(
+        isIncluded: option.wrappedValue.isIncluded,
+        isRuntimeAvailable: capability.isWritable,
+        hasRuntimeEvidence: systemSnapshot != nil
+      )
+    {
       unavailableSavedOption(
         appLocalized(title),
         embeddedTitle: "Volume",
+        inclusion: option.isIncluded,
         validationFields: [fieldID],
         warning: appLocalized(
           "Volume cannot be changed for this device right now. Choose another device or review available settings before applying."
@@ -2340,6 +2385,7 @@ private struct ProfileEditorForm: View {
       optionEditor(
         "Output mute",
         embeddedTitle: "Output mute",
+        inclusion: option.isIncluded,
         validationFields: [fieldID]
       ) {
         if option.wrappedValue.value == nil {
@@ -2347,32 +2393,41 @@ private struct ProfileEditorForm: View {
             option.wrappedValue.value = capability.suggestedValue
           }
         } else {
-          Toggle(
-            appLocalized(option.wrappedValue.value == true ? "Muted" : "Not muted"),
-            isOn: optionalBoolBinding(
-              option.value,
-              defaultValue: capability.suggestedValue ?? false
+          HStack(spacing: 12) {
+            Text(appLocalized(option.wrappedValue.value == true ? "Muted" : "Not muted"))
+              .foregroundStyle(.secondary)
+              .accessibilityHidden(true)
+            Spacer(minLength: 12)
+            Toggle(
+              appLocalized("Output mute"),
+              isOn: optionalBoolBinding(
+                option.value,
+                defaultValue: capability.suggestedValue ?? false
+              )
             )
-          )
-          .toggleStyle(.switch)
-          .focused($focusedField, equals: fieldID)
-          .accessibilityLabel(appLocalized("Output mute"))
-          .accessibilityValue(
-            appLocalized(option.wrappedValue.value == true ? "Muted" : "Not muted")
-          )
-          .accessibilityHint(
-            validationAccessibilityHint(
-              for: fieldID,
-              fallback: "Turn sound off or on for the selected output device"
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .focused($focusedField, equals: fieldID)
+            .accessibilityLabel(appLocalized("Output mute"))
+            .accessibilityValue(
+              appLocalized(option.wrappedValue.value == true ? "Muted" : "Not muted")
             )
-          )
-          .accessibilityInvalid(validation.issue(for: fieldID) != nil)
+            .accessibilityHint(
+              validationAccessibilityHint(
+                for: fieldID,
+                fallback: "Turn sound off or on for the selected output device"
+              )
+            )
+            .accessibilityInvalid(validation.issue(for: fieldID) != nil)
+            .uiAuditLayoutAnchor("audio-output.mute.switch")
+          }
         }
       }
     } else {
       unavailableSavedOption(
         appLocalized("Output mute"),
         embeddedTitle: "Output mute",
+        inclusion: option.isIncluded,
         validationFields: [fieldID],
         warning: appLocalized(
           "Mute cannot be changed for this output device right now. Choose another device or review available settings before applying."
@@ -2483,73 +2538,7 @@ private struct ProfileEditorForm: View {
   private func focusTarget(
     for fieldID: DraftFieldIdentifier
   ) -> DraftFieldIdentifier {
-    for display in profile.settings.display.value.displays
-    where [
-      DisplayDraftField.modeWidth,
-      .modeHeight,
-      .modePixelWidth,
-      .modePixelHeight,
-      .modeRefreshRate,
-    ].contains(where: { fieldID == .display(display.id, $0) }) {
-      return .display(display.id, .modeWidth)
-    }
-    if fieldID == .profileName || fieldID == .profileDescription {
-      return fieldID
-    }
     return fieldID
-  }
-
-  private func displayModeSummary(_ mode: DisplayMode) -> String {
-    let base = "\(mode.width)×\(mode.height)"
-    guard mode.hasDistinctPixelDimensions else { return base }
-    let pixels = appLocalized("\(mode.pixelWidth)×\(mode.pixelHeight) pixels")
-    return "\(base) · \(pixels)"
-  }
-
-  private func primaryDisplaySelectionBinding() -> Binding<UUID> {
-    Binding(
-      get: {
-        let selected = profile.settings.display.value.displays.filter { $0.isPrimary.value }
-        return selected.count == 1 ? selected[0].id : invalidPrimaryDisplaySelectionID
-      },
-      set: { selectedID in
-        profile.settings.display.value.displays = DisplayPrimarySelectionEditor.selecting(
-          selectedID,
-          in: profile.settings.display.value.displays
-        )
-      }
-    )
-  }
-
-  private var primaryDisplaySummary: String {
-    let selected = profile.settings.display.value.displays.filter { $0.isPrimary.value }
-    guard selected.count == 1 else {
-      return appLocalized("Choose a display")
-    }
-    return displayName(selected[0])
-  }
-
-  private var primaryDisplaySelectionIsAmbiguous: Bool {
-    profile.settings.display.value.displays.count(where: { $0.isPrimary.value }) != 1
-  }
-
-  private func supportedDisplayModes(for display: DisplayTargetSettings) -> [DisplayMode] {
-    let entries = systemSnapshot?.displayModeCatalog ?? []
-    let identities = entries.map(\.identity)
-    guard
-      case .matched(let matchedIdentity) = DisplayIdentityMatcher().match(
-        display.identity,
-        among: identities
-      ), let entry = entries.first(where: { $0.identity == matchedIdentity })
-    else {
-      return []
-    }
-
-    return DisplayResolutionMatcher().resolutions(from: entry.modes)
-  }
-
-  private var hasVisibleDisplayFields: Bool {
-    visibleSettingFields.contains { $0.contract.group == .display }
   }
 
   private var hasVisibleAudioFields: Bool {
@@ -2742,20 +2731,6 @@ private struct ProfileEditorForm: View {
     )
   }
 
-  private func supportedDisplayModeBinding(
-    _ savedMode: Binding<DisplayMode>,
-    supportedModes: [DisplayMode]
-  ) -> Binding<DisplayMode> {
-    let matcher = DisplayResolutionMatcher()
-    return Binding(
-      get: {
-        matcher.match(savedMode.wrappedValue, among: supportedModes)
-          ?? savedMode.wrappedValue
-      },
-      set: { savedMode.wrappedValue = $0 }
-    )
-  }
-
   private func audioDeviceSummary(
     _ uid: String?,
     choices: [AudioDeviceChoice]
@@ -2763,28 +2738,6 @@ private struct ProfileEditorForm: View {
     guard let uid, !uid.isEmpty else { return appLocalized("Choose a device") }
     return choices.first(where: { $0.uid == uid })?.name
       ?? appLocalized("Saved device — currently disconnected")
-  }
-
-  private func displayName(_ display: DisplayTargetSettings) -> String {
-    let candidates = profile.settings.display.value.displays.map {
-      (id: $0.id, name: baseDisplayName($0))
-    }
-    return FriendlyNameDisambiguator().labels(for: candidates)[display.id]
-      ?? baseDisplayName(display)
-  }
-
-  private func baseDisplayName(_ display: DisplayTargetSettings) -> String {
-    let name = display.identity.productName?.trimmingCharacters(in: .whitespacesAndNewlines)
-    if let name, !name.isEmpty {
-      return name
-    }
-    return display.identity.isBuiltIn
-      ? appLocalized("Built-in display") : appLocalized("External display")
-  }
-
-  private func mirroredIdentity(_ mirroring: DisplayMirroring) -> DisplayIdentity? {
-    guard case .mirrors(let identity) = mirroring else { return nil }
-    return identity
   }
 
   private var audioDeviceChoices: [AudioDeviceChoice] {

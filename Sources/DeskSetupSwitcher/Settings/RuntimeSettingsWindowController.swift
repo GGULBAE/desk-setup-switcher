@@ -560,19 +560,29 @@ struct SettingsView: View {
   }
 
   var body: some View {
-    TabView(selection: $selectedTab) {
-      ProfilesSettingsView(presentationGeneration: presentationGeneration)
-        .tabItem { Label(appLocalized("Profiles"), systemImage: "rectangle.stack") }
-        .tag(SettingsTab.profiles)
+    VStack(spacing: 0) {
+      Picker(appLocalized("Settings"), selection: $selectedTab) {
+        Text(appLocalized("Profiles")).tag(SettingsTab.profiles)
+        Text(appLocalized("App Settings")).tag(SettingsTab.system)
+        Text(appLocalized("About")).tag(SettingsTab.about)
+      }
+      .pickerStyle(.segmented)
+      .labelsHidden()
+      .frame(width: 420)
+      .padding(.bottom, 16)
+      .accessibilityLabel(appLocalized("Settings"))
 
-      AppSettingsView()
-        .environmentObject(model)
-        .tabItem { Label(appLocalized("App Settings"), systemImage: "gearshape") }
-        .tag(SettingsTab.system)
-
-      AboutSettingsView()
-        .tabItem { Label(appLocalized("About"), systemImage: "info.circle") }
-        .tag(SettingsTab.about)
+      Group {
+        switch selectedTab {
+        case .profiles:
+          ProfilesSettingsView(presentationGeneration: presentationGeneration)
+        case .system:
+          AppSettingsView().environmentObject(model)
+        case .about:
+          AboutSettingsView()
+        }
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .padding(20)
   }

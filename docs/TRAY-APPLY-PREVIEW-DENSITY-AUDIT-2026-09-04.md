@@ -1,5 +1,7 @@
 # Tray and Apply Preview density audit — 2026-09-04
 
+> Follow-up: the 2026-09-05 refinement removes the Beta hardware-verification sentence from the dialog and changes standard-width planned changes to a two-column grid. The transaction safety model and documented hardware-evidence boundary are unchanged.
+
 ## Scope and evidence boundary
 
 This pass addresses three user-reported presentation problems:

@@ -149,10 +149,6 @@ extension View {
       uuidString: "10000000-0000-0000-0000-000000000002")!
     private static let legacyProfileID = UUID(
       uuidString: "10000000-0000-0000-0000-000000000003")!
-    private static let builtInDisplayID = UUID(
-      uuidString: "20000000-0000-0000-0000-000000000001")!
-    private static let externalDisplayID = UUID(
-      uuidString: "20000000-0000-0000-0000-000000000002")!
     private static let capturedAt = Date(timeIntervalSince1970: 1_700_000_000)
 
     static func makeModel(configuration: UIAuditConfiguration) -> ApplicationModel {
@@ -178,12 +174,8 @@ extension View {
 
       if variant == .validation {
         ready.name = "Validation Sample"
-        ready.settings.display.value.displays[1].isPrimary.value = true
         ready.settings.audio.value.defaultInputUID.value = nil
-        ready.settings.network.value.wifiSSID.value = "  "
       }
-
-      configureNetworkEvidence(variant, profile: &ready)
 
       let profiles: [DeskProfile]
       switch variant {
@@ -215,10 +207,10 @@ extension View {
       )
       let captureSummary: ProfileCaptureSummary? =
         variant == .overview || variant == .menuPolish || variant == .trayCapturePermission
-        ? partialCaptureSummary() : nil
+        ? currentCaptureSummary() : nil
       let applySummary: ApplyResultSummary? =
         variant == .overview || variant == .trayApplyResult
-        ? partialApplySummary(profile: ready) : nil
+        ? currentApplySummary(profile: ready) : nil
 
       let readiness = Dictionary(
         uniqueKeysWithValues: profiles.map { profile in
@@ -246,10 +238,10 @@ extension View {
     private static func readyProfile() -> DeskProfile {
       DeskProfile(
         id: readyProfileID,
-        name: "Focus Workspace — Display & Sound",
+        name: "Focus Workspace — Sound & Keyboard",
         profileDescription:
           "A long synthetic profile used only to review layout, wrapping, controls, and accessibility metadata.",
-        symbolName: "display.2",
+        symbolName: "headphones",
         settings: comprehensiveSettings(),
         createdAt: capturedAt,
         updatedAt: capturedAt,
@@ -264,8 +256,8 @@ extension View {
               message: "The saved target was applied."
             ),
             ApplicationItemSummary(
-              group: .network,
-              key: "wifi.ssid",
+              group: .input,
+              key: "InitialKeyRepeat",
               status: .skipped,
               message: "Read-back was unavailable."
             ),
@@ -276,8 +268,9 @@ extension View {
 
     private static func partialProfile() -> DeskProfile {
       var settings = comprehensiveSettings()
-      settings.display.isIncluded = false
       settings.input.isIncluded = false
+      settings.input.value.keyRepeatInterval = .init(isIncluded: false, value: nil)
+      settings.input.value.initialKeyRepeatDelay = .init(isIncluded: false, value: nil)
       return DeskProfile(
         id: partialProfileID,
         name: "Portable Desk — Available Settings Only",
@@ -303,56 +296,7 @@ extension View {
     }
 
     private static func comprehensiveSettings() -> ProfileSettings {
-      let builtInIdentity = DisplayIdentity(
-        uuid: builtInDisplayID,
-        productName: "Built-in Retina Display",
-        isBuiltIn: true
-      )
-      let externalIdentity = DisplayIdentity(
-        uuid: externalDisplayID,
-        productName: "Synthetic Wide Display"
-      )
-      let builtInMode = DisplayMode(
-        width: 1728,
-        height: 1117,
-        pixelWidth: 3456,
-        pixelHeight: 2234,
-        refreshRate: 60
-      )
-      let externalMode = DisplayMode(width: 2560, height: 1440, refreshRate: 60)
-      let colorProfile = ColorSyncProfileTarget(
-        registeredProfileID: "synthetic-srgb",
-        fileSHA256: String(repeating: "a", count: 64),
-        displayName: "Synthetic sRGB ICC"
-      )
-
-      return ProfileSettings(
-        display: .init(
-          value: .init(displays: [
-            DisplayTargetSettings(
-              id: builtInDisplayID,
-              identity: builtInIdentity,
-              isPrimary: .init(value: true),
-              origin: .init(isIncluded: false, value: .init(x: 0, y: 0)),
-              mirroring: .init(value: .extended),
-              mode: .init(value: builtInMode),
-              colorProfile: .init(value: colorProfile),
-              rotationDegrees: .init(isIncluded: false, value: 0),
-              isActive: .init(isIncluded: false, value: true)
-            ),
-            DisplayTargetSettings(
-              id: externalDisplayID,
-              identity: externalIdentity,
-              isPrimary: .init(value: false),
-              origin: .init(isIncluded: false, value: .init(x: 1728, y: 0)),
-              mirroring: .init(value: .extended),
-              mode: .init(value: externalMode),
-              colorProfile: .init(value: colorProfile),
-              rotationDegrees: .init(isIncluded: false, value: 0),
-              isActive: .init(isIncluded: false, value: true)
-            ),
-          ])
-        ),
+      ProfileSettings(
         audio: .init(
           value: .init(
             defaultInputUID: .init(value: "synthetic-input"),
@@ -363,48 +307,10 @@ extension View {
             outputMuted: .init(value: false)
           )
         ),
-        network: .init(
-          value: .init(
-            wifiPower: .init(isIncluded: false, value: true),
-            wifiSSID: .init(isIncluded: false, value: "Synthetic Studio"),
-            serviceIPv4: [
-              .init(
-                identity: .init(
-                  kind: .ethernet,
-                  serviceName: "Synthetic Ethernet",
-                  interfaceType: "Ethernet"
-                ),
-                configuration: .init(
-                  value: .manual(
-                    address: "192.0.2.40",
-                    subnetMask: "255.255.255.0",
-                    router: "192.0.2.1"
-                  )
-                )
-              ),
-              .init(
-                identity: .init(
-                  kind: .wifi,
-                  serviceName: "Synthetic Wi-Fi",
-                  interfaceType: "IEEE80211"
-                ),
-                configuration: .init(value: .dhcp)
-              ),
-            ],
-            ipv4: .init(isIncluded: false, value: .dhcp),
-            dnsServers: .init(isIncluded: false, value: ["192.0.2.53"]),
-            webProxy: .init(isIncluded: false, value: nil),
-            secureWebProxy: .init(isIncluded: false, value: nil)
-          )
-        ),
         input: .init(
-          isIncluded: false,
           value: .init(
-            pointerSpeed: .init(value: 4.5),
-            naturalScrolling: .init(value: true),
             keyRepeatInterval: .init(value: 60),
-            initialKeyRepeatDelay: .init(value: 150),
-            useStandardFunctionKeys: .init(value: false)
+            initialKeyRepeatDelay: .init(value: 150)
           )
         )
       )
@@ -414,32 +320,7 @@ extension View {
       settings: ProfileSettings,
       supportsAudioVolume: Bool = true
     ) -> SystemSnapshotResult {
-      let displaySettings = settings.display.value
       let audioSettings = settings.audio.value
-      let displayCatalog = displaySettings.displays.map { display in
-        DisplayModeCatalogEntry(
-          identity: display.identity,
-          modes: [
-            display.mode.value,
-            DisplayMode(width: 1920, height: 1080, refreshRate: 60),
-          ]
-        )
-      }
-      let displaySnapshot = AdapterSnapshot(
-        group: .display,
-        capturedAt: capturedAt,
-        payload: .display(displaySettings),
-        items: [],
-        displayModeCatalog: displayCatalog,
-        displayColorProfileCatalog: displaySettings.displays.compactMap { display in
-          guard let profile = display.colorProfile.value else { return nil }
-          return DisplayColorProfileCatalogEntry(
-            identity: display.identity,
-            profiles: [profile],
-            canApply: true
-          )
-        }
-      )
       let audioItems = [
         SnapshotItem(
           key: "device:synthetic-input",
@@ -546,31 +427,9 @@ extension View {
           ),
         ]
       )
-      let networkRollbackCatalog = settings.network.value.serviceIPv4.map { service in
-        NetworkIPv4RollbackCatalogEntry(
-          identity: service.identity,
-          configurationData: Data("synthetic-\(service.identity.kind.rawValue)".utf8),
-          currentConfiguration: service.configuration.value
-        )
-      }
-      let networkSnapshot = AdapterSnapshot(
-        group: .network,
-        capturedAt: capturedAt,
-        payload: .network(settings.network.value),
-        items: [],
-        networkIPv4RollbackCatalog: networkRollbackCatalog,
-        savedWiFiNetworkNames: ["Synthetic Saved Wi-Fi"]
-      )
       return SystemSnapshotResult(
         capturedAt: capturedAt,
         groups: [
-          SystemSnapshotGroupResult(
-            group: .display,
-            capability: .init(group: .display, state: .supported, reason: ""),
-            snapshot: displaySnapshot,
-            items: [],
-            failures: []
-          ),
           SystemSnapshotGroupResult(
             group: .audio,
             capability: .init(group: .audio, state: .supported, reason: ""),
@@ -585,94 +444,37 @@ extension View {
             items: inputItems,
             failures: []
           ),
-          SystemSnapshotGroupResult(
-            group: .network,
-            capability: .init(group: .network, state: .supported, reason: ""),
-            snapshot: networkSnapshot,
-            items: [],
-            failures: []
-          ),
         ],
         profileSettings: settings
       )
     }
 
-    private static func configureNetworkEvidence(
-      _ variant: UIAuditVariant,
-      profile: inout DeskProfile
-    ) {
-      let selection: (NetworkServiceKind, IPv4Configuration)? =
-        switch variant {
-        case .editorNetworkEthernetDHCP:
-          (.ethernet, .dhcp)
-        case .editorNetworkEthernetManual:
-          (
-            .ethernet,
-            .manual(
-              address: "192.0.2.40",
-              subnetMask: "255.255.255.0",
-              router: "192.0.2.1"
-            )
-          )
-        case .editorNetworkWiFiDHCP:
-          (.wifi, .dhcp)
-        case .editorNetworkWiFiManual:
-          (
-            .wifi,
-            .manual(
-              address: "198.51.100.40",
-              subnetMask: "255.255.255.0",
-              router: "198.51.100.1"
-            )
-          )
-        case .overview, .menuPolish, .trayEmpty, .traySingle, .trayOverflow, .trayDelete,
-          .trayCapturePermission, .trayCaptureSuccess, .trayCaptureFailure, .trayApplyResult,
-          .editor, .editorPolish, .editorDisplay, .editorDisplayColor, .editorAudio,
-          .editorAudioUnsupported, .editorKeyboard,
-          .editorNetwork, .validation, .permissions, .diagnostics:
-          nil
-        }
-      guard let selection,
-        var service = profile.settings.network.value.serviceIPv4.first(where: {
-          $0.identity.kind == selection.0
-        })
-      else { return }
-      service.configuration = .init(value: selection.1)
-      profile.settings.network.value.serviceIPv4 = [service]
-    }
-
-    private static func partialCaptureSummary() -> ProfileCaptureSummary {
+    private static func currentCaptureSummary() -> ProfileCaptureSummary {
       ProfileCaptureSummary(items: [
-        .init(group: .display, key: "display.0.primary", disposition: .savedApplicable),
-        .init(group: .display, key: "display.0.origin", disposition: .savedApplicable),
-        .init(group: .display, key: "display.0.mirroring", disposition: .savedApplicable),
-        .init(group: .display, key: "display.0.mode", disposition: .savedApplicable),
-        .init(group: .display, key: "display.0.colorProfile", disposition: .savedApplicable),
         .init(group: .audio, key: "defaultInput", disposition: .savedApplicable),
         .init(group: .audio, key: "defaultOutput", disposition: .savedApplicable),
         .init(group: .audio, key: "inputVolume", disposition: .savedApplicable),
         .init(group: .audio, key: "outputVolume", disposition: .savedApplicable),
+        .init(group: .audio, key: "outputMute", disposition: .savedApplicable),
         .init(group: .input, key: "KeyRepeat", disposition: .savedApplicable),
         .init(group: .input, key: "InitialKeyRepeat", disposition: .savedApplicable),
-        .init(
-          group: .network, key: "network.serviceIPv4.ethernet.0", disposition: .savedApplicable),
-        .init(group: .network, key: "network.serviceIPv4.wifi.1", disposition: .savedApplicable),
       ])
     }
 
-    private static func partialApplySummary(profile: DeskProfile) -> ApplyResultSummary {
+    private static func currentApplySummary(profile: DeskProfile) -> ApplyResultSummary {
       ApplyResultSummary(
         profileID: profile.id,
         profileName: profile.name,
         appliedAt: capturedAt,
         items: [
-          .init(
-            operation: .init(group: .display, key: "display.atomic-configuration"),
-            status: .succeeded
-          ),
+          .init(operation: .init(group: .audio, key: "defaultInput"), status: .succeeded),
+          .init(operation: .init(group: .audio, key: "defaultOutput"), status: .succeeded),
+          .init(operation: .init(group: .audio, key: "inputVolume"), status: .succeeded),
           .init(operation: .init(group: .audio, key: "outputVolume"), status: .succeeded),
+          .init(operation: .init(group: .audio, key: "outputMute"), status: .succeeded),
+          .init(operation: .init(group: .input, key: "KeyRepeat"), status: .succeeded),
           .init(
-            operation: .init(group: .network, key: "network.serviceIPv4.ethernet.0"),
+            operation: .init(group: .input, key: "InitialKeyRepeat"),
             status: .notVerified
           ),
         ]

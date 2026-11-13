@@ -12,7 +12,8 @@ from a clean detached checkout of exact application-source commit
 `4ecdf48a712fe1bee1142d00dc56403adc5caf0a` (`Add current-scope launch review
 fixture`). The resulting gallery demonstrates the then-current seven-setting
 Display/Sound scope and manual workflow. It predates the 2026-09-15 Keyboard
-surface and is not visual evidence for the current nine-setting product. It is
+surface and Display retirement, and is not visual evidence for the current
+seven-setting Sound/Keyboard product. It is
 product-tour evidence, not proof of a supported download, installed-window
 behavior, or hardware mutation.
 

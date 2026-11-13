@@ -59,8 +59,6 @@
 "Apply Available Settings" = "사용 가능한 설정 적용";
 "Apply Profile" = "프로필 적용";
 "This is a review. No setting changes until you press %@ below." = "현재 화면은 검토 단계입니다. 아래의 ‘%@’을 눌러야 설정이 변경됩니다.";
-"Beta · Apply/rollback not hardware-verified. Check System Settings after applying." = "베타 · 적용/롤백은 실제 하드웨어 검증 전입니다. 적용 후 시스템 설정을 확인하세요.";
-"Beta hardware verification status" = "베타 하드웨어 검증 상태";
 "Safety summary" = "안전 요약";
 "Available settings only; skipped items are listed below." = "사용 가능한 설정만 적용하며, 건너뛸 항목은 아래에 표시됩니다.";
 "Display and network changes stay temporary for 15 seconds unless you keep them." = "유지하기 전까지 디스플레이와 네트워크 변경은 15초 동안만 임시 적용됩니다.";
@@ -1325,3 +1323,13 @@
 "Sound settings" = "소리 설정";
 "Choose the main display and resolution for this profile." = "이 프로필의 주 디스플레이와 해상도를 선택하세요.";
 "Choose input and output devices and their volumes." = "입출력 기기와 각각의 음량을 선택하세요.";
+
+"Sound Output" = "사운드 출력 설정";
+
+"Sound Input" = "사운드 입력 설정";
+
+"Not applied. Saved values are kept." = "적용하지 않습니다. 저장된 값은 유지됩니다.";
+
+"Only enabled settings change when applying this profile." = "프로필을 적용할 때 켜진 설정만 변경합니다.";
+
+"No settings available on this Mac." = "이 Mac에서 사용할 수 있는 설정이 없습니다.";

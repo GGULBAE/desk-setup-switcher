@@ -47,8 +47,8 @@ struct ProfileDraftValidationTests {
     )
   }
 
-  @Test("display mode dimensions refresh rate and rotation are validated")
-  func displayModeValidation() {
+  @Test("legacy display mode values do not participate in current draft validation")
+  func legacyDisplayModeValidationIsDormant() {
     let display = DisplayTargetSettings(
       id: displayID,
       identity: .init(productName: "Synthetic display"),
@@ -73,27 +73,12 @@ struct ProfileDraftValidationTests {
 
     let result = ProfileDraftValidator().validate(settings)
 
-    #expect(
-      result.issues.map(\.fieldID) == [
-        .display(displayID, .modeWidth),
-        .display(displayID, .modeHeight),
-        .display(displayID, .modePixelWidth),
-        .display(displayID, .modePixelHeight),
-        .display(displayID, .modeRefreshRate),
-      ]
-    )
-    #expect(
-      result.issue(for: .display(displayID, .modeWidth))?.message
-        == .invalidDisplayDimension
-    )
-    #expect(
-      result.issue(for: .display(displayID, .modeRefreshRate))?.message
-        == .outOfRange(minimum: 0, maximum: 1_000)
-    )
+    #expect(result.isValid)
+    #expect(result.issues.isEmpty)
   }
 
-  @Test("primary display inclusion requires exactly one selected target")
-  func primaryDisplayValidation() {
+  @Test("legacy primary display selections do not participate in current validation")
+  func legacyPrimaryDisplayValidationIsDormant() {
     let first = validDisplay(id: displayID, isPrimary: true)
     let second = validDisplay(
       id: UUID(uuidString: "20000000-0000-0000-0000-000000000002")!,
@@ -105,11 +90,12 @@ struct ProfileDraftValidationTests {
 
     let result = ProfileDraftValidator().validate(settings)
 
-    #expect(result.issue(for: .displayPrimary)?.message == .chooseOnePrimaryDisplay)
+    #expect(result.isValid)
+    #expect(result.issues.isEmpty)
   }
 
-  @Test("primary display inclusion is one global option across every target")
-  func primaryDisplayRejectsMixedInclusion() {
+  @Test("mixed legacy primary display inclusion does not block save")
+  func mixedLegacyPrimaryDisplayInclusionIsDormant() {
     var first = validDisplay(id: displayID, isPrimary: true)
     var second = validDisplay(
       id: UUID(uuidString: "20000000-0000-0000-0000-000000000002")!,
@@ -123,9 +109,8 @@ struct ProfileDraftValidationTests {
 
     let result = ProfileDraftValidator().validate(settings)
 
-    #expect(
-      result.issue(for: .displayPrimary)?.message == .repairPrimaryDisplayInclusion
-    )
+    #expect(result.isValid)
+    #expect(result.issues.isEmpty)
   }
 
   @Test("visible volume and repeat ranges reject non-finite and out-of-range values")
@@ -306,8 +291,8 @@ struct ProfileDraftValidationTests {
     )
   }
 
-  @Test("blank portable ColorSync identity is rejected before save")
-  func blankColorSyncIdentity() {
+  @Test("legacy ColorSync identity does not participate in current validation")
+  func legacyColorSyncIdentityIsDormant() {
     var settings = ProfileSettings()
     let displayID = UUID()
     settings.display.value.displays = [
@@ -333,11 +318,7 @@ struct ProfileDraftValidationTests {
       )
     ]
 
-    #expect(
-      ProfileDraftValidator().validate(settings).issues == [
-        issue(.display(displayID, .colorProfile), .display, .cannotBeBlank)
-      ]
-    )
+    #expect(ProfileDraftValidator().validate(settings).isValid)
   }
 
   @Test("valid service-specific manual IPv4 permits an absent router")

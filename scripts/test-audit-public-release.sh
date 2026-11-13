@@ -239,6 +239,8 @@ reviewed_app_repository="$(new_repository reviewed-app-fixtures)"
 reviewed_app_paths=(
     Sources/DeskSetupSwitcher/UIAuditFixtures.swift
     Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift
+    Tests/DeskSetupCoreTests/ProfileValidationTests.swift
+    Tests/DeskSetupPresentationTests/ProfileDraftValidationTests.swift
     Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift
     Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift
 )

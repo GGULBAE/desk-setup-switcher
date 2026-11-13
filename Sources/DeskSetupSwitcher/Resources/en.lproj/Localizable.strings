@@ -59,8 +59,6 @@
 "Apply Available Settings" = "Apply Available Settings";
 "Apply Profile" = "Apply Profile";
 "This is a review. No setting changes until you press %@ below." = "This is a review. No setting changes until you press %@ below.";
-"Beta · Apply/rollback not hardware-verified. Check System Settings after applying." = "Beta · Apply/rollback not hardware-verified. Check System Settings after applying.";
-"Beta hardware verification status" = "Beta hardware verification status";
 "Safety summary" = "Safety summary";
 "Available settings only; skipped items are listed below." = "Available settings only; skipped items are listed below.";
 "Display and network changes stay temporary for 15 seconds unless you keep them." = "Display and network changes stay temporary for 15 seconds unless you keep them.";
@@ -1325,3 +1323,13 @@
 "Sound settings" = "Sound settings";
 "Choose the main display and resolution for this profile." = "Choose the main display and resolution for this profile.";
 "Choose input and output devices and their volumes." = "Choose input and output devices and their volumes.";
+
+"Sound Output" = "Sound Output";
+
+"Sound Input" = "Sound Input";
+
+"Not applied. Saved values are kept." = "Not applied. Saved values are kept.";
+
+"Only enabled settings change when applying this profile." = "Only enabled settings change when applying this profile.";
+
+"No settings available on this Mac." = "No settings available on this Mac.";

@@ -9,7 +9,7 @@ struct VisibleSettingRegistryTests {
   func completeContracts() {
     let contracts = VisibleSettingRegistry.contracts
 
-    #expect(contracts.count == 9)
+    #expect(contracts.count == 7)
     #expect(contracts.count == VisibleSettingKind.allCases.count)
     #expect(Set(contracts.map(\.kind)) == Set(VisibleSettingKind.allCases))
     #expect(Set(contracts.map(\.kind)).count == contracts.count)
@@ -27,9 +27,7 @@ struct VisibleSettingRegistryTests {
     let fields = VisibleSettingRegistry().fields(snapshots: supportedSnapshots)
     let counts = Dictionary(grouping: fields, by: { $0.contract.kind }).mapValues(\.count)
 
-    #expect(counts[.displayPrimary] == 1)
-    #expect(counts[.displayMode] == 2)
-    #expect(!fields.contains { $0.contract.snapshotKey == "display.colorProfile" })
+    #expect(!fields.contains { $0.contract.group == .display })
     #expect(counts[.audioDefaultInput] == 1)
     #expect(counts[.audioDefaultOutput] == 1)
     #expect(counts[.audioInputVolume] == 1)

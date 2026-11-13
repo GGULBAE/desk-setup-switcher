@@ -23,20 +23,19 @@ const content = {
     ],
     title: "Bring your desk back, deliberately.",
     summary:
-      "Save available values from nine Display, Sound, and Keyboard setting kinds as a local profile. Review the exact plan before you apply anything.",
+      "Save available values from seven Sound and Keyboard setting kinds as a local profile. Review the exact plan before you apply anything.",
     badges: ["Local only", "No account", "No cloud", "No auto-switching"],
     github: "View source on GitHub",
     heroAlt: "Synthetic empty tray with the Capture Current Settings action",
     scopeLabel: "Current profile scope",
-    scopeTitle: "Display + Sound + Keyboard",
+    scopeTitle: "Sound + Keyboard",
     scopeItems: [
-      "Main display and resolution",
       "Output device, volume, and mute",
       "Input device and volume",
       "Key repeat speed and repeat delay",
     ],
-    scopeNote: "Nine settings · no Network or automatic switching",
-    proof: "Current scope · pre-Keyboard synthetic UI image · no personal identifiers",
+    scopeNote: "Seven settings · no Display, Network, or automatic switching",
+    proof: "Current scope · historical synthetic UI image · no personal identifiers",
     flowEyebrow: "One decision at a time",
     flowTitle: "Capture → Edit → Review & Apply",
     flowSummary:
@@ -45,12 +44,12 @@ const content = {
       {
         number: "01",
         title: "Capture",
-        body: "Read the Mac’s current Display, Sound, and available Keyboard values into a local profile. Capture itself changes nothing.",
+        body: "Read the Mac’s current Sound and available Keyboard values into a local profile. Capture itself changes nothing.",
       },
       {
         number: "02",
         title: "Edit",
-        body: "Name the profile and set any available values across the nine current settings. Missing values stay absent.",
+        body: "Name the profile and set any available values across the seven current settings. Missing values stay absent.",
       },
       {
         number: "03",
@@ -61,7 +60,7 @@ const content = {
     galleryEyebrow: "Pre-Keyboard interface snapshot",
     galleryTitle: "Four screens. One deliberate flow.",
     gallerySummary:
-      "These exact-source synthetic screens predate the Keyboard step. They truthfully show the earlier Display and Sound workflow without performing or claiming a hardware change.",
+      "These exact-source synthetic screens predate the Keyboard step and Display retirement. They truthfully preserve the earlier Display and Sound workflow without representing the current profile scope or claiming a hardware change.",
     galleryProof: "Synthetic data · No Apply performed · No automatic switching",
     galleryItems: [
       {
@@ -95,7 +94,7 @@ const content = {
     ],
     demoTitle: "Watch the workflow",
     demoSummary:
-      "This pre-Keyboard, silent walkthrough moves through Capture, Display editing, Sound editing, and Review. It never simulates pressing Apply or a successful hardware change.",
+      "This historical pre-Keyboard, pre-Display-retirement silent walkthrough moves through Capture, Display editing, Sound editing, and Review. It never represents the current scope or simulates pressing Apply.",
     demoLabel: "Desk Setup Switcher Capture, Display, Sound, and Review walkthrough",
     demoFallback: "Download the MP4 walkthrough",
     transcriptTitle: "Transcript summary",
@@ -106,15 +105,10 @@ const content = {
       "Review lists planned changes and omissions; only a separate explicit Apply can begin a system change.",
     ],
     supportEyebrow: "Honest support boundary",
-    supportTitle: "Three areas. Evidence shown plainly.",
+    supportTitle: "Two areas. Evidence shown plainly.",
     supportSummary:
-      "Display and Sound retain read-only group evidence on Apple Silicon. Keyboard capture/apply/rollback remains deterministic mock evidence; no live repeat mutation has been hardware verified.",
+      "Sound retains read-only group evidence on Apple Silicon. Keyboard capture/apply/rollback remains deterministic mock evidence; no live repeat mutation has been hardware verified. Display is dormant legacy profile data.",
     capabilities: [
-      {
-        name: "Display",
-        items: "Main display and resolution. Resolution keeps the current refresh rate; an unavailable combination is skipped.",
-        evidence: "Current-source group live-read · apply/rollback mock-only",
-      },
       {
         name: "Sound",
         items: "Output device, volume, and mute; input device and volume. Selecting an input device does not record audio.",
@@ -127,15 +121,15 @@ const content = {
       },
     ],
     safetyEyebrow: "Safety before speed",
-    safetyTitle: "High-risk changes get a recovery step.",
+    safetyTitle: "Apply starts from a fresh plan.",
     safetyBody:
-      "Protected display changes remain temporary during a 15-second review. Keeping them requires explicit confirmation; timeout, window close, or confirmation failure requests restoration of the preflight snapshot. Rollback is best-effort, and hardware mutation remains labelled unverified until independently tested.",
+      "The app reads current state again immediately before execution. If the reviewed plan is stale, it changes nothing and returns to review. After execution begins, completed operations use the adapter rollback contract when a later fatal failure requires recovery; rollback remains best-effort.",
     safetyPoints: [
       "Fresh snapshot before execution",
-      "15-second Keep / Revert window",
+      "Stale plan rejected before mutation",
       "Itemized success, failure, omission, and rollback result",
     ],
-    safetyChoices: ["Keep Changes", "Revert Now"],
+    safetyChoices: ["Review", "Apply explicitly"],
     privacyEyebrow: "Private by architecture",
     privacyTitle: "Your desk profile stays on your Mac.",
     privacyCards: [
@@ -155,9 +149,9 @@ const content = {
     faqTitle: "Know the boundary before you install.",
     faqs: [
       ["Does it switch profiles automatically?", "No. Capture reads, Edit changes a draft, Review explains, and only Apply can start a system change."],
-      ["Which settings can a profile save?", "Main display, resolution, output device, output volume, output mute, input device, input volume, key repeat speed, and repeat delay. Keyboard brightness, pointer, scrolling, function-key, and Network settings are not current features."],
+      ["Which settings can a profile save?", "Output device, output volume, output mute, input device, input volume, key repeat speed, and repeat delay. Display, keyboard brightness, pointer, scrolling, function-key, and Network settings are not current features."],
       ["Why is keyboard brightness missing?", "Keyboard brightness is preserved only as dormant legacy profile data. The app never captures, edits, or applies it."],
-      ["What happens if a risky display change is wrong?", "Protected display changes offer Keep or Revert and request rollback on timeout, close, or confirmation failure."],
+      ["Why are Display settings missing?", "Display values can remain in older profile JSON for compatibility, but the app never captures, edits, or applies them."],
       ["Is Intel supported?", "Not in the initial beta. The build contains an x86_64 slice, but physical Intel install and runtime verification are still missing."],
     ],
     contributeTitle: "Small product. Public evidence.",
@@ -186,20 +180,19 @@ const content = {
     ],
     title: "책상 설정을 바꾸기 전에, 먼저 확인하세요.",
     summary:
-      "디스플레이·사운드·키보드의 아홉 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 저장하고, 실제 적용 전에 정확한 변경 계획을 확인하세요.",
+      "사운드·키보드의 일곱 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 저장하고, 실제 적용 전에 정확한 변경 계획을 확인하세요.",
     badges: ["로컬 전용", "계정 없음", "클라우드 없음", "자동 전환 없음"],
     github: "GitHub에서 소스 보기",
     heroAlt: "현재 설정 캡처 버튼이 있는 합성 빈 트레이 화면",
     scopeLabel: "현재 프로필 범위",
-    scopeTitle: "디스플레이 + 사운드 + 키보드",
+    scopeTitle: "사운드 + 키보드",
     scopeItems: [
-      "주 디스플레이와 해상도",
       "출력 기기, 음량, 소리 끔",
       "입력 기기와 음량",
       "키 반복 속도와 반복 지연 시간",
     ],
-    scopeNote: "아홉 가지 설정 종류 · 네트워크 및 자동 전환 없음",
-    proof: "현재 범위 · 키보드 추가 전 합성 UI 이미지 · 개인 식별자 없음",
+    scopeNote: "일곱 가지 설정 종류 · 디스플레이·네트워크·자동 전환 없음",
+    proof: "현재 범위 · 과거 합성 UI 이미지 · 개인 식별자 없음",
     flowEyebrow: "한 번에 하나의 결정",
     flowTitle: "캡처 → 편집 → 검토 후 적용",
     flowSummary:
@@ -208,12 +201,12 @@ const content = {
       {
         number: "01",
         title: "캡처",
-        body: "현재 Mac의 디스플레이·사운드와 사용 가능한 키보드 값을 로컬 프로필로 읽습니다. 캡처 자체는 어떤 설정도 바꾸지 않습니다.",
+        body: "현재 Mac의 사운드와 사용 가능한 키보드 값을 로컬 프로필로 읽습니다. 캡처 자체는 어떤 설정도 바꾸지 않습니다.",
       },
       {
         number: "02",
         title: "편집",
-        body: "프로필 이름과 아홉 가지 현재 설정 중 사용할 수 있는 값을 정합니다. 없는 값은 임의로 만들지 않습니다.",
+        body: "프로필 이름과 일곱 가지 현재 설정 중 사용할 수 있는 값을 정합니다. 없는 값은 임의로 만들지 않습니다.",
       },
       {
         number: "03",
@@ -224,7 +217,7 @@ const content = {
     galleryEyebrow: "키보드 추가 전 인터페이스 기록",
     galleryTitle: "네 화면으로 보는 명확한 흐름.",
     gallerySummary:
-      "키보드 단계가 추가되기 전 정확한 소스에서 만든 합성 화면입니다. 실제 하드웨어 설정을 바꾸거나 변경 성공을 주장하지 않고 당시의 디스플레이·사운드 흐름을 보여줍니다.",
+      "키보드 단계가 추가되고 디스플레이가 현재 범위에서 제외되기 전 정확한 소스에서 만든 합성 화면입니다. 현재 프로필 범위를 나타내거나 실제 하드웨어 변경을 주장하지 않고 당시의 디스플레이·사운드 흐름을 기록합니다.",
     galleryProof: "합성 데이터 · Apply 실행 없음 · 자동 전환 없음",
     galleryItems: [
       {
@@ -258,7 +251,7 @@ const content = {
     ],
     demoTitle: "전체 흐름 보기",
     demoSummary:
-      "키보드 단계 추가 전 제작한 이 짧은 무음 영상은 캡처, 디스플레이 편집, 사운드 편집, 검토로 이어집니다. Apply를 누르거나 하드웨어 변경이 성공한 것처럼 연출하지 않습니다.",
+      "키보드 단계 추가와 디스플레이 범위 제외 전 제작한 이 과거 무음 영상은 캡처, 디스플레이 편집, 사운드 편집, 검토로 이어집니다. 현재 범위를 나타내거나 Apply를 누른 것처럼 연출하지 않습니다.",
     demoLabel: "Desk Setup Switcher 캡처, 디스플레이, 사운드, 검토 흐름 영상",
     demoFallback: "MP4 흐름 영상 내려받기",
     transcriptTitle: "영상 내용 요약",
@@ -269,15 +262,10 @@ const content = {
       "검토에서 예정 변경과 제외 항목을 확인하며, 별도의 명시적인 Apply에서만 시스템 변경을 시작할 수 있습니다.",
     ],
     supportEyebrow: "정직한 지원 경계",
-    supportTitle: "세 가지 영역, 검증 수준까지 그대로.",
+    supportTitle: "두 가지 영역, 검증 수준까지 그대로.",
     supportSummary:
-      "디스플레이와 사운드는 Apple Silicon 읽기 전용 그룹 증거를 유지합니다. 키보드 Capture·적용·되돌리기는 결정론적 모의 증거만 있으며, 실제 반복 변경은 하드웨어에서 검증되지 않았습니다.",
+      "사운드는 Apple Silicon 읽기 전용 그룹 증거를 유지합니다. 키보드 Capture·적용·되돌리기는 결정론적 모의 증거만 있으며, 실제 반복 변경은 하드웨어에서 검증되지 않았습니다. 디스플레이는 비활성 과거 프로필 데이터입니다.",
     capabilities: [
-      {
-        name: "디스플레이",
-        items: "주 디스플레이와 해상도. 해상도는 현재 주사율을 유지하며 사용할 수 없는 조합은 건너뜁니다.",
-        evidence: "현재 소스 그룹 실기 읽기 · 적용/되돌리기 모의 검증",
-      },
       {
         name: "사운드",
         items: "출력 기기, 음량, 소리 끔과 입력 기기, 음량. 입력 기기 선택은 소리를 녹음하지 않습니다.",
@@ -290,15 +278,15 @@ const content = {
       },
     ],
     safetyEyebrow: "속도보다 안전",
-    safetyTitle: "위험한 변경에는 복구 단계를 둡니다.",
+    safetyTitle: "적용은 최신 계획에서 시작합니다.",
     safetyBody:
-      "보호 대상 디스플레이 변경은 15초 동안 임시 상태로 유지됩니다. 명시적으로 확인해야 유지되며, 시간 초과·창 닫기·확인 실패 시 변경 전 상태 복원을 요청합니다. 복구는 최선을 다해 시도하며, 실제 하드웨어 변경은 독립 검증 전까지 미검증으로 표시합니다.",
+      "앱은 실행 직전에 현재 상태를 다시 읽습니다. 검토한 계획이 오래되었으면 아무것도 바꾸지 않고 검토 화면으로 돌아갑니다. 실행을 시작한 뒤 치명적 실패가 발생하면 완료된 작업에 adapter rollback 계약을 사용하며, 복구는 최선을 다해 시도합니다.",
     safetyPoints: [
       "실행 직전 새 스냅샷",
-      "15초 유지 / 되돌리기 창",
+      "변경 전 오래된 계획 중단",
       "성공·실패·제외·롤백 결과를 항목별 표시",
     ],
-    safetyChoices: ["변경 사항 유지", "지금 되돌리기"],
+    safetyChoices: ["다시 검토", "명시적으로 적용"],
     privacyEyebrow: "구조부터 개인정보 보호",
     privacyTitle: "책상 프로필은 내 Mac에만 남습니다.",
     privacyCards: [
@@ -318,9 +306,9 @@ const content = {
     faqTitle: "설치 전에 경계를 확인하세요.",
     faqs: [
       ["프로필이 자동으로 전환되나요?", "아니요. Capture는 읽고, Edit은 초안을 바꾸고, Review는 설명합니다. 시스템 변경은 Apply에서만 시작할 수 있습니다."],
-      ["프로필에 어떤 설정을 저장하나요?", "주 디스플레이, 해상도, 출력 기기, 출력 음량, 출력 소리 끔, 입력 기기, 입력 음량, 키 반복 속도, 반복 지연 시간입니다. 키보드 밝기·포인터·스크롤·기능 키·네트워크 설정은 현재 기능이 아닙니다."],
+      ["프로필에 어떤 설정을 저장하나요?", "출력 기기, 출력 음량, 출력 소리 끔, 입력 기기, 입력 음량, 키 반복 속도, 반복 지연 시간입니다. 디스플레이·키보드 밝기·포인터·스크롤·기능 키·네트워크 설정은 현재 기능이 아닙니다."],
       ["키보드 밝기가 보이지 않는 이유는 무엇인가요?", "키보드 밝기는 이전 프로필 호환 데이터로만 비활성 보존합니다. 앱은 이를 캡처·편집·적용하지 않습니다."],
-      ["위험한 디스플레이 변경이 잘못되면 어떻게 되나요?", "보호 대상 디스플레이 변경은 유지 또는 되돌리기를 제공하며, 시간 초과·닫기·확인 실패 시 복구를 요청합니다."],
+      ["디스플레이 설정이 보이지 않는 이유는 무엇인가요?", "이전 프로필 JSON의 디스플레이 값은 호환성을 위해 남을 수 있지만 앱은 이를 캡처·편집·적용하지 않습니다."],
       ["Intel Mac도 지원하나요?", "초기 베타에서는 지원하지 않습니다. x86_64 빌드는 포함하지만 실제 Intel 설치·실행 검증이 없습니다."],
     ],
     contributeTitle: "작은 제품, 공개된 검증.",
@@ -563,7 +551,7 @@ export function LandingPage({ releaseURL }: { releaseURL: string | null }) {
             </ul>
           </div>
           <div className="safety-visual" aria-hidden="true">
-            <div className="safety-timer">15</div>
+            <div className="safety-timer">✓</div>
             <div className="safety-line" />
             <div className="safety-choice">
               <span>{text.safetyChoices[0]}</span>

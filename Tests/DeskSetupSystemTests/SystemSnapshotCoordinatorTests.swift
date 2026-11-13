@@ -12,7 +12,7 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     let liveGroups = LiveAdapterFactory.makeAdapters().map(\.group)
     let visibleGroups = Set(VisibleSettingRegistry.contracts.map(\.group))
 
-    XCTAssertEqual(liveGroups, [.display, .audio, .input])
+    XCTAssertEqual(liveGroups, [.audio, .input])
     XCTAssertEqual(Set(liveGroups), visibleGroups)
     XCTAssertFalse(liveGroups.contains(.network))
   }
@@ -94,7 +94,7 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
     XCTAssertFalse(result.settings.network.value.wifiPower.isIncluded)
     XCTAssertEqual(result.settings.input.value.pointerSpeed.value, 1.25)
     XCTAssertFalse(result.settings.input.value.pointerSpeed.isIncluded)
-    XCTAssertTrue(result.settings.audio.value.outputVolume.isIncluded)
+    XCTAssertFalse(result.settings.audio.value.outputVolume.isIncluded)
     XCTAssertEqual(result.settings.audio.value.outputVolume.value, 0.8)
     XCTAssertTrue(result.settings.audio.value.outputMuted.isIncluded)
     XCTAssertEqual(result.settings.audio.value.outputMuted.value, true)
@@ -327,13 +327,12 @@ final class SystemSnapshotCoordinatorTests: XCTestCase {
       })
   }
 
-  func testLiveFactoryReturnsEveryConcreteAdapterWithoutPerformingIO() {
+  func testLiveFactoryReturnsOnlyCurrentConcreteAdaptersWithoutPerformingIO() {
     let adapters = LiveAdapterFactory.makeAdapters()
 
-    XCTAssertEqual(adapters.map(\.group), [.display, .audio, .input])
-    XCTAssertTrue(adapters[0] is CoreGraphicsDisplayAdapter)
-    XCTAssertTrue(adapters[1] is CoreAudioAdapter)
-    XCTAssertTrue(adapters[2] is InputPreferencesAdapter)
+    XCTAssertEqual(adapters.map(\.group), [.audio, .input])
+    XCTAssertTrue(adapters[0] is CoreAudioAdapter)
+    XCTAssertTrue(adapters[1] is InputPreferencesAdapter)
   }
 
   private func makeAdapter(

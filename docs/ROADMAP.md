@@ -1,12 +1,29 @@
 # Roadmap
 
+## Selective settings and consistent editor — 2026-11-13
+
+The editor has three equal-width sections: **Sound Output**, **Sound Input**, and **Keyboard**. Each section has an On/Off switch; each field has an inclusion checkbox. Off sections retain their values and collapse to a short “not applied” state. Turning a section on selects its populated values, after which individual fields may be excluded. A single vertical editor scroll area, aligned field/control columns, a large-text vertical fallback, and a readable native segmented Settings picker replace uneven control widths and clipped tab names. Display remains excluded from Capture, editing, and Apply.
+
+Explicit leaf flags now survive normalization, save/load, import/export, and recapture. A first Capture selects readable supported values; recapturing an existing populated draft refreshes values while preserving all seven inclusion flags, including an all-off profile. With device switching off, selected volume/mute controls target the current default device. An all-off profile produces no operations in either apply mode.
+
+Verification status: the 2026-11-13 working tree passes full non-live `make verify` and `git diff --check`, including native popover, both-architecture Debug/Release builds, static analysis, and local DMG verification. Mock/offscreen evidence does not establish hardware behavior. No live device mutation, installation, or deployment is part of this change. Earlier dated inclusion-control and flat-layout notes describe their historical builds and are superseded by this section.
+
+
+## Display retirement and flatter profile editor — 2026-09-17
+
+Reduce the current profile allowlist from nine to seven kinds: **Sound** keeps output device, output volume, output mute, input device, and input volume; **Keyboard** keeps key repeat speed and repeat delay. Display data remains schema-compatible for import/export, but normalization forces every Display inclusion flag off, the visible-setting registry does not project it, and the normal live factory registers only Audio and Input adapters, so Capture and Apply cannot snapshot, plan, write, verify, or roll back Display. Remove Display from the editor, remove the redundant Sound heading and Output/Input container boxes, retain the Output/Input headings, and place the mute switch at the trailing edge. No live setting mutation is part of this milestone.
+
+Deterministic verification must cover the seven-kind registry, dormant legacy Display round-trip, zero Display adapter invocation in normal and force modes, Audio/Input-only live construction, the flat vertical layout, localization/public copy, and `git diff --check`. The pre-existing lower-level Display adapter remains compatibility/regression code and does not form part of the current profile workflow.
+
+The Keyboard-brightness milestone below remains exact historical evidence for the superseded nine-setting build.
+
 ## Keyboard brightness retirement and unified editor — 2026-09-17
 
 Reduce the current profile allowlist from ten to nine kinds by making keyboard brightness schema-compatible dormant data: preserve its legacy JSON value, force inclusion off at every normalization boundary, and remove its live snapshot, permission, capture, visible-registry, plan, Apply, verification, rollback, and UI paths. Keyboard now exposes exactly **Key repeat speed** and **Repeat delay**. Replace the profile editor's internal rail/segmented navigation with one vertically scrolling **Display**, **Sound**, and **Keyboard** page, and raise the initial Settings height to 700 points while preserving its resizable 680×480 minimum. Deterministic tests must prove that legacy brightness values round-trip but never become operations and that only the nine editable kinds cross Capture and Apply boundaries. No live setting mutation is part of this milestone.
 
 Commit `ce58e61` records the implementation. Exact-commit fallback verification passed 373 Swift Testing cases in 41 suites with two opt-in live skips, the isolated native-popover XCTest, SwiftPM Release with warnings as errors, and every public-surface variant. The user-authorized [local reinstall](KEYBOARD-BRIGHTNESS-RETIREMENT-REINSTALL-2026-09-17.md) launched that exact source from `/Applications`, preserved both profile files byte-for-byte, and showed zero visible app-owned windows after startup. The unaccepted Xcode license still blocks canonical `make verify` and the universal package path; no Capture, Apply, permission request, or live setting mutation was run.
 
-The 2026-09-15 milestone below remains exact historical evidence for the superseded three-control build.
+This milestone is superseded by the seven-setting Display-retirement milestone above. The 2026-09-15 milestone below remains exact historical evidence for the superseded three-control build.
 
 ## Historical Keyboard profile settings — 2026-09-15
 
@@ -22,7 +39,7 @@ Publish only the bilingual informational holding page at <https://ggulbae.github
 
 ## Current launch gallery and demo — 2026-09-12
 
-Historical scope note: these exact pixels and transcripts predate Keyboard and show only the then-current Display/Sound workflow. They remain truthful source-bound media, not visual evidence for the current nine-setting product.
+Historical scope note: these exact pixels and transcripts predate Keyboard and show only the then-current Display/Sound workflow. They remain truthful source-bound media, not visual evidence for the current seven-setting Sound/Keyboard product.
 
 Replace the stale three-screen media lineage with exact-source Capture, Edit Display, Edit Sound, and Review evidence from commit `4ecdf48`. Build four reusable `1270×760` launch cards and a silent, bilingual-captioned 40-second tour; expose them in the GitHub README and public bilingual holding site with explicit playback, a readable transcript, and no autoplay. Keep the product boundary local-only and manual: no Apply success simulation, public download, Release, directory submission, Threads campaign, or hardware mutation. Deterministic double-build hashes, strict source/public manifests, media/privacy checks, the public-surface gate, full non-live `make verify`, and `git diff --check` pass locally.
 
@@ -77,6 +94,7 @@ The original profile contract was main display, resolution, output device/volume
 The canonical non-live `make verify` gate and 19-fixture offscreen matrix passed. The app was reinstalled and launched from `/Applications`; both profile files passed the value-preservation audit after retired-field normalization. Installed keyboard/VoiceOver and hardware mutation remain unverified.
 
 Sound now groups device and volume controls inside **Output** and **Input** cards, preserving target-device capability checks. Independent inclusion was subsequently removed by the 2026-09-08 registered-values policy. This presentation-only follow-up does not change the six-setting capture/apply contract. Its full `make verify` retry, 19-fixture offscreen matrix, and local reinstall/startup passed; both profile files remained byte-identical. See [grouped Sound evidence](AUDIO-SECTIONS-2026-09-07.md).
+
 
 The roadmap is evidence-based. “Implemented” means source exists; “verified” names the evidence boundary; “done” additionally requires current documentation and the commit or push evidence required by that milestone's explicit contract. Dates are intentionally omitted because safety gates determine sequence.
 
@@ -352,7 +370,7 @@ The earlier, separately authorized 2026-09-07 reinstall copied the verified sign
 
 - Give exactly three standard profile cards a 480-point tray viewport instead of the 560-point overflow maximum; retain the existing 0/1/2 and 4+ height contracts and screen clamping.
 - Put Apply Preview's change/skip/review counts and compact before → after operation cards before secondary information.
-- Group omissions, validation issues, and rejections into one localized **Review details** disclosure. Expand it automatically whenever the plan cannot execute, while keeping the Beta status, refreshed-plan warning, protected-change timer, and final decision notice visible when relevant.
+- Group omissions, validation issues, and rejections into one localized **Review details** disclosure. Expand it automatically whenever the plan cannot execute, while keeping the refreshed-plan warning, protected-change timer, and final decision notice visible when relevant.
 - Start the workflow window at 620×440, anchor short-state actions to the bottom, and preserve the same one-scroll ordering, 520×360 minimum, Escape cancel shortcut, and non-default Apply action for overflow and accessibility text.
 - Cover the reported Korean dark-mode state with a three-profile tray fixture and a two-change/two-skip/two-warning preview fixture. Record strict same-viewport source/implementation comparisons in a build-local QA report without tracking the user's unrelated root `design-qa.md`.
 - Finish the canonical non-live gate and a behavior-focused commit before checking the completion item. A later reinstall may prove package replacement and launch only; it must not invoke Capture, Apply, permissions, login-item changes, or system-setting mutation.
@@ -382,7 +400,7 @@ Baseline completed locally:
 - Add support, governance, compatibility, security, privacy, contribution, and distribution guidance. The current manual unsigned workflow accepts one existing annotated tag and exact commit, runs the complete app/history/public-surface gates, retains the exact DMG/checksum pair, and creates a **draft prerelease** only. It has no Apple credentials or publication command. The older signed-candidate workflows and scripts remain non-gating historical engineering evidence.
 - Fail closed on missing/non-integral profile schema versions, nil included ColorSync values, and snapshot capability-group mismatches without blocking unrelated snapshot groups. Preserve only the explicit schema 0→1 migration.
 - Remove runtime coordinate collection/cache and its Settings refresh surface. Location authorization now exists only to read the current Wi-Fi SSID during an explicit Capture; imported location conditions remain dormant schema data.
-- Keep the final Apply decision honest without complicating the flow: Apply Preview uses one review-to-decision scroll sequence with a localized text-and-shield Beta status stating that Apply and rollback are not hardware-verified and that users must check System Settings afterward. Decision actions follow the review content, Escape remains the cancel shortcut, and Apply is not a default Return-key action.
+- Keep the final Apply decision honest without complicating the flow: Apply Preview keeps explicit read-only and protected-change guidance but does not repeat the repository's hardware-verification status inside the dialog. Planned changes use two columns at standard width and one column in narrow/accessibility layouts. Decision actions follow the review content in one overflow-capable scroll sequence, Escape remains the cancel shortcut, and Apply is not a default Return-key action.
 - Complete the source-level productization polish: preserve full readiness/action copy at 368 points, keep populated IPv4 fields visibly labelled, move profile deletion into the secondary menu, consolidate stable Apply warnings into one Safety summary, compare dirty-draft profile identities in labelled rows, expose safe destination retry, localize Korean beta/breadcrumb/validation copy consistently, and center sparse About/error content without weakening scroll or keyboard behavior. Deterministic unit and synthetic offscreen evidence do not close installed-accessibility, hardware, TCC, or distribution gates.
 - Prepare the user-facing public surface locally: rewritten README, English/Korean user guides, profile-schema and adapter-contract references, launch copy, bilingual static site, and public media regenerated from exact committed application source `bc3ec58e2f1f13e3c47be3e879fed957564012cd`. The Capture/Edit/Review screenshots, silent bilingual-captioned demo, deterministic social preview, eight-file public manifest, 11-file source/AX manifest, and asset provenance are synchronized and locally verified; superseded unmanifested evidence was removed and the verifier now rejects unexpected source-evidence files.
 - Verify the site's privacy boundary locally: no project analytics, client tracking, project-set cookies, account, database, object storage, service binding, or download; disclose hosting-provider aggregate operations and the two pinned tab-scoped vinext router guards instead of claiming that no provider processing exists.

@@ -8,14 +8,15 @@ import Testing
 struct VisibleSettingEndToEndInvariantTests {
   @Test("every projected field validates, plans, applies, verifies, and rolls back")
   func everyProjectedFieldHasAnExecutableVerticalSlice() async throws {
-    let display = try await makeDisplaySlice()
     let audio = try await makeAudioSlice()
     let input = try await makeInputSlice()
-    let slices = [display, audio, input]
+    let slices = [audio, input]
     let snapshots = slices.map(\.snapshot)
     let fields = VisibleSettingRegistry().fields(snapshots: snapshots)
 
     #expect(Set(fields.map(\.contract.kind)) == Set(VisibleSettingKind.allCases))
+    #expect(Set(fields.map(\.contract.group)) == [.audio, .input])
+    #expect(!fields.contains { $0.contract.group == .display })
     #expect(fields.allSatisfy { $0.contract.stages == Set(VisibleSettingStage.allCases) })
 
     for field in fields {
@@ -62,97 +63,6 @@ struct VisibleSettingEndToEndInvariantTests {
     let snapshot: AdapterSnapshot
     let validationIssues: [ValidationIssue]
     let operations: [PlannedOperation]
-  }
-
-  private func makeDisplaySlice() async throws -> Slice {
-    let originalProfile = ColorSyncProfileTarget(
-      registeredProfileID: "synthetic-original",
-      fileSHA256: String(repeating: "a", count: 64),
-      displayName: "Synthetic Original ICC"
-    )
-    let targetProfile = ColorSyncProfileTarget(
-      registeredProfileID: "synthetic-target",
-      fileSHA256: String(repeating: "b", count: 64),
-      displayName: "Synthetic Target ICC"
-    )
-    let builtInIdentity = DisplayIdentity(
-      uuid: UUID(uuidString: "30000000-0000-0000-0000-000000000001"),
-      vendorID: 1_001,
-      modelID: 2_001,
-      serialNumber: 3_001,
-      productName: "Synthetic Built-in Display",
-      isBuiltIn: true
-    )
-    let externalIdentity = DisplayIdentity(
-      uuid: UUID(uuidString: "30000000-0000-0000-0000-000000000002"),
-      vendorID: 1_002,
-      modelID: 2_002,
-      serialNumber: 3_002,
-      productName: "Synthetic External Display"
-    )
-    let builtInModes = [
-      DisplayMode(width: 1_440, height: 900, refreshRate: 60),
-      DisplayMode(width: 1_280, height: 800, refreshRate: 60),
-    ]
-    let externalModes = [
-      DisplayMode(width: 2_560, height: 1_440, refreshRate: 60),
-      DisplayMode(width: 1_920, height: 1_080, refreshRate: 60),
-    ]
-    let originalMapping = ColorSyncCustomProfileMapping(
-      entries: [.init(key: "default", value: .scope("synthetic-original"))]
-    )
-    let api = MockDisplaySystemAPI(
-      displays: [
-        .init(
-          sessionID: 10,
-          identity: builtInIdentity,
-          bounds: .init(x: 0, y: 0, width: 1_440, height: 900),
-          isMain: true,
-          rotationDegrees: 0,
-          isActive: true,
-          currentMode: builtInModes[0],
-          supportedModes: builtInModes,
-          availableColorProfiles: [originalProfile, targetProfile],
-          currentColorProfile: originalProfile,
-          currentColorProfileMapping: originalMapping,
-          canSetColorProfile: true
-        ),
-        .init(
-          sessionID: 20,
-          identity: externalIdentity,
-          bounds: .init(x: 1_440, y: 0, width: 2_560, height: 1_440),
-          isMain: false,
-          rotationDegrees: 0,
-          isActive: true,
-          currentMode: externalModes[0],
-          supportedModes: externalModes,
-          availableColorProfiles: [originalProfile, targetProfile],
-          currentColorProfile: originalProfile,
-          currentColorProfileMapping: originalMapping,
-          canSetColorProfile: true
-        ),
-      ]
-    )
-    let adapter = CoreGraphicsDisplayAdapter(systemAPI: api)
-    let snapshot = try await adapter.snapshot()
-    guard case .display(var desired)? = snapshot.payload else {
-      throw InvariantError.missingPayload(.display)
-    }
-    desired.displays[0].isPrimary.value = false
-    desired.displays[1].isPrimary.value = true
-    desired.displays[0].mirroring.value = .mirrors(externalIdentity)
-    desired.displays[1].mirroring.value = .extended
-    desired.displays[0].mode.value = builtInModes[1]
-    desired.displays[1].mode.value = externalModes[1]
-    let payload = SettingsPayload.display(desired)
-    let issues = await adapter.validate(payload, against: snapshot)
-    let plan = try await adapter.plan(payload, from: snapshot, mode: .normal)
-    return Slice(
-      adapter: adapter,
-      snapshot: snapshot,
-      validationIssues: issues,
-      operations: plan.operations
-    )
   }
 
   private var audioAPI: MockAudioSystemAPI {

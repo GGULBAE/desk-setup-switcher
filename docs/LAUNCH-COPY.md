@@ -1,6 +1,6 @@
 # Launch copy and repository metadata
 
-Last reviewed: 2026-09-15
+Last reviewed: 2026-09-17
 
 This document is a copy deck and approval checklist. It does not authorize a GitHub setting change, site deployment, release publication, or community post.
 
@@ -13,8 +13,8 @@ Authenticated GitHub and deployed-site read-back on 2026-09-13 confirmed this pu
 | Field | Current value | Required action |
 | --- | --- | --- |
 | Repository | Public at [GGULBAE/desk-setup-switcher](https://github.com/GGULBAE/desk-setup-switcher) | Keep public |
-| Description | “A local-first macOS menu bar app for saving, reviewing, and deliberately applying display and sound profiles.” | This remote value predates Keyboard. A future separately authorized metadata update should use the proposed current description below |
-| Topics | `appkit`, `audio`, `display-management`, `local-first`, `macos`, `macos-app`, `menu-bar-app`, `open-source`, `privacy-first`, `productivity`, `swift`, `swiftui` | Keep this focused discovery set unless product scope changes |
+| Description | “A local-first macOS menu bar app for saving, reviewing, and deliberately applying display and sound profiles.” | This remote value predates Keyboard and Display retirement. A future separately authorized metadata update should use the proposed current description below |
+| Topics | `appkit`, `audio`, `display-management`, `local-first`, `macos`, `macos-app`, `menu-bar-app`, `open-source`, `privacy-first`, `productivity`, `swift`, `swiftui` | The remote set predates Display retirement; remove `display-management` in a separately authorized metadata update |
 | Homepage | `https://ggulbae.github.io/desk-setup-switcher/` | Keep synchronized with the approved holding-site origin and project base path |
 | Social preview | Custom `1280×640` current-scope Capture composition | Keep synchronized with the verified `site/public/og.png` asset |
 | Discussions | Disabled | The public support issue form is the current deliberate alternative; do not advertise Discussions while disabled |
@@ -41,9 +41,9 @@ Primary references: [GitHub Topics](https://docs.github.com/en/repositories/mana
 
 Proposed current description (not yet applied remotely):
 
-> A local-first macOS menu bar app for saving, reviewing, and deliberately applying display, sound, and keyboard profiles.
+> A local-first macOS menu bar app for saving, reviewing, and deliberately applying sound and keyboard profiles.
 
-This description is safe before or after release because it does not claim that a supported download exists. Capability and verification detail still belongs in the [support matrix](SUPPORT-MATRIX.md).
+This description is safe before or after release because it does not claim that a supported download exists. Capability and verification detail still belongs in the [support matrix](SUPPORT-MATRIX.md). The applied Topics block below records the current remote state; `display-management` is not part of the proposed current scope.
 
 ### Topics
 
@@ -75,7 +75,7 @@ Do not add `intel`, `homebrew`, `app-store`, `automatic-switching`, `accessibili
 
 ### Social preview
 
-Upload only the final sanitized social-preview asset recorded in the release-asset provenance document. The current asset uses synthetic Display/Sound profile data from before the Keyboard surface was added; it must not be described as showing Keyboard. It must contain no real identifier, avoid an “applied successfully” claim, and remain legible when cropped.
+Upload only the final sanitized social-preview asset recorded in the release-asset provenance document. The current asset uses historical synthetic Display/Sound profile data from before the Keyboard surface was added and before Display was retired; it must not be described as showing the current profile scope. It must contain no real identifier, avoid an “applied successfully” claim, and remain legible when cropped.
 
 English alternative text:
 
@@ -89,7 +89,7 @@ Use these strings wherever the publishing surface supports alternative text, inc
 
 ## Launch gallery kit
 
-The repository, public holding site, and owner-only preview may show this exact-commit synthetic kit before a supported download exists. This kit predates the Keyboard section and demonstrates only the earlier Display/Sound workflow; it is not visual evidence for the current nine-setting surface, release availability, or hardware verification. Keep that boundary adjacent to it.
+The repository, public holding site, and owner-only preview may show this exact-commit synthetic kit before a supported download exists. This kit predates the Keyboard section and Display retirement, and demonstrates only the earlier Display/Sound workflow; it is not visual evidence for the current seven-setting surface, release availability, or hardware verification. Keep that boundary adjacent to it.
 
 | Order | Asset | Public-facing message | Boundary |
 | --- | --- | --- | --- |
@@ -104,19 +104,19 @@ The companion `site/public/demo/desk-setup-switcher.mp4` is a pre-Keyboard silen
 
 ### English short
 
-Save available values from nine Display, Sound, and Keyboard setting kinds as a local profile, edit them, and review every change before applying it. Desk Setup Switcher is a local-only, open-source macOS menu bar app that never switches profiles automatically.
+Save available values from seven Sound and Keyboard setting kinds as a local profile, edit them, and review every change before applying it. Desk Setup Switcher is a local-only, open-source macOS menu bar app that never switches profiles automatically.
 
 ### English full
 
-Desk Setup Switcher is a free, open-source macOS menu bar app for people who move between desk setups. Save available values from nine setting kinds—main display, resolution, output device/volume/mute, input device/volume, key repeat speed, and repeat delay—into a local profile, edit them, then review every planned change before explicitly applying it. There are no per-setting inclusion switches or editable refresh-rate setting; resolution keeps the current refresh rate or is skipped. Keyboard brightness, pointer speed, natural scrolling, standard-function-key behavior, Network, and other legacy fields remain dormant compatibility data. Profiles and redacted diagnostics stay on the Mac: there is no account, cloud sync, telemetry, analytics, automatic switching, or in-app updater. Capture queries Display, Audio, and Input and does not request Location or Input Monitoring permission. Repeat values use experimental undocumented preference keys. No live Keyboard mutation is hardware verified. The initial public beta targets Apple Silicon with a macOS 14 deployment target, pending the exact-candidate Sonoma lifecycle gate. Capability claims follow the support matrix; physical Intel support is not claimed.
+Desk Setup Switcher is a free, open-source macOS menu bar app for people who move between desk setups. Save available values from seven setting kinds—output device/volume/mute, input device/volume, key repeat speed, and repeat delay—into a local profile, edit them, then review every planned change before explicitly applying it. There are no per-setting inclusion switches. Display settings, keyboard brightness, pointer speed, natural scrolling, standard-function-key behavior, Network, and other legacy fields remain dormant compatibility data. Profiles and redacted diagnostics stay on the Mac: there is no account, cloud sync, telemetry, analytics, automatic switching, or in-app updater. Capture queries Audio and Input and does not request Location or Input Monitoring permission. Repeat values use experimental undocumented preference keys. No live Keyboard mutation is hardware verified. The initial public beta targets Apple Silicon with a macOS 14 deployment target, pending the exact-candidate Sonoma lifecycle gate. Capability claims follow the support matrix; physical Intel support is not claimed.
 
 ### 한국어 짧은 소개
 
-Display·Sound·Keyboard의 아홉 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 저장하고, 편집한 뒤, 모든 변경을 검토하고 적용하세요. Desk Setup Switcher는 프로필을 자동으로 전환하지 않는 로컬 전용 오픈소스 macOS 메뉴 막대 앱입니다.
+Sound·Keyboard의 일곱 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 저장하고, 편집한 뒤, 모든 변경을 검토하고 적용하세요. Desk Setup Switcher는 프로필을 자동으로 전환하지 않는 로컬 전용 오픈소스 macOS 메뉴 막대 앱입니다.
 
 ### 한국어 전체 소개
 
-Desk Setup Switcher는 여러 책상 환경을 오가는 사용자를 위한 무료 오픈소스 macOS 메뉴 막대 앱입니다. 주 디스플레이, 해상도, 출력 기기·음량·음소거, 입력 기기·음량, 키 반복 속도, 반복 지연 시간의 아홉 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 Capture하고, Edit한 뒤, 예정된 변경을 모두 Review하고 명시적으로 Apply합니다. 설정별 포함 스위치와 편집 가능한 재생률 설정은 없으며, 해상도는 현재 재생률을 유지할 수 없으면 적용에서 제외됩니다. 키보드 밝기, 포인터 속도, 자연스러운 스크롤, 표준 기능 키 동작, Network와 다른 과거 필드는 비활성 호환 데이터로 남습니다. Capture는 Display, Audio, Input만 조회하고 위치 또는 입력 모니터링 권한을 요청하지 않습니다. 반복 값은 문서화되지 않은 환경설정 키를 사용하므로 실험적입니다. 실제 키보드 변경은 하드웨어에서 검증하지 않았습니다. 프로필과 민감 정보를 제거한 진단은 Mac 안에만 남으며 계정, 클라우드 동기화, 텔레메트리, 분석, 자동 전환, 앱 내 업데이트가 없습니다. 초기 public beta는 macOS 14 배포 타깃의 Apple Silicon을 대상으로 하며 정확한 후보의 Sonoma 수명주기 검증이 먼저 필요합니다. 기능 주장은 지원표를 따르며 실제 Intel 지원은 주장하지 않습니다.
+Desk Setup Switcher는 여러 책상 환경을 오가는 사용자를 위한 무료 오픈소스 macOS 메뉴 막대 앱입니다. 출력 기기·음량·음소거, 입력 기기·음량, 키 반복 속도, 반복 지연 시간의 일곱 가지 설정 종류에서 사용할 수 있는 값을 로컬 프로필로 Capture하고, Edit한 뒤, 예정된 변경을 모두 Review하고 명시적으로 Apply합니다. 설정별 포함 스위치는 없습니다. 디스플레이 설정, 키보드 밝기, 포인터 속도, 자연스러운 스크롤, 표준 기능 키 동작, Network와 다른 과거 필드는 비활성 호환 데이터로 남습니다. Capture는 Audio와 Input만 조회하고 위치 또는 입력 모니터링 권한을 요청하지 않습니다. 반복 값은 문서화되지 않은 환경설정 키를 사용하므로 실험적입니다. 실제 키보드 변경은 하드웨어에서 검증하지 않았습니다. 프로필과 민감 정보를 제거한 진단은 Mac 안에만 남으며 계정, 클라우드 동기화, 텔레메트리, 분석, 자동 전환, 앱 내 업데이트가 없습니다. 초기 public beta는 macOS 14 배포 타깃의 Apple Silicon을 대상으로 하며 정확한 후보의 Sonoma 수명주기 검증이 먼저 필요합니다. 기능 주장은 지원표를 따르며 실제 Intel 지원은 주장하지 않습니다.
 
 ## Pre-release holding copy
 
@@ -149,10 +149,10 @@ Body:
 >
 > **Capture → Edit → Review & Apply**
 >
-> - Capture available values from nine Display, Sound, and Keyboard setting kinds without changing the Mac or requesting Location or Input Monitoring permission: main display, resolution, output device/volume/mute, input device/volume, key repeat speed, and repeat delay.
+> - Capture available values from seven Sound and Keyboard setting kinds without changing the Mac or requesting Location or Input Monitoring permission: output device/volume/mute, input device/volume, key repeat speed, and repeat delay.
 > - Edit the available saved values; missing values remain absent, without per-setting inclusion switches.
 > - Review operations and omissions before an explicit Apply.
-> - Use protected confirmation and itemized rollback results for high-risk changes.
+> - Reject stale plans before execution and show itemized apply and rollback results.
 > - Keep profiles and redacted diagnostics local—no account, cloud, telemetry, analytics, automatic switching, or updater.
 >
 > **Initial support:** Apple Silicon, macOS 14 Sonoma or later. Intel is not currently supported.
@@ -164,11 +164,11 @@ Body:
 Insert exactly one capability line from the final support matrix:
 
 - If physical apply and independent rollback evidence exists: describe only the exact hardware/OS/capability combinations that passed.
-- If it does not exist: `Display, Sound, and Keyboard apply/rollback paths remain mock verified rather than hardware-mutation verified; use the beta within the published support-matrix boundary. Keyboard repeat values use experimental undocumented preference keys. Keyboard brightness, pointer, scrolling, function-key, Network, and other legacy fields remain dormant and never reach the current Capture or Apply path.`
+- If it does not exist: `Sound and Keyboard apply/rollback paths remain mock verified rather than hardware-mutation verified; use the beta within the published support-matrix boundary. Keyboard repeat values use experimental undocumented preference keys. Display, keyboard brightness, pointer, scrolling, function-key, Network, and other legacy fields remain dormant and never reach the current Capture or Apply path.`
 
 Suggested Korean summary beneath the English notes:
 
-> Desk Setup Switcher `v0.1.0` public beta는 Display·Sound·Keyboard의 아홉 가지 설정 종류(주 디스플레이, 해상도, 출력 기기·음량·음소거, 입력 기기·음량, 키 반복 속도, 반복 지연 시간)에서 사용할 수 있는 값을 Capture하고 Edit한 뒤, 모든 변경을 Review하고 명시적으로 Apply하는 로컬 전용 macOS 메뉴 막대 앱입니다. 반복 값은 실험적입니다. 키보드 밝기와 다른 과거 필드는 비활성 호환 데이터로만 보존하며 캡처하거나 적용하지 않습니다. 실제 키보드 변경은 검증하지 않았습니다. 초기 지원 환경은 Apple Silicon 기반 macOS 14 이상입니다. 계정·클라우드·텔레메트리·자동 전환은 없으며 Intel 실기 지원은 주장하지 않습니다. Assets의 Developer ID 미서명·미공증 DMG와 공개된 SHA-256을 확인한 뒤 안내된 일회성 **그래도 열기** 절차를 따르세요.
+> Desk Setup Switcher `v0.1.0` public beta는 Sound·Keyboard의 일곱 가지 설정 종류(출력 기기·음량·음소거, 입력 기기·음량, 키 반복 속도, 반복 지연 시간)에서 사용할 수 있는 값을 Capture하고 Edit한 뒤, 모든 변경을 Review하고 명시적으로 Apply하는 로컬 전용 macOS 메뉴 막대 앱입니다. 반복 값은 실험적입니다. 디스플레이 설정, 키보드 밝기와 다른 과거 필드는 비활성 호환 데이터로만 보존하며 캡처하거나 적용하지 않습니다. 실제 키보드 변경은 검증하지 않았습니다. 초기 지원 환경은 Apple Silicon 기반 macOS 14 이상입니다. 계정·클라우드·텔레메트리·자동 전환은 없으며 Intel 실기 지원은 주장하지 않습니다. Assets의 Developer ID 미서명·미공증 DMG와 공개된 SHA-256을 확인한 뒤 안내된 일회성 **그래도 열기** 절차를 따르세요.
 
 ### English developer-community post
 
@@ -180,7 +180,7 @@ Body:
 
 > Desk Setup Switcher `v0.1.0` public beta is available for Apple Silicon Macs on macOS 14+. It is a Swift/SwiftUI/AppKit menu-bar app with a deliberately small flow: Capture → Edit → Review & Apply.
 >
-> The safety boundary is the interesting part: adapters follow snapshot → validate → plan → apply → verify → rollback, previews do not mutate, high-risk work has protected confirmation, and results are itemized. Profiles and redacted diagnostics stay local; there is no account, cloud, telemetry, analytics, automatic switching, private API, UI automation, or updater.
+> The safety boundary is the interesting part: adapters follow snapshot → validate → plan → apply → verify → rollback, previews do not mutate, stale plans fail closed, and results are itemized. Profiles and redacted diagnostics stay local; there is no account, cloud, telemetry, analytics, automatic switching, private API, UI automation, or updater.
 >
 > Source and architecture: https://github.com/GGULBAE/desk-setup-switcher
 >
@@ -200,7 +200,7 @@ Before posting, replace “is available” with the holding copy if the release 
 
 > Desk Setup Switcher `v0.1.0` public beta를 공개합니다. Apple Silicon 기반 macOS 14 이상에서 현재 설정을 **Capture → Edit → Review & Apply** 흐름으로 저장하고 명시적으로 적용하는 Swift/SwiftUI/AppKit 메뉴 막대 앱입니다.
 >
-> preview에서는 설정을 바꾸지 않고, adapter는 snapshot → validate → plan → apply → verify → rollback 계약을 따릅니다. 위험도가 높은 변경은 보호 확인을 거치며 결과는 항목별로 보여줍니다. 프로필과 민감 정보를 제거한 진단은 Mac 안에만 남고 계정, 클라우드, 텔레메트리, 분석, 자동 전환, private API, UI automation, 앱 내 updater가 없습니다.
+> preview에서는 설정을 바꾸지 않고, adapter는 snapshot → validate → plan → apply → verify → rollback 계약을 따릅니다. 오래된 계획은 변경 전에 중단하며 결과는 항목별로 보여줍니다. 프로필과 민감 정보를 제거한 진단은 Mac 안에만 남고 계정, 클라우드, 텔레메트리, 분석, 자동 전환, private API, UI automation, 앱 내 updater가 없습니다.
 >
 > 소스·구조: https://github.com/GGULBAE/desk-setup-switcher
 >
@@ -246,7 +246,7 @@ show the pre-release copy above.
 - [ ] Three external Apple Silicon reports use browser-downloaded protected workflow artifacts and the identical final DMG SHA-256/final-DMG provenance attestation.
 - [ ] At least one of those reports passes the full exact-candidate lifecycle on macOS 14 Sonoma before any launch copy states macOS 14 support.
 - [ ] A public read-only query and maintainer decision show zero unresolved P0/P1 issues, and the security responder records only a yes/no no-confidential-blocker sign-off.
-- [ ] The final support matrix states the exact evidence for all nine current Display/Sound/Keyboard setting kinds and preserves the explicit mock-only Keyboard limitation; brightness, pointer, scrolling, function-key, Network, and other legacy fields remain clearly dormant.
+- [ ] The final support matrix states the exact evidence for all seven current Sound/Keyboard setting kinds and preserves the explicit mock-only Keyboard limitation; Display, brightness, pointer, scrolling, function-key, Network, and other legacy fields remain clearly dormant.
 - [ ] The canonical [GitHub Releases page](https://github.com/GGULBAE/desk-setup-switcher/releases) contains only the approved versioned unsigned DMG, matching checksum, and curated English/Korean notes.
 - [ ] The Release body is self-contained: it links no branch-lifecycle document and permits only the tag-pinned distribution procedure plus the exact public-support and private-advisory action routes.
 - [ ] The GitHub Pages holding-site origin, `/desk-setup-switcher` base path, and branch-source configuration remain the exact separately approved values. The static builder rejects any other origin/base-path pair and any release state other than `holding` with a null release URL.

@@ -839,6 +839,9 @@ private final class NativePopoverFactory: TraySurfaceFactory {
       backing: .buffered,
       defer: false
     )
+    // The factory owns this window under ARC; close must not release it a
+    // second time when XCTest drains the native presentation autorelease pool.
+    anchorWindow.isReleasedWhenClosed = false
     anchorWindow.contentView = statusItem.anchor
     anchorWindow.orderFront(nil)
   }

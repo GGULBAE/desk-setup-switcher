@@ -10,6 +10,10 @@ There is no supported public download yet. Until the exact `v0.1.0` release
 gate below passes and a maintainer publishes its GitHub Release, local builds
 and ordinary CI artifacts remain development evidence only.
 
+## User-requested development DMG delivery — 2026-11-13
+
+The maintainer requested reinstalling and distributing the current DMG, clarifying the existing file-delivery model. Version `0.0.9` may be delivered as a clearly labeled **development prerelease** with only its DMG and checksum from the exact successful CI commit. This is not a supported public-beta promotion, does not assert a Sonoma lifecycle result, and does not change the holding state or the required supported `v0.1.0` gate below. Automated checks, asset verification, and read-back remain required for this delivery. Never replace existing public assets or move an existing tag.
+
 ## What “unsigned” means here
 
 The project calls the public package **unsigned** because it has no Developer ID

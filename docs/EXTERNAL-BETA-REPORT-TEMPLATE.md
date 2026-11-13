@@ -204,7 +204,7 @@ Use synthetic profile names and values. Do not choose Apply or mutate display, a
 | Final installed copy | Finder copy from mounted final DMG to the same exact path; eject before launch; installed identity matches final manifest | `<not recorded>` | [ ] |
 | Clean first launch | Only `/Applications/Desk Setup Switcher.app` is launched; menu-bar-only app appears normally | `<not recorded>` | [ ] |
 | Login default | Launch at login is off | `<not recorded>` | [ ] |
-| Three-step explanation | Capture → Edit → Review is understandable; the localized Beta text-and-shield status explicitly says Apply/rollback are not hardware-verified and says to check System Settings afterward; at reduced height or large text, scroll through the plan until Cancel/Apply are reachable, then stop without activating Apply | `<not recorded>` | [ ] |
+| Three-step explanation | Capture → Edit → Review is understandable; planned changes use a balanced two-column layout at standard width and retain one-column overflow access at reduced height or large text; confirm Cancel/Apply remain reachable, then stop without activating Apply | `<not recorded>` | [ ] |
 | Upgrade | Exact protected `v0.0.9` build 1, obtained and verified as recorded above, upgrades to exact `v0.1.0` build 2 without losing schema-1 profiles, settings, selection, backups, or consent state | `<not recorded>` | [ ] |
 | Schema migration | Synthetic schema 0 migrates to schema 1 without system-setting mutation | `<not recorded>` | [ ] |
 | Backup recovery | With app closed, synthetic primary corruption recovers last-known-good and quarantines safely | `<not recorded>` | [ ] |

@@ -24,12 +24,11 @@ export const metadata: Metadata = {
     template: "%s · Desk Setup Switcher",
   },
   description:
-    "A local-only open-source macOS menu-bar app for saving, reviewing, and explicitly applying display, sound, and keyboard profiles.",
+    "A local-only open-source macOS menu-bar app for saving, reviewing, and explicitly applying sound and keyboard profiles.",
   applicationName: "Desk Setup Switcher",
   keywords: [
     "macOS",
     "menu bar app",
-    "display profiles",
     "sound profiles",
     "keyboard profiles",
     "open source",

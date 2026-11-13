@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Profile capture summary builder")
 struct ProfileCaptureSummaryBuilderTests {
-  @Test("hidden Wi-Fi permission evidence does not degrade visible capture")
+  @Test("retired display values and hidden Wi-Fi evidence do not degrade visible capture")
   func hiddenPermissionEvidenceIsDormant() {
     let display = DisplayTargetSettings(
       identity: DisplayIdentity(isBuiltIn: true),
@@ -24,6 +24,7 @@ struct ProfileCaptureSummaryBuilderTests {
     )
     let settings = ProfileSettings(
       display: .init(value: .init(displays: [display])),
+      audio: .init(value: .init(outputMuted: .init(value: false))),
       network: .init(
         value: .init(
           wifiPower: .init(value: true),
@@ -46,14 +47,62 @@ struct ProfileCaptureSummaryBuilderTests {
     )
 
     #expect(summary.status == .complete)
+    #expect(!summary.items.contains { $0.group == .display })
     #expect(!summary.items.contains { $0.group == .network })
-    #expect(summary.applicableCount == 2)
+    #expect(summary.applicableCount == 1)
     #expect(!summary.items.contains { $0.key.contains("colorProfile") })
     #expect(summary.excludedCount == 0)
     #expect(summary.unreadableCount == 0)
     #expect(summary.permissionRequiredCount == 0)
     #expect(summary.unsupportedCount == 0)
     #expect(!summary.wifiNetworkWasNotCaptured)
+  }
+
+  @Test("capture summary contains exactly the seven current sound and keyboard settings")
+  func allCurrentSettingsAreCapturedWithoutDisplay() {
+    let legacyDisplay = DisplayTargetSettings(
+      identity: DisplayIdentity(productName: "Synthetic legacy panel"),
+      isPrimary: .init(value: true),
+      origin: .init(value: .init(x: 0, y: 0)),
+      mirroring: .init(value: .extended),
+      mode: .init(value: .init(width: 1_920, height: 1_080, refreshRate: 60)),
+      rotationDegrees: .init(value: 0),
+      isActive: .init(value: true)
+    )
+    let settings = ProfileSettings(
+      display: .init(value: .init(displays: [legacyDisplay])),
+      audio: .init(
+        value: .init(
+          defaultInputUID: .init(value: "synthetic-input"),
+          defaultOutputUID: .init(value: "synthetic-output"),
+          inputVolume: .init(value: 0.4),
+          outputVolume: .init(value: 0.6),
+          outputMuted: .init(value: false)
+        )
+      ),
+      input: .init(
+        value: .init(
+          keyRepeatInterval: .init(value: 30),
+          initialKeyRepeatDelay: .init(value: 90)
+        )
+      )
+    )
+
+    let summary = ProfileCaptureSummaryBuilder().summary(settings: settings, evidence: [])
+
+    #expect(summary.status == .complete)
+    #expect(summary.applicableCount == 7)
+    #expect(!summary.items.contains { $0.group == .display })
+    #expect(
+      summary.items.map(\.key) == [
+        "defaultInput",
+        "defaultOutput",
+        "inputVolume",
+        "outputVolume",
+        "outputMute",
+        "KeyRepeat",
+        "InitialKeyRepeat",
+      ])
   }
 
   @Test("snapshot-only values are omitted from the user-facing capture result")

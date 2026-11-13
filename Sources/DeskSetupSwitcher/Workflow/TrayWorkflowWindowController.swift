@@ -398,19 +398,6 @@ enum WorkflowErrorActionPolicy {
 }
 
 enum ApplyPreviewActionCopy {
-  static func hardwareVerificationNotice(languageCode: String? = nil) -> String {
-    localized(
-      "Beta · Apply/rollback not hardware-verified. Check System Settings after applying.",
-      languageCode: languageCode
-    )
-  }
-
-  static func hardwareVerificationAccessibilityLabel(
-    languageCode: String? = nil
-  ) -> String {
-    localized("Beta hardware verification status", languageCode: languageCode)
-  }
-
   static func actionTitle(
     for mode: ApplyMode,
     languageCode: String? = nil
@@ -443,22 +430,6 @@ enum ApplyPreviewActionCopy {
       return appLocalizedRuntime(key, languageCode: languageCode)
     }
     return appLocalizedRuntime(key)
-  }
-}
-
-struct ApplyPreviewHardwareVerificationStatus: Equatable, Sendable {
-  let text: String
-  let systemImage: String
-  let accessibilityLabel: String
-
-  static func localized(languageCode: String? = nil) -> Self {
-    Self(
-      text: ApplyPreviewActionCopy.hardwareVerificationNotice(languageCode: languageCode),
-      systemImage: "exclamationmark.shield",
-      accessibilityLabel: ApplyPreviewActionCopy.hardwareVerificationAccessibilityLabel(
-        languageCode: languageCode
-      )
-    )
   }
 }
 
@@ -500,6 +471,20 @@ enum ApplyPreviewSummaryPolicy {
 
   static func expandsDetailsInitially(canExecute: Bool) -> Bool {
     !canExecute
+  }
+}
+
+enum ApplyPreviewOperationGridPolicy {
+  static let minimumColumnWidth: CGFloat = 250
+  static let spacing: CGFloat = 10
+
+  static func columnCount(
+    for availableWidth: CGFloat,
+    usesAccessibilityText: Bool
+  ) -> Int {
+    guard !usesAccessibilityText else { return 1 }
+    let twoColumnMinimum = minimumColumnWidth * 2 + spacing
+    return availableWidth >= twoColumnMinimum ? 2 : 1
   }
 }
 
@@ -682,7 +667,6 @@ struct ApplyPreviewView: View {
   @State private var expandedTechnicalOperationIDs: Set<UUID> = []
   @State private var showsReviewDetails = false
   let request: PendingApplyRequest
-  let showsHardwareVerificationStatus: Bool
   let initialScrollAnchor: UnitPoint
   let onCancel: () -> Void
   let onConfirm: () -> Void
@@ -693,7 +677,6 @@ struct ApplyPreviewView: View {
     onConfirm: @escaping () -> Void
   ) {
     self.request = request
-    self.showsHardwareVerificationStatus = true
     self.initialScrollAnchor = .top
     self.onCancel = onCancel
     self.onConfirm = onConfirm
@@ -702,13 +685,11 @@ struct ApplyPreviewView: View {
   #if DEBUG
     init(
       request: PendingApplyRequest,
-      showsHardwareVerificationStatus: Bool,
       initialScrollAnchor: UnitPoint = .top,
       onCancel: @escaping () -> Void = {},
       onConfirm: @escaping () -> Void
     ) {
       self.request = request
-      self.showsHardwareVerificationStatus = showsHardwareVerificationStatus
       self.initialScrollAnchor = initialScrollAnchor
       self.onCancel = onCancel
       self.onConfirm = onConfirm
@@ -724,10 +705,12 @@ struct ApplyPreviewView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 14) {
           previewHeader
-          hardwareVerificationNotice
           previewSummary
 
-          reviewSection(ApplyPreviewReviewOrderPolicy.primarySection)
+          reviewSection(
+            ApplyPreviewReviewOrderPolicy.primarySection,
+            availableWidth: viewport.size.width
+          )
           secondaryReviewDetails
           applyNotices
 
@@ -788,7 +771,10 @@ struct ApplyPreviewView: View {
   }
 
   @ViewBuilder
-  private func reviewSection(_ section: ApplyPreviewReviewSection) -> some View {
+  private func reviewSection(
+    _ section: ApplyPreviewReviewSection,
+    availableWidth: CGFloat = 0
+  ) -> some View {
     switch section {
     case .plannedChanges:
       previewSection(
@@ -799,8 +785,14 @@ struct ApplyPreviewView: View {
           Text(appLocalized("No setting needs to change."))
             .foregroundStyle(.secondary)
         } else {
-          ForEach(request.preparation.operations) { operation in
-            operationRow(operation)
+          LazyVGrid(
+            columns: plannedOperationColumns(for: availableWidth),
+            alignment: .leading,
+            spacing: ApplyPreviewOperationGridPolicy.spacing
+          ) {
+            ForEach(request.preparation.operations) { operation in
+              operationRow(operation)
+            }
           }
         }
       }
@@ -880,21 +872,6 @@ struct ApplyPreviewView: View {
     .font(.title2.bold())
     .accessibilityAddTraits(.isHeader)
     .accessibilityFocused($isHeadingAccessibilityFocused)
-  }
-
-  @ViewBuilder
-  private var hardwareVerificationNotice: some View {
-    if showsHardwareVerificationStatus {
-      let status = ApplyPreviewHardwareVerificationStatus.localized()
-      Label(status.text, systemImage: status.systemImage)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityElement(children: .ignore)
-        .accessibilityIdentifier("apply-preview-beta-hardware-status")
-        .accessibilityLabel(status.accessibilityLabel)
-        .accessibilityValue(status.text)
-    }
   }
 
   @ViewBuilder
@@ -1082,6 +1059,21 @@ struct ApplyPreviewView: View {
     case .rejections:
       request.preparation.rejectionReasons.isEmpty
     }
+  }
+
+  private func plannedOperationColumns(for availableWidth: CGFloat) -> [GridItem] {
+    let count = ApplyPreviewOperationGridPolicy.columnCount(
+      for: availableWidth,
+      usesAccessibilityText: dynamicTypeSize.isAccessibilitySize
+    )
+    return Array(
+      repeating: GridItem(
+        .flexible(minimum: 0),
+        spacing: ApplyPreviewOperationGridPolicy.spacing,
+        alignment: .top
+      ),
+      count: count
+    )
   }
 
   @ViewBuilder

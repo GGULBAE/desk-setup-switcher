@@ -2,7 +2,7 @@
 
 [한국어](USER-GUIDE.ko.md) · [Guide index](README.md)
 
-Desk Setup Switcher saves selected display, sound, and keyboard settings as local profiles. Nothing is applied automatically. The normal flow is **Capture → Edit → Review & Apply**.
+Desk Setup Switcher saves selected sound and keyboard settings as local profiles. Nothing is applied automatically. The normal flow is **Capture → Edit → Review & Apply**.
 
 ## Before you install
 
@@ -36,7 +36,7 @@ Registration is requested only when you turn the switch on or choose **Retry Reg
 ## One-minute workflow
 
 1. **Capture:** Open the menu-bar item and choose **Capture Current Settings**. Capture reads the Mac and creates a new reviewable profile; it does not apply a change.
-2. **Edit:** Choose **Edit** on the tray card, name the profile, work through **Display**, **Sound**, and **Keyboard**, then save.
+2. **Edit:** Choose **Edit** on the tray card, name the profile, review **Output**, **Input**, and **Keyboard**, then save.
 3. **Review & Apply:** Choose **Apply** on the tray card. Check every change and omission. Nothing changes until you explicitly choose **Apply Profile** or **Apply Available Settings** in the preview.
 
 There is no timer, condition, or background rule that applies a profile automatically.
@@ -45,15 +45,16 @@ There is no timer, condition, or background rule that applies a profile automati
 
 Open the menu-bar item and choose **Capture Current Settings**. On an empty first run, this is the single main action in the body. When profiles already exist, Capture is in the header.
 
-Capture stores only the nine current settings when readable and applicable: main display, resolutions, output device/volume/mute, input device/volume, key repeat speed, and repeat delay. It does not capture network or keyboard-brightness settings and does not require Location or Input Monitoring access. Older imported values outside this scope remain stored with inclusion off for compatibility and may appear in exported JSON.
+Capture stores only the seven current settings when readable and applicable: output device/volume/mute, input device/volume, key repeat speed, and repeat delay. It does not capture display, network, or keyboard-brightness settings and does not require Location or Input Monitoring access. Older imported values outside this scope remain stored with inclusion off for compatibility and may appear in exported JSON.
 
 ## 2. Edit
 
 Choose **Edit** on a tray profile to open **Settings → Profiles**. The trash icon on the same row opens inline deletion confirmation directly; Cancel/Escape leaves the profile unchanged.
 
 - Give the profile a recognizable name and icon.
-- Scroll through **Display**, **Sound**, and **Keyboard** together on one page; there is no internal side rail or segmented section selector.
-- **Display** has only **Main display** and per-display **Resolution**. **Sound** has **Output** and **Input** sections for devices and volume, plus the Output mute value. **Keyboard** has exactly **Key repeat speed** and **Repeat delay**, shown as discrete **Slow → Fast** and **Long → Short** sliders instead of raw numbers. The speed slider covers enabled steps only; macOS's separate repeat **Off** state is not yet captured or applied and the slowest step is not labeled Off. There is no Advanced or Network section and no per-setting inclusion switch. A new Capture includes readable current repeat values; explicitly changing a Keyboard field opts it in. Missing values are never invented. Keyboard brightness, pointer speed, natural scrolling, standard-function-key behavior, old mirroring, color, and network values remain dormant and are never applied. Resolution keeps the current refresh rate or is skipped when that combination is unavailable.
+- Scroll through **Output**, **Input**, and **Keyboard** together on one page; there is no internal side rail or segmented section selector.
+- **Sound Output**, **Sound Input**, and **Keyboard** each have an On/Off switch. Off keeps the saved values and leaves that section unchanged during Apply. On selects the section’s populated settings; use the checkboxes to exclude individual fields. Recapture keeps your choices.
+- Output and Input show device and volume controls, with mute on Output. **Keyboard** has exactly **Key repeat speed** and **Repeat delay**, shown as discrete **Slow → Fast** and **Long → Short** sliders instead of raw numbers. The speed slider covers enabled steps only; macOS's separate repeat **Off** state is not yet captured or applied and the slowest step is not labeled Off. There is no Display, Advanced, or Network section. Only checked fields in enabled sections are applied. A new Capture includes readable current repeat values; explicitly changing a Keyboard field opts it in. Missing values are never invented. Legacy display values, keyboard brightness, pointer speed, natural scrolling, standard-function-key behavior, old color, and network values remain dormant and are never applied.
 - Key repeat speed and repeat delay are experimental because their macOS preference keys are undocumented.
 - If a value is invalid, Save scrolls to the owning section before focusing it.
 - The editor contains profile settings only. Itemized application results remain available after Apply.
@@ -71,9 +72,9 @@ Each tray card shows **Apply / Edit / trash** on one line. Apply opens a state-a
 - **Partial:** some executable settings exist but other items will be omitted, blocked, unsupported, or unavailable.
 - A matched or unavailable profile keeps Apply disabled. The status text and symbol remain, but passive explanation sentences leave a blank line; hover the disabled button for its reason.
 
-The review is read-only. Start with the summary counts, then scan each compact current → target row. **Review details** groups omissions, validation issues, and rejected items; open it before applying an available-items plan. A blocking plan opens those details automatically.
+The review is read-only. Start with the summary counts, then scan each compact current → target card. Standard-width previews place the cards in two columns; narrow windows and accessibility text use one column. **Review details** groups omissions, validation issues, and rejected items; open it before applying an available-items plan. A blocking plan opens those details automatically.
 
-The top of Apply Preview carries a **Beta** text-and-shield status: Apply and rollback are not hardware-verified, so check System Settings after applying. Temporary display/network guidance and a refreshed-plan warning remain visible when relevant. Review content and decision actions form one scroll sequence; at reduced height or large text, scroll through the plan before the buttons become reachable. Escape cancels, while Return alone does not apply.
+A refreshed-plan warning remains visible when relevant. Review content and decision actions form one scroll sequence, but the standard two-change state fits without scrolling; reduced height, large text, or longer plans may require scrolling before the buttons become reachable. Escape cancels, while Return alone does not apply. Hardware verification limits remain documented in the support matrix instead of being repeated inside the preview.
 
 - **Apply Profile** starts a complete plan.
 - **Apply Available Settings** applies only the listed executable items. Use it only when every omission is expected.
@@ -82,13 +83,7 @@ The top of Apply Preview carries a **Beta** text-and-shield status: Apply and ro
 
 After execution, inspect the itemized result. An item can be succeeded, failed, skipped, unsupported, rolled back, rollback failed, or not verified. A success label requires read-back; if read-back is unavailable or the change still appears necessary, the item is **not verified**.
 
-### Protected changes and rollback
-
-High-risk display and network changes remain temporary while a 15-second safety window is open.
-
-- Choose **Keep Changes** only when the Mac is usable and the result matches the review.
-- Choose **Revert Now** if the display, network, or result is unexpected.
-- Closing the safety window, quitting the app, or allowing the timer to expire requests restoration of the previous configuration.
+### Rollback
 
 On a fatal failure, the transaction engine attempts supported completed steps in reverse order. Rollback is capability-specific and can itself fail; it is not a substitute for checking the itemized result and the current macOS settings. If a protected change or rollback behaves unsafely, restore the original value in macOS System Settings when possible and follow the current [SECURITY.md](../../SECURITY.md) instructions. Private vulnerability reporting is currently disabled; request a private channel without putting sensitive details in the initial contact or a public issue.
 
@@ -98,7 +93,7 @@ Desk Setup Switcher is local-only. It has no account, cloud sync, app-owned serv
 
 | Access | Why it may appear | If declined |
 | --- | --- | --- |
-| Location | Not needed for the current Display/Sound/Keyboard Capture flow | Capture is available regardless of Location status |
+| Location | Not needed for the current Sound/Keyboard Capture flow | Capture is available regardless of Location status |
 | Microphone | Not used; choosing an audio input device does not record audio | No microphone permission should be needed |
 
 Profiles and diagnostics stay under `~/Library/Application Support/Desk Setup Switcher/`. Imports are read from, and exports are written to, locations you select. The app does not store Wi-Fi passwords in profiles or logs; saved-network credentials remain managed by macOS.
@@ -143,7 +138,7 @@ Use [SUPPORT.md](../../SUPPORT.md) for public support and bug-report routes. For
 | Symptom | What to do |
 | --- | --- |
 | The app opened but no window appeared | Look for the menu-bar icon. The app is menu-bar-only by design. |
-| Network settings are missing | Expected: profiles capture and apply only the nine Display/Sound/Keyboard setting kinds. |
+| Display or network settings are missing | Expected: profiles capture and apply only the seven Sound/Keyboard setting kinds. Legacy values are preserved with inclusion off. |
 | Keyboard brightness is missing | Expected: keyboard brightness is legacy profile data only and is never captured, edited, or applied. |
 | A profile is Partial or Unavailable | Choose **Edit**, inspect warning rows, reconnect the required device/service, or exclude an unavailable setting. If **Apply** is enabled, inspect the preview and proceed only when every omission is intentional. |
 | Review shows no operation | The profile already matches the current readable state, or no included setting can be safely applied. Nothing needs to run. |

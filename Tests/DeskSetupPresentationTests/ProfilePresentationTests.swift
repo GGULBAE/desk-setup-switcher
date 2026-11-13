@@ -8,7 +8,7 @@ struct ProfilePresentationTests {
   @Test("group summaries include only applicable groups in stable presentation order")
   func groupSummaryOrderAndInclusion() {
     #expect(
-      ProfilePresentationBuilder.groupOrder == [.display, .audio, .network, .input]
+      ProfilePresentationBuilder.groupOrder == [.audio, .input]
     )
     let profile = DeskProfile(
       name: "Synthetic desk",
@@ -52,12 +52,13 @@ struct ProfilePresentationTests {
 
     let summaries = ProfilePresentationBuilder().summaries(for: profile)
 
-    #expect(summaries.map(\.group) == [.display, .audio, .input])
+    #expect(summaries.map(\.group) == [.audio, .input])
+    #expect(!summaries.contains { $0.group == .display })
     #expect(!summaries.contains { $0.group == .network })
   }
 
-  @Test("display summary favors product details and hides identifiers")
-  func displaySummaryHidesIdentifiers() {
+  @Test("legacy display values do not produce a current profile summary")
+  func legacyDisplaySummaryIsDormant() {
     let identifier = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
     let target = displayTarget(
       identity: .init(
@@ -75,13 +76,7 @@ struct ProfilePresentationTests {
 
     let summary = ProfilePresentationBuilder().summary(for: .display, in: settings)
 
-    #expect(summary?.items.map(\.kind) == [.display, .displayMode, .displayRole])
-    #expect(summary?.summaryText.contains("Synthetic Studio Panel") == true)
-    #expect(summary?.summaryText.contains("2560 × 1440") == true)
-    #expect(summary?.summaryText.contains(identifier.uuidString) == false)
-    #expect(summary?.summaryText.contains("303") == false)
-    #expect(summary?.technicalDetails.contains { $0.value == identifier.uuidString } == true)
-    #expect(summary?.technicalDetails.contains { $0.value == "303" } == true)
+    #expect(summary == nil)
   }
 
   @Test("audio summary uses names when available and roles otherwise")
@@ -120,8 +115,8 @@ struct ProfilePresentationTests {
     )
   }
 
-  @Test("multiple unnamed displays receive stable role-based names")
-  func multipleUnnamedDisplaysHaveStableNames() {
+  @Test("multiple legacy displays remain absent from current summaries")
+  func multipleLegacyDisplaysRemainDormant() {
     let first = displayTarget(
       identity: .init(
         uuid: UUID(uuidString: "10000000-0000-0000-0000-000000000001"),
@@ -140,10 +135,7 @@ struct ProfilePresentationTests {
 
     let summary = ProfilePresentationBuilder().summary(for: .display, in: settings)
 
-    #expect(summary?.items[0].label == "Display 1")
-    #expect(summary?.items[0].value.primaryText == "External display 1")
-    let secondDisplay = summary?.items.first { $0.label == "Display 2" }
-    #expect(secondDisplay?.value.primaryText == "External display 2")
+    #expect(summary == nil)
   }
 
   @Test("included unavailable values remain visible without invented values")

@@ -1,6 +1,6 @@
 # System adapter contract
 
-Last updated: 2026-09-15
+Last updated: 2026-09-17
 
 Desk Setup Switcher's adapters are an internal safety boundary between pure planning and concrete macOS frameworks. The contract is for repository contributors. It is **not** a public SDK, binary compatibility promise, dynamically loadable plug-in API, or invitation for third-party modules to mutate a user's Mac.
 
@@ -62,7 +62,7 @@ The current concrete setting adapters are:
 | Input | [`InputPreferencesAdapter`](../Sources/DeskSetupSystem/Input/InputPreferencesAdapter.swift) | Current Keyboard boundary: experimental undocumented CFPreferences keys for repeat speed/delay |
 | Explicit absence | [`UnsupportedSystemSettingsAdapter`](../Sources/DeskSetupSystem/UnsupportedSystemSettingsAdapter.swift) | Typed unsupported capability, omissions, and diagnostics instead of a crash |
 
-Construction of [`LiveAdapterFactory`](../Sources/DeskSetupSystem/Snapshot/LiveAdapterFactory.swift) performs no discovery and changes no setting. The default registry includes Display, Audio, and Input so read-only Capture can collect the nine current settings. Current capability and evidence claims belong in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md), not in an adapter type name.
+Construction of [`LiveAdapterFactory`](../Sources/DeskSetupSystem/Snapshot/LiveAdapterFactory.swift) performs no discovery and changes no setting. The default registry includes only Audio and Input so read-only Capture can collect the seven current settings. The concrete Display adapter remains an injectable low-level compatibility component, but normal Capture and Apply never register it. Current capability and evidence claims belong in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md), not in an adapter type name.
 
 The current Input projection contains exactly key repeat speed and repeat delay. Existing inclusion flags for those two leaves are preserved during upgrade: a previously dormant excluded value does not silently become actionable. A new Capture includes each readable current value, and an explicit editor change opts that value in. Keyboard brightness, pointer speed, natural scrolling, and standard-function-key behavior remain normalized dormant in both normal and available-items planning.
 
