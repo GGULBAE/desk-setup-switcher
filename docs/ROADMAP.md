@@ -1,5 +1,9 @@
 # Roadmap
 
+## Keyboard repeat runtime application — 2026-11-14
+
+Correct the preference-only success path: Capture reads active HID repeat timing, and explicit Apply writes and confirms both CFPreferences and public IOHID runtime parameters. Session-only rollback records preserve the saved key (including its absence) independently from the exact active nanoseconds. A saved value already matching the profile cannot suppress a required runtime change. Unreadable runtime values and legacy snapshots without paired rollback evidence omit that control without guessing. Native Off and retired fields remain excluded. See the [implementation and verification record](KEYBOARD-RUNTIME-APPLY-2026-11-14.md). The full non-live `make verify`, 387 Swift tests, native popover, opt-in read-only Input snapshot, and `git diff --check` passed; no live mutation, reinstall, or release is claimed.
+
 ## Selective settings and consistent editor — 2026-11-13
 
 The editor has three equal-width sections: **Sound Output**, **Sound Input**, and **Keyboard**. Each section has an On/Off switch; each field has an inclusion checkbox. Off sections retain their values and collapse to a short “not applied” state. Turning a section on selects its populated values, after which individual fields may be excluded. A single vertical editor scroll area, aligned field/control columns, a large-text vertical fallback, and a readable native segmented Settings picker replace uneven control widths and clipped tab names. Display remains excluded from Capture, editing, and Apply.

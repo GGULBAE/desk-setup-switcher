@@ -256,9 +256,22 @@ private final class InputInvariantFixture: @unchecked Sendable {
 private final class MockInvariantInputPreferencesAPI: InputPreferencesAPI, @unchecked Sendable {
   private let lock = NSLock()
   private var values: [InputPreferenceKey: InputPreferenceValue]
+  private var runtimeValues: [InputPreferenceKey: Int64]
 
   init(values: [InputPreferenceKey: InputPreferenceValue]) {
     self.values = values
+    self.runtimeValues = values.compactMapValues {
+      guard case .number(let number) = $0 else { return nil }
+      return KeyboardRepeatTiming.nanoseconds(for: number)
+    }
+  }
+
+  func runtimeNanoseconds(for key: InputPreferenceKey) -> Int64? {
+    lock.withLock { runtimeValues[key] }
+  }
+
+  func setRuntimeNanoseconds(_ value: Int64, for key: InputPreferenceKey) throws {
+    lock.withLock { runtimeValues[key] = value }
   }
 
   func value(for key: InputPreferenceKey) -> InputPreferenceValue? {

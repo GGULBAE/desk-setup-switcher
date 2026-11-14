@@ -6,7 +6,8 @@ import Foundation
 
 private struct InputPreferenceWrite: Codable, Sendable {
   let key: InputPreferenceKey
-  let value: InputPreferenceValue
+  let persistedValue: Double?
+  let runtimeNanoseconds: Int64
 }
 
 public struct InputPreferencesAdapter: SystemSettingsAdapter {
@@ -34,14 +35,20 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
   }
 
   public func snapshot() async throws -> AdapterSnapshot {
+    let repeatRuntime = api.runtimeNanoseconds(for: .keyRepeatInterval)
+    let delayRuntime = api.runtimeNanoseconds(for: .initialKeyRepeatDelay)
     let repeatInterval = validSnapshotNumber(
-      api.value(for: .keyRepeatInterval)?.numberValue,
+      repeatRuntime.map(KeyboardRepeatTiming.ticks),
       range: 1...120
     )
     let initialDelay = validSnapshotNumber(
-      api.value(for: .initialKeyRepeatDelay)?.numberValue,
+      delayRuntime.map(KeyboardRepeatTiming.ticks),
       range: 1...300
     )
+    let repeatRollback = rollbackState(
+      for: .keyRepeatInterval, runtime: repeatRuntime, range: 1...120)
+    let delayRollback = rollbackState(
+      for: .initialKeyRepeatDelay, runtime: delayRuntime, range: 1...300)
     let settings = InputProfileSettings(
       keyRepeatInterval: .init(isIncluded: repeatInterval != nil, value: repeatInterval),
       initialKeyRepeatDelay: .init(isIncluded: initialDelay != nil, value: initialDelay)
@@ -67,12 +74,14 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
         .init(
           kind: .keyRepeatInterval,
           currentValue: repeatInterval,
-          canApply: repeatInterval != nil
+          canApply: repeatRollback != nil,
+          preferenceRollback: repeatRollback
         ),
         .init(
           kind: .initialKeyRepeatDelay,
           currentValue: initialDelay,
-          canApply: initialDelay != nil
+          canApply: delayRollback != nil,
+          preferenceRollback: delayRollback
         ),
       ]
     )
@@ -175,13 +184,16 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
       guard isValidPreferenceWrite(write, for: operation) else {
         throw CocoaError(.coderReadCorrupt)
       }
-      try api.setValue(write.value, for: write.key)
-      guard api.value(for: write.key) == write.value else {
+      guard let persistedValue = write.persistedValue,
+        write.runtimeNanoseconds == KeyboardRepeatTiming.nanoseconds(for: persistedValue)
+      else { throw CocoaError(.coderReadCorrupt) }
+      try api.setValue(write.persistedValue.map(InputPreferenceValue.number), for: write.key)
+      try api.setRuntimeNanoseconds(write.runtimeNanoseconds, for: write.key)
+      guard confirms(write) else {
         return OperationResult(
           operationID: operation.id,
           status: .failed,
-          message:
-            "macOS accepted the experimental input preference write, but read-back did not confirm the requested value."
+          message: "The saved and active keyboard repeat values could not both be confirmed."
         )
       }
       return OperationResult(
@@ -207,12 +219,21 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
       guard isValidPreferenceWrite(write, for: operation) else {
         throw CocoaError(.coderReadCorrupt)
       }
-      try api.setValue(write.value, for: write.key)
-      guard api.value(for: write.key) == write.value else {
+      // Attempt both restores even when one layer fails. The engine reports
+      // rollbackFailed if either layer cannot be positively confirmed.
+      var restored = true
+      do {
+        try api.setValue(write.persistedValue.map(InputPreferenceValue.number), for: write.key)
+      } catch { restored = false }
+      do {
+        try api.setRuntimeNanoseconds(write.runtimeNanoseconds, for: write.key)
+      } catch { restored = false }
+      guard restored && confirms(write) else {
         return OperationResult(
           operationID: operation.id,
           status: .rollbackFailed,
-          message: "The previous input preference could not be confirmed after rollback."
+          message:
+            "The previous saved and active keyboard repeat values could not both be restored."
         )
       }
       return OperationResult(
@@ -230,7 +251,7 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
   }
 
   public func diagnostics() async -> [DiagnosticEntry] {
-    [
+    var entries = [
       DiagnosticEntry(
         severity: .info,
         component: "adapter.input",
@@ -238,6 +259,21 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
         message: "Key-repeat preferences are isolated behind an experimental capability."
       )
     ]
+    for key in [InputPreferenceKey.keyRepeatInterval, .initialKeyRepeatDelay] {
+      guard let saved = api.value(for: key)?.numberValue,
+        saved.isFinite, (1...300).contains(saved),
+        let active = api.runtimeNanoseconds(for: key),
+        active != KeyboardRepeatTiming.nanoseconds(for: saved)
+      else { continue }
+      entries.append(
+        DiagnosticEntry(
+          severity: .warning,
+          component: "adapter.input",
+          code: "input.runtime-mismatch",
+          message: "The saved keyboard repeat preference differs from the active setting."
+        ))
+    }
+    return entries
   }
 
   private func snapshotItem(
@@ -299,17 +335,25 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
       return
     }
     guard value.isFinite, range.contains(value) else { return }
-    guard controlIsAvailable(kind, in: snapshot), let current else {
+    guard let control = availableControl(kind, in: snapshot),
+      let previous = control.preferenceRollback,
+      let current
+    else {
       omissions.append(unavailableOmission(key: key.rawValue, snapshot: snapshot))
       return
     }
-    if abs(current - value) < 0.000_001 { return }
+    if previous.persistedValue == value,
+      previous.runtimeNanoseconds == KeyboardRepeatTiming.nanoseconds(for: value)
+    {
+      return
+    }
     operations.append(
       try preferenceOperation(
         key: key,
         label: label,
-        desired: .number(value),
-        previous: .number(current)
+        desired: value,
+        current: current,
+        previous: previous
       )
     )
   }
@@ -317,8 +361,9 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
   private func preferenceOperation(
     key: InputPreferenceKey,
     label: String,
-    desired: InputPreferenceValue,
-    previous: InputPreferenceValue
+    desired: Double,
+    current: Double,
+    previous: KeyboardPreferenceRollback
   ) throws -> PlannedOperation {
     PlannedOperation(
       group: group,
@@ -327,19 +372,20 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
       risk: .moderate,
       isFatalOnFailure: false,
       preview: OperationPreview(
-        previousValue: previewValue(previous),
-        desiredValue: previewValue(desired)
+        previousValue: previewValue(.number(current)),
+        desiredValue: previewValue(.number(desired))
       ),
-      payload: try encoder.encode(InputPreferenceWrite(key: key, value: desired)),
-      rollbackPayload: try encoder.encode(InputPreferenceWrite(key: key, value: previous))
+      payload: try encoder.encode(
+        InputPreferenceWrite(
+          key: key, persistedValue: desired,
+          runtimeNanoseconds: KeyboardRepeatTiming.nanoseconds(for: desired)
+        )),
+      rollbackPayload: try encoder.encode(
+        InputPreferenceWrite(
+          key: key, persistedValue: previous.persistedValue,
+          runtimeNanoseconds: previous.runtimeNanoseconds
+        ))
     )
-  }
-
-  private func controlIsAvailable(
-    _ kind: KeyboardControlKind,
-    in snapshot: AdapterSnapshot
-  ) -> Bool {
-    availableControl(kind, in: snapshot) != nil
   }
 
   private func availableControl(
@@ -360,15 +406,39 @@ public struct InputPreferencesAdapter: SystemSettingsAdapter {
     for operation: PlannedOperation
   ) -> Bool {
     guard operation.group == group, operation.key == write.key.rawValue else { return false }
-    guard case .number(let value) = write.value, value.isFinite else { return false }
+    let range: ClosedRange<Double>
     switch write.key {
-    case .keyRepeatInterval:
-      return (1...120).contains(value)
-    case .initialKeyRepeatDelay:
-      return (1...300).contains(value)
-    case .pointerSpeed, .naturalScrolling, .standardFunctionKeys:
+    case .keyRepeatInterval: range = 1...120
+    case .initialKeyRepeatDelay: range = 1...300
+    case .pointerSpeed, .naturalScrolling, .standardFunctionKeys: return false
+    }
+    guard range.contains(KeyboardRepeatTiming.ticks(for: write.runtimeNanoseconds)) else {
       return false
     }
+    guard let value = write.persistedValue else { return true }
+    return value.isFinite && range.contains(value)
+  }
+
+  private func rollbackState(
+    for key: InputPreferenceKey,
+    runtime: Int64?,
+    range: ClosedRange<Double>
+  ) -> KeyboardPreferenceRollback? {
+    guard let runtime,
+      range.contains(KeyboardRepeatTiming.ticks(for: runtime))
+    else { return nil }
+    let persisted: Double?
+    switch api.value(for: key) {
+    case nil: persisted = nil
+    case .number(let value) where value.isFinite && range.contains(value): persisted = value
+    default: return nil
+    }
+    return KeyboardPreferenceRollback(persistedValue: persisted, runtimeNanoseconds: runtime)
+  }
+
+  private func confirms(_ write: InputPreferenceWrite) -> Bool {
+    api.value(for: write.key) == write.persistedValue.map(InputPreferenceValue.number)
+      && api.runtimeNanoseconds(for: write.key) == write.runtimeNanoseconds
   }
 
   private func unavailableOmission(

@@ -178,6 +178,18 @@ public enum KeyboardControlKind: String, Codable, CaseIterable, Hashable, Sendab
   case keyboardBrightness
 }
 
+/// Exact session-only state for restoring both layers of an experimental
+/// repeat preference. A nil persisted value means the global key was absent.
+public struct KeyboardPreferenceRollback: Codable, Hashable, Sendable {
+  public var persistedValue: Double?
+  public var runtimeNanoseconds: Int64
+
+  public init(persistedValue: Double?, runtimeNanoseconds: Int64) {
+    self.persistedValue = persistedValue
+    self.runtimeNanoseconds = runtimeNanoseconds
+  }
+}
+
 /// Session-only evidence that a keyboard control was read and has a concrete
 /// adapter path for a later preflight/apply/rollback transaction.
 public struct KeyboardControlCatalogEntry: Codable, Hashable, Sendable {
@@ -187,17 +199,21 @@ public struct KeyboardControlCatalogEntry: Codable, Hashable, Sendable {
   /// Half of the device's normalized logical step. A missing value preserves
   /// compatibility with older session snapshots and requires exact equality.
   public var quantizationTolerance: Double?
+  /// Optional for older snapshots, which cannot authorize a paired repeat write.
+  public var preferenceRollback: KeyboardPreferenceRollback?
 
   public init(
     kind: KeyboardControlKind,
     currentValue: Double?,
     canApply: Bool,
-    quantizationTolerance: Double? = nil
+    quantizationTolerance: Double? = nil,
+    preferenceRollback: KeyboardPreferenceRollback? = nil
   ) {
     self.kind = kind
     self.currentValue = currentValue
     self.canApply = canApply
     self.quantizationTolerance = quantizationTolerance
+    self.preferenceRollback = preferenceRollback
   }
 }
 

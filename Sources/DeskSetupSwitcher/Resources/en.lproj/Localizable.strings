@@ -1333,3 +1333,9 @@
 "Only enabled settings change when applying this profile." = "Only enabled settings change when applying this profile.";
 
 "No settings available on this Mac." = "No settings available on this Mac.";
+
+/* Saved and active keyboard repeat verification */
+"The saved and active keyboard repeat values could not both be confirmed." = "The saved and active keyboard repeat values could not both be confirmed.";
+"The previous saved and active keyboard repeat values could not both be restored." = "The previous saved and active keyboard repeat values could not both be restored.";
+"The saved keyboard repeat preference differs from the active setting." = "The saved keyboard repeat preference differs from the active setting.";
+"The active keyboard repeat setting could not be accessed." = "The active keyboard repeat setting could not be accessed.";

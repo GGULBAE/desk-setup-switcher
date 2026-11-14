@@ -1,5 +1,14 @@
 # Completion criteria and evidence ledger
 
+## Keyboard repeat runtime correction — 2026-11-14
+
+- [ ] Committed evidence records active HID Capture, paired saved/runtime Apply and read-back, exact independent rollback including absent preferences, and unchanged inclusion/retired-field policies.
+- [ ] Deterministic regressions cover saved/active drift, ignored/denied runtime writes, partial transaction recovery, failed rollback, unavailable runtime access, old snapshots, fractional values, and invalid/Off states.
+- [ ] The primary non-live `make verify` and `git diff --check` pass for the final source. README, support matrix, roadmap, and adapter documentation agree.
+- [ ] A separately authorized hardware procedure with an explicit environment flag, interactive confirmation, preflight state for both layers, and an exact rollback path establishes actual typing behavior. No such mutation was run for this correction.
+
+See the [implementation and verification record](KEYBOARD-RUNTIME-APPLY-2026-11-14.md). Full non-live `make verify`, 387 Swift tests, native popover, the opt-in read-only Input snapshot, and `git diff --check` passed locally. Items remain unchecked pending committed evidence; mock tests do not establish hardware behavior.
+
 ## Selective settings and consistent editor — 2026-11-13
 
 Current working-tree milestone: full non-live `make verify` and `git diff --check` passed on 2026-11-13. The native popover fixture now retains its ARC-owned window through close, avoiding a teardown over-release. The universal 0.0.9 local DMG passed checksum, bundle/resource, and architecture checks. Items remain unchecked until committed evidence exists. No hardware mutation, installation, publication, or push was performed.
