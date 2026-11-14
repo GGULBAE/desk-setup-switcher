@@ -9,6 +9,8 @@
 
 See the [implementation and verification record](KEYBOARD-RUNTIME-APPLY-2026-11-14.md). Full non-live `make verify`, 387 Swift tests, native popover, the opt-in read-only Input snapshot, and `git diff --check` passed locally. Items remain unchecked pending committed evidence; mock tests do not establish hardware behavior.
 
+Installation observation, not a hardware gate: the user-requested corrected universal build was reinstalled and fully launched on 2026-11-14 with both profile files and app-owned preferences byte-identical. The signed installed executable matches the DMG digest in the [fix record](KEYBOARD-RUNTIME-APPLY-2026-11-14.md#user-requested-local-reinstall--2026-11-14). No live Apply or rollback was run; those items remain unchecked.
+
 ## Selective settings and consistent editor — 2026-11-13
 
 Current working-tree milestone: full non-live `make verify` and `git diff --check` passed on 2026-11-13. The native popover fixture now retains its ARC-owned window through close, avoiding a teardown over-release. The universal 0.0.9 local DMG passed checksum, bundle/resource, and architecture checks. Items remain unchecked until committed evidence exists. No hardware mutation, installation, publication, or push was performed.
