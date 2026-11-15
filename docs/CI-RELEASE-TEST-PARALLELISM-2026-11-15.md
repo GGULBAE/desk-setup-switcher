@@ -14,7 +14,7 @@ The remaining shell checks run after the whole pool succeeds. Their source, orde
 
 ## Existing coverage inventory
 
-All 15 suite files below are byte-identical to the baseline. Their expected summaries are the preceding successful CI results, not new hardware evidence.
+All existing assertions below are preserved. Fourteen suite files are byte-identical to the baseline; the collector shell suite changes only issuance/expiry timestamps in three fresh-observation fixtures, as explained below. Their expected summaries are the preceding successful CI results, not new hardware evidence.
 
 | Existing suite | Tests, when separately reported | Assertions |
 |---|---:|---:|
@@ -43,7 +43,15 @@ The baseline has 4,820 assertions across these release-tooling checks. The coord
 
 The focused 41 coordinator assertions passed during implementation. Full local verification, unchanged-summary comparison, and exact-source CI timing are recorded at the corresponding completion checkpoints. A performance claim requires the successful CI result; elapsed time can vary with runner load. The baseline and candidate use the same macOS workflow and no restored build/test cache.
 
-Local `make verify` subsequently completed with exit code 0: 387 Swift tests, the isolated native popover, all 15 original release-suite summaries, 271 parent shell assertions, warnings-as-errors Debug/Release builds for both architectures, static analysis, and DMG/bundle/resource checks passed. The 15 suite summaries matched the baseline individually; the original 4,820 release assertions plus 42 new coordinator/parent assertions total 4,862. Public-history audit and remote CI remain the subsequent pre-push/completion checkpoints for this source snapshot.
+Local `make verify` for the initial `af8bfaa` implementation completed with exit code 0: 387 Swift tests, the isolated native popover, all 15 original release-suite summaries, 271 parent shell assertions, warnings-as-errors Debug/Release builds for both architectures, static analysis, and DMG/bundle/resource checks passed. The 15 suite summaries matched the baseline individually; the original 4,820 release assertions plus 42 new coordinator/parent assertions total 4,862. Its public-history audit passed before push.
+
+### Longer-running fixture correction
+
+The [first parallel CI](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/43702220145) correctly failed the remote-controls collector's final pre-publication success fixture. That suite took over 15 minutes under concurrent CI load. Three fixture blocks updated `observedAt` but retained the token's earlier `issuedAt`, violating the unchanged production 900-second issuance-capture limit. The same suite passed locally, where it completed sooner.
+
+The three fresh observations now mint consistent synthetic issuance/expiry metadata, following the existing final-pre-tag fixture pattern. All assertions and production validation remain intact, including intentional backdated-observation and reused-source rejection. A frozen-clock reproduction executes the actual three fixture blocks at 30 minutes after initial issuance: all three old blocks fail and all three corrected blocks pass the same production manual-evidence validator. The unchanged collector-v2 tests also retain the exact 900-second acceptance and 901-second rejection boundaries. Full local verification and exact-source CI are repeated for this correction; failed CI is never used as performance-completion evidence.
+
+The corrected fixture subsequently passed the complete local `make verify` with the same 387 Swift tests, all 15 original suite summaries, 4,862 release-tooling assertions, native popover, universal builds, analysis, and package/resource checks. Its follow-up commit is gated by diff checks, the complete new-commit public-history audit before push, and a successful exact-source CI before reporting elapsed-time improvement.
 
 ## Boundaries
 

@@ -2,7 +2,7 @@
 
 ## CI release-test concurrency — 2026-11-15
 
-Tooling-only completion evidence must retain the existing 15 suite files byte-for-byte, preserve the original 270 shell assertions, and run every app/build/package/public-history/site gate. The process coordinator adds 41 real-process regression assertions plus one parent exit-status assertion. Compare the exact-source CI timing and all existing suite summaries against the baseline before reporting improvement. Full `make verify` and final diff checks gate the implementation commit; the public-history audit gates its public push. Physical-device gates remain separate. See the [coverage and timing record](CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
+Tooling-only completion evidence must retain every existing check in the 15 suites, preserve the original 270 shell assertions, and run every app/build/package/public-history/site gate. Fourteen suite files remain byte-identical; the collector suite changes only three fresh-observation fixtures to keep issued/expiry timestamps consistent with the new observation. The 900-second production limit and every negative assertion remain unchanged. The process coordinator adds 41 real-process regression assertions plus one parent exit-status assertion. Compare the exact-source CI timing and all existing suite summaries against the baseline before reporting improvement. Full `make verify` and final diff checks gate the implementation commit; the public-history audit gates its public push. Physical-device gates remain separate. See the [coverage and timing record](CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
 
 ## Keyboard repeat development release source — 2026-11-15
 

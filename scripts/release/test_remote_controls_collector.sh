@@ -1299,9 +1299,14 @@ ruby -rjson -rtime -e '
   %w[release-candidate-admin-bypass.json release-publication-admin-token-scope.json].each_with_index do |name, index|
     path = File.join(directory, name)
     value = JSON.parse(File.binread(path), allow_nan: false, create_additions: false)
+    observed = Time.now.utc
     value["phase"] = "pre-publication"
-    value["observedAt"] = Time.now.utc.iso8601
+    value["observedAt"] = observed.iso8601
     value["sourceArtifactSHA256"] = (index + 5).to_s * 64
+    if value["token"]
+      value["token"]["issuedAt"] = (observed - 60).iso8601
+      value["token"]["expiresAt"] = (observed + 29 * 86_400).iso8601
+    end
     value["subject"] = {
       "peeledCommit" => release_commit,
       "releaseId" => 12_345,
@@ -1384,8 +1389,13 @@ ruby -rjson -rtime -e '
   %w[release-candidate-admin-bypass.json release-publication-admin-token-scope.json].each_with_index do |name, index|
     path = File.join(directory, name)
     value = JSON.parse(File.binread(path), allow_nan: false, create_additions: false)
-    value["observedAt"] = Time.now.utc.iso8601
+    observed = Time.now.utc
+    value["observedAt"] = observed.iso8601
     value["sourceArtifactSHA256"] = (index + 3).to_s * 64
+    if value["token"]
+      value["token"]["issuedAt"] = (observed - 60).iso8601
+      value["token"]["expiresAt"] = (observed + 29 * 86_400).iso8601
+    end
     File.binwrite(path, JSON.generate(value) + "\n")
   end
 ' "$test_repository/docs/evidence/releases/v0.1.0"
@@ -1408,8 +1418,13 @@ ruby -rjson -rtime -e '
   %w[release-candidate-admin-bypass.json release-publication-admin-token-scope.json].each_with_index do |name, index|
     path = File.join(directory, name)
     value = JSON.parse(File.binread(path), allow_nan: false, create_additions: false)
-    value["observedAt"] = Time.now.utc.iso8601
+    observed = Time.now.utc
+    value["observedAt"] = observed.iso8601
     value["sourceArtifactSHA256"] = (index + 5).to_s * 64
+    if value["token"]
+      value["token"]["issuedAt"] = (observed - 60).iso8601
+      value["token"]["expiresAt"] = (observed + 29 * 86_400).iso8601
+    end
     File.binwrite(path, JSON.generate(value) + "\n")
   end
 ' "$test_repository/docs/evidence/releases/v0.1.0"

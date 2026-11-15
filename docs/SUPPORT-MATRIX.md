@@ -2,7 +2,7 @@
 
 ## CI scheduling verification — 2026-11-15
 
-Release-tooling checks use bounded process concurrency with the same 15 policy/mock suite bodies and original shell assertions. The runner has separate deterministic real-process coverage for serial/parallel outcomes, worker bounds, output and temporary-directory isolation, and interruption cleanup. This is development-tool verification; physical-device and supported-runtime evidence remains in its existing separate gates. See the [coverage and timing record](CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
+Release-tooling checks use bounded process concurrency with the same 15 policy/mock suites and original assertions. Fourteen suite files remain byte-identical; the collector suite only refreshes issuance/expiry timestamps alongside its three fresh manual observations. Production freshness limits, timeouts, and negative cases retain their existing checks. The runner has separate deterministic real-process coverage for serial/parallel outcomes, worker bounds, output and temporary-directory isolation, and interruption cleanup. This is development-tool verification; physical-device and supported-runtime evidence remains in its existing separate gates. See the [coverage and timing record](CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
 
 ## Keyboard repeat user report and v0.0.10 — 2026-11-15
 

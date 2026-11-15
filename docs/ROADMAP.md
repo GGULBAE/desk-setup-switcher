@@ -2,7 +2,7 @@
 
 ## Preserve coverage while shortening CI — 2026-11-15
 
-Run the existing 15 independent release policy/mock suites through a bounded process pool (default four, configurable 1–8). Keep every suite body, the original 270 shell assertions, all app/build/package/public-history/site gates, and native popover isolation. Add real-process regressions for bounded overlap, serial/parallel failure equivalence, isolated output/TMPDIR, spawn failure, signals, and child cleanup. Measure the exact-source CI against the preceding roughly 59-minute run. See the [scope, coverage inventory, and timing record](CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
+Run the existing 15 independent release policy/mock suites through a bounded process pool (default four, configurable 1–8). Keep every assertion, the original 270 shell checks, all app/build/package/public-history/site gates, and native popover isolation. Fourteen suite files remain byte-identical; three fresh-observation fixtures in the collector suite now refresh issuance/expiry metadata consistently so longer execution cannot invalidate otherwise fresh test data. The production 900-second issuance-capture limit remains unchanged. Add real-process regressions for bounded overlap, serial/parallel failure equivalence, isolated output/TMPDIR, spawn failure, signals, and child cleanup. Measure the exact-source CI against the preceding roughly 59-minute run. See the [scope, coverage inventory, and timing record](CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
 
 ## Keyboard repeat development update — 2026-11-15
 
