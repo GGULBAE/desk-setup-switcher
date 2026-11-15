@@ -1,5 +1,9 @@
 # Roadmap
 
+## Preserve coverage while shortening CI — 2026-11-15
+
+Run the existing 15 independent release policy/mock suites through a bounded process pool (default four, configurable 1–8). Keep every suite body, the original 270 shell assertions, all app/build/package/public-history/site gates, and native popover isolation. Add real-process regressions for bounded overlap, serial/parallel failure equivalence, isolated output/TMPDIR, spawn failure, signals, and child cleanup. Measure the exact-source CI against the preceding roughly 59-minute run. See the [scope, coverage inventory, and timing record](CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
+
 ## Keyboard repeat development update — 2026-11-15
 
 Deliver the existing runtime-repeat correction as **v0.0.10/build 2**, a new development prerelease containing only the universal DMG and checksum. The app behavior is the same correction installed locally from `bc994f8`; no new settings or automatic switching are added. The user reported that keyboard changes now work after reinstalling the corrected build. Record that as a manual user report, distinct from agent-run hardware tests, rollback, and the supported Sonoma lifecycle. Existing v0.0.9 assets and tags remain intact. Exact-source CI, privacy/history and public-copy audits, package inspection, and public download comparison gate delivery. See [release notes](releases/0.0.10.md).

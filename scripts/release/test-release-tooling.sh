@@ -65,52 +65,34 @@ cleanup() {
 }
 trap cleanup EXIT
 
-ruby "$RELEASE_SCRIPTS_DIR/test_release_policy.rb"
+ruby "$RELEASE_SCRIPTS_DIR/test_run_test_suites.rb"
 pass
 
-ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_policy.rb"
-pass
-
-ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_policy_v2.rb"
-pass
-
-ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_policy_v3.rb"
-pass
-
-ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector_v2.rb"
-pass
-
-ruby "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector_v3.rb"
-pass
-
-ruby "$RELEASE_SCRIPTS_DIR/test_publication_policy.rb"
-pass
-
-ruby "$RELEASE_SCRIPTS_DIR/test_external_beta_policy.rb"
-pass
-
-"$RELEASE_SCRIPTS_DIR/test_verify_app_bundle.sh"
-pass
-
-"$RELEASE_SCRIPTS_DIR/test_remote_controls_collector.sh"
-pass
-
-"$RELEASE_SCRIPTS_DIR/test_release_evidence_history.sh"
-pass
-
-"$RELEASE_SCRIPTS_DIR/test_prepare_draft_release.sh"
-pass
-
-"$RELEASE_SCRIPTS_DIR/test_restore_candidate_artifact.sh"
-pass
-
-# The publisher suite owns its isolated v0.1.0/build-2 target fixture because
-# this checkout remains the deliberate v0.0.9/build-1 predecessor.
-"$RELEASE_SCRIPTS_DIR/test_publish_approved_release.sh"
-pass
-
-"$RELEASE_SCRIPTS_DIR/test_legacy_workflow_containment.sh"
-pass
+# Preserve every original suite and its exit-status assertion. Each worker has
+# a separate process, log, TMPDIR and existing mock fixtures. Set
+# DESK_SETUP_RELEASE_TEST_JOBS=1 for the same complete inventory in serial.
+release_test_suites=(
+    "$RELEASE_SCRIPTS_DIR/test_release_policy.rb"
+    "$RELEASE_SCRIPTS_DIR/test_remote_controls_policy.rb"
+    "$RELEASE_SCRIPTS_DIR/test_remote_controls_policy_v2.rb"
+    "$RELEASE_SCRIPTS_DIR/test_remote_controls_policy_v3.rb"
+    "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector_v2.rb"
+    "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector_v3.rb"
+    "$RELEASE_SCRIPTS_DIR/test_publication_policy.rb"
+    "$RELEASE_SCRIPTS_DIR/test_external_beta_policy.rb"
+    "$RELEASE_SCRIPTS_DIR/test_verify_app_bundle.sh"
+    "$RELEASE_SCRIPTS_DIR/test_remote_controls_collector.sh"
+    "$RELEASE_SCRIPTS_DIR/test_release_evidence_history.sh"
+    "$RELEASE_SCRIPTS_DIR/test_prepare_draft_release.sh"
+    "$RELEASE_SCRIPTS_DIR/test_restore_candidate_artifact.sh"
+    # The publisher keeps its own isolated v0.1.0/build-2 target fixture.
+    "$RELEASE_SCRIPTS_DIR/test_publish_approved_release.sh"
+    "$RELEASE_SCRIPTS_DIR/test_legacy_workflow_containment.sh"
+)
+ruby "$RELEASE_SCRIPTS_DIR/run_test_suites.rb" "${release_test_suites[@]}"
+for suite in "${release_test_suites[@]}"; do
+    pass
+done
 
 ruby "$RELEASE_SCRIPTS_DIR/release_policy.rb" verify-entitlements \
     --plist Config/ReleaseEntitlements.plist

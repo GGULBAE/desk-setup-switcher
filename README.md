@@ -126,6 +126,8 @@ make verify
 
 `make verify` is the canonical non-live gate. It does not mutate display, audio, network, mouse, or keyboard settings. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow.
 
+Release-tooling verification runs the same 15 policy/mock suites in up to four isolated processes. Every original suite, assertion, and failure gate is retained; each worker has its own log and temporary directory. Use `DESK_SETUP_RELEASE_TEST_JOBS=1 make test-release-tooling` for serial reproduction, or set an integer from 1 to 8 to bound concurrency. Runner regressions also check failure propagation and interruption cleanup. See the [CI timing and coverage record](docs/CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
+
 ## Documentation
 
 - **Use the app:** [English guide](docs/guides/USER-GUIDE.md) · [한국어 가이드](docs/guides/USER-GUIDE.ko.md) · [Support](SUPPORT.md)

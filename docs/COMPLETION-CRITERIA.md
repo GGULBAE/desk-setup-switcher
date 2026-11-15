@@ -1,5 +1,9 @@
 # Completion criteria and evidence ledger
 
+## CI release-test concurrency — 2026-11-15
+
+Tooling-only completion evidence must retain the existing 15 suite files byte-for-byte, preserve the original 270 shell assertions, and run every app/build/package/public-history/site gate. The process coordinator adds 41 real-process regression assertions plus one parent exit-status assertion. Compare the exact-source CI timing and all existing suite summaries against the baseline before reporting improvement. Full `make verify` and final diff checks gate the implementation commit; the public-history audit gates its public push. Physical-device gates remain separate. See the [coverage and timing record](CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
+
 ## Keyboard repeat development release source — 2026-11-15
 
 Version 0.0.10/build 2 carries the committed runtime-repeat correction and the user's manual report that keyboard changes now work after the local reinstall. This report does not close structured hardware Apply/rollback or Sonoma lifecycle gates. The new development DMG must be built from the exact successful CI source, retain the existing v0.0.9 release, pass public history/privacy and package checks, and be redownloaded with matching checksum before delivery is recorded complete. See [release notes](releases/0.0.10.md).
