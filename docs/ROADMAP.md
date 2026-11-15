@@ -1,5 +1,9 @@
 # Roadmap
 
+## Keyboard repeat development update — 2026-11-15
+
+Deliver the existing runtime-repeat correction as **v0.0.10/build 2**, a new development prerelease containing only the universal DMG and checksum. The app behavior is the same correction installed locally from `bc994f8`; no new settings or automatic switching are added. The user reported that keyboard changes now work after reinstalling the corrected build. Record that as a manual user report, distinct from agent-run hardware tests, rollback, and the supported Sonoma lifecycle. Existing v0.0.9 assets and tags remain intact. Exact-source CI, privacy/history and public-copy audits, package inspection, and public download comparison gate delivery. See [release notes](releases/0.0.10.md).
+
 ## Keyboard repeat runtime application — 2026-11-14
 
 Correct the preference-only success path: Capture reads active HID repeat timing, and explicit Apply writes and confirms both CFPreferences and public IOHID runtime parameters. Session-only rollback records preserve the saved key (including its absence) independently from the exact active nanoseconds. A saved value already matching the profile cannot suppress a required runtime change. Unreadable runtime values and legacy snapshots without paired rollback evidence omit that control without guessing. Native Off and retired fields remain excluded. See the [implementation and verification record](KEYBOARD-RUNTIME-APPLY-2026-11-14.md). The full non-live `make verify`, 387 Swift tests, native popover, opt-in read-only Input snapshot, and `git diff --check` passed; no live mutation or public release is claimed. The subsequent local reinstall is recorded below.

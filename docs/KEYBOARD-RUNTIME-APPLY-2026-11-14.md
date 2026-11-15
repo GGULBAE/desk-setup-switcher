@@ -49,3 +49,10 @@ Post-install verification confirmed exactly one fully launched process at the in
 App-only rollback: request normal termination, preserve the replacement separately, and restore the privately retained original app, then verify its signature before launch. Do not restore profile/preference snapshots merely to roll back the app, because later user edits must be preserved. Detailed local paths and commands are in the private `RESTORE.md`.
 
 This is local installation/startup/data-preservation evidence for the corrected source in `bc994f8`. No app control was invoked after launch: Capture, Apply, permission prompts, login registration changes, and live display/audio/network/mouse/keyboard mutation were not performed. Actual keyboard effect and hardware rollback remain unverified. The public v0.0.9 asset was not replaced and no source was pushed.
+
+
+## User report and development redistribution request — 2026-11-15
+
+The user reported that keyboard changes now work after installing the corrected local build and requested redistribution. This is a manual user report, not an agent-run hardware mutation test; exact paired rollback and supported Sonoma lifecycle verification remain open. Version 0.0.10/build 2 packages the same app behavior as a new development prerelease; the currently installed corrected 0.0.9 development bundle is not replaced again as part of publication.
+
+The exact public-audit approval for `VisibleSettingEndToEndInvariantTests.swift` was refreshed after reviewing its added runtime mock storage. Its existing network values are documentation-range synthetic fixtures, and no host value changed. The approval remains bound to the exact blob, path, and `ip-host` category; modified content and copied paths must continue to fail the existing regressions. This is required release preparation, not a broader scanner exception.

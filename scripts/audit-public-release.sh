@@ -721,6 +721,9 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
     ["2de55c9a917832b0c8118cb91feb254b7400d560", "Tests/DeskSetupCoreTests/ProfileApplicabilityNormalizerTests.swift", "ip-host"],
     ["2035534dd2f1b8c2d2534f527c4cfe055bd57659", "Tests/DeskSetupSwitcherTests/UIAuditSafetyTests.swift", "device-identifier"],
     ["6336d0a6c489393103ab7d5050b6d1731d0f7d58", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
+    # Keyboard runtime mock storage review (2026-11-15): the same synthetic
+    # documentation-range host values; only the injected repeat storage changed.
+    ["a3a5b0454fe50f4e949ca07c52153012c65db254", "Tests/DeskSetupSystemTests/VisibleSettingEndToEndInvariantTests.swift", "ip-host"],
     # Reviewed 2026-11-13 historical/current test blobs: constructed network
     # validation inputs, invalid coordinate boundaries, and mock device labels.
     # The regression-script probes remain bound to exact bytes, path, category.

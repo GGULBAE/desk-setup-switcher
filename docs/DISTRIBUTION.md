@@ -1,6 +1,6 @@
 # Distribution
 
-Last updated: 2026-08-05
+Last updated: 2026-11-15
 
 Desk Setup Switcher uses a cost-free public-beta distribution path. The initial
 release is published from GitHub Releases without the Mac App Store, paid Apple
@@ -12,7 +12,7 @@ and ordinary CI artifacts remain development evidence only.
 
 ## User-requested development DMG delivery — 2026-11-13
 
-The maintainer requested reinstalling and distributing the current DMG, clarifying the existing file-delivery model. Version `0.0.9` may be delivered as a clearly labeled **development prerelease** with only its DMG and checksum from the exact successful CI commit. This is not a supported public-beta promotion, does not assert a Sonoma lifecycle result, and does not change the holding state or the required supported `v0.1.0` gate below. Automated checks, asset verification, and read-back remain required for this delivery. Never replace existing public assets or move an existing tag.
+The maintainer requested reinstalling and distributing the current DMG, clarifying the existing file-delivery model. Versions `0.0.9` and the user-requested `0.0.10` keyboard-fix follow-up (2026-11-15) may be delivered as a clearly labeled **development prerelease** with only its DMG and checksum from the exact successful CI commit. This is not a supported public-beta promotion, does not assert a Sonoma lifecycle result, and does not change the holding state or the required supported `v0.1.0` gate below. Automated checks, asset verification, and read-back remain required for this delivery. Never replace existing public assets or move an existing tag.
 
 ## What “unsigned” means here
 

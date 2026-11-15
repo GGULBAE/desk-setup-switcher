@@ -1,5 +1,9 @@
 # Support matrix
 
+## Keyboard repeat user report and v0.0.10 — 2026-11-15
+
+After the corrected local build was installed, the user reported that keyboard changes worked and requested redistribution. This is one manual user confirmation of the installed correction; no agent-run hardware mutation, structured repeat/rollback matrix, or Sonoma lifecycle evidence is inferred. The repeat controls remain experimental. Version **0.0.10/build 2** packages the same fix as a new universal development prerelease, with exact-source automated CI and byte-verified DMG/checksum delivery. It does not replace existing v0.0.9 assets or promote supported v0.1.0 status. See [release notes](releases/0.0.10.md).
+
 ## Keyboard repeat runtime correction — 2026-11-14
 
 The installed 0.0.9 preference-only check could report success while active repeat timing stayed unchanged. Current-source Capture reads public `IOHIDCopyCFTypeParameter` values for `HIDKeyRepeat` / `HIDInitialKeyRepeat`; explicit Apply uses `IOHIDSetCFTypeParameter` plus CFPreferences, then confirms both layers. Global preference ticks use the experimental 60 Hz mapping to integer nanoseconds. Exact per-layer rollback evidence is session-only; absent saved keys remain absent on restoration. Missing runtime access, invalid/Off values, and old snapshots lacking rollback evidence cannot authorize writes. These controls remain experimental because the global preference keys and mapping are not a stable Apple contract. The full non-live `make verify`, 387 Swift tests, native popover, opt-in read-only Input snapshot, and `git diff --check` passed. Read-only mismatch evidence is distinct from hardware Apply/rollback and perceived typing, which remain unverified. See the [fix record](KEYBOARD-RUNTIME-APPLY-2026-11-14.md).
