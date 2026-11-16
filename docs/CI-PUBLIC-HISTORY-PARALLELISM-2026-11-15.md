@@ -6,7 +6,7 @@ Run the public-history audit alongside app verification while keeping every exis
 
 ## Execution and approval contract
 
-`make verify-ci` calls `scripts/release/verify_ci.rb`, which schedules exactly the original complete `make verify` and `make audit-public-release` commands in two isolated processes. The original app verification script, audit scanner, audit fixtures, and production release/approval policies are unchanged. Every check still runs; neither result is optional or cached as already passed.
+`make verify-ci` calls `scripts/release/verify_ci.rb`, which schedules exactly the original complete `make verify` and `make audit-public-release` commands in two isolated processes. The original app verification script, audit scanning rules, 42 existing audit fixtures, and production release/approval policies are unchanged. A later bounded Git transport correction and four additional transport assertions are recorded below. Every check still runs; neither result is optional or cached as already passed.
 
 Both commands must exit successfully. Source roots must resolve to their own Git checkout, be non-shallow, and match the pinned commits before and after execution. Hosted CI also checks that tracked files remain clean. Missing roots, parent-Git fallback, invalid event/commit inputs, source drift, either command failure, or interruption returns failure and blocks the existing upload step.
 
@@ -34,13 +34,23 @@ The existing parent workflow assertions also retain their count and approval con
 
 The focused 59 CI-gate assertions and unchanged 41 runner assertions passed during implementation. Full local verification, README/link checks, new-commit public audit, and exact-source whole CI are the completion checkpoints. Measurements use the earliest job start through final job completion, excluding queue time, and remain subject to runner load.
 
-## Local completion checkpoint — 2026-11-16
+## Initial local completion checkpoint — 2026-11-16
 
-The final `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer make verify-ci` completed with exit code 0. Both unchanged complete commands passed, followed by the source-anchor check. The log comparison confirmed each original suite's test/assertion summary, all 4,922 release assertions, 387 Swift tests, the locally executed isolated native popover, universal Debug/Release builds, static analysis, and DMG/checksum/bundle/resource verification. The audit retained its 42 fixture assertions and complete history/privacy/asset scan.
+For initial source `4237c9454da5676c0ee0b210d7e1ac317b8b3d2c`, `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer make verify-ci` completed with exit code 0. Both unchanged complete commands passed, followed by the source-anchor check. The log comparison confirmed each original suite's test/assertion summary, all 4,922 release assertions, 387 Swift tests, the locally executed isolated native popover, universal Debug/Release builds, static analysis, and DMG/checksum/bundle/resource verification. The audit retained its 42 fixture assertions and complete history/privacy/asset scan.
 
 `make verify-public-surface` passed its public-copy, release-link, asset, dependency/build, and rendered-site checks. The dependency advisory audit reported zero vulnerabilities. All 42 local Markdown/HTML README references and image alternative text were checked, and the documented combined command and upload condition match the implementation. Final worktree and staged diff checks passed; unrelated tracked and untracked user changes remained unchanged.
 
 The earlier local attempt exposed the parent's old serial-step/path expectations after all child suites and the audit had passed. Those expectations were adapted to the equivalent parallel approval contract described above, preserving their assertion count. The final full run above includes those corrected checks. A subsequent resumed session could not recover the old temporary log, so this complete run was executed again rather than inferred from the interrupted attempt. New-commit public auditing, push, exact-source full CI, and remote timing remain the delivery checkpoints; local timing is not a remote performance claim.
+
+## Hosted timeout and bounded Git transport — 2026-11-16
+
+Initial [CI 43790382387](https://github.com/GGULBAE/desk-setup-switcher/actions/runs/43790382387), source `4237c94`, timed out at the unchanged 60-minute limit. Its public-site job passed in 3m00s. App verification itself passed in 1,983.39 seconds, including all 4,922 release assertions, 387 Swift tests, builds, analysis, and DMG verification. The audit never returned, and package upload remained blocked. This cancelled run is not a successful performance benchmark.
+
+The scanner's two `git cat-file --batch` readers wrote the complete request inventory before reading responses. If the request and response pipes both fill, neither process can advance. Each reader now writes and flushes one object request, validates and drains its complete header/body/separator, then requests the next object. Every object/path/message and every existing validation and rejection remains in the same scan. No scanning rule, reviewed synthetic-blob approval, timeout, publication policy, or workflow approval condition changes.
+
+`test-audit-batch-transport.rb` invokes the actual scanner and real Git through a strict transport guard. It rejects any second request until the previous response is fully consumed, independently of OS pipe capacity or elapsed time. The test first proves that its guard rejects the old write-ahead protocol, then checks scanner success, the full audit/diagnostic boundary, and both multi-object history and message streams. The uncorrected scanner failed this regression; the corrected scanner passed all four assertions. The original 42-assertion audit fixture file remains byte-identical and also passed. `make audit-public-release` adds this regression before the existing complete scan. Full local verification, README/public-surface checks, a new-commit scan, and successful exact-source CI must be repeated for the correction before reporting completion.
+
+The corrected working tree subsequently passed complete `make verify-ci` with exit code 0: all 4,922 release assertions, 387 Swift tests, the local isolated native popover, universal builds, analysis, DMG/bundle/resources, the original 42 audit fixtures, all four new transport assertions, and the complete history/privacy/asset scan. `make verify-public-surface`, all 42 local README references and image alt text, the dependency advisory audit (zero vulnerabilities), and final diff checks passed. New-commit public auditing and exact-source hosted CI remain the final delivery checkpoints.
 
 ## Scope
 

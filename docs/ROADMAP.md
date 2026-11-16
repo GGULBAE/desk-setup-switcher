@@ -4,6 +4,10 @@
 
 Run complete app verification and the full public-history audit concurrently inside the existing macOS app job. Preserve both required job names, all original checks, permissions/triggers/timeouts, PR exact-head full-history auditing, and the artifact upload gate. Pin and recheck both source commits before allowing success; keep the PR audit checkout isolated under `.build`. Add real-process source, failure, interruption, and approval regressions, and compare exact-source full CI with the preceding 38m44s run. See the [implementation and verification record](CI-PUBLIC-HISTORY-PARALLELISM-2026-11-15.md).
 
+The first hosted run timed out while the audit batch pipes waited, after complete app verification passed. Preserve all checks and the 60-minute gate while changing only the two Git batch readers to drain one response per request. Add four deterministic real-Git transport assertions alongside the unchanged 42 audit fixtures, then repeat full verification and exact-source CI.
+
+Corrected full local app/audit verification, README/public-surface checks, and dependency advisory checks passed; exact-source hosted CI is still required before completion.
+
 ## Preserve coverage while shortening CI — 2026-11-15
 
 Run the existing 15 independent release policy/mock suites through a bounded process pool (default four, configurable 1–8). Keep every assertion, the original 270 shell checks, all app/build/package/public-history/site gates, and native popover isolation. Fourteen suite files remain byte-identical; three fresh-observation fixtures in the collector suite now refresh issuance/expiry metadata consistently so longer execution cannot invalidate otherwise fresh test data. The production 900-second issuance-capture limit remains unchanged. Add real-process regressions for bounded overlap, serial/parallel failure equivalence, isolated output/TMPDIR, spawn failure, signals, and child cleanup. Measure the exact-source CI against the preceding roughly 59-minute run. See the [scope, coverage inventory, and timing record](CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).

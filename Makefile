@@ -19,6 +19,7 @@ analyze:
 
 audit-public-release:
 	./scripts/test-audit-public-release.sh
+	ruby ./scripts/test-audit-batch-transport.rb
 	./scripts/audit-public-release.sh
 
 verify-public-assets:

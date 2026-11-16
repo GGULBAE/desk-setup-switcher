@@ -34,6 +34,8 @@ The release-tooling stage inside `make verify` keeps all 15 existing policy/mock
 
 `make verify-ci` is the combined CI gate: it runs the unchanged complete `make verify` and `make audit-public-release` commands concurrently, waits for both results, and rejects missing, shallow, mismatched, or changed source anchors. Hosted CI also requires both tracked worktrees to remain clean. The existing two job names, read-only permissions, triggers, timeouts, approval conditions, and upload inventory remain intact. PRs audit their exact original head from `.build/public-history-audit`, isolated from the merge-source app build and ordinary Markdown traversal. Any failed check, launch failure, source drift, or interruption blocks upload. Local execution uses the current checkout and keeps the audit's existing inspection of tracked worktree/index bytes. See the [source-selection and approval tests](docs/CI-PUBLIC-HISTORY-PARALLELISM-2026-11-15.md).
 
+The audit keeps all 42 existing privacy/asset fixtures and adds four bounded-transport assertions. Its history and message readers drain each Git object response before requesting the next object; scanning rules, exact fixture approvals, and full-history coverage remain unchanged. The transport regression uses the real scanner and Git with a strict one-request protocol, so it does not depend on a particular host pipe capacity or timing threshold.
+
 The read-only live discovery tests require an explicit opt-in and still do not change settings:
 
 ```sh

@@ -1053,9 +1053,11 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
 
   unless paths_by_object.empty?
     Open3.popen3("git", "-C", root, "cat-file", "--batch") do |stdin, stdout, stderr, wait_thread|
-      paths_by_object.each_key { |object| stdin.puts(object) }
-      stdin.close
+      # Drain each response before sending another request. Writing the whole
+      # inventory first can fill both pipes and deadlock on a large history.
+      stdin.sync = true
       paths_by_object.each do |object, paths|
+        stdin.puts(object)
         header = stdout.gets
         abort "Public-release privacy scanner received malformed Git object metadata." unless header
         returned_object, type, size_text = header.chomp.split(" ", 3)
@@ -1072,6 +1074,7 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
           end
         end
       end
+      stdin.close
       error_text = stderr.read
       abort "Public-release privacy scanner could not read Git objects." unless wait_thread.value.success? && error_text.empty?
     end
@@ -1090,9 +1093,9 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
 
   unless message_objects.empty?
     Open3.popen3("git", "-C", root, "cat-file", "--batch") do |stdin, stdout, stderr, wait_thread|
-      message_objects.each_key { |object| stdin.puts(object) }
-      stdin.close
+      stdin.sync = true
       message_objects.each do |object, scope|
+        stdin.puts(object)
         header = stdout.gets
         abort "Public-release privacy scanner received malformed Git message metadata." unless header
         returned_object, type, size_text = header.chomp.split(" ", 3)
@@ -1111,6 +1114,7 @@ if ! ruby -ropen3 -ripaddr -rset -rdigest -e '
           records << [scope, object, finding.category]
         end
       end
+      stdin.close
       error_text = stderr.read
       abort "Public-release privacy scanner could not read Git messages." unless wait_thread.value.success? && error_text.empty?
     end
