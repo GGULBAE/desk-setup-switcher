@@ -88,6 +88,7 @@ release_test_suites=(
     # The publisher keeps its own isolated v0.1.0/build-2 target fixture.
     "$RELEASE_SCRIPTS_DIR/test_publish_approved_release.sh"
     "$RELEASE_SCRIPTS_DIR/test_legacy_workflow_containment.sh"
+    "$RELEASE_SCRIPTS_DIR/test_verify_ci.rb"
 )
 ruby "$RELEASE_SCRIPTS_DIR/run_test_suites.rb" "${release_test_suites[@]}"
 for suite in "${release_test_suites[@]}"; do
@@ -715,9 +716,9 @@ pass
 assert_contains "$ci_workflow" "timeout-minutes: 60"
 assert_contains "$ci_workflow" "Check out exact pull request head for public-history audit"
 assert_contains "$ci_workflow" "ref: \${{ github.event.pull_request.head.sha }}"
-assert_contains "$ci_workflow" "path: public-history-audit"
-assert_contains "$ci_workflow" "Audit public history from the exact pull request head"
-assert_contains "$ci_workflow" "Audit public history from the checked-out commit"
+assert_contains "$ci_workflow" "path: .build/public-history-audit"
+assert_contains "$ci_workflow" "Verify app and public history concurrently"
+assert_contains "$ci_workflow" "PUBLIC_HISTORY_AUDIT_COMMIT:"
 
 ruby -ryaml -e '
   workflow = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: true)
@@ -725,7 +726,6 @@ ruby -ryaml -e '
   abort "CI app timeout differs" unless verify.fetch("timeout-minutes") == 60
   steps = verify.fetch("steps")
   pr_condition = "github.event_name == #{39.chr}pull_request#{39.chr}"
-  non_pr_condition = "github.event_name != #{39.chr}pull_request#{39.chr}"
   audit_checkout = steps.find do |step|
     step["name"] == "Check out exact pull request head for public-history audit"
   end
@@ -738,24 +738,24 @@ ruby -ryaml -e '
   abort "CI PR-head audit checkout boundary differs" unless
     audit_checkout.fetch("with") == {
       "ref" => "${{ github.event.pull_request.head.sha }}",
-      "path" => "public-history-audit",
+      "path" => ".build/public-history-audit",
       "fetch-depth" => 0,
       "persist-credentials" => false
     }
-  pr_audit = steps.find do |step|
-    step["name"] == "Audit public history from the exact pull request head"
+  combined = steps.find do |step|
+    step["name"] == "Verify app and public history concurrently"
   end
-  abort "CI PR-head audit step differs" unless pr_audit &&
-    pr_audit.fetch("if") == pr_condition &&
-    pr_audit.fetch("working-directory") == "public-history-audit" &&
-    pr_audit.fetch("run") == "make audit-public-release"
-  branch_audit = steps.find do |step|
-    step["name"] == "Audit public history from the checked-out commit"
-  end
-  abort "CI branch audit step differs" unless branch_audit &&
-    branch_audit.fetch("if") == non_pr_condition &&
-    !branch_audit.key?("working-directory") &&
-    branch_audit.fetch("run") == "make audit-public-release"
+  abort "CI audit command gate differs" unless combined &&
+    !combined.key?("if") && !combined.key?("continue-on-error") &&
+    !combined.key?("working-directory") && combined.fetch("run") == "make verify-ci"
+  abort "CI PR/branch audit source selection differs" unless combined.fetch("env") == {
+    "PUBLIC_HISTORY_AUDIT_COMMIT" => "${{ github.event.pull_request.head.sha || github.sha }}"
+  }
+  upload = steps.find { |step| step["name"] == "Upload unsigned package" }
+  abort "CI audit/upload order differs" unless upload &&
+    steps.index(audit_checkout) < steps.index(combined) &&
+    steps.index(combined) < steps.index(upload) &&
+    !upload.key?("if") && !upload.key?("continue-on-error")
 ' "$ci_workflow"
 pass
 

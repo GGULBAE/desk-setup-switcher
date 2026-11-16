@@ -3,7 +3,7 @@
 	verify-downloaded-release verify-remote-controls verify-remote-controls-predecessor-pre-tag \
 	verify-remote-controls-final-pre-tag verify-remote-controls-pre-publication \
 	plan-legacy-workflow-containment \
-	apply-legacy-workflow-containment verify clean
+	apply-legacy-workflow-containment verify verify-ci clean
 
 build:
 	./scripts/build.sh
@@ -121,6 +121,9 @@ apply-legacy-workflow-containment:
 
 verify:
 	./scripts/verify.sh
+
+verify-ci:
+	./scripts/release/verify_ci.rb
 
 clean:
 	./scripts/clean.sh

@@ -24,12 +24,15 @@ make verify-public-surface
 make package
 make verify-package
 make verify
+make verify-ci
 make clean
 ```
 
 `make verify` is the required app gate. It runs source-policy and formatting checks, the default unit/mock suite, Swift and universal Xcode Debug/Release builds with warnings as errors, Xcode Analyze, no-Developer-ID DMG packaging, SHA-256 validation, and mounted-image inspection. `make audit-public-release` separately scans the complete Git history and image metadata for high-confidence credential and personal-path patterns, plus commit/tag author, committer, and tagger email metadata, while suppressing matched values; run it from a full, non-shallow checkout before preparing anything public. Changes to `site/`, public media, or their provenance must also run `make verify-public-surface` after installing the lockfile-pinned site dependencies with lifecycle scripts disabled. That public-media gate requires `ffmpeg` and `ffprobe` as development-only inspection tools; CI supplies them through Homebrew `ffmpeg@7`, while the app and deployed site have no Homebrew or FFmpeg runtime dependency.
 
-The release-tooling stage inside `make verify` keeps all 15 existing policy/mock suites and their assertions, running at most four suites concurrently in separate processes with private logs and temporary directories. It waits for every registered suite and fails the gate if any suite exits unsuccessfully, is signalled, or cannot start. `DESK_SETUP_RELEASE_TEST_JOBS=1 make test-release-tooling` runs the full same inventory serially; integers 1–8 bound concurrency. INT/TERM cancels active process groups before temporary cleanup. See the [coverage and timing record](docs/CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
+The release-tooling stage inside `make verify` keeps all 15 existing policy/mock suites and their assertions, adds CI approval-gate regressions, and runs at most four suites concurrently in separate processes with private logs and temporary directories. It waits for every registered suite and fails the gate if any suite exits unsuccessfully, is signalled, or cannot start. `DESK_SETUP_RELEASE_TEST_JOBS=1 make test-release-tooling` runs the full same inventory serially; integers 1–8 bound concurrency. INT/TERM cancels active process groups before temporary cleanup. See the [coverage and timing record](docs/CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
+
+`make verify-ci` is the combined CI gate: it runs the unchanged complete `make verify` and `make audit-public-release` commands concurrently, waits for both results, and rejects missing, shallow, mismatched, or changed source anchors. Hosted CI also requires both tracked worktrees to remain clean. The existing two job names, read-only permissions, triggers, timeouts, approval conditions, and upload inventory remain intact. PRs audit their exact original head from `.build/public-history-audit`, isolated from the merge-source app build and ordinary Markdown traversal. Any failed check, launch failure, source drift, or interruption blocks upload. Local execution uses the current checkout and keeps the audit's existing inspection of tracked worktree/index bytes. See the [source-selection and approval tests](docs/CI-PUBLIC-HISTORY-PARALLELISM-2026-11-15.md).
 
 The read-only live discovery tests require an explicit opt-in and still do not change settings:
 

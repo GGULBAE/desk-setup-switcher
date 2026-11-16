@@ -1,5 +1,9 @@
 # Completion criteria and evidence ledger
 
+## Public-history audit overlap and approval preservation — 2026-11-15
+
+Completion requires all original checks and the two-job approval contract to remain intact, exact PR-head auditing from a separate full-history checkout, both verification results to gate upload, and source-anchor checks before/after execution. Real-process tests cover overlap, app/audit/both failures, source mismatch/drift, shallow or missing Git roots, and interrupted nested process groups. Existing 4,862 release assertions remain, with 60 new CI-gate/parent assertions for 4,922 total. Full local app/audit verification, README/link checks, final diffs, and exact-source full CI must pass before reporting completion or timing improvements. See the [record](CI-PUBLIC-HISTORY-PARALLELISM-2026-11-15.md).
+
 ## CI release-test concurrency — 2026-11-15
 
 Tooling-only completion evidence must retain every existing check in the 15 suites, preserve the original 270 shell assertions, and run every app/build/package/public-history/site gate. Fourteen suite files remain byte-identical; the collector suite changes only three fresh-observation fixtures to keep issued/expiry timestamps consistent with the new observation. The 900-second production limit and every negative assertion remain unchanged. The process coordinator adds 41 real-process regression assertions plus one parent exit-status assertion. Compare the exact-source CI timing and all existing suite summaries against the baseline before reporting improvement. Full `make verify` and final diff checks gate the implementation commit; the public-history audit gates its public push. Physical-device gates remain separate. See the [coverage and timing record](CI-RELEASE-TEST-PARALLELISM-2026-11-15.md).
